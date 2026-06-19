@@ -27,6 +27,7 @@ export function cardNegocio(n: NegocioCard) {
     valor: n.valor != null ? Number(n.valor) : null,
     temperatura: n.temperatura,
     status: n.status,
+    finalidade: n.finalidade,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
     agente: n.agente

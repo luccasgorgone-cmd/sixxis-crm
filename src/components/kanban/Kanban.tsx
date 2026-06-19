@@ -26,6 +26,7 @@ import type {
   AgenteResumo,
   EventoNegocio,
   FiltroDono,
+  Finalidade,
 } from "./tipos";
 
 type Pendente = {
@@ -61,6 +62,10 @@ export function Kanban({
     ehAdmin ? "todos" : "meus",
   );
   const [agenteId, setAgenteId] = useState("");
+  // Finalidade: POS_VENDA ve so pos-venda; VENDEDOR so venda; ADMIN alterna.
+  const [finalidade, setFinalidade] = useState<Finalidade>(
+    papel === "POS_VENDA" ? "POS_VENDA" : "VENDA",
+  );
 
   const [ativo, setAtivo] = useState<Card | null>(null);
   const [pendente, setPendente] = useState<Pendente | null>(null);
@@ -78,6 +83,7 @@ export function Kanban({
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
+    p.set("finalidade", finalidade);
     if (buscaAplicada) p.set("busca", buscaAplicada);
     if (etiquetaId) p.set("etiquetaId", etiquetaId);
     if (temperatura) p.set("temperatura", temperatura);
@@ -86,7 +92,7 @@ export function Kanban({
       if (filtroDono === "todos" && agenteId) p.set("agenteId", agenteId);
     }
     return p.toString();
-  }, [buscaAplicada, etiquetaId, temperatura, ehAdmin, filtroDono, agenteId]);
+  }, [finalidade, buscaAplicada, etiquetaId, temperatura, ehAdmin, filtroDono, agenteId]);
 
   const carregar = useCallback(async () => {
     try {
@@ -258,8 +264,28 @@ export function Kanban({
     !erro &&
     Object.values(colunas).every((c) => c.length === 0);
 
+  const podeAlternar = papel === "ADMIN";
+
   return (
     <div className="flex h-full flex-col">
+      {podeAlternar && (
+        <div className="flex items-center gap-2 border-b border-black/5 bg-white px-4 pt-2.5">
+          {(["VENDA", "POS_VENDA"] as Finalidade[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFinalidade(f)}
+              className={`rounded-t-lg border-b-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                finalidade === f
+                  ? "border-tiffany text-tiffany"
+                  : "border-transparent text-medio/60 hover:text-escuro"
+              }`}
+            >
+              {f === "VENDA" ? "Vendas" : "Pos-venda"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <BarraFiltros
         ehAdmin={ehAdmin}
         busca={busca}

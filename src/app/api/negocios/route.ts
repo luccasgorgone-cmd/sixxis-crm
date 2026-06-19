@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import type { Prisma } from "@/generated/prisma/client";
-import { Temperatura } from "@/generated/prisma/enums";
+import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,8 +23,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const temperatura = sp.get("temperatura") ?? "";
   const agenteIdFiltro = sp.get("agenteId") ?? "";
   const busca = sp.get("busca")?.trim() ?? "";
+  const fParam = sp.get("finalidade");
+  const finalidade =
+    fParam === Finalidade.POS_VENDA ? Finalidade.POS_VENDA : Finalidade.VENDA;
 
-  const where: Prisma.NegocioWhereInput = {};
+  const where: Prisma.NegocioWhereInput = { finalidade };
 
   // Regra de papel.
   if (!ehAdmin(agente.papel)) {
@@ -58,9 +61,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where.lead = leadWhere;
   }
 
+  const finalidadeEtapas =
+    finalidade === Finalidade.VENDA
+      ? [FinalidadeEtapa.VENDA, FinalidadeEtapa.AMBAS]
+      : [FinalidadeEtapa.POS_VENDA, FinalidadeEtapa.AMBAS];
+
   const [etapas, negocios] = await Promise.all([
     prisma.etapa.findMany({
-      where: { ativo: true },
+      where: { ativo: true, finalidade: { in: finalidadeEtapas } },
       orderBy: { ordem: "asc" },
       select: { id: true, nome: true, cor: true, tipo: true, ordem: true },
     }),

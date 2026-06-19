@@ -17,7 +17,7 @@ import {
   DollarSign,
   Phone,
 } from "lucide-react";
-import type { ItemAtividade, VendedorOpcao } from "./tipos";
+import type { ItemAtividade, VendedorOpcao, Finalidade } from "./tipos";
 
 const ICONE_ATIV: Record<string, typeof Tag> = {
   CRIACAO: Sparkles,
@@ -45,15 +45,16 @@ function dataHora(valor: string): string {
 export function ClienteAba({
   leadId,
   dono,
-  vendedores,
+  finalidade,
   onMudou,
 }: {
   leadId: string;
   dono: { id: string; nome: string } | null;
-  vendedores: VendedorOpcao[];
+  finalidade: Finalidade;
   onMudou: () => void;
 }) {
   const [atividades, setAtividades] = useState<ItemAtividade[]>([]);
+  const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [acao, setAcao] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
@@ -69,10 +70,22 @@ export function ClienteAba({
     void carregar();
   }, [carregar]);
 
+  // Vendedores da equipe da finalidade (para transferir).
+  useEffect(() => {
+    fetch(`/api/vendedores?finalidade=${finalidade}`)
+      .then((r) => (r.ok ? r.json() : { vendedores: [] }))
+      .then((d) => setVendedores(d.vendedores ?? []))
+      .catch(() => undefined);
+  }, [finalidade]);
+
   async function assumir() {
     setAcao(true);
     try {
-      await fetch(`/api/leads/${leadId}/assumir`, { method: "POST" });
+      await fetch(`/api/leads/${leadId}/assumir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finalidade }),
+      });
       await carregar();
       onMudou();
     } finally {
@@ -87,7 +100,7 @@ export function ClienteAba({
       await fetch(`/api/leads/${leadId}/transferir`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agenteId: destino }),
+        body: JSON.stringify({ agenteId: destino, finalidade }),
       });
       setTransferindo(false);
       setDestino("");

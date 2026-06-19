@@ -3,6 +3,7 @@
 export type TipoEtapa = "ABERTA" | "GANHO" | "PERDIDO";
 export type Temperatura = "QUENTE" | "MORNO" | "FRIO";
 export type StatusNeg = "ABERTO" | "GANHO" | "PERDIDO";
+export type Finalidade = "VENDA" | "POS_VENDA";
 
 export type Etapa = {
   id: string;
@@ -29,6 +30,7 @@ export type CardNegocio = {
   valor: number | null;
   temperatura: Temperatura;
   status: StatusNeg;
+  finalidade: Finalidade;
   etapaId: string | null;
   entrouEtapaEm: string;
   agente: AgenteResumo | null;

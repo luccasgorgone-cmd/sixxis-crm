@@ -1,12 +1,19 @@
-// Transfere um cliente para outro vendedor. ADMIN transfere qualquer; vendedor
-// transfere apenas os seus. Reatribui dono do lead + negocio aberto e registra
-// Atividade(TRANSFERENCIA) "de A para B".
+// Transfere um cliente para outro agente NAQUELA finalidade. ADMIN cruza
+// qualquer; nao-admin transfere apenas os seus e dentro da mesma equipe
+// (VENDEDOR<->VENDEDOR, POS_VENDA<->POS_VENDA). Reatribui o dono da finalidade,
+// o negocio aberto e espelha nas conversas. Atividade(TRANSFERENCIA).
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
 import {
+  campoDono,
+  papelDaFinalidade,
+  espelharDonoNasConversas,
+} from "@/lib/dono";
+import {
   StatusNeg,
+  Finalidade,
   AtividadeTipo,
   TipoHistorico,
 } from "@/generated/prisma/enums";
@@ -24,7 +31,7 @@ export async function POST(
   }
   const { id } = await ctx.params;
 
-  let body: { agenteId?: string };
+  let body: { agenteId?: string; finalidade?: string };
   try {
     body = await req.json();
   } catch {
@@ -34,41 +41,68 @@ export async function POST(
   if (!destinoId) {
     return NextResponse.json({ erro: "agenteId obrigatorio" }, { status: 400 });
   }
+  const finalidade =
+    body?.finalidade === Finalidade.POS_VENDA
+      ? Finalidade.POS_VENDA
+      : Finalidade.VENDA;
+  const campo = campoDono(finalidade);
 
   const lead = await prisma.lead.findUnique({
     where: { id },
-    select: { id: true, donoId: true, dono: { select: { nome: true } } },
+    select: {
+      id: true,
+      donoId: true,
+      donoPosVendaId: true,
+      dono: { select: { nome: true } },
+      donoPosVenda: { select: { nome: true } },
+    },
   });
   if (!lead) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  // Vendedor so transfere os proprios.
-  if (!ehAdmin(agente.papel) && lead.donoId !== agente.id) {
+  // Nao-admin so transfere os proprios (daquela finalidade).
+  if (!ehAdmin(agente.papel) && lead[campo] !== agente.id) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
   const destino = await prisma.agente.findUnique({
     where: { id: destinoId },
-    select: { id: true, nome: true, ativo: true },
+    select: { id: true, nome: true, ativo: true, papel: true },
   });
   if (!destino || !destino.ativo) {
     return NextResponse.json(
-      { erro: "vendedor destino invalido" },
+      { erro: "agente destino invalido" },
       { status: 400 },
+    );
+  }
+  // Nao-admin so transfere dentro da equipe da finalidade.
+  if (!ehAdmin(agente.papel) && destino.papel !== papelDaFinalidade(finalidade)) {
+    return NextResponse.json(
+      { erro: "destino fora da equipe da finalidade" },
+      { status: 403 },
     );
   }
 
   const negocio = await prisma.negocio.findFirst({
-    where: { leadId: id, status: StatusNeg.ABERTO },
+    where: { leadId: id, finalidade, status: StatusNeg.ABERTO },
     orderBy: { criadoEm: "desc" },
     select: { id: true },
   });
 
-  const de = lead.dono?.nome ?? "sem dono";
+  const de =
+    (finalidade === Finalidade.VENDA
+      ? lead.dono?.nome
+      : lead.donoPosVenda?.nome) ?? "sem dono";
   const descricao = `Transferido de ${de} para ${destino.nome}`;
 
   await prisma.$transaction(async (tx) => {
-    await tx.lead.update({ where: { id }, data: { donoId: destino.id } });
+    await tx.lead.update({
+      where: { id },
+      data:
+        finalidade === Finalidade.VENDA
+          ? { donoId: destino.id }
+          : { donoPosVendaId: destino.id },
+    });
     if (negocio) {
       await tx.negocio.update({
         where: { id: negocio.id },
@@ -83,6 +117,7 @@ export async function POST(
         },
       });
     }
+    await espelharDonoNasConversas(tx, id, finalidade, destino.id);
     await tx.atividade.create({
       data: {
         leadId: id,
@@ -101,6 +136,7 @@ export async function POST(
       motivo: "transferido",
     });
   }
+  getIO()?.emit("conversa:atualizada", { leadId: id, finalidade });
 
   return NextResponse.json({ ok: true });
 }

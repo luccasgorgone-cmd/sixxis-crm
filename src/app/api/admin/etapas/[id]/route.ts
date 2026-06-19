@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
-import { TipoEtapa } from "@/generated/prisma/enums";
+import { TipoEtapa, FinalidadeEtapa } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -17,7 +17,13 @@ export async function PATCH(
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;
-  let body: { nome?: string; cor?: string; tipo?: string; ativo?: boolean };
+  let body: {
+    nome?: string;
+    cor?: string;
+    tipo?: string;
+    finalidade?: string;
+    ativo?: boolean;
+  };
   try {
     body = await req.json();
   } catch {
@@ -28,6 +34,9 @@ export async function PATCH(
   if (body.cor !== undefined) data.cor = body.cor.trim();
   if (body.tipo !== undefined && body.tipo in TipoEtapa) {
     data.tipo = body.tipo as TipoEtapa;
+  }
+  if (body.finalidade !== undefined && body.finalidade in FinalidadeEtapa) {
+    data.finalidade = body.finalidade as FinalidadeEtapa;
   }
   if (body.ativo !== undefined) data.ativo = body.ativo;
 

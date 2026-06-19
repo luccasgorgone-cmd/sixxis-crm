@@ -12,6 +12,8 @@ export type TipoMensagem =
 export type StatusEnvio = "ENVIANDO" | "ENVIADA" | "ENTREGUE" | "ERRO" | null;
 export type AtendidoPor = "HUMANO" | "IA";
 
+export type Finalidade = "VENDA" | "POS_VENDA";
+
 export type ConversaItem = {
   id: string;
   leadNome: string | null;
@@ -21,6 +23,9 @@ export type ConversaItem = {
   naoLidas: number;
   atendidoPor: AtendidoPor;
   agenteId: string | null;
+  finalidade?: Finalidade;
+  instanciaNome?: string | null;
+  instanciaNumero?: string | null;
 };
 
 export type MensagemItem = {

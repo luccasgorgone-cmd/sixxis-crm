@@ -11,7 +11,10 @@ import {
   seedFunil,
   seedVendedorTeste,
   seedRoteamentoEPresets,
+  seedFinalidadeEInstancias,
+  purgarDadosTeste,
   backfillNegocios,
+  backfillDonoConversas,
 } from "./src/lib/seed";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -29,7 +32,10 @@ async function main(): Promise<void> {
   await seedFunil();
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
+  await seedFinalidadeEInstancias();
+  await purgarDadosTeste();
   await backfillNegocios();
+  await backfillDonoConversas();
 
   // Servidor HTTP usando o request handler do Next.
   const httpServer = createServer((req, res) => {

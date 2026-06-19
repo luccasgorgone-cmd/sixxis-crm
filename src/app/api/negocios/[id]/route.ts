@@ -12,7 +12,9 @@ import {
   Temperatura,
   TipoHistorico,
   AtividadeTipo,
+  Finalidade,
 } from "@/generated/prisma/enums";
+import { espelharDonoNasConversas } from "@/lib/dono";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,8 @@ export async function GET(
           origem: true,
           donoId: true,
           dono: { select: { id: true, nome: true } },
+          donoPosVendaId: true,
+          donoPosVenda: { select: { id: true, nome: true } },
           etiquetas: { include: { etiqueta: true } },
           notas: {
             orderBy: { criadoEm: "desc" },
@@ -87,9 +91,18 @@ export async function GET(
         email: negocio.lead.email,
         origem: negocio.lead.origem,
       },
-      dono: negocio.lead.dono
-        ? { id: negocio.lead.dono.id, nome: negocio.lead.dono.nome }
-        : null,
+      // Dono mostrado conforme a finalidade do negocio.
+      dono:
+        negocio.finalidade === Finalidade.VENDA
+          ? negocio.lead.dono
+            ? { id: negocio.lead.dono.id, nome: negocio.lead.dono.nome }
+            : null
+          : negocio.lead.donoPosVenda
+            ? {
+                id: negocio.lead.donoPosVenda.id,
+                nome: negocio.lead.donoPosVenda.nome,
+              }
+            : null,
       produtos: negocio.produtos ?? null,
       motivoPerda: negocio.motivoPerda,
       fechadoEm: negocio.fechadoEm,
@@ -147,6 +160,7 @@ export async function PATCH(
       agenteId: true,
       valor: true,
       motivoPerda: true,
+      finalidade: true,
     },
   });
   if (!negocio) {
@@ -316,12 +330,22 @@ export async function PATCH(
     });
   }
 
-  // Atribuir vendedor ao negocio tambem define o dono do lead (sticky futuro).
+  // Atribuir agente ao negocio tambem define o dono do lead (campo da
+  // finalidade) e espelha nas conversas dessa finalidade.
   if (body.agenteId !== undefined) {
     await prisma.lead.update({
       where: { id: negocio.leadId },
-      data: { donoId: body.agenteId },
+      data:
+        negocio.finalidade === Finalidade.VENDA
+          ? { donoId: body.agenteId }
+          : { donoPosVendaId: body.agenteId },
     });
+    await espelharDonoNasConversas(
+      prisma,
+      negocio.leadId,
+      negocio.finalidade,
+      body.agenteId,
+    );
   }
 
   const card = cardNegocio(atualizado);

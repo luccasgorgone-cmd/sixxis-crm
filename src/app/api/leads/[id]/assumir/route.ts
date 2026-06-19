@@ -1,11 +1,14 @@
-// Vendedor (ou admin) assume um cliente SEM dono: vira dono do lead e do
-// negocio aberto. Registra Atividade(ASSUMIDO) e historico do negocio.
+// Vendedor/pos-venda (ou admin) assume um cliente SEM dono NAQUELA finalidade:
+// vira dono do lead (campo da finalidade) e do negocio aberto. Espelha o dono
+// nas conversas. Registra Atividade(ASSUMIDO) e historico do negocio.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
+import { campoDono, espelharDonoNasConversas } from "@/lib/dono";
 import {
   StatusNeg,
+  Finalidade,
   AtividadeTipo,
   TipoHistorico,
 } from "@/generated/prisma/enums";
@@ -14,7 +17,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -23,29 +26,44 @@ export async function POST(
   }
   const { id } = await ctx.params;
 
+  let body: { finalidade?: string };
+  try {
+    body = await req.json().catch(() => ({}));
+  } catch {
+    body = {};
+  }
+  const finalidade =
+    body?.finalidade === Finalidade.POS_VENDA
+      ? Finalidade.POS_VENDA
+      : Finalidade.VENDA;
+  const campo = campoDono(finalidade);
+
   const lead = await prisma.lead.findUnique({
     where: { id },
-    select: { id: true, donoId: true },
+    select: { id: true, donoId: true, donoPosVendaId: true },
   });
   if (!lead) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  // So pode assumir lead sem dono (ou ja seu). Admin pode sempre.
-  if (lead.donoId && lead.donoId !== agente.id && !ehAdmin(agente.papel)) {
-    return NextResponse.json(
-      { erro: "lead ja tem dono" },
-      { status: 403 },
-    );
+  const donoAtual = lead[campo];
+  if (donoAtual && donoAtual !== agente.id && !ehAdmin(agente.papel)) {
+    return NextResponse.json({ erro: "lead ja tem dono" }, { status: 403 });
   }
 
   const negocio = await prisma.negocio.findFirst({
-    where: { leadId: id, status: StatusNeg.ABERTO },
+    where: { leadId: id, finalidade, status: StatusNeg.ABERTO },
     orderBy: { criadoEm: "desc" },
     select: { id: true },
   });
 
   await prisma.$transaction(async (tx) => {
-    await tx.lead.update({ where: { id }, data: { donoId: agente.id } });
+    await tx.lead.update({
+      where: { id },
+      data:
+        finalidade === Finalidade.VENDA
+          ? { donoId: agente.id }
+          : { donoPosVendaId: agente.id },
+    });
     if (negocio) {
       await tx.negocio.update({
         where: { id: negocio.id },
@@ -56,17 +74,18 @@ export async function POST(
           negocioId: negocio.id,
           agenteId: agente.id,
           tipo: TipoHistorico.ATRIBUICAO,
-          descricao: `Assumido por ${agente.nome ?? "vendedor"}`,
+          descricao: `Assumido por ${agente.nome ?? "agente"}`,
         },
       });
     }
+    await espelharDonoNasConversas(tx, id, finalidade, agente.id);
     await tx.atividade.create({
       data: {
         leadId: id,
         negocioId: negocio?.id ?? null,
         agenteId: agente.id,
         tipo: AtividadeTipo.ASSUMIDO,
-        descricao: `Cliente assumido por ${agente.nome ?? "vendedor"}`,
+        descricao: `Cliente assumido por ${agente.nome ?? "agente"}`,
       },
     });
   });
@@ -78,6 +97,7 @@ export async function POST(
       motivo: "assumido",
     });
   }
+  getIO()?.emit("conversa:atualizada", { leadId: id, finalidade });
 
   return NextResponse.json({ ok: true });
 }

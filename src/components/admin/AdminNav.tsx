@@ -10,6 +10,7 @@ import {
   Tags,
   StickyNote,
   Route,
+  Smartphone,
   Zap,
   Clock,
   MessageSquareDot,
@@ -28,6 +29,7 @@ type Secao = {
 
 const SECOES: Secao[] = [
   { rotulo: "Vendedores", href: "/admin/vendedores", icone: Users },
+  { rotulo: "Numeros WhatsApp", href: "/admin/numeros", icone: Smartphone },
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },

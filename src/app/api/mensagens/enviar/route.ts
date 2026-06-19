@@ -43,7 +43,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const conversa = await prisma.conversa.findUnique({
     where: { id: conversaId },
-    include: { lead: { select: { id: true, nome: true, telefone: true } } },
+    include: {
+      lead: { select: { id: true, nome: true, telefone: true } },
+      instanciaRef: { select: { instanciaEvolution: true } },
+    },
   });
   if (!conversa) {
     return NextResponse.json(
@@ -60,8 +63,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Envia pela instancia (numero) da conversa; fallback para a do env.
+  const instanciaEvolution =
+    conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
+
   // Chama a Evolution. Se falhar, ainda gravamos a mensagem com status ERRO.
-  const resultado = await enviarTexto(numero, texto);
+  const resultado = await enviarTexto(numero, texto, instanciaEvolution);
   const status: StatusEnvio = resultado.ok
     ? StatusEnvio.ENVIADA
     : StatusEnvio.ERRO;

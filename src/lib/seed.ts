@@ -4,7 +4,12 @@
 // Nunca derruba o boot: erros sao logados e engolidos.
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { Papel, TipoEtapa } from "../generated/prisma/enums";
+import {
+  Papel,
+  TipoEtapa,
+  Finalidade,
+  FinalidadeEtapa,
+} from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
 
 export async function seedAdmin(): Promise<void> {
@@ -177,6 +182,187 @@ export async function seedRoteamentoEPresets(): Promise<void> {
   }
 }
 
+// Funil padrao de POS-VENDA (criado uma vez junto da migracao de finalidade).
+const ETAPAS_POSVENDA: { nome: string; cor: string; tipo: TipoEtapa }[] = [
+  { nome: "Aberto", cor: "#64748b", tipo: TipoEtapa.ABERTA },
+  { nome: "Em atendimento", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA },
+  { nome: "Aguardando cliente", cor: "#f59e0b", tipo: TipoEtapa.ABERTA },
+  { nome: "Resolvido", cor: "#16a34a", tipo: TipoEtapa.GANHO },
+  { nome: "Encerrado sem solucao", cor: "#dc2626", tipo: TipoEtapa.PERDIDO },
+];
+
+// Instancia atual + backfill de finalidade/instancia + funil de pos-venda.
+export async function seedFinalidadeEInstancias(): Promise<void> {
+  try {
+    // 1) Instancia atual (numero de vendas).
+    const instNome = process.env.EVOLUTION_INSTANCE || "sixxis-wa1";
+    let instancia = await prisma.instanciaWhatsApp.findUnique({
+      where: { instanciaEvolution: instNome },
+    });
+    if (!instancia) {
+      instancia = await prisma.instanciaWhatsApp.create({
+        data: {
+          nome: "Sixxis Vendas 1",
+          instanciaEvolution: instNome,
+          numero: "5518997257602",
+          finalidade: Finalidade.VENDA,
+          ativo: true,
+        },
+      });
+      console.log("[seed] instancia WhatsApp criada");
+    } else {
+      console.log("[seed] instancia WhatsApp ok");
+    }
+
+    // 2) Backfill: conversas sem instancia -> a instancia atual (legado = venda).
+    const upd = await prisma.conversa.updateMany({
+      where: { instanciaId: null },
+      data: { instanciaId: instancia.id },
+    });
+    if (upd.count > 0) {
+      console.log(`[seed] backfill instancia em ${upd.count} conversas`);
+    }
+
+    // 3) Funil de POS-VENDA + 2.3 etapas -> AMBAS (uma vez, guardado).
+    const temPosVenda = await prisma.etapa.count({
+      where: { finalidade: FinalidadeEtapa.POS_VENDA },
+    });
+    if (temPosVenda === 0) {
+      // As etapas existentes (finalidade VENDA por padrao da migracao) viram AMBAS.
+      await prisma.etapa.updateMany({
+        where: { finalidade: FinalidadeEtapa.VENDA },
+        data: { finalidade: FinalidadeEtapa.AMBAS },
+      });
+      const ultima = await prisma.etapa.findFirst({
+        orderBy: { ordem: "desc" },
+        select: { ordem: true },
+      });
+      let ordem = ultima?.ordem ?? 0;
+      await prisma.etapa.createMany({
+        data: ETAPAS_POSVENDA.map((e) => ({
+          ...e,
+          ordem: ++ordem,
+          finalidade: FinalidadeEtapa.POS_VENDA,
+        })),
+      });
+      console.log(
+        `[seed] funil pos-venda criado (${ETAPAS_POSVENDA.length} etapas)`,
+      );
+    } else {
+      console.log("[seed] funil pos-venda ok");
+    }
+  } catch (erro) {
+    console.error(
+      `[seed] falha em finalidade/instancias: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Espelha retroativamente o dono do lead nas conversas sem agente (A1), para
+// que conversas legadas aparecam no "meus" do inbox. So preenche nulos.
+export async function backfillDonoConversas(): Promise<void> {
+  try {
+    const leadsVenda = await prisma.lead.findMany({
+      where: { donoId: { not: null } },
+      select: { id: true, donoId: true },
+    });
+    let n = 0;
+    for (const l of leadsVenda) {
+      const r = await prisma.conversa.updateMany({
+        where: { leadId: l.id, finalidade: Finalidade.VENDA, agenteId: null },
+        data: { agenteId: l.donoId },
+      });
+      n += r.count;
+    }
+    const leadsPos = await prisma.lead.findMany({
+      where: { donoPosVendaId: { not: null } },
+      select: { id: true, donoPosVendaId: true },
+    });
+    for (const l of leadsPos) {
+      const r = await prisma.conversa.updateMany({
+        where: {
+          leadId: l.id,
+          finalidade: Finalidade.POS_VENDA,
+          agenteId: null,
+        },
+        data: { agenteId: l.donoPosVendaId },
+      });
+      n += r.count;
+    }
+    if (n > 0) console.log(`[seed] backfill dono em ${n} conversas`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha no backfill de dono: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Purga idempotente dos dados de teste usados na validacao ao vivo da 2.3.
+export async function purgarDadosTeste(): Promise<void> {
+  const emailsTeste = [
+    "teste.vendedora@sixxis.local",
+    "teste.vendedorb@sixxis.local",
+  ];
+  const telefonesTeste = ["5500000000001", "5500000000002"];
+  try {
+    const leads = await prisma.lead.findMany({
+      where: { telefone: { in: telefonesTeste } },
+      select: { id: true },
+    });
+    const leadIds = leads.map((l) => l.id);
+
+    if (leadIds.length > 0) {
+      const conversas = await prisma.conversa.findMany({
+        where: { leadId: { in: leadIds } },
+        select: { id: true },
+      });
+      const convIds = conversas.map((c) => c.id);
+      const negocios = await prisma.negocio.findMany({
+        where: { leadId: { in: leadIds } },
+        select: { id: true },
+      });
+      const negIds = negocios.map((n) => n.id);
+
+      // Remove filhos antes dos pais (FKs RESTRICT).
+      await prisma.$transaction([
+        prisma.mensagem.deleteMany({ where: { conversaId: { in: convIds } } }),
+        prisma.atividade.deleteMany({ where: { leadId: { in: leadIds } } }),
+        prisma.historicoNegocio.deleteMany({
+          where: { negocioId: { in: negIds } },
+        }),
+        prisma.nota.deleteMany({ where: { leadId: { in: leadIds } } }),
+        prisma.leadEtiqueta.deleteMany({ where: { leadId: { in: leadIds } } }),
+        prisma.conversa.deleteMany({ where: { leadId: { in: leadIds } } }),
+        prisma.negocio.deleteMany({ where: { leadId: { in: leadIds } } }),
+        prisma.lead.deleteMany({ where: { id: { in: leadIds } } }),
+      ]);
+      console.log(`[seed] purga: ${leadIds.length} leads de teste removidos`);
+    }
+
+    // Agentes de teste (FKs para Agente sao SET NULL).
+    const delAg = await prisma.agente.deleteMany({
+      where: { email: { in: emailsTeste } },
+    });
+    if (delAg.count > 0) {
+      console.log(`[seed] purga: ${delAg.count} agentes de teste removidos`);
+    }
+
+    // Zera os ponteiros de roteamento (venda e pos-venda).
+    const config = await prisma.configRoteamento.findFirst();
+    if (config) {
+      await prisma.configRoteamento.update({
+        where: { id: config.id },
+        data: { ponteiroAgenteId: null, ponteiroPosVendaId: null },
+      });
+    }
+    console.log("[seed] purga de dados de teste ok");
+  } catch (erro) {
+    console.error(
+      `[seed] falha na purga de teste: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill: garante um negocio aberto para cada lead que ainda nao tem.
 // Roda no boot, sem emitir socket (io ainda nao tem clientes / ruido).
 export async function backfillNegocios(): Promise<void> {
@@ -192,7 +378,7 @@ export async function backfillNegocios(): Promise<void> {
       select: { id: true },
     });
     for (const l of leads) {
-      await garantirNegocioParaLead(l.id, false);
+      await garantirNegocioParaLead(l.id, Finalidade.VENDA, false);
     }
     if (leads.length > 0) {
       console.log(`[seed] backfill: ${leads.length} negocios criados`);

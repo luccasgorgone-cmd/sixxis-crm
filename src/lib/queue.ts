@@ -10,7 +10,7 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
-import { TipoMsg, DirecaoMsg, Prisma } from "../generated/prisma/client";
+import { TipoMsg, DirecaoMsg, Finalidade, Prisma } from "../generated/prisma/client";
 
 const NOME_FILA = "messages-in";
 
@@ -180,16 +180,33 @@ async function processarEvento(
     });
   }
 
-  // Conversa: garante UMA conversa "aberta" para o Lead.
+  // Resolve a instancia (numero) pelo campo `instance` do payload. Define a
+  // finalidade (VENDA/POS_VENDA). Instancia nao cadastrada: ingere mesmo assim
+  // como VENDA e loga aviso (nao perde mensagem).
+  const nomeInstancia = payload?.instance ?? "sixxis-wa1";
+  const instancia = await prisma.instanciaWhatsApp.findUnique({
+    where: { instanciaEvolution: nomeInstancia },
+    select: { id: true, finalidade: true },
+  });
+  if (!instancia) {
+    console.warn(
+      `[ingest] instancia "${nomeInstancia}" nao cadastrada; usando finalidade VENDA`,
+    );
+  }
+  const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
+
+  // Conversa: garante UMA conversa "aberta" para o Lead NAQUELA finalidade.
   let conversa = await prisma.conversa.findFirst({
-    where: { leadId: lead.id, status: "aberta" },
+    where: { leadId: lead.id, status: "aberta", finalidade },
     orderBy: { criadoEm: "desc" },
   });
   if (!conversa) {
     conversa = await prisma.conversa.create({
       data: {
         leadId: lead.id,
-        instancia: payload?.instance ?? "sixxis-wa1",
+        instancia: nomeInstancia,
+        instanciaId: instancia?.id ?? null,
+        finalidade,
       },
     });
   }
@@ -241,12 +258,12 @@ async function processarEvento(
       ultimaMensagemEm: mensagem.hora,
     });
 
-    // Garante um negocio aberto para o lead (idempotente). Leads novos passam
-    // a aparecer no Kanban; registra HistoricoNegocio(CRIACAO) e emite evento.
-    await garantirNegocioParaLead(lead.id);
-    // Roteia o lead/negocio para um vendedor (sticky por dono ou round-robin).
+    // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente).
+    // Registra HistoricoNegocio(CRIACAO) e emite evento.
+    await garantirNegocioParaLead(lead.id, finalidade);
+    // Roteia o negocio da finalidade para a equipe correta (sticky/round-robin).
     // Idempotente: nao mexe em negocio ja atribuido.
-    await rotearLeadNovo(lead.id);
+    await rotearLeadNovo(lead.id, finalidade);
   } catch (erro) {
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
     // P2002 = violacao de unique (externalId). Tratamos como idempotente.

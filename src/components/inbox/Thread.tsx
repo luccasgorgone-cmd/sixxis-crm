@@ -55,10 +55,22 @@ export function Thread({
           <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
           <p className="truncate text-xs text-medio/60">
             {formatarTelefone(conversa.leadTelefone)}
+            {conversa.instanciaNome ? ` · ${conversa.instanciaNome}` : ""}
           </p>
         </div>
+        {conversa.finalidade && (
+          <span
+            className={`ml-auto rounded-full px-2.5 py-1 text-xs font-medium ${
+              conversa.finalidade === "POS_VENDA"
+                ? "bg-purple-100 text-purple-700"
+                : "bg-tiffany/10 text-tiffany"
+            }`}
+          >
+            {conversa.finalidade === "POS_VENDA" ? "Pos-venda" : "Venda"}
+          </span>
+        )}
         <span
-          className={`ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+          className={`${conversa.finalidade ? "" : "ml-auto "}flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
             conversa.atendidoPor === "IA"
               ? "bg-tiffany/10 text-tiffany"
               : "bg-medio/10 text-medio"

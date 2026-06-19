@@ -13,9 +13,17 @@ import type {
   MensagemItem,
   EventoMensagemNova,
   Filtro,
+  Finalidade,
 } from "./tipos";
 
-export function Inbox({ agenteIdAtual }: { agenteIdAtual: string }) {
+export function Inbox({
+  agenteIdAtual,
+  papel,
+}: {
+  agenteIdAtual: string;
+  papel: string;
+}) {
+  const ehAdmin = papel === "ADMIN";
   const [conversas, setConversas] = useState<ConversaItem[]>([]);
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erroLista, setErroLista] = useState<string | null>(null);
@@ -26,6 +34,8 @@ export function Inbox({ agenteIdAtual }: { agenteIdAtual: string }) {
 
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  // Finalidade: "" = todas (so faz sentido para ADMIN, que ve as duas).
+  const [finalidade, setFinalidade] = useState<Finalidade | "">("");
 
   // Ref para o socket ler a conversa aberta sem recriar o listener.
   const selecionadaRef = useRef<string | null>(null);
@@ -33,7 +43,8 @@ export function Inbox({ agenteIdAtual }: { agenteIdAtual: string }) {
 
   const carregarConversas = useCallback(async () => {
     try {
-      const r = await fetch("/api/conversas");
+      const qs = finalidade ? `?finalidade=${finalidade}` : "";
+      const r = await fetch(`/api/conversas${qs}`);
       if (!r.ok) throw new Error();
       const d = await r.json();
       setConversas(d.conversas as ConversaItem[]);
@@ -43,10 +54,20 @@ export function Inbox({ agenteIdAtual }: { agenteIdAtual: string }) {
     } finally {
       setCarregandoLista(false);
     }
-  }, []);
+  }, [finalidade]);
 
   useEffect(() => {
     void carregarConversas();
+  }, [carregarConversas]);
+
+  // Dono mudou (roteamento/assumir/transferir) -> recarrega a lista.
+  useEffect(() => {
+    const socket = getSocket();
+    const recarregar = () => void carregarConversas();
+    socket.on("conversa:atualizada", recarregar);
+    return () => {
+      socket.off("conversa:atualizada", recarregar);
+    };
   }, [carregarConversas]);
 
   const abrirConversa = useCallback(async (id: string) => {
@@ -178,8 +199,11 @@ export function Inbox({ agenteIdAtual }: { agenteIdAtual: string }) {
         selecionada={selecionada}
         busca={busca}
         filtro={filtro}
+        finalidade={finalidade}
+        mostrarFinalidade={ehAdmin}
         onBusca={setBusca}
         onFiltro={setFiltro}
+        onFinalidade={setFinalidade}
         onSelecionar={abrirConversa}
       />
 

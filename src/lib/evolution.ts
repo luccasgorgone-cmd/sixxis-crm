@@ -1,5 +1,5 @@
-// Cliente minimo da Evolution API para ENVIO de texto (outbound).
-// Nenhuma conexao no topo do modulo; tudo lido de env em runtime.
+// Cliente minimo da Evolution API. Nenhuma conexao no topo do modulo; tudo
+// lido de env em runtime. As funcoes aceitam a instancia (numero) a usar.
 type ResultadoEnvio = {
   ok: boolean;
   externalId?: string;
@@ -7,45 +7,95 @@ type ResultadoEnvio = {
   raw: unknown;
 };
 
-// Envia uma mensagem de texto para um numero (apenas digitos, com DDI).
+function baseEKey(): { base: string; apikey: string } | null {
+  const base = process.env.EVOLUTION_BASE_URL;
+  const apikey = process.env.EVOLUTION_API_KEY;
+  if (!base || !apikey) return null;
+  return { base: base.replace(/\/$/, ""), apikey };
+}
+
+// Envia uma mensagem de texto por uma instancia especifica (ou a padrao do env).
 // Endpoint: POST {BASE}/message/sendText/{INSTANCE}  header apikey.
 export async function enviarTexto(
   numero: string,
   texto: string,
+  instancia?: string | null,
 ): Promise<ResultadoEnvio> {
-  const base = process.env.EVOLUTION_BASE_URL;
-  const instance = process.env.EVOLUTION_INSTANCE;
-  const apikey = process.env.EVOLUTION_API_KEY;
-
-  if (!base || !instance || !apikey) {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
     return { ok: false, raw: { erro: "config Evolution ausente" } };
   }
 
-  const url = `${base.replace(/\/$/, "")}/message/sendText/${instance}`;
-
+  const url = `${cfg.base}/message/sendText/${instance}`;
   try {
     const resp = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey,
-      },
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({ number: numero, text: texto }),
     });
-
     const raw: unknown = await resp.json().catch(() => null);
-
-    if (!resp.ok) {
-      return { ok: false, status: resp.status, raw };
-    }
-
-    // A Evolution retorna o id da mensagem em key.id quando aceita.
+    if (!resp.ok) return { ok: false, status: resp.status, raw };
     const externalId =
       typeof raw === "object" && raw !== null
         ? (raw as { key?: { id?: string } }).key?.id
         : undefined;
-
     return { ok: true, externalId, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
+// Estado de conexao de uma instancia: GET /instance/connectionState/{instance}.
+// Retorna "open" | "close" | "connecting" | "desconhecido".
+export async function estadoConexao(instancia: string): Promise<string> {
+  const cfg = baseEKey();
+  if (!cfg) return "sem_config";
+  try {
+    const resp = await fetch(
+      `${cfg.base}/instance/connectionState/${instancia}`,
+      { headers: { apikey: cfg.apikey } },
+    );
+    if (!resp.ok) return "desconhecido";
+    const raw = (await resp.json().catch(() => null)) as {
+      instance?: { state?: string };
+      state?: string;
+    } | null;
+    return raw?.instance?.state ?? raw?.state ?? "desconhecido";
+  } catch {
+    return "desconhecido";
+  }
+}
+
+// Configura o webhook da instancia apontando para a nossa rota de ingestao.
+// POST /webhook/set/{instance} com headers x-webhook-secret e evento MESSAGES_UPSERT.
+export async function configurarWebhook(
+  instancia: string,
+  url: string,
+  secret: string,
+): Promise<{ ok: boolean; status?: number; raw: unknown }> {
+  const cfg = baseEKey();
+  if (!cfg) return { ok: false, raw: { erro: "config Evolution ausente" } };
+  try {
+    const resp = await fetch(`${cfg.base}/webhook/set/${instancia}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({
+        webhook: {
+          enabled: true,
+          url,
+          headers: { "x-webhook-secret": secret },
+          byEvents: false,
+          base64: false,
+          events: ["MESSAGES_UPSERT"],
+        },
+      }),
+    });
+    const raw = await resp.json().catch(() => null);
+    return { ok: resp.ok, status: resp.status, raw };
   } catch (erro) {
     return {
       ok: false,

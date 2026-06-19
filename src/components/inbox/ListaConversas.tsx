@@ -2,13 +2,19 @@
 
 // Coluna esquerda da inbox: busca, filtros e a lista de conversas.
 import { Search, Bot, User as UserIcon } from "lucide-react";
-import type { ConversaItem, Filtro } from "./tipos";
+import type { ConversaItem, Filtro, Finalidade } from "./tipos";
 import { horarioLista, iniciais } from "@/lib/format";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "minhas", rotulo: "Minhas" },
   { chave: "naoLidas", rotulo: "Nao lidas" },
   { chave: "todas", rotulo: "Todas" },
+];
+
+const FINALIDADES: { chave: Finalidade | ""; rotulo: string }[] = [
+  { chave: "", rotulo: "Todos" },
+  { chave: "VENDA", rotulo: "Vendas" },
+  { chave: "POS_VENDA", rotulo: "Pos-venda" },
 ];
 
 export function ListaConversas({
@@ -18,8 +24,11 @@ export function ListaConversas({
   selecionada,
   busca,
   filtro,
+  finalidade,
+  mostrarFinalidade,
   onBusca,
   onFiltro,
+  onFinalidade,
   onSelecionar,
 }: {
   conversas: ConversaItem[];
@@ -28,12 +37,32 @@ export function ListaConversas({
   selecionada: string | null;
   busca: string;
   filtro: Filtro;
+  finalidade: Finalidade | "";
+  mostrarFinalidade: boolean;
   onBusca: (v: string) => void;
   onFiltro: (f: Filtro) => void;
+  onFinalidade: (f: Finalidade | "") => void;
   onSelecionar: (id: string) => void;
 }) {
   return (
     <div className="flex h-full w-full flex-col border-r border-black/5 bg-white sm:w-80 md:w-96">
+      {mostrarFinalidade && (
+        <div className="flex gap-1 border-b border-black/5 px-3 pt-2">
+          {FINALIDADES.map((f) => (
+            <button
+              key={f.chave || "todos"}
+              onClick={() => onFinalidade(f.chave)}
+              className={`border-b-2 px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                finalidade === f.chave
+                  ? "border-tiffany text-tiffany"
+                  : "border-transparent text-medio/60 hover:text-escuro"
+              }`}
+            >
+              {f.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Busca */}
       <div className="border-b border-black/5 p-3">
         <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-fundo px-3 transition-colors focus-within:border-tiffany">
@@ -127,6 +156,26 @@ function ItemConversa({
             {horarioLista(conversa.ultimaMensagemEm)}
           </span>
         </div>
+        {(conversa.finalidade || conversa.instanciaNome) && (
+          <div className="mb-0.5 flex items-center gap-1.5">
+            {conversa.finalidade && (
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  conversa.finalidade === "POS_VENDA"
+                    ? "bg-purple-100 text-purple-700"
+                    : "bg-tiffany/10 text-tiffany"
+                }`}
+              >
+                {conversa.finalidade === "POS_VENDA" ? "Pos-venda" : "Venda"}
+              </span>
+            )}
+            {conversa.instanciaNome && (
+              <span className="truncate text-[10px] text-medio/40">
+                {conversa.instanciaNome}
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2">
           <p className="truncate text-xs text-medio/70">
             {conversa.ultimaMensagemPreview ?? "Sem mensagens"}

@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
-import { TipoEtapa } from "@/generated/prisma/enums";
+import { TipoEtapa, FinalidadeEtapa } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +19,7 @@ export async function GET(): Promise<NextResponse> {
       nome: true,
       cor: true,
       tipo: true,
+      finalidade: true,
       ordem: true,
       ativo: true,
       _count: { select: { negocios: true } },
@@ -30,6 +31,7 @@ export async function GET(): Promise<NextResponse> {
       nome: e.nome,
       cor: e.cor,
       tipo: e.tipo,
+      finalidade: e.finalidade,
       ordem: e.ordem,
       ativo: e.ativo,
       negocios: e._count.negocios,
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!admin) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
-  let body: { nome?: string; cor?: string; tipo?: string };
+  let body: { nome?: string; cor?: string; tipo?: string; finalidade?: string };
   try {
     body = await req.json();
   } catch {
@@ -56,6 +58,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     body?.tipo && body.tipo in TipoEtapa
       ? (body.tipo as TipoEtapa)
       : TipoEtapa.ABERTA;
+  const finalidade =
+    body?.finalidade && body.finalidade in FinalidadeEtapa
+      ? (body.finalidade as FinalidadeEtapa)
+      : FinalidadeEtapa.VENDA;
   const ultima = await prisma.etapa.findFirst({
     orderBy: { ordem: "desc" },
     select: { ordem: true },
@@ -65,6 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       nome,
       cor: body.cor?.trim() || "#3cbfb3",
       tipo,
+      finalidade,
       ordem: (ultima?.ordem ?? 0) + 1,
     },
   });

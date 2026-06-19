@@ -6,31 +6,44 @@ import {
   TipoEtapa,
   Temperatura,
   TipoHistorico,
+  Finalidade,
+  FinalidadeEtapa,
 } from "../generated/prisma/enums";
 
-// Primeira etapa ABERTA do funil (menor ordem). null se o funil nao foi semeado.
-export async function primeiraEtapaAberta() {
+// Etapas elegiveis para uma finalidade: a propria + AMBAS.
+function etapasDaFinalidade(finalidade: Finalidade): FinalidadeEtapa[] {
+  return finalidade === Finalidade.VENDA
+    ? [FinalidadeEtapa.VENDA, FinalidadeEtapa.AMBAS]
+    : [FinalidadeEtapa.POS_VENDA, FinalidadeEtapa.AMBAS];
+}
+
+// Primeira etapa ABERTA do funil da finalidade (menor ordem).
+export async function primeiraEtapaAberta(finalidade: Finalidade) {
   return prisma.etapa.findFirst({
-    where: { tipo: TipoEtapa.ABERTA, ativo: true },
+    where: {
+      tipo: TipoEtapa.ABERTA,
+      ativo: true,
+      finalidade: { in: etapasDaFinalidade(finalidade) },
+    },
     orderBy: { ordem: "asc" },
   });
 }
 
-// Garante UM negocio aberto para o lead. Idempotente: se ja existe um negocio
-// ABERTO, nao cria outro. Registra HistoricoNegocio(CRIACAO).
-// emitir=false no backfill de boot (evita enxurrada de eventos e io ainda nulo).
+// Garante UM negocio aberto para o lead NAQUELA finalidade. Idempotente.
+// Retorna o id do negocio aberto (existente ou criado) ou null se sem funil.
 export async function garantirNegocioParaLead(
   leadId: string,
+  finalidade: Finalidade = Finalidade.VENDA,
   emitir = true,
-): Promise<void> {
+): Promise<string | null> {
   const existente = await prisma.negocio.findFirst({
-    where: { leadId, status: StatusNeg.ABERTO },
+    where: { leadId, finalidade, status: StatusNeg.ABERTO },
     select: { id: true },
   });
-  if (existente) return;
+  if (existente) return existente.id;
 
-  const etapa = await primeiraEtapaAberta();
-  if (!etapa) return; // funil ainda nao configurado
+  const etapa = await primeiraEtapaAberta(finalidade);
+  if (!etapa) return null; // funil ainda nao configurado
 
   const negocio = await prisma.negocio.create({
     data: {
@@ -38,6 +51,7 @@ export async function garantirNegocioParaLead(
       etapaId: etapa.id,
       status: StatusNeg.ABERTO,
       temperatura: Temperatura.MORNO,
+      finalidade,
       entrouEtapaEm: new Date(),
       historicos: {
         create: {
@@ -56,4 +70,5 @@ export async function garantirNegocioParaLead(
       motivo: "criado",
     });
   }
+  return negocio.id;
 }

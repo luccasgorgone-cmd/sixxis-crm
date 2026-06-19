@@ -26,12 +26,19 @@ type Etapa = {
   nome: string;
   cor: string;
   tipo: string;
+  finalidade: string;
   ordem: number;
   ativo: boolean;
   negocios: number;
 };
 
 const TIPOS = ["ABERTA", "GANHO", "PERDIDO"];
+const FINALIDADES = ["VENDA", "POS_VENDA", "AMBAS"];
+const ROTULO_FIN: Record<string, string> = {
+  VENDA: "Venda",
+  POS_VENDA: "Pos-venda",
+  AMBAS: "Ambas",
+};
 
 export function EtapasAdmin() {
   const [etapas, setEtapas] = useState<Etapa[]>([]);
@@ -188,6 +195,18 @@ function LinhaEtapa({
         }}
         className="min-w-0 flex-1 rounded-lg border border-transparent px-2 py-1.5 text-sm font-medium text-escuro outline-none hover:border-black/10 focus:border-tiffany"
       />
+
+      <select
+        value={etapa.finalidade}
+        onChange={(e) => onCampo({ finalidade: e.target.value })}
+        className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-tiffany"
+      >
+        {FINALIDADES.map((f) => (
+          <option key={f} value={f}>
+            {ROTULO_FIN[f]}
+          </option>
+        ))}
+      </select>
 
       <select
         value={etapa.tipo}

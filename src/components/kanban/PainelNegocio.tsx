@@ -29,7 +29,6 @@ import {
   type EtiquetaChip,
   type AgenteResumo,
   type Temperatura,
-  type VendedorOpcao,
   type ObservacaoOpcao,
 } from "./tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
@@ -84,7 +83,6 @@ export function PainelNegocio({
   const [detalhe, setDetalhe] = useState<DetalheNegocio | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aba, setAba] = useState<Aba>("resumo");
-  const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
   const [presets, setPresets] = useState<ObservacaoOpcao[]>([]);
   const [modal, setModal] = useState<{
     tipo: "ganho" | "perdido";
@@ -108,12 +106,8 @@ export function PainelNegocio({
     void carregar();
   }, [carregar]);
 
-  // Listas auxiliares (uma vez): vendedores p/ transferir e observacoes preset.
+  // Observacoes preset (uma vez).
   useEffect(() => {
-    fetch("/api/vendedores")
-      .then((r) => (r.ok ? r.json() : { vendedores: [] }))
-      .then((d) => setVendedores(d.vendedores ?? []))
-      .catch(() => undefined);
     fetch("/api/observacoes")
       .then((r) => (r.ok ? r.json() : { observacoes: [] }))
       .then((d) => setPresets(d.observacoes ?? []))
@@ -237,7 +231,7 @@ export function PainelNegocio({
                 <ClienteAba
                   leadId={detalhe.cliente.id}
                   dono={detalhe.dono}
-                  vendedores={vendedores}
+                  finalidade={detalhe.finalidade}
                   onMudou={() => {
                     void carregar();
                     onAtualizado();

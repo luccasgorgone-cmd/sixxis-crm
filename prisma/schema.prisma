@@ -79,6 +79,19 @@ enum EstrategiaRoteamento {
   ROUND_ROBIN
 }
 
+// Finalidade de um numero/conversa/negocio: pre-venda (VENDA) ou pos-venda.
+enum Finalidade {
+  VENDA
+  POS_VENDA
+}
+
+// Finalidade de uma etapa do funil. AMBAS aparece nos dois funis.
+enum FinalidadeEtapa {
+  VENDA
+  POS_VENDA
+  AMBAS
+}
+
 // Tipos de evento na linha do tempo do CLIENTE (nivel lead).
 enum AtividadeTipo {
   CONTATO
@@ -105,13 +118,14 @@ model Agente {
   metaMensal  Decimal?   @db.Decimal(12, 2)
   ativo       Boolean    @default(true)
   ultimoLogin DateTime?
-  negocios      Negocio[]
-  notas         Nota[]
-  conversas     Conversa[]
-  historicos    HistoricoNegocio[]
-  leadsComoDono Lead[]             @relation("LeadDono")
-  atividades    Atividade[]
-  criadoEm      DateTime           @default(now())
+  negocios              Negocio[]
+  notas                 Nota[]
+  conversas             Conversa[]
+  historicos            HistoricoNegocio[]
+  leadsComoDono         Lead[]             @relation("LeadDono")
+  leadsComoDonoPosVenda Lead[]             @relation("LeadDonoPosVenda")
+  atividades            Atividade[]
+  criadoEm              DateTime           @default(now())
 }
 
 model Lead {
@@ -121,36 +135,44 @@ model Lead {
   email         String?
   origem        String?
   ctwaClid      String?
-  clienteSiteId String?
-  donoId        String?
-  dono          Agente?        @relation("LeadDono", fields: [donoId], references: [id])
-  conversas     Conversa[]
-  negocios      Negocio[]
-  etiquetas     LeadEtiqueta[]
-  notas         Nota[]
-  atividades    Atividade[]
-  criadoEm      DateTime       @default(now())
+  clienteSiteId  String?
+  donoId         String?
+  dono           Agente?        @relation("LeadDono", fields: [donoId], references: [id])
+  donoPosVendaId String?
+  donoPosVenda   Agente?        @relation("LeadDonoPosVenda", fields: [donoPosVendaId], references: [id])
+  conversas      Conversa[]
+  negocios       Negocio[]
+  etiquetas      LeadEtiqueta[]
+  notas          Nota[]
+  atividades     Atividade[]
+  criadoEm       DateTime       @default(now())
 
   @@index([donoId])
+  @@index([donoPosVendaId])
 }
 
 model Conversa {
-  id               String      @id @default(cuid())
+  id               String            @id @default(cuid())
   leadId           String
-  lead             Lead        @relation(fields: [leadId], references: [id])
+  lead             Lead              @relation(fields: [leadId], references: [id])
   agenteId         String?
-  agente           Agente?     @relation(fields: [agenteId], references: [id])
-  instancia        String      @default("sixxis-wa1")
-  status           String      @default("aberta")
-  atendidoPor      AtendidoPor @default(HUMANO)
-  naoLidas         Int         @default(0)
+  agente           Agente?           @relation(fields: [agenteId], references: [id])
+  instancia        String            @default("sixxis-wa1")
+  instanciaId      String?
+  instanciaRef     InstanciaWhatsApp? @relation(fields: [instanciaId], references: [id])
+  finalidade       Finalidade        @default(VENDA)
+  status           String            @default("aberta")
+  atendidoPor      AtendidoPor       @default(HUMANO)
+  naoLidas         Int               @default(0)
   ultimaMensagemEm DateTime?
-  arquivada        Boolean     @default(false)
+  arquivada        Boolean           @default(false)
   mensagens        Mensagem[]
-  criadoEm         DateTime    @default(now())
+  criadoEm         DateTime          @default(now())
 
   @@index([leadId])
   @@index([agenteId])
+  @@index([instanciaId])
+  @@index([finalidade])
 }
 
 model Mensagem {
@@ -172,13 +194,14 @@ model Mensagem {
 }
 
 model Etapa {
-  id       String    @id @default(cuid())
-  nome     String
-  ordem    Int
-  cor      String    @default("#3cbfb3")
-  tipo     TipoEtapa @default(ABERTA)
-  ativo    Boolean   @default(true)
-  negocios Negocio[]
+  id         String          @id @default(cuid())
+  nome       String
+  ordem      Int
+  cor        String          @default("#3cbfb3")
+  tipo       TipoEtapa       @default(ABERTA)
+  finalidade FinalidadeEtapa @default(VENDA)
+  ativo      Boolean         @default(true)
+  negocios   Negocio[]
 }
 
 model Etiqueta {
@@ -209,6 +232,7 @@ model Negocio {
   produtos      Json?
   status        StatusNeg          @default(ABERTO)
   temperatura   Temperatura        @default(MORNO)
+  finalidade    Finalidade         @default(VENDA)
   motivoPerda   String?
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
@@ -219,6 +243,7 @@ model Negocio {
 
   @@index([etapaId, status])
   @@index([agenteId])
+  @@index([finalidade])
 }
 
 // Linha do tempo do negocio: cada mudanca relevante vira um registro.
@@ -256,12 +281,27 @@ model ObservacaoPreset {
 
 // Configuracao (singleton) do roteamento de leads entre vendedores.
 model ConfigRoteamento {
-  id              String               @id @default(cuid())
-  estrategia      EstrategiaRoteamento @default(ROUND_ROBIN)
-  ativo           Boolean              @default(true)
-  respeitarDono   Boolean              @default(true)
-  ponteiroAgenteId String?
-  atualizadoEm    DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  estrategia        EstrategiaRoteamento @default(ROUND_ROBIN)
+  ativo             Boolean              @default(true)
+  respeitarDono     Boolean              @default(true)
+  ponteiroAgenteId  String?
+  ponteiroPosVendaId String?
+  atualizadoEm      DateTime             @updatedAt
+}
+
+// Numero de WhatsApp (instancia Evolution) com finalidade VENDA ou POS_VENDA.
+model InstanciaWhatsApp {
+  id                 String     @id @default(cuid())
+  nome               String
+  instanciaEvolution String     @unique
+  numero             String?
+  finalidade         Finalidade @default(VENDA)
+  ativo              Boolean    @default(true)
+  statusConexao      String?
+  conversas          Conversa[]
+  criadoEm           DateTime   @default(now())
+  atualizadoEm       DateTime   @updatedAt
 }
 
 // Linha do tempo do CLIENTE (nivel lead): contato, atribuicao, transferencia,
