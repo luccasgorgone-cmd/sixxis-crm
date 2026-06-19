@@ -22,6 +22,7 @@ import {
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
 import { ClienteAba } from "./ClienteAba";
+import { LojaCliente } from "@/components/loja/LojaCliente";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -33,7 +34,7 @@ import {
 } from "./tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
-type Aba = "resumo" | "conversa" | "notas" | "cliente" | "timeline";
+type Aba = "resumo" | "conversa" | "notas" | "cliente" | "loja" | "timeline";
 
 const ICONE_HIST: Record<string, typeof Tag> = {
   CRIACAO: Sparkles,
@@ -164,6 +165,7 @@ export function PainelNegocio({
               ["conversa", "Conversa"],
               ["notas", "Notas"],
               ["cliente", "Cliente"],
+              ["loja", "Loja"],
               ["timeline", "Negocio"],
             ] as [Aba, string][]
           ).map(([chave, rotulo]) => (
@@ -241,6 +243,12 @@ export function PainelNegocio({
                     void carregar();
                     onAtualizado();
                   }}
+                />
+              )}
+              {aba === "loja" && (
+                <LojaCliente
+                  telefone={detalhe.cliente.telefone}
+                  origem={detalhe.cliente.origem}
                 />
               )}
               {aba === "timeline" && <Timeline detalhe={detalhe} />}

@@ -21,6 +21,7 @@ import {
 import { Thread } from "@/components/inbox/Thread";
 import { getSocket } from "@/lib/socketClient";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import { LojaCliente } from "@/components/loja/LojaCliente";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 import type {
   MensagemItem,
@@ -85,6 +86,7 @@ export function InspecaoConversa({
   const [acao, setAcao] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
+  const [abaLado, setAbaLado] = useState<"timeline" | "loja">("timeline");
 
   const carregarTudo = useCallback(async () => {
     // Mensagens.
@@ -291,11 +293,31 @@ export function InspecaoConversa({
           </div>
         )}
 
-        {/* Timeline */}
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
-          Linha do tempo
-        </h4>
-        {atividades.length === 0 ? (
+        {/* Alternancia Atividade | Loja */}
+        <div className="mb-3 flex gap-1 border-b border-black/5">
+          {(
+            [
+              ["timeline", "Atividade"],
+              ["loja", "Loja"],
+            ] as ["timeline" | "loja", string][]
+          ).map(([chave, rotulo]) => (
+            <button
+              key={chave}
+              onClick={() => setAbaLado(chave)}
+              className={`border-b-2 px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                abaLado === chave
+                  ? "border-tiffany text-tiffany"
+                  : "border-transparent text-medio/60 hover:text-escuro"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+
+        {abaLado === "loja" ? (
+          <LojaCliente telefone={leadTelefone} />
+        ) : atividades.length === 0 ? (
           <p className="text-sm text-medio/50">Sem atividades.</p>
         ) : (
           <ol className="space-y-3">

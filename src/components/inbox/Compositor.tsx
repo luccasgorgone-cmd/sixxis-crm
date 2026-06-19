@@ -4,8 +4,10 @@
 // Enter envia, Shift+Enter quebra linha. Digitar "/" abre a lista filtravel; ao
 // escolher, o texto e inserido no compositor (editavel antes de enviar).
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { Send, Loader2, Zap, X } from "lucide-react";
+import { Send, Loader2, Zap, X, Package } from "lucide-react";
 import type { MensagemItem } from "./tipos";
+import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
+import type { ProdutoLoja } from "@/components/loja/tipos";
 
 type Resposta = {
   id: string;
@@ -29,6 +31,15 @@ export function Compositor({
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
+  const [seletorProduto, setSeletorProduto] = useState(false);
+
+  function inserirProduto(p: ProdutoLoja) {
+    const msg = mensagemProduto(p);
+    const base = texto.trim();
+    setTexto(base === "" || base.startsWith("/") ? msg : `${base}\n${msg}`);
+    setSeletorProduto(false);
+    setTimeout(() => ref.current?.focus(), 0);
+  }
 
   useEffect(() => {
     fetch("/api/respostas")
@@ -157,6 +168,13 @@ export function Compositor({
         </div>
       )}
 
+      {seletorProduto && (
+        <SeletorProduto
+          onEscolher={inserirProduto}
+          onFechar={() => setSeletorProduto(false)}
+        />
+      )}
+
       <div className="flex items-end gap-2">
         <button
           onClick={() => {
@@ -171,6 +189,13 @@ export function Compositor({
           }`}
         >
           <Zap className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setSeletorProduto(true)}
+          title="Enviar produto"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+        >
+          <Package className="h-5 w-5" />
         </button>
         <textarea
           ref={ref}
