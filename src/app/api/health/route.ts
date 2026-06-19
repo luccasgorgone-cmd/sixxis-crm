@@ -2,7 +2,7 @@
 // Retorna 200 se ambos respondem; 503 se algum falhar.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { redis } from "@/lib/redis";
+import { getRedis } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ export async function GET(): Promise<NextResponse> {
   }
 
   try {
-    const pong = await redis.ping();
+    // Conexao Redis obtida sob demanda aqui dentro (runtime).
+    const pong = await getRedis().ping();
     redisStatus = pong === "PONG" ? "ok" : "erro";
   } catch {
     redisStatus = "erro";

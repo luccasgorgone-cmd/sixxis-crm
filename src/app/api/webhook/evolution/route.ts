@@ -3,7 +3,7 @@
 // quem decide o que fazer (inclusive ignorar) e o worker da fila.
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
-import { messagesQueue } from "@/lib/queue";
+import { getMessagesQueue } from "@/lib/queue";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +38,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, ignorado: true });
   }
 
-  await messagesQueue.add("evolution-event", payload);
+  // Fila criada sob demanda aqui dentro (runtime), nunca no topo do modulo.
+  await getMessagesQueue().add("evolution-event", payload);
 
   return NextResponse.json({ ok: true });
 }

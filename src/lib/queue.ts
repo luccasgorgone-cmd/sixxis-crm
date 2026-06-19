@@ -10,30 +10,53 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { TipoMsg, DirecaoMsg, Prisma } from "../generated/prisma/client";
 
-// Conexao dedicada para a fila/worker. Separada do singleton de redis.ts
-// porque o worker usa comandos bloqueantes (BRPOPLPUSH) que ocupariam a
-// conexao usada pelo health check. maxRetriesPerRequest: null e exigido.
-// BullMQ embute sua propria copia do ioredis; o cast resolve a divergencia
-// puramente estrutural de tipos (em runtime e a mesma biblioteca).
-const connection = new IORedis(
-  process.env.REDIS_URL ?? "redis://localhost:6379",
-  { maxRetriesPerRequest: null },
-) as unknown as ConnectionOptions;
-
 const NOME_FILA = "messages-in";
 
-// Produtor: o webhook usa esta fila para enfileirar os eventos da Evolution.
-export const messagesQueue = new Queue(NOME_FILA, {
-  connection,
-  defaultJobOptions: {
-    // Retry com backoff exponencial caso o processamento falhe.
-    attempts: 5,
-    backoff: { type: "exponential", delay: 2000 },
-    // Limpeza para nao acumular jobs concluidos/falhos indefinidamente.
-    removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 5000 },
-  },
-});
+// IMPORTANTE: nada de conexao Redis/BullMQ no topo do modulo. Tudo e criado
+// sob demanda (lazy), so em runtime. Assim o "next build" nao tenta conectar
+// no Redis em tempo de build (no Railway o Redis nem e alcancavel no build).
+
+// Conexao dedicada para a fila/worker, criada sob demanda. Separada do
+// singleton de redis.ts porque o worker usa comandos bloqueantes (BRPOPLPUSH)
+// que ocupariam a conexao usada pelo health check.
+// lazyConnect: true => so conecta na primeira operacao (runtime).
+// maxRetriesPerRequest: null e exigido pelo BullMQ.
+let connectionSingleton: IORedis | null = null;
+function getConnection(): ConnectionOptions {
+  if (!connectionSingleton) {
+    const conn = new IORedis(
+      process.env.REDIS_URL ?? "redis://localhost:6379",
+      { lazyConnect: true, maxRetriesPerRequest: null },
+    );
+    conn.on("error", (err) => {
+      console.error(`[queue] erro de conexao redis: ${err?.message}`);
+    });
+    connectionSingleton = conn;
+  }
+  // BullMQ embute sua propria copia do ioredis; o cast resolve a divergencia
+  // puramente estrutural de tipos (em runtime e a mesma biblioteca).
+  return connectionSingleton as unknown as ConnectionOptions;
+}
+
+// Produtor: a fila e criada na PRIMEIRA chamada (dentro do handler do webhook),
+// nunca no carregamento do modulo.
+let queueSingleton: Queue | null = null;
+export function getMessagesQueue(): Queue {
+  if (!queueSingleton) {
+    queueSingleton = new Queue(NOME_FILA, {
+      connection: getConnection(),
+      defaultJobOptions: {
+        // Retry com backoff exponencial caso o processamento falhe.
+        attempts: 5,
+        backoff: { type: "exponential", delay: 2000 },
+        // Limpeza para nao acumular jobs concluidos/falhos indefinidamente.
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
+      },
+    });
+  }
+  return queueSingleton;
+}
 
 // Estrutura minima esperada do evento da Evolution v2.
 type EventoEvolution = {
@@ -214,7 +237,7 @@ export function createMessagesWorker(io?: Server): Worker {
       // reprocessar (retry). Um job ruim nunca derruba o worker.
       await processarEvento(job.data as EventoEvolution, io ?? null);
     },
-    { connection },
+    { connection: getConnection() },
   );
 
   worker.on("failed", (job, err) => {

@@ -1,20 +1,29 @@
 // Conexao ioredis usada para checagens gerais (ex.: health check).
-// maxRetriesPerRequest: null e exigencia do BullMQ e mantemos aqui por
-// consistencia. O singleton via globalThis evita multiplas conexoes no dev.
+// IMPORTANTE: a conexao e criada SOB DEMANDA (getRedis), nunca no topo do
+// modulo. Isso evita que o "next build" tente conectar no Redis em tempo de
+// build (no Railway o Redis nem e alcancavel durante o build).
+// lazyConnect: true => so conecta na primeira operacao (em runtime).
+// maxRetriesPerRequest: null e exigencia do BullMQ; mantido por consistencia.
 import IORedis from "ioredis";
 
 const globalForRedis = globalThis as unknown as {
   redis?: IORedis;
 };
 
-function criarRedis(): IORedis {
-  return new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+export function getRedis(): IORedis {
+  if (globalForRedis.redis) return globalForRedis.redis;
+
+  const redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+    lazyConnect: true,
     maxRetriesPerRequest: null,
   });
-}
 
-export const redis = globalForRedis.redis ?? criarRedis();
+  // Sem handler de 'error', um erro de conexao vira "unhandled error event"
+  // e derruba o processo. Apenas logamos.
+  redis.on("error", (err) => {
+    console.error(`[redis] erro: ${err?.message}`);
+  });
 
-if (process.env.NODE_ENV !== "production") {
   globalForRedis.redis = redis;
+  return redis;
 }
