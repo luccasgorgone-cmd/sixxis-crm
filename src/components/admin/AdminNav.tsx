@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Eye,
   Users,
   Columns3,
   Tags,
@@ -30,6 +31,7 @@ type Secao = {
 
 const SECOES: Secao[] = [
   { rotulo: "Painel", href: "/admin/dashboard", icone: LayoutDashboard },
+  { rotulo: "Colaboradores", href: "/admin/colaboradores", icone: Eye },
   { rotulo: "Equipe", href: "/admin/vendedores", icone: Users },
   { rotulo: "Numeros WhatsApp", href: "/admin/numeros", icone: Smartphone },
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },

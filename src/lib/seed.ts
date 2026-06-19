@@ -332,6 +332,7 @@ export async function purgarDadosTeste(): Promise<void> {
   const emailsTeste = [
     "teste.vendedora@sixxis.local",
     "teste.vendedorb@sixxis.local",
+    "teste.ambos@sixxis.local",
   ];
   const telefonesTeste = ["5500000000001", "5500000000002"];
   try {

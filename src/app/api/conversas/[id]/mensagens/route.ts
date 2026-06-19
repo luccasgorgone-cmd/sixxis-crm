@@ -43,17 +43,20 @@ export async function GET(
     },
   });
 
-  // Marca como lidas / zera o badge. Best-effort: nao falha a leitura.
-  await prisma.$transaction([
-    prisma.mensagem.updateMany({
-      where: { conversaId: id, direcao: DirecaoMsg.IN, lida: false },
-      data: { lida: true },
-    }),
-    prisma.conversa.update({
-      where: { id },
-      data: { naoLidas: 0 },
-    }),
-  ]);
+  // Marca como lidas / zera o badge APENAS para o dono da conversa (quem
+  // realmente esta atendendo). A inspecao do admin nao zera o contador alheio.
+  if (conversa.agenteId === session.user.id) {
+    await prisma.$transaction([
+      prisma.mensagem.updateMany({
+        where: { conversaId: id, direcao: DirecaoMsg.IN, lida: false },
+        data: { lida: true },
+      }),
+      prisma.conversa.update({
+        where: { id },
+        data: { naoLidas: 0 },
+      }),
+    ]);
+  }
 
   return NextResponse.json({
     conversa: {
@@ -61,6 +64,7 @@ export async function GET(
       leadNome: conversa.lead.nome,
       leadTelefone: conversa.lead.telefone,
       atendidoPor: conversa.atendidoPor,
+      finalidade: conversa.finalidade,
     },
     mensagens,
   });

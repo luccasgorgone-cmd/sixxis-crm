@@ -16,6 +16,7 @@ import {
 import { getSocket } from "@/lib/socketClient";
 import { ColunaKanban } from "./ColunaKanban";
 import { CardNegocio } from "./CardNegocio";
+import { corFinalidade } from "@/components/BadgeFinalidade";
 import { BarraFiltros } from "./BarraFiltros";
 import { ModalFechamento } from "./ModalFechamento";
 import { PainelNegocio } from "./PainelNegocio";
@@ -273,6 +274,23 @@ export function Kanban({
     !erro &&
     Object.values(colunas).every((c) => c.length === 0);
 
+  // Agrupa as etapas por funil (finalidade). Quando ha mais de uma finalidade
+  // (acesso duplo do colaborador), o quadro mostra secoes separadas e coloridas.
+  const secoes = useMemo(() => {
+    const grupos = new Map<"VENDA" | "POS_VENDA", Etapa[]>();
+    for (const e of etapas) {
+      const f = e.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA";
+      const lista = grupos.get(f) ?? [];
+      lista.push(e);
+      grupos.set(f, lista);
+    }
+    const ordem: ("VENDA" | "POS_VENDA")[] = ["VENDA", "POS_VENDA"];
+    return ordem
+      .filter((f) => grupos.has(f))
+      .map((f) => ({ finalidade: f, etapas: grupos.get(f) ?? [] }));
+  }, [etapas]);
+  const multiSecao = secoes.length > 1;
+
   const podeAlternar = papel === "ADMIN";
 
   return (
@@ -321,16 +339,56 @@ export function Kanban({
           onDragStart={aoIniciar}
           onDragEnd={aoFinalizar}
         >
-          <div className="scroll-fino flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
-            {etapas.map((etapa) => (
-              <ColunaKanban
-                key={etapa.id}
-                etapa={etapa}
-                cards={colunas[etapa.id] ?? []}
-                onAbrir={setDrawerId}
-              />
-            ))}
-          </div>
+          {multiSecao ? (
+            <div className="scroll-fino flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+              {secoes.map((s) => {
+                const cor = corFinalidade(s.finalidade);
+                return (
+                  <section key={s.finalidade} className="min-h-0">
+                    <div
+                      className="mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      style={{ backgroundColor: `${cor.hex}14` }}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: cor.hex }}
+                      />
+                      <h2
+                        className="text-sm font-semibold"
+                        style={{ color: cor.hex }}
+                      >
+                        {cor.rotulo}
+                      </h2>
+                    </div>
+                    <div
+                      className="scroll-fino flex gap-3 overflow-x-auto rounded-xl border-l-2 pl-2"
+                      style={{ borderColor: cor.hex }}
+                    >
+                      {s.etapas.map((etapa) => (
+                        <ColunaKanban
+                          key={etapa.id}
+                          etapa={etapa}
+                          cards={colunas[etapa.id] ?? []}
+                          onAbrir={setDrawerId}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="scroll-fino flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+              {etapas.map((etapa) => (
+                <ColunaKanban
+                  key={etapa.id}
+                  etapa={etapa}
+                  cards={colunas[etapa.id] ?? []}
+                  onAbrir={setDrawerId}
+                />
+              ))}
+            </div>
+          )}
 
           <DragOverlay>
             {ativo ? <CardNegocio card={ativo} arrastando /> : null}

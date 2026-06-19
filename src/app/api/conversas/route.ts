@@ -56,10 +56,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     naoLidas: c.naoLidas,
     atendidoPor: c.atendidoPor,
     agenteId: c.agenteId,
-    // Finalidade/instancia SO para ADMIN: o colaborador nunca ve a distincao.
+    // Finalidade visivel a todos (indicador colorido). Nome/numero da instancia
+    // segue apenas para ADMIN.
+    finalidade: c.finalidade,
     ...(admin
       ? {
-          finalidade: c.finalidade,
           instanciaNome: c.instanciaRef?.nome ?? c.instancia,
           instanciaNumero: c.instanciaRef?.numero ?? null,
         }

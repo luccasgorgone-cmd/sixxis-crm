@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
+import { BadgeFinalidade } from "@/components/BadgeFinalidade";
 import {
   horaCurta,
   rotuloDia,
@@ -29,11 +30,13 @@ export function Thread({
   mensagens,
   carregando,
   onEnviada,
+  somenteLeitura = false,
 }: {
   conversa: ConversaItem;
   mensagens: MensagemItem[];
   carregando: boolean;
-  onEnviada: (msg: MensagemItem) => void;
+  onEnviada?: (msg: MensagemItem) => void;
+  somenteLeitura?: boolean;
 }) {
   const fimRef = useRef<HTMLDivElement>(null);
 
@@ -59,14 +62,11 @@ export function Thread({
           </p>
         </div>
         {conversa.finalidade && (
-          <span
-            className={`ml-auto rounded-full px-2.5 py-1 text-xs font-medium ${
-              conversa.finalidade === "POS_VENDA"
-                ? "bg-purple-100 text-purple-700"
-                : "bg-tiffany/10 text-tiffany"
-            }`}
-          >
-            {conversa.finalidade === "POS_VENDA" ? "Pos-venda" : "Venda"}
+          <span className="ml-auto">
+            <BadgeFinalidade
+              finalidade={conversa.finalidade}
+              className="px-2.5 py-1 text-xs"
+            />
           </span>
         )}
         <span
@@ -101,7 +101,16 @@ export function Thread({
         <div ref={fimRef} />
       </div>
 
-      <Compositor conversaId={conversa.id} onEnviada={onEnviada} />
+      {somenteLeitura ? (
+        <div className="border-t border-black/5 bg-white px-4 py-3 text-center text-xs text-medio/50">
+          Modo inspecao (somente leitura)
+        </div>
+      ) : (
+        <Compositor
+          conversaId={conversa.id}
+          onEnviada={onEnviada ?? (() => undefined)}
+        />
+      )}
     </div>
   );
 }

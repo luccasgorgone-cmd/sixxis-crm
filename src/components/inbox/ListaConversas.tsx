@@ -4,6 +4,7 @@
 import { Search, Bot, User as UserIcon } from "lucide-react";
 import type { ConversaItem, Filtro, Finalidade } from "./tipos";
 import { horarioLista, iniciais } from "@/lib/format";
+import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "minhas", rotulo: "Minhas" },
@@ -126,10 +127,12 @@ function ItemConversa({
   onClick: () => void;
 }) {
   const nome = conversa.leadNome?.trim() || conversa.leadTelefone;
+  const cor = conversa.finalidade ? corFinalidade(conversa.finalidade) : null;
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 border-b border-black/5 px-3 py-3 text-left transition-colors ${
+      style={cor ? { borderLeftColor: cor.hex } : undefined}
+      className={`flex w-full items-center gap-3 border-b border-l-[3px] border-black/5 px-3 py-3 text-left transition-colors ${
         ativa ? "bg-tiffany/10" : "hover:bg-fundo"
       }`}
     >
@@ -158,17 +161,7 @@ function ItemConversa({
         </div>
         {(conversa.finalidade || conversa.instanciaNome) && (
           <div className="mb-0.5 flex items-center gap-1.5">
-            {conversa.finalidade && (
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                  conversa.finalidade === "POS_VENDA"
-                    ? "bg-purple-100 text-purple-700"
-                    : "bg-tiffany/10 text-tiffany"
-                }`}
-              >
-                {conversa.finalidade === "POS_VENDA" ? "Pos-venda" : "Venda"}
-              </span>
-            )}
+            <BadgeFinalidade finalidade={conversa.finalidade} />
             {conversa.instanciaNome && (
               <span className="truncate text-[10px] text-medio/40">
                 {conversa.instanciaNome}
