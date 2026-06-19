@@ -1,0 +1,144 @@
+// Prisma 7 — generator novo "prisma-client" (Rust-free) com saida em src/generated.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Papel {
+  VENDEDOR
+  POS_VENDA
+  ADMIN
+}
+
+enum DirecaoMsg {
+  IN
+  OUT
+}
+
+enum TipoMsg {
+  TEXTO
+  AUDIO
+  IMAGEM
+  VIDEO
+  DOCUMENTO
+  OUTRO
+}
+
+enum StatusNeg {
+  ABERTO
+  GANHO
+  PERDIDO
+}
+
+model Agente {
+  id         String   @id @default(cuid())
+  nome       String
+  email      String   @unique
+  papel      Papel    @default(VENDEDOR)
+  avatarUrl  String?
+  metaMensal Decimal? @db.Decimal(12, 2)
+  ativo      Boolean  @default(true)
+  negocios   Negocio[]
+  notas      Nota[]
+  criadoEm   DateTime @default(now())
+}
+
+model Lead {
+  id            String         @id @default(cuid())
+  nome          String?
+  telefone      String         @unique
+  email         String?
+  origem        String?
+  ctwaClid      String?
+  clienteSiteId String?
+  conversas     Conversa[]
+  negocios      Negocio[]
+  etiquetas     LeadEtiqueta[]
+  notas         Nota[]
+  criadoEm      DateTime       @default(now())
+}
+
+model Conversa {
+  id        String     @id @default(cuid())
+  leadId    String
+  lead      Lead       @relation(fields: [leadId], references: [id])
+  instancia String     @default("sixxis-wa1")
+  status    String     @default("aberta")
+  mensagens Mensagem[]
+  criadoEm  DateTime   @default(now())
+
+  @@index([leadId])
+}
+
+model Mensagem {
+  id          String     @id @default(cuid())
+  externalId  String     @unique
+  conversaId  String
+  conversa    Conversa   @relation(fields: [conversaId], references: [id])
+  direcao     DirecaoMsg
+  tipo        TipoMsg    @default(TEXTO)
+  conteudo    String?    @db.Text
+  transcricao String?    @db.Text
+  mediaUrl    String?
+  raw         Json
+  hora        DateTime   @default(now())
+
+  @@index([conversaId, hora])
+}
+
+model Etapa {
+  id       String    @id @default(cuid())
+  nome     String
+  ordem    Int
+  cor      String    @default("#3cbfb3")
+  ativo    Boolean   @default(true)
+  negocios Negocio[]
+}
+
+model Etiqueta {
+  id    String         @id @default(cuid())
+  nome  String
+  cor   String         @default("#3cbfb3")
+  leads LeadEtiqueta[]
+}
+
+model LeadEtiqueta {
+  leadId     String
+  etiquetaId String
+  lead       Lead     @relation(fields: [leadId], references: [id])
+  etiqueta   Etiqueta @relation(fields: [etiquetaId], references: [id])
+
+  @@id([leadId, etiquetaId])
+}
+
+model Negocio {
+  id           String    @id @default(cuid())
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id])
+  agenteId     String?
+  agente       Agente?   @relation(fields: [agenteId], references: [id])
+  etapaId      String?
+  etapa        Etapa?    @relation(fields: [etapaId], references: [id])
+  valor        Decimal?  @db.Decimal(12, 2)
+  produtos     Json?
+  status       StatusNeg @default(ABERTO)
+  motivoPerda  String?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  @@index([etapaId, status])
+}
+
+model Nota {
+  id       String   @id @default(cuid())
+  leadId   String
+  lead     Lead     @relation(fields: [leadId], references: [id])
+  agenteId String?
+  agente   Agente?  @relation(fields: [agenteId], references: [id])
+  texto    String   @db.Text
+  criadoEm DateTime @default(now())
+}

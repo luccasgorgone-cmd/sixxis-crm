@@ -1,0 +1,23 @@
+# Dependencias
+node_modules
+
+# Variaveis de ambiente (NUNCA comitar)
+.env
+.env.local
+
+# Build do Next
+.next
+dist
+next-env.d.ts
+*.tsbuildinfo
+
+# Prisma Client gerado (recriado no postinstall via "prisma generate")
+src/generated
+
+# Logs
+*.log
+npm-debug.log*
+
+# SO
+.DS_Store
+Thumbs.db
