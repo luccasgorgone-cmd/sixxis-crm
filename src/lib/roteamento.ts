@@ -8,7 +8,7 @@
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { StatusNeg, AtividadeTipo, TipoHistorico, Finalidade } from "../generated/prisma/enums";
-import { campoDono, campoPonteiro, papelDaFinalidade, espelharDonoNasConversas } from "./dono";
+import { campoDono, campoPonteiro, filtroEquipe, espelharDonoNasConversas } from "./dono";
 
 export async function rotearLeadNovo(
   leadId: string,
@@ -16,7 +16,6 @@ export async function rotearLeadNovo(
 ): Promise<void> {
   const campoOwner = campoDono(finalidade);
   const campoPont = campoPonteiro(finalidade);
-  const papelEquipe = papelDaFinalidade(finalidade);
 
   const resultado = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.findUnique({
@@ -46,9 +45,9 @@ export async function rotearLeadNovo(
       tipo = AtividadeTipo.CONTATO;
       descricao = "Contato recorrente atribuido ao dono";
     } else if (config?.ativo) {
-      // 2) Round-robin na equipe da finalidade.
+      // 2) Round-robin na fila (acesso) da finalidade.
       const equipe = await tx.agente.findMany({
-        where: { ativo: true, papel: papelEquipe },
+        where: filtroEquipe(finalidade),
         orderBy: { criadoEm: "asc" },
         select: { id: true, nome: true },
       });

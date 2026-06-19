@@ -228,11 +228,6 @@ export async function seedFinalidadeEInstancias(): Promise<void> {
       where: { finalidade: FinalidadeEtapa.POS_VENDA },
     });
     if (temPosVenda === 0) {
-      // As etapas existentes (finalidade VENDA por padrao da migracao) viram AMBAS.
-      await prisma.etapa.updateMany({
-        where: { finalidade: FinalidadeEtapa.VENDA },
-        data: { finalidade: FinalidadeEtapa.AMBAS },
-      });
       const ultima = await prisma.etapa.findFirst({
         orderBy: { ordem: "desc" },
         select: { ordem: true },
@@ -251,9 +246,44 @@ export async function seedFinalidadeEInstancias(): Promise<void> {
     } else {
       console.log("[seed] funil pos-venda ok");
     }
+
+    // A1 (2.5): as etapas da 2.3 deixam de ser AMBAS e passam a VENDA, para o
+    // funil de venda e o de pos-venda ficarem proprios e limpos. Idempotente.
+    const nomes23 = ETAPAS_PADRAO.map((e) => e.nome);
+    const flip = await prisma.etapa.updateMany({
+      where: { nome: { in: nomes23 }, finalidade: FinalidadeEtapa.AMBAS },
+      data: { finalidade: FinalidadeEtapa.VENDA },
+    });
+    if (flip.count > 0) {
+      console.log(`[seed] ${flip.count} etapas AMBAS -> VENDA`);
+    }
   } catch (erro) {
     console.error(
       `[seed] falha em finalidade/instancias: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Backfill de acesso por papel (legado). Idempotente. Agentes editados pela
+// tela de Equipe passam a ter papel COLABORADOR/ADMIN e nao sao mais tocados.
+export async function backfillAcesso(): Promise<void> {
+  try {
+    await prisma.agente.updateMany({
+      where: { papel: Papel.VENDEDOR },
+      data: { acessoVenda: true, acessoPosVenda: false },
+    });
+    await prisma.agente.updateMany({
+      where: { papel: Papel.POS_VENDA },
+      data: { acessoVenda: false, acessoPosVenda: true },
+    });
+    await prisma.agente.updateMany({
+      where: { papel: Papel.ADMIN },
+      data: { acessoVenda: true, acessoPosVenda: true },
+    });
+    console.log("[seed] backfill de acesso ok");
+  } catch (erro) {
+    console.error(
+      `[seed] falha no backfill de acesso: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }

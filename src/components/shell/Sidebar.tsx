@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   Inbox as InboxIcon,
   KanbanSquare,
+  LayoutDashboard,
   Target,
   Shield,
   type LucideIcon,
@@ -24,6 +25,9 @@ export function Sidebar({ papel }: { papel: string }) {
   const pathname = usePathname();
 
   const itens: Item[] = [
+    papel === "ADMIN"
+      ? { rotulo: "Painel", href: "/admin/dashboard", icone: LayoutDashboard }
+      : { rotulo: "Painel", href: "/dashboard", icone: LayoutDashboard },
     { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
     { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
     { rotulo: "Metas", href: "#", icone: Target, emBreve: true },

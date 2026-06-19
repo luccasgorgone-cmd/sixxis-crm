@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// /admin cai na primeira secao.
+// /admin cai no painel da operacao.
 export default function AdminHome() {
-  redirect("/admin/vendedores");
+  redirect("/admin/dashboard");
 }

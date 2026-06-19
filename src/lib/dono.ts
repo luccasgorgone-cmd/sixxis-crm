@@ -24,6 +24,28 @@ export function papelDaFinalidade(finalidade: Finalidade): Papel {
   return finalidade === Finalidade.VENDA ? Papel.VENDEDOR : Papel.POS_VENDA;
 }
 
+// Filtro da fila (equipe) de uma finalidade: agentes ativos, NAO-admin, com
+// acesso aquela finalidade. Substitui o pool por papel (2.4).
+export function filtroEquipe(finalidade: Finalidade): Prisma.AgenteWhereInput {
+  return {
+    ativo: true,
+    papel: { not: Papel.ADMIN },
+    ...(finalidade === Finalidade.VENDA
+      ? { acessoVenda: true }
+      : { acessoPosVenda: true }),
+  };
+}
+
+// Um agente tem acesso aquela finalidade?
+export function temAcesso(
+  agente: { acessoVenda: boolean; acessoPosVenda: boolean },
+  finalidade: Finalidade,
+): boolean {
+  return finalidade === Finalidade.VENDA
+    ? agente.acessoVenda
+    : agente.acessoPosVenda;
+}
+
 // Espelha o dono nas conversas abertas do lead naquela finalidade.
 export async function espelharDonoNasConversas(
   client: ClientePrisma,

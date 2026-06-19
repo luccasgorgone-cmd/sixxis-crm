@@ -213,6 +213,15 @@ export function Kanban({
     const destino = etapas.find((et) => et.id === destinoEtapaId);
     if (!destino) return;
 
+    // Nao permite mover entre funis de finalidades diferentes (uniao de acesso).
+    if (
+      destino.finalidade &&
+      destino.finalidade !== "AMBAS" &&
+      destino.finalidade !== achado.card.finalidade
+    ) {
+      return;
+    }
+
     if (destino.tipo === "GANHO") {
       setPendente({
         tipo: "ganho",

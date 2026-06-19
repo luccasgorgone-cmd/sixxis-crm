@@ -44,24 +44,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     take: 200,
   });
 
-  const lista = conversas.map((c) => {
-    const ultima = c.mensagens[0];
-    return {
-      id: c.id,
-      leadNome: c.lead.nome,
-      leadTelefone: c.lead.telefone,
-      ultimaMensagemPreview: ultima
-        ? previewMensagem(ultima.tipo, ultima.conteudo)
-        : null,
-      ultimaMensagemEm: c.ultimaMensagemEm,
-      naoLidas: c.naoLidas,
-      atendidoPor: c.atendidoPor,
-      agenteId: c.agenteId,
-      finalidade: c.finalidade,
-      instanciaNome: c.instanciaRef?.nome ?? c.instancia,
-      instanciaNumero: c.instanciaRef?.numero ?? null,
-    };
-  });
+  const admin = ehAdmin(agente.papel);
+  const lista = conversas.map((c) => ({
+    id: c.id,
+    leadNome: c.lead.nome,
+    leadTelefone: c.lead.telefone,
+    ultimaMensagemPreview: c.mensagens[0]
+      ? previewMensagem(c.mensagens[0].tipo, c.mensagens[0].conteudo)
+      : null,
+    ultimaMensagemEm: c.ultimaMensagemEm,
+    naoLidas: c.naoLidas,
+    atendidoPor: c.atendidoPor,
+    agenteId: c.agenteId,
+    // Finalidade/instancia SO para ADMIN: o colaborador nunca ve a distincao.
+    ...(admin
+      ? {
+          finalidade: c.finalidade,
+          instanciaNome: c.instanciaRef?.nome ?? c.instancia,
+          instanciaNumero: c.instanciaRef?.numero ?? null,
+        }
+      : {}),
+  }));
 
   return NextResponse.json({ conversas: lista });
 }

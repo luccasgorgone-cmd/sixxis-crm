@@ -67,6 +67,25 @@ export function formatarBRL(valor: number | null | undefined): string {
   });
 }
 
+// Duracao legivel a partir de segundos: "—", "45 min", "2 h 5 min", "1 d 3 h".
+export function formatarDuracao(seg: number | null | undefined): string {
+  if (!seg || seg <= 0) return "—";
+  const min = Math.round(seg / 60);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const restoMin = min % 60;
+  if (h < 24) return restoMin ? `${h} h ${restoMin} min` : `${h} h`;
+  const d = Math.floor(h / 24);
+  const restoH = h % 24;
+  return restoH ? `${d} d ${restoH} h` : `${d} d`;
+}
+
+// Percentual a partir de 0..1: "62%".
+export function formatarPct(v: number | null | undefined): string {
+  if (v == null) return "0%";
+  return `${Math.round(v * 100)}%`;
+}
+
 // "ha X" desde uma data (tempo na etapa): "agora", "ha 3 h", "ha 2 d".
 export function tempoDesde(valor: string | Date | null | undefined): string {
   if (!valor) return "";

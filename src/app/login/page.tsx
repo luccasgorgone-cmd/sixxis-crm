@@ -20,7 +20,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") || "/inbox";
+  const callbackUrl = params.get("callbackUrl") || "/";
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");

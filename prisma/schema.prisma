@@ -11,6 +11,7 @@ datasource db {
 enum Papel {
   VENDEDOR
   POS_VENDA
+  COLABORADOR
   ADMIN
 }
 
@@ -112,12 +113,14 @@ model Agente {
   nome        String
   email       String     @unique
   senha       String?
-  papel       Papel      @default(VENDEDOR)
-  telefone    String?
-  avatarUrl   String?
-  metaMensal  Decimal?   @db.Decimal(12, 2)
-  ativo       Boolean    @default(true)
-  ultimoLogin DateTime?
+  papel         Papel    @default(COLABORADOR)
+  telefone      String?
+  avatarUrl     String?
+  metaMensal    Decimal? @db.Decimal(12, 2)
+  ativo         Boolean  @default(true)
+  acessoVenda   Boolean  @default(true)
+  acessoPosVenda Boolean @default(false)
+  ultimoLogin   DateTime?
   negocios              Negocio[]
   notas                 Nota[]
   conversas             Conversa[]
@@ -173,6 +176,7 @@ model Conversa {
   @@index([agenteId])
   @@index([instanciaId])
   @@index([finalidade])
+  @@index([agenteId, ultimaMensagemEm])
 }
 
 model Mensagem {
@@ -191,6 +195,7 @@ model Mensagem {
   hora        DateTime     @default(now())
 
   @@index([conversaId, hora])
+  @@index([conversaId, direcao])
 }
 
 model Etapa {
@@ -244,6 +249,7 @@ model Negocio {
   @@index([etapaId, status])
   @@index([agenteId])
   @@index([finalidade])
+  @@index([agenteId, status, fechadoEm])
 }
 
 // Linha do tempo do negocio: cada mudanca relevante vira um registro.

@@ -24,6 +24,8 @@ export async function GET(): Promise<NextResponse> {
       telefone: true,
       avatarUrl: true,
       ativo: true,
+      acessoVenda: true,
+      acessoPosVenda: true,
       ultimoLogin: true,
       criadoEm: true,
     },
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     telefone?: string;
     avatarUrl?: string;
     ativo?: boolean;
+    acessoVenda?: boolean;
+    acessoPosVenda?: boolean;
   };
   try {
     body = await req.json();
@@ -55,8 +59,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const nome = String(body?.nome ?? "").trim();
   const email = String(body?.email ?? "").toLowerCase().trim();
   const senha = String(body?.senha ?? "");
-  const papel =
-    body?.papel && body.papel in Papel ? (body.papel as Papel) : Papel.VENDEDOR;
+  // Papel: ADMIN se pedido, senao COLABORADOR. (VENDEDOR/POS_VENDA sao legado.)
+  const papel = body?.papel === Papel.ADMIN ? Papel.ADMIN : Papel.COLABORADOR;
+  const ehAdminNovo = papel === Papel.ADMIN;
+  // Acesso: admin tem ambos; colaborador conforme enviado (default so venda).
+  const acessoVenda = ehAdminNovo ? true : (body.acessoVenda ?? true);
+  const acessoPosVenda = ehAdminNovo ? true : (body.acessoPosVenda ?? false);
 
   if (!nome || !email || !senha) {
     return NextResponse.json(
@@ -76,6 +84,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         telefone: body.telefone?.trim() || null,
         avatarUrl: body.avatarUrl?.trim() || null,
         ativo: body.ativo ?? true,
+        acessoVenda,
+        acessoPosVenda,
       },
       select: {
         id: true,
@@ -85,6 +95,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         telefone: true,
         avatarUrl: true,
         ativo: true,
+        acessoVenda: true,
+        acessoPosVenda: true,
         criadoEm: true,
       },
     });

@@ -27,6 +27,8 @@ export async function PATCH(
     avatarUrl?: string | null;
     ativo?: boolean;
     senha?: string;
+    acessoVenda?: boolean;
+    acessoPosVenda?: boolean;
   };
   try {
     body = await req.json();
@@ -37,8 +39,9 @@ export async function PATCH(
   const data: Prisma.AgenteUncheckedUpdateInput = {};
   if (body.nome !== undefined) data.nome = body.nome.trim();
   if (body.email !== undefined) data.email = body.email.toLowerCase().trim();
-  if (body.papel !== undefined && body.papel in Papel) {
-    data.papel = body.papel as Papel;
+  // Papel: apenas ADMIN ou COLABORADOR pela tela de Equipe.
+  if (body.papel !== undefined) {
+    data.papel = body.papel === Papel.ADMIN ? Papel.ADMIN : Papel.COLABORADOR;
   }
   if (body.telefone !== undefined) data.telefone = body.telefone?.trim() || null;
   if (body.avatarUrl !== undefined) {
@@ -46,6 +49,15 @@ export async function PATCH(
   }
   if (body.ativo !== undefined) data.ativo = body.ativo;
   if (body.senha) data.senha = await bcrypt.hash(body.senha, 10);
+  if (body.acessoVenda !== undefined) data.acessoVenda = body.acessoVenda;
+  if (body.acessoPosVenda !== undefined) {
+    data.acessoPosVenda = body.acessoPosVenda;
+  }
+  // Admin sempre tem acesso aos dois.
+  if (body.papel === Papel.ADMIN) {
+    data.acessoVenda = true;
+    data.acessoPosVenda = true;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ erro: "nada a atualizar" }, { status: 400 });
@@ -63,6 +75,8 @@ export async function PATCH(
         telefone: true,
         avatarUrl: true,
         ativo: true,
+        acessoVenda: true,
+        acessoPosVenda: true,
         ultimoLogin: true,
         criadoEm: true,
       },

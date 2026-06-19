@@ -190,12 +190,22 @@ export async function PATCH(
   if (body.etapaId) {
     const destino = await prisma.etapa.findUnique({
       where: { id: body.etapaId },
-      select: { id: true, nome: true, tipo: true },
+      select: { id: true, nome: true, tipo: true, finalidade: true },
     });
     if (!destino) {
       return NextResponse.json(
         { erro: "etapa destino invalida" },
         { status: 400 },
+      );
+    }
+    // A etapa destino tem de pertencer ao funil da finalidade do negocio.
+    if (
+      destino.finalidade !== "AMBAS" &&
+      (destino.finalidade as unknown as Finalidade) !== negocio.finalidade
+    ) {
+      return NextResponse.json(
+        { erro: "etapa de outro funil" },
+        { status: 422 },
       );
     }
 

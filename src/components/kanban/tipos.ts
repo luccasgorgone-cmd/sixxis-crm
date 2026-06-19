@@ -5,11 +5,14 @@ export type Temperatura = "QUENTE" | "MORNO" | "FRIO";
 export type StatusNeg = "ABERTO" | "GANHO" | "PERDIDO";
 export type Finalidade = "VENDA" | "POS_VENDA";
 
+export type FinalidadeEtapa = "VENDA" | "POS_VENDA" | "AMBAS";
+
 export type Etapa = {
   id: string;
   nome: string;
   cor: string;
   tipo: TipoEtapa;
+  finalidade?: FinalidadeEtapa;
   ordem: number;
 };
 

@@ -3,7 +3,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
-import { Papel } from "@/generated/prisma/enums";
+import { Finalidade } from "@/generated/prisma/enums";
+import { filtroEquipe } from "@/lib/dono";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,8 +21,10 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const config = await pegarConfig();
+  // Fila de VENDA (acesso). O ciclo de pos-venda usa a mesma logica com a
+  // fila de pos-venda; aqui exibimos a de venda (mesma da 2.4).
   const vendedores = await prisma.agente.findMany({
-    where: { ativo: true, papel: { in: [Papel.VENDEDOR, Papel.POS_VENDA] } },
+    where: filtroEquipe(Finalidade.VENDA),
     orderBy: { criadoEm: "asc" },
     select: { id: true, nome: true, papel: true },
   });

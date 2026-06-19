@@ -29,6 +29,7 @@ const COR_STATUS: Record<string, string> = {
 export function NumerosAdmin() {
   const [numeros, setNumeros] = useState<Numero[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [statusCarregado, setStatusCarregado] = useState(false);
   const [editando, setEditando] = useState<Numero | null>(null);
   const [criando, setCriando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -42,6 +43,20 @@ export function NumerosAdmin() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // A2: carrega o status de conexao automaticamente ao montar (uma vez).
+  useEffect(() => {
+    if (carregando || statusCarregado || numeros.length === 0) return;
+    setStatusCarregado(true);
+    void (async () => {
+      await Promise.all(
+        numeros.map((n) =>
+          fetch(`/api/admin/numeros/${n.id}/status`).catch(() => undefined),
+        ),
+      );
+      await carregar();
+    })();
+  }, [carregando, statusCarregado, numeros, carregar]);
 
   async function patch(id: string, body: Record<string, unknown>) {
     await fetch(`/api/admin/numeros/${id}`, {

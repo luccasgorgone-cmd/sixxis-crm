@@ -211,7 +211,12 @@ export function PainelNegocio({
                   agenteIdAtual={agenteIdAtual}
                   agentes={agentes}
                   etiquetas={etiquetas}
-                  etapas={etapas}
+                  etapas={etapas.filter(
+                    (e) =>
+                      !e.finalidade ||
+                      e.finalidade === "AMBAS" ||
+                      e.finalidade === detalhe.finalidade,
+                  )}
                   negocioId={negocioId}
                   salvar={salvar}
                   recarregar={carregar}

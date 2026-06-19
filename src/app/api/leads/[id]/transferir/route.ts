@@ -6,11 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
-import {
-  campoDono,
-  papelDaFinalidade,
-  espelharDonoNasConversas,
-} from "@/lib/dono";
+import { campoDono, temAcesso, espelharDonoNasConversas } from "@/lib/dono";
 import {
   StatusNeg,
   Finalidade,
@@ -67,7 +63,13 @@ export async function POST(
 
   const destino = await prisma.agente.findUnique({
     where: { id: destinoId },
-    select: { id: true, nome: true, ativo: true, papel: true },
+    select: {
+      id: true,
+      nome: true,
+      ativo: true,
+      acessoVenda: true,
+      acessoPosVenda: true,
+    },
   });
   if (!destino || !destino.ativo) {
     return NextResponse.json(
@@ -75,10 +77,11 @@ export async function POST(
       { status: 400 },
     );
   }
-  // Nao-admin so transfere dentro da equipe da finalidade.
-  if (!ehAdmin(agente.papel) && destino.papel !== papelDaFinalidade(finalidade)) {
+  // O destino precisa ter acesso aquela finalidade (mesmo para admin: nao faz
+  // sentido cair em quem nao atende aquela fila).
+  if (!temAcesso(destino, finalidade)) {
     return NextResponse.json(
-      { erro: "destino fora da equipe da finalidade" },
+      { erro: "destino sem acesso a essa finalidade" },
       { status: 403 },
     );
   }

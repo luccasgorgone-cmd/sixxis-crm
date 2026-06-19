@@ -13,16 +13,26 @@ type Agente = {
   telefone: string | null;
   avatarUrl: string | null;
   ativo: boolean;
+  acessoVenda: boolean;
+  acessoPosVenda: boolean;
   ultimoLogin: string | null;
   criadoEm: string;
 };
 
-const PAPEIS = ["VENDEDOR", "POS_VENDA", "ADMIN"];
 const ROTULO_PAPEL: Record<string, string> = {
-  VENDEDOR: "Vendedor",
-  POS_VENDA: "Pos-venda",
+  VENDEDOR: "Colaborador",
+  POS_VENDA: "Colaborador",
+  COLABORADOR: "Colaborador",
   ADMIN: "Administrador",
 };
+
+// Acesso -> rotulo curto.
+function rotuloAcesso(a: Agente): string {
+  if (a.acessoVenda && a.acessoPosVenda) return "Ambos";
+  if (a.acessoVenda) return "Venda";
+  if (a.acessoPosVenda) return "Pos-venda";
+  return "Nenhum";
+}
 
 export function VendedoresAdmin() {
   const [agentes, setAgentes] = useState<Agente[]>([]);
@@ -55,14 +65,14 @@ export function VendedoresAdmin() {
   return (
     <div className="p-6">
       <Cabecalho
-        titulo="Vendedores"
-        subtitulo="Crie e gerencie os agentes do CRM"
+        titulo="Equipe"
+        subtitulo="Crie e gerencie os colaboradores e seus acessos"
         acao={
           <button
             onClick={() => setCriando(true)}
             className="flex items-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
           >
-            <UserPlus className="h-4 w-4" /> Novo vendedor
+            <UserPlus className="h-4 w-4" /> Novo colaborador
           </button>
         }
       />
@@ -77,6 +87,7 @@ export function VendedoresAdmin() {
                 <th className="px-4 py-2.5 font-medium">Nome</th>
                 <th className="px-4 py-2.5 font-medium">Email</th>
                 <th className="px-4 py-2.5 font-medium">Papel</th>
+                <th className="px-4 py-2.5 font-medium">Acesso</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
@@ -88,6 +99,11 @@ export function VendedoresAdmin() {
                   <td className="px-4 py-3 text-medio/70">{a.email}</td>
                   <td className="px-4 py-3 text-medio/70">
                     {ROTULO_PAPEL[a.papel] ?? a.papel}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-tiffany/10 px-2 py-0.5 text-xs font-medium text-tiffany">
+                      {rotuloAcesso(a)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <button
@@ -147,8 +163,19 @@ function ModalVendedor({
   const [nome, setNome] = useState(agente?.nome ?? "");
   const [email, setEmail] = useState(agente?.email ?? "");
   const [senha, setSenha] = useState("");
-  const [papel, setPapel] = useState(agente?.papel ?? "VENDEDOR");
   const [telefone, setTelefone] = useState(agente?.telefone ?? "");
+  const [ehAdminSel, setEhAdminSel] = useState(agente?.papel === "ADMIN");
+  // Acesso: "venda" | "posvenda" | "ambos".
+  const acessoInicial: "venda" | "posvenda" | "ambos" = agente
+    ? agente.acessoVenda && agente.acessoPosVenda
+      ? "ambos"
+      : agente.acessoPosVenda
+        ? "posvenda"
+        : "venda"
+    : "venda";
+  const [acesso, setAcesso] = useState<"venda" | "posvenda" | "ambos">(
+    acessoInicial,
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -163,8 +190,10 @@ function ModalVendedor({
       const corpo: Record<string, unknown> = {
         nome,
         email,
-        papel,
         telefone,
+        papel: ehAdminSel ? "ADMIN" : "COLABORADOR",
+        acessoVenda: acesso === "venda" || acesso === "ambos",
+        acessoPosVenda: acesso === "posvenda" || acesso === "ambos",
       };
       if (senha) corpo.senha = senha;
       const r = await fetch(
@@ -195,7 +224,7 @@ function ModalVendedor({
       <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
-            {edicao ? "Editar vendedor" : "Novo vendedor"}
+            {edicao ? "Editar colaborador" : "Novo colaborador"}
           </h3>
           <button
             onClick={onFechar}
@@ -226,20 +255,47 @@ function ModalVendedor({
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-escuro">
-              Papel
+              Acesso
             </label>
-            <select
-              value={papel}
-              onChange={(e) => setPapel(e.target.value)}
-              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-            >
-              {PAPEIS.map((p) => (
-                <option key={p} value={p}>
-                  {ROTULO_PAPEL[p]}
-                </option>
+            <div className="flex overflow-hidden rounded-lg border border-black/10">
+              {(
+                [
+                  ["venda", "Venda"],
+                  ["posvenda", "Pos-venda"],
+                  ["ambos", "Ambos"],
+                ] as ["venda" | "posvenda" | "ambos", string][]
+              ).map(([chave, rotulo]) => (
+                <button
+                  key={chave}
+                  type="button"
+                  onClick={() => setAcesso(chave)}
+                  disabled={ehAdminSel}
+                  className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                    acesso === chave && !ehAdminSel
+                      ? "bg-tiffany text-white"
+                      : "bg-white text-medio hover:bg-black/5"
+                  } disabled:opacity-50`}
+                >
+                  {rotulo}
+                </button>
               ))}
-            </select>
+            </div>
+            {ehAdminSel && (
+              <p className="mt-1 text-xs text-medio/50">
+                Administrador tem acesso aos dois.
+              </p>
+            )}
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-escuro">
+            <input
+              type="checkbox"
+              checked={ehAdminSel}
+              onChange={(e) => setEhAdminSel(e.target.checked)}
+              className="h-4 w-4 accent-tiffany"
+            />
+            Administrador (acesso total ao painel)
+          </label>
         </div>
 
         {erro && <p className="mt-3 text-xs text-erro">{erro}</p>}
