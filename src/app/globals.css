@@ -1,1 +1,54 @@
 @import "tailwindcss";
+
+/* Tokens da marca Sixxis (Tailwind v4 @theme => vira classes utilitarias:
+   bg-tiffany, text-escuro, border-medio, etc.). */
+@theme {
+  --color-tiffany: #3cbfb3;
+  --color-tiffany-escuro: #2aa79b;
+  --color-escuro: #0f2e2b;
+  --color-medio: #1a4f4a;
+  --color-erro: #dc2626;
+  --color-fundo: #f6f8f8;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-fundo);
+  color: var(--color-escuro);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar discreta nas areas roláveis. */
+.scroll-fino::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-fino::-webkit-scrollbar-thumb {
+  background-color: #cbd5d3;
+  border-radius: 9999px;
+}
+.scroll-fino::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Animacao de skeleton (carregamento). */
+@keyframes pulsar {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.skeleton {
+  background-color: #e2e8e7;
+  border-radius: 0.5rem;
+  animation: pulsar 1.5s ease-in-out infinite;
+}

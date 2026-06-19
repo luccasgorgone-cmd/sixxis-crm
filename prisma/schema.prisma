@@ -34,17 +34,34 @@ enum StatusNeg {
   PERDIDO
 }
 
+// Quem esta conduzindo o atendimento da conversa.
+enum AtendidoPor {
+  HUMANO
+  IA
+}
+
+// Ciclo de vida do envio de uma mensagem outbound (OUT).
+enum StatusEnvio {
+  ENVIANDO
+  ENVIADA
+  ENTREGUE
+  ERRO
+}
+
 model Agente {
-  id         String   @id @default(cuid())
-  nome       String
-  email      String   @unique
-  papel      Papel    @default(VENDEDOR)
-  avatarUrl  String?
-  metaMensal Decimal? @db.Decimal(12, 2)
-  ativo      Boolean  @default(true)
-  negocios   Negocio[]
-  notas      Nota[]
-  criadoEm   DateTime @default(now())
+  id          String     @id @default(cuid())
+  nome        String
+  email       String     @unique
+  senha       String?
+  papel       Papel      @default(VENDEDOR)
+  avatarUrl   String?
+  metaMensal  Decimal?   @db.Decimal(12, 2)
+  ativo       Boolean    @default(true)
+  ultimoLogin DateTime?
+  negocios    Negocio[]
+  notas       Nota[]
+  conversas   Conversa[]
+  criadoEm    DateTime   @default(now())
 }
 
 model Lead {
@@ -63,15 +80,22 @@ model Lead {
 }
 
 model Conversa {
-  id        String     @id @default(cuid())
-  leadId    String
-  lead      Lead       @relation(fields: [leadId], references: [id])
-  instancia String     @default("sixxis-wa1")
-  status    String     @default("aberta")
-  mensagens Mensagem[]
-  criadoEm  DateTime   @default(now())
+  id               String      @id @default(cuid())
+  leadId           String
+  lead             Lead        @relation(fields: [leadId], references: [id])
+  agenteId         String?
+  agente           Agente?     @relation(fields: [agenteId], references: [id])
+  instancia        String      @default("sixxis-wa1")
+  status           String      @default("aberta")
+  atendidoPor      AtendidoPor @default(HUMANO)
+  naoLidas         Int         @default(0)
+  ultimaMensagemEm DateTime?
+  arquivada        Boolean     @default(false)
+  mensagens        Mensagem[]
+  criadoEm         DateTime    @default(now())
 
   @@index([leadId])
+  @@index([agenteId])
 }
 
 model Mensagem {
@@ -80,12 +104,14 @@ model Mensagem {
   conversaId  String
   conversa    Conversa   @relation(fields: [conversaId], references: [id])
   direcao     DirecaoMsg
-  tipo        TipoMsg    @default(TEXTO)
-  conteudo    String?    @db.Text
-  transcricao String?    @db.Text
+  tipo        TipoMsg      @default(TEXTO)
+  conteudo    String?      @db.Text
+  transcricao String?      @db.Text
   mediaUrl    String?
+  lida        Boolean      @default(false)
+  statusEnvio StatusEnvio?
   raw         Json
-  hora        DateTime   @default(now())
+  hora        DateTime     @default(now())
 
   @@index([conversaId, hora])
 }

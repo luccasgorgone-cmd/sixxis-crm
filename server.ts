@@ -6,6 +6,7 @@ import next from "next";
 import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
 import { createMessagesWorker } from "./src/lib/queue";
+import { seedAdmin } from "./src/lib/seed";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 3000);
@@ -15,6 +16,9 @@ const handle = app.getRequestHandler();
 
 async function main(): Promise<void> {
   await app.prepare();
+
+  // Seed idempotente do admin antes de subir o servidor.
+  await seedAdmin();
 
   // Servidor HTTP usando o request handler do Next.
   const httpServer = createServer((req, res) => {

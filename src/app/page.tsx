@@ -1,8 +1,6 @@
-// Placeholder simples. A UID (Kanban, conversa, etc.) vira em fases futuras.
+import { redirect } from "next/navigation";
+
+// A raiz redireciona para a inbox (o middleware ja garante a sessao).
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold">Sixxis CRM</h1>
-    </main>
-  );
+  redirect("/inbox");
 }

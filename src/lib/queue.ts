@@ -211,15 +211,32 @@ async function processarEvento(
 
     console.log(`[ingest] ${telefone} ${tipo} ${externalId}`);
 
+    // Atualiza a conversa: ultima atividade sempre; nao lidas so na ENTRADA.
+    // (mensagens OUT vindas do proprio celular nao contam como nao lidas.)
+    const conversaAtualizada = await prisma.conversa.update({
+      where: { id: conversa.id },
+      data: {
+        ultimaMensagemEm: mensagem.hora,
+        ...(direcao === DirecaoMsg.IN ? { naoLidas: { increment: 1 } } : {}),
+      },
+      select: { naoLidas: true },
+    });
+
     // Tempo real: notifica os clientes conectados sobre a nova mensagem.
+    // O payload carrega o suficiente para a UI atualizar lista E thread.
     (io ?? getIO())?.emit("mensagem:nova", {
       leadId: lead.id,
+      leadNome: lead.nome,
+      leadTelefone: telefone,
       conversaId: conversa.id,
       mensagemId: mensagem.id,
       direcao: mensagem.direcao,
       tipo: mensagem.tipo,
       conteudo: mensagem.conteudo,
+      statusEnvio: mensagem.statusEnvio,
       hora: mensagem.hora,
+      naoLidas: conversaAtualizada.naoLidas,
+      ultimaMensagemEm: mensagem.hora,
     });
   } catch (erro) {
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
