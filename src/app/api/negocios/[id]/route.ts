@@ -11,6 +11,7 @@ import {
   TipoEtapa,
   Temperatura,
   TipoHistorico,
+  AtividadeTipo,
 } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
@@ -44,6 +45,8 @@ export async function GET(
           telefone: true,
           email: true,
           origem: true,
+          donoId: true,
+          dono: { select: { id: true, nome: true } },
           etiquetas: { include: { etiqueta: true } },
           notas: {
             orderBy: { criadoEm: "desc" },
@@ -84,6 +87,9 @@ export async function GET(
         email: negocio.lead.email,
         origem: negocio.lead.origem,
       },
+      dono: negocio.lead.dono
+        ? { id: negocio.lead.dono.id, nome: negocio.lead.dono.nome }
+        : null,
       produtos: negocio.produtos ?? null,
       motivoPerda: negocio.motivoPerda,
       fechadoEm: negocio.fechadoEm,
@@ -135,7 +141,13 @@ export async function PATCH(
 
   const negocio = await prisma.negocio.findUnique({
     where: { id },
-    select: { id: true, agenteId: true, valor: true, motivoPerda: true },
+    select: {
+      id: true,
+      leadId: true,
+      agenteId: true,
+      valor: true,
+      motivoPerda: true,
+    },
   });
   if (!negocio) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
@@ -289,6 +301,28 @@ export async function PATCH(
     },
     include: includeCard,
   });
+
+  // Espelha os eventos na timeline do CLIENTE (Atividade). Os nomes de
+  // TipoHistorico coincidem com AtividadeTipo para os casos gerados aqui.
+  if (historicos.length > 0) {
+    await prisma.atividade.createMany({
+      data: historicos.map((h) => ({
+        leadId: negocio.leadId,
+        negocioId: negocio.id,
+        agenteId: agente.id,
+        tipo: h.tipo as unknown as AtividadeTipo,
+        descricao: h.descricao,
+      })),
+    });
+  }
+
+  // Atribuir vendedor ao negocio tambem define o dono do lead (sticky futuro).
+  if (body.agenteId !== undefined) {
+    await prisma.lead.update({
+      where: { id: negocio.leadId },
+      data: { donoId: body.agenteId },
+    });
+  }
 
   const card = cardNegocio(atualizado);
 

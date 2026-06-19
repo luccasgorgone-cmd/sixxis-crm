@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
+import { ClienteAba } from "./ClienteAba";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -28,10 +29,12 @@ import {
   type EtiquetaChip,
   type AgenteResumo,
   type Temperatura,
+  type VendedorOpcao,
+  type ObservacaoOpcao,
 } from "./tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
-type Aba = "resumo" | "conversa" | "notas" | "timeline";
+type Aba = "resumo" | "conversa" | "notas" | "cliente" | "timeline";
 
 const ICONE_HIST: Record<string, typeof Tag> = {
   CRIACAO: Sparkles,
@@ -81,6 +84,8 @@ export function PainelNegocio({
   const [detalhe, setDetalhe] = useState<DetalheNegocio | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aba, setAba] = useState<Aba>("resumo");
+  const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
+  const [presets, setPresets] = useState<ObservacaoOpcao[]>([]);
   const [modal, setModal] = useState<{
     tipo: "ganho" | "perdido";
     etapaId: string;
@@ -102,6 +107,18 @@ export function PainelNegocio({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Listas auxiliares (uma vez): vendedores p/ transferir e observacoes preset.
+  useEffect(() => {
+    fetch("/api/vendedores")
+      .then((r) => (r.ok ? r.json() : { vendedores: [] }))
+      .then((d) => setVendedores(d.vendedores ?? []))
+      .catch(() => undefined);
+    fetch("/api/observacoes")
+      .then((r) => (r.ok ? r.json() : { observacoes: [] }))
+      .then((d) => setPresets(d.observacoes ?? []))
+      .catch(() => undefined);
+  }, []);
 
   // Aplica um PATCH e recarrega detalhe + quadro.
   const salvar = useCallback(
@@ -152,7 +169,8 @@ export function PainelNegocio({
               ["resumo", "Resumo"],
               ["conversa", "Conversa"],
               ["notas", "Notas"],
-              ["timeline", "Linha do tempo"],
+              ["cliente", "Cliente"],
+              ["timeline", "Negocio"],
             ] as [Aba, string][]
           ).map(([chave, rotulo]) => (
             <button
@@ -211,7 +229,19 @@ export function PainelNegocio({
                 <Notas
                   detalhe={detalhe}
                   negocioId={negocioId}
+                  presets={presets}
                   recarregar={carregar}
+                />
+              )}
+              {aba === "cliente" && (
+                <ClienteAba
+                  leadId={detalhe.cliente.id}
+                  dono={detalhe.dono}
+                  vendedores={vendedores}
+                  onMudou={() => {
+                    void carregar();
+                    onAtualizado();
+                  }}
                 />
               )}
               {aba === "timeline" && <Timeline detalhe={detalhe} />}
@@ -593,10 +623,12 @@ function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
 function Notas({
   detalhe,
   negocioId,
+  presets,
   recarregar,
 }: {
   detalhe: DetalheNegocio;
   negocioId: string;
+  presets: ObservacaoOpcao[];
   recarregar: () => Promise<void>;
 }) {
   const [texto, setTexto] = useState("");
@@ -620,6 +652,20 @@ function Notas({
 
   return (
     <div className="space-y-3">
+      {presets.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setTexto(p.texto)}
+              title="Inserir observacao"
+              className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs text-medio transition-colors hover:border-tiffany hover:text-escuro"
+            >
+              {p.texto}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="rounded-xl border border-black/5 bg-white p-3">
         <textarea
           value={texto}

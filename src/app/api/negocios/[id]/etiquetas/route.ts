@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
-import { TipoHistorico } from "@/generated/prisma/enums";
+import { TipoHistorico, AtividadeTipo } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +61,15 @@ export async function POST(
           negocioId: negocio.id,
           agenteId: agente.id,
           tipo: TipoHistorico.ETIQUETA,
+          descricao: `Etiqueta "${etiqueta.nome}" adicionada`,
+        },
+      }),
+      prisma.atividade.create({
+        data: {
+          leadId: negocio.leadId,
+          negocioId: negocio.id,
+          agenteId: agente.id,
+          tipo: AtividadeTipo.ETIQUETA,
           descricao: `Etiqueta "${etiqueta.nome}" adicionada`,
         },
       }),

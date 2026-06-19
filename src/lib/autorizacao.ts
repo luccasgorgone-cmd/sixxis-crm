@@ -23,6 +23,14 @@ export function ehAdmin(papel: Papel): boolean {
   return papel === Papel.ADMIN;
 }
 
+// Retorna o agente da sessao apenas se for ADMIN; senao null. Atalho para as
+// rotas de /api/admin (defesa em profundidade, alem do middleware).
+export async function obterAdmin(): Promise<SessaoAgente | null> {
+  const agente = await obterAgente();
+  if (!agente || !ehAdmin(agente.papel)) return null;
+  return agente;
+}
+
 // VENDEDOR/POS_VENDA so podem agir sobre negocios proprios.
 export function podeAcessarNegocio(
   agente: SessaoAgente,

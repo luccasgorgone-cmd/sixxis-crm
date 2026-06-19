@@ -13,6 +13,7 @@ const ROTULO_PAPEL: Record<string, string> = {
 const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
   { prefixo: "/inbox", titulo: "Inbox" },
   { prefixo: "/kanban", titulo: "Kanban" },
+  { prefixo: "/admin", titulo: "Administracao" },
 ];
 
 export function Topbar({

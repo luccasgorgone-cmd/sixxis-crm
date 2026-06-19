@@ -10,6 +10,7 @@ import {
   seedAdmin,
   seedFunil,
   seedVendedorTeste,
+  seedRoteamentoEPresets,
   backfillNegocios,
 } from "./src/lib/seed";
 
@@ -27,6 +28,7 @@ async function main(): Promise<void> {
   await seedAdmin();
   await seedFunil();
   await seedVendedorTeste();
+  await seedRoteamentoEPresets();
   await backfillNegocios();
 
   // Servidor HTTP usando o request handler do Next.

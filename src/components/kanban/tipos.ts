@@ -60,6 +60,17 @@ export type NotaItem = {
   criadoEm: string;
 };
 
+export type ItemAtividade = {
+  id: string;
+  tipo: string;
+  descricao: string;
+  agente: string | null;
+  criadoEm: string;
+};
+
+export type VendedorOpcao = { id: string; nome: string };
+export type ObservacaoOpcao = { id: string; texto: string };
+
 export type DetalheNegocio = CardNegocio & {
   cliente: {
     id: string;
@@ -68,6 +79,7 @@ export type DetalheNegocio = CardNegocio & {
     email: string | null;
     origem: string | null;
   };
+  dono: { id: string; nome: string } | null;
   produtos: unknown;
   motivoPerda: string | null;
   fechadoEm: string | null;

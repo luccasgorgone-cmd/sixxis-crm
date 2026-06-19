@@ -24,17 +24,33 @@ export default auth((req) => {
   );
   if (ehPublica) return NextResponse.next();
 
-  // Logado: segue. req.auth e a sessao (null quando deslogado).
-  if (req.auth) return NextResponse.next();
-
   // Deslogado: manda para o login guardando para onde queria ir.
-  const url = req.nextUrl.clone();
-  url.pathname = "/login";
-  url.search = "";
-  if (pathname !== "/") {
-    url.searchParams.set("callbackUrl", pathname);
+  if (!req.auth) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    if (pathname !== "/") {
+      url.searchParams.set("callbackUrl", pathname);
+    }
+    return NextResponse.redirect(url);
   }
-  return NextResponse.redirect(url);
+
+  // Area administrativa: somente ADMIN. Vendedor -> 403 (API) ou /inbox (pagina).
+  const ehRotaAdmin =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname.startsWith("/api/admin");
+  if (ehRotaAdmin && req.auth.user?.papel !== "ADMIN") {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = "/inbox";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next();
 });
 
 export const config = {

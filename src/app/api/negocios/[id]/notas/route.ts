@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
-import { TipoHistorico } from "@/generated/prisma/enums";
+import { TipoHistorico, AtividadeTipo } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +39,7 @@ export async function POST(
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
+  const resumo = texto.length > 120 ? `${texto.slice(0, 117)}...` : texto;
   const [nota] = await prisma.$transaction([
     prisma.nota.create({
       data: { leadId: negocio.leadId, agenteId: agente.id, texto },
@@ -48,7 +49,16 @@ export async function POST(
         negocioId: negocio.id,
         agenteId: agente.id,
         tipo: TipoHistorico.NOTA,
-        descricao: texto.length > 120 ? `${texto.slice(0, 117)}...` : texto,
+        descricao: resumo,
+      },
+    }),
+    prisma.atividade.create({
+      data: {
+        leadId: negocio.leadId,
+        negocioId: negocio.id,
+        agenteId: agente.id,
+        tipo: AtividadeTipo.NOTA,
+        descricao: resumo,
       },
     }),
   ]);

@@ -20,15 +20,17 @@ type Item = {
   emBreve?: boolean;
 };
 
-const ITENS: Item[] = [
-  { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
-  { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
-  { rotulo: "Metas", href: "#", icone: Target, emBreve: true },
-  { rotulo: "Admin", href: "#", icone: Shield, emBreve: true },
-];
-
-export function Sidebar() {
+export function Sidebar({ papel }: { papel: string }) {
   const pathname = usePathname();
+
+  const itens: Item[] = [
+    { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
+    { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
+    { rotulo: "Metas", href: "#", icone: Target, emBreve: true },
+    papel === "ADMIN"
+      ? { rotulo: "Admin", href: "/admin", icone: Shield }
+      : { rotulo: "Admin", href: "#", icone: Shield, emBreve: true },
+  ];
 
   return (
     <aside className="flex h-full w-16 flex-col items-center border-r border-black/5 bg-escuro py-4 md:w-56 md:items-stretch md:px-3">
@@ -37,7 +39,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {ITENS.map((item) => {
+        {itens.map((item) => {
           const Icone = item.icone;
           const base =
             "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors justify-center md:justify-start";

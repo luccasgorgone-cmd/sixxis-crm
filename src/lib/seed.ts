@@ -139,6 +139,44 @@ export async function seedVendedorTeste(): Promise<void> {
   }
 }
 
+// Observacoes pre-definidas semeadas se a tabela estiver vazia.
+const OBSERVACOES_PADRAO: string[] = [
+  "Cliente pediu desconto",
+  "Aguardando pagamento",
+  "Sem resposta ha 24h",
+  "Pos-venda: acompanhar entrega",
+  "Lead frio - reengajar",
+  "Interessado em outro produto",
+];
+
+export async function seedRoteamentoEPresets(): Promise<void> {
+  try {
+    const config = await prisma.configRoteamento.findFirst();
+    if (!config) {
+      await prisma.configRoteamento.create({ data: {} });
+      console.log("[seed] config de roteamento criada");
+    } else {
+      console.log("[seed] config de roteamento ok");
+    }
+
+    const totalObs = await prisma.observacaoPreset.count();
+    if (totalObs === 0) {
+      await prisma.observacaoPreset.createMany({
+        data: OBSERVACOES_PADRAO.map((texto, i) => ({ texto, ordem: i + 1 })),
+      });
+      console.log(
+        `[seed] ${OBSERVACOES_PADRAO.length} observacoes pre-definidas criadas`,
+      );
+    } else {
+      console.log("[seed] observacoes pre-definidas ok");
+    }
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear roteamento/presets: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill: garante um negocio aberto para cada lead que ainda nao tem.
 // Roda no boot, sem emitir socket (io ainda nao tem clientes / ruido).
 export async function backfillNegocios(): Promise<void> {

@@ -15,7 +15,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-fundo">
-      <Sidebar />
+      <Sidebar papel={session.user.papel} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar nome={session.user.name} papel={session.user.papel} />
         <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
