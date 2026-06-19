@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
-import { campoDono, espelharDonoNasConversas } from "@/lib/dono";
+import { campoDono, temAcesso, espelharDonoNasConversas } from "@/lib/dono";
 import {
   StatusNeg,
   Finalidade,
@@ -32,12 +32,6 @@ export async function POST(
   } catch {
     body = {};
   }
-  const finalidade =
-    body?.finalidade === Finalidade.POS_VENDA
-      ? Finalidade.POS_VENDA
-      : Finalidade.VENDA;
-  const campo = campoDono(finalidade);
-
   const lead = await prisma.lead.findUnique({
     where: { id },
     select: { id: true, donoId: true, donoPosVendaId: true },
@@ -45,6 +39,42 @@ export async function POST(
   if (!lead) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
+
+  // Finalidade: corpo explicito ou inferida do negocio aberto do lead.
+  let finalidade: Finalidade;
+  if (
+    body?.finalidade === Finalidade.VENDA ||
+    body?.finalidade === Finalidade.POS_VENDA
+  ) {
+    finalidade = body.finalidade;
+  } else {
+    const negAberto = await prisma.negocio.findFirst({
+      where: { leadId: id, status: StatusNeg.ABERTO },
+      orderBy: { criadoEm: "desc" },
+      select: { finalidade: true },
+    });
+    finalidade =
+      negAberto?.finalidade ??
+      (lead.donoPosVendaId && !lead.donoId
+        ? Finalidade.POS_VENDA
+        : Finalidade.VENDA);
+  }
+  const campo = campoDono(finalidade);
+
+  // Quem assume precisa ter acesso aquela finalidade (admin pode sempre).
+  if (!ehAdmin(agente.papel)) {
+    const eu = await prisma.agente.findUnique({
+      where: { id: agente.id },
+      select: { acessoVenda: true, acessoPosVenda: true },
+    });
+    if (!eu || !temAcesso(eu, finalidade)) {
+      return NextResponse.json(
+        { erro: "sem acesso a essa finalidade" },
+        { status: 403 },
+      );
+    }
+  }
+
   const donoAtual = lead[campo];
   if (donoAtual && donoAtual !== agente.id && !ehAdmin(agente.papel)) {
     return NextResponse.json({ erro: "lead ja tem dono" }, { status: 403 });

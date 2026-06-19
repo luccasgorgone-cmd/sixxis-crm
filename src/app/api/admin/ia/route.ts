@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,27 +43,53 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   } catch {
     return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
   }
-  const c = await pegar();
-  const atualizada = await prisma.configAgenteIA.update({
-    where: { id: c.id },
-    data: {
-      ...(body.ativo !== undefined ? { ativo: body.ativo } : {}),
-      ...(body.modelo !== undefined && MODELOS.includes(body.modelo)
-        ? { modelo: body.modelo }
-        : {}),
-      ...(body.promptSistema !== undefined
-        ? { promptSistema: body.promptSistema.trim() || null }
-        : {}),
-      ...(body.responderForaHorario !== undefined
-        ? { responderForaHorario: body.responderForaHorario }
-        : {}),
-      ...(body.responderLeadNovo !== undefined
-        ? { responderLeadNovo: body.responderLeadNovo }
-        : {}),
-      ...(body.handoffPalavras !== undefined
-        ? { handoffPalavras: body.handoffPalavras.trim() || null }
-        : {}),
-    },
-  });
-  return NextResponse.json({ config: atualizada });
+
+  try {
+    // Whitelist dos campos aceitos.
+    const data: Prisma.ConfigAgenteIAUpdateManyMutationInput = {};
+    if (body.ativo !== undefined) data.ativo = Boolean(body.ativo);
+    if (body.modelo !== undefined && MODELOS.includes(body.modelo)) {
+      data.modelo = body.modelo;
+    }
+    if (body.promptSistema !== undefined) {
+      data.promptSistema =
+        typeof body.promptSistema === "string"
+          ? body.promptSistema.trim() || null
+          : null;
+    }
+    if (body.responderForaHorario !== undefined) {
+      data.responderForaHorario = Boolean(body.responderForaHorario);
+    }
+    if (body.responderLeadNovo !== undefined) {
+      data.responderLeadNovo = Boolean(body.responderLeadNovo);
+    }
+    if (body.handoffPalavras !== undefined) {
+      data.handoffPalavras =
+        typeof body.handoffPalavras === "string"
+          ? body.handoffPalavras.trim() || null
+          : null;
+    }
+
+    // Singleton: atualiza sem depender do id; cria se nao houver linha.
+    if (Object.keys(data).length > 0) {
+      const res = await prisma.configAgenteIA.updateMany({ data });
+      if (res.count === 0) {
+        await prisma.configAgenteIA.create({ data: {} });
+        await prisma.configAgenteIA.updateMany({ data });
+      }
+    } else {
+      await pegar();
+    }
+
+    const config = await pegar();
+    return NextResponse.json({ config });
+  } catch (erro) {
+    return NextResponse.json(
+      {
+        erro: "falha ao salvar configuracao da IA",
+        detalhe: erro instanceof Error ? erro.message : String(erro),
+      },
+      { status: 500 },
+    );
+  }
 }

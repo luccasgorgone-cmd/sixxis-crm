@@ -125,8 +125,13 @@ export function GeralAdmin() {
         setAbertoAgora(d.abertoAgora);
         setAviso("Configuracao salva.");
       } else {
-        setAviso("Nao foi possivel salvar.");
+        const d = await r.json().catch(() => null);
+        setAviso(
+          d?.erro ? `Erro: ${d.erro}` : "Nao foi possivel salvar a configuracao.",
+        );
       }
+    } catch {
+      setAviso("Falha de rede ao salvar.");
     } finally {
       setSalvando(false);
     }

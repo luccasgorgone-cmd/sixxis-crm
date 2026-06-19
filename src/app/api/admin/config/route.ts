@@ -60,37 +60,62 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
   }
 
-  const config = await pegarConfig();
-  const horarios =
-    body.horarios !== undefined
-      ? normalizarHorarios(body.horarios)
-      : undefined;
+  try {
+    // Whitelist dos campos aceitos.
+    const data: Prisma.ConfiguracaoCRMUpdateManyMutationInput = {};
+    if (body.nomeEmpresa !== undefined) {
+      data.nomeEmpresa =
+        typeof body.nomeEmpresa === "string" ? body.nomeEmpresa.trim() || null : null;
+    }
+    if (body.fuso !== undefined && typeof body.fuso === "string" && body.fuso.trim()) {
+      data.fuso = body.fuso.trim();
+    }
+    if (body.horarios !== undefined) {
+      const h = normalizarHorarios(body.horarios);
+      if (h) data.horarios = h as unknown as Prisma.InputJsonValue;
+    }
+    if (body.mensagemForaHorario !== undefined) {
+      data.mensagemForaHorario =
+        typeof body.mensagemForaHorario === "string"
+          ? body.mensagemForaHorario.trim() || null
+          : null;
+    }
 
-  const atualizada = await prisma.configuracaoCRM.update({
-    where: { id: config.id },
-    data: {
-      ...(body.nomeEmpresa !== undefined
-        ? { nomeEmpresa: body.nomeEmpresa.trim() || null }
-        : {}),
-      ...(body.fuso !== undefined ? { fuso: body.fuso.trim() } : {}),
-      ...(horarios !== undefined
-        ? { horarios: horarios as unknown as Prisma.InputJsonValue }
-        : {}),
-      ...(body.mensagemForaHorario !== undefined
-        ? { mensagemForaHorario: body.mensagemForaHorario.trim() || null }
-        : {}),
-    },
-  });
+    // Singleton: atualiza a linha existente sem depender do id; cria se nao houver.
+    if (Object.keys(data).length > 0) {
+      const res = await prisma.configuracaoCRM.updateMany({ data });
+      if (res.count === 0) {
+        await prisma.configuracaoCRM.create({
+          data: {
+            nomeEmpresa: "Sixxis",
+            fuso: "America/Sao_Paulo",
+            horarios: HORARIOS_PADRAO as unknown as Prisma.InputJsonValue,
+          },
+        });
+        await prisma.configuracaoCRM.updateMany({ data });
+      }
+    } else {
+      await pegarConfig();
+    }
 
-  const horariosNorm =
-    normalizarHorarios(atualizada.horarios) ?? HORARIOS_PADRAO;
-  return NextResponse.json({
-    config: {
-      nomeEmpresa: atualizada.nomeEmpresa,
-      fuso: atualizada.fuso,
-      horarios: horariosNorm,
-      mensagemForaHorario: atualizada.mensagemForaHorario,
-    },
-    abertoAgora: estaAbertoAgora(horariosNorm as DiaHorario[], atualizada.fuso),
-  });
+    const config = await pegarConfig();
+    const horarios = normalizarHorarios(config.horarios) ?? HORARIOS_PADRAO;
+    return NextResponse.json({
+      config: {
+        nomeEmpresa: config.nomeEmpresa,
+        fuso: config.fuso,
+        horarios,
+        mensagemForaHorario: config.mensagemForaHorario,
+      },
+      abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
+    });
+  } catch (erro) {
+    return NextResponse.json(
+      {
+        erro: "falha ao salvar configuracao",
+        detalhe: erro instanceof Error ? erro.message : String(erro),
+      },
+      { status: 500 },
+    );
+  }
 }

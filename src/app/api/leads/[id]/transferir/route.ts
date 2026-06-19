@@ -37,11 +37,6 @@ export async function POST(
   if (!destinoId) {
     return NextResponse.json({ erro: "agenteId obrigatorio" }, { status: 400 });
   }
-  const finalidade =
-    body?.finalidade === Finalidade.POS_VENDA
-      ? Finalidade.POS_VENDA
-      : Finalidade.VENDA;
-  const campo = campoDono(finalidade);
 
   const lead = await prisma.lead.findUnique({
     where: { id },
@@ -56,6 +51,28 @@ export async function POST(
   if (!lead) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
+
+  // Finalidade: usa a do corpo quando explicita; senao infere do negocio aberto
+  // do lead (evita o ramo VENDA padrao tratar um lead POS_VENDA por engano).
+  let finalidade: Finalidade;
+  if (
+    body?.finalidade === Finalidade.VENDA ||
+    body?.finalidade === Finalidade.POS_VENDA
+  ) {
+    finalidade = body.finalidade;
+  } else {
+    const negAberto = await prisma.negocio.findFirst({
+      where: { leadId: id, status: StatusNeg.ABERTO },
+      orderBy: { criadoEm: "desc" },
+      select: { finalidade: true },
+    });
+    finalidade =
+      negAberto?.finalidade ??
+      (lead.donoPosVendaId && !lead.donoId
+        ? Finalidade.POS_VENDA
+        : Finalidade.VENDA);
+  }
+  const campo = campoDono(finalidade);
   // Nao-admin so transfere os proprios (daquela finalidade).
   if (!ehAdmin(agente.papel) && lead[campo] !== agente.id) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
