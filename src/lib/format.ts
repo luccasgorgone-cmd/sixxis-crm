@@ -58,6 +58,30 @@ export function formatarTelefone(tel: string): string {
   return `+${m[1]} ${m[2]} ${m[3]}-${m[4]}`;
 }
 
+// Valor em reais. null/undefined -> "—".
+export function formatarBRL(valor: number | null | undefined): string {
+  if (valor == null) return "—";
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+// "ha X" desde uma data (tempo na etapa): "agora", "ha 3 h", "ha 2 d".
+export function tempoDesde(valor: string | Date | null | undefined): string {
+  if (!valor) return "";
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return "";
+  const ms = Date.now() - d.getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `ha ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `ha ${h} h`;
+  const dias = Math.floor(h / 24);
+  return `ha ${dias} d`;
+}
+
 // Iniciais para o avatar (nome ou telefone).
 export function iniciais(nome: string | null, telefone: string): string {
   const base = (nome ?? "").trim();

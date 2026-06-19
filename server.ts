@@ -6,7 +6,12 @@ import next from "next";
 import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
 import { createMessagesWorker } from "./src/lib/queue";
-import { seedAdmin } from "./src/lib/seed";
+import {
+  seedAdmin,
+  seedFunil,
+  seedVendedorTeste,
+  backfillNegocios,
+} from "./src/lib/seed";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 3000);
@@ -17,8 +22,12 @@ const handle = app.getRequestHandler();
 async function main(): Promise<void> {
   await app.prepare();
 
-  // Seed idempotente do admin antes de subir o servidor.
+  // Seeds idempotentes antes de subir o servidor: admin, funil (etapas/
+  // etiquetas), vendedor de teste e backfill de negocios dos leads antigos.
   await seedAdmin();
+  await seedFunil();
+  await seedVendedorTeste();
+  await backfillNegocios();
 
   // Servidor HTTP usando o request handler do Next.
   const httpServer = createServer((req, res) => {

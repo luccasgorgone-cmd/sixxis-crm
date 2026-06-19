@@ -1,0 +1,64 @@
+// Adiciona uma nota ao lead do negocio e registra na linha do tempo.
+import { NextResponse, type NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
+import { TipoHistorico } from "@/generated/prisma/enums";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
+  }
+  const { id } = await ctx.params;
+
+  let body: { texto?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
+  }
+  const texto = String(body?.texto ?? "").trim();
+  if (!texto) {
+    return NextResponse.json({ erro: "texto obrigatorio" }, { status: 400 });
+  }
+
+  const negocio = await prisma.negocio.findUnique({
+    where: { id },
+    select: { id: true, leadId: true, agenteId: true },
+  });
+  if (!negocio) {
+    return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
+  }
+  if (!podeAcessarNegocio(agente, negocio.agenteId)) {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
+
+  const [nota] = await prisma.$transaction([
+    prisma.nota.create({
+      data: { leadId: negocio.leadId, agenteId: agente.id, texto },
+    }),
+    prisma.historicoNegocio.create({
+      data: {
+        negocioId: negocio.id,
+        agenteId: agente.id,
+        tipo: TipoHistorico.NOTA,
+        descricao: texto.length > 120 ? `${texto.slice(0, 117)}...` : texto,
+      },
+    }),
+  ]);
+
+  return NextResponse.json({
+    nota: {
+      id: nota.id,
+      texto: nota.texto,
+      agente: agente.nome,
+      criadoEm: nota.criadoEm,
+    },
+  });
+}

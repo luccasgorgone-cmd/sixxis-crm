@@ -1,4 +1,7 @@
-// Barra superior: titulo da area + identificacao do usuario e logout.
+"use client";
+
+// Barra superior: titulo da area (pela rota) + identificacao e logout.
+import { usePathname } from "next/navigation";
 import { LogoutButton } from "./LogoutButton";
 
 const ROTULO_PAPEL: Record<string, string> = {
@@ -7,6 +10,11 @@ const ROTULO_PAPEL: Record<string, string> = {
   POS_VENDA: "Pos-venda",
 };
 
+const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
+  { prefixo: "/inbox", titulo: "Inbox" },
+  { prefixo: "/kanban", titulo: "Kanban" },
+];
+
 export function Topbar({
   nome,
   papel,
@@ -14,10 +22,13 @@ export function Topbar({
   nome: string | null | undefined;
   papel: string;
 }) {
+  const pathname = usePathname();
+  const titulo =
+    TITULO_ROTA.find((r) => pathname.startsWith(r.prefixo))?.titulo ?? "Sixxis";
   const inicial = (nome?.trim()?.[0] ?? "?").toUpperCase();
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/5 bg-white px-4">
-      <h1 className="text-sm font-semibold text-escuro">Inbox</h1>
+      <h1 className="text-sm font-semibold text-escuro">{titulo}</h1>
 
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">

@@ -52,3 +52,27 @@ body {
   border-radius: 0.5rem;
   animation: pulsar 1.5s ease-in-out infinite;
 }
+
+/* Entrada do drawer (painel lateral) e do overlay. */
+@keyframes deslizar-dir {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.drawer-in {
+  animation: deslizar-dir 0.2s ease-out;
+}
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fade-in {
+  animation: surgir 0.15s ease-out;
+}

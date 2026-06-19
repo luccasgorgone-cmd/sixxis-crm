@@ -8,6 +8,7 @@ import type { Server } from "socket.io";
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
+import { garantirNegocioParaLead } from "./negocio";
 import { TipoMsg, DirecaoMsg, Prisma } from "../generated/prisma/client";
 
 const NOME_FILA = "messages-in";
@@ -238,6 +239,10 @@ async function processarEvento(
       naoLidas: conversaAtualizada.naoLidas,
       ultimaMensagemEm: mensagem.hora,
     });
+
+    // Garante um negocio aberto para o lead (idempotente). Leads novos passam
+    // a aparecer no Kanban; registra HistoricoNegocio(CRIACAO) e emite evento.
+    await garantirNegocioParaLead(lead.id);
   } catch (erro) {
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
     // P2002 = violacao de unique (externalId). Tratamos como idempotente.
