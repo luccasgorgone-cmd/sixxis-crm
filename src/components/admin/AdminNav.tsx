@@ -17,7 +17,6 @@ import {
   Clock,
   MessageSquareDot,
   Bot,
-  Settings,
   BarChart3,
   type LucideIcon,
 } from "lucide-react";
@@ -38,12 +37,11 @@ const SECOES: Secao[] = [
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
-  { rotulo: "Respostas rapidas", href: "#", icone: Zap, emBreve: true },
-  { rotulo: "Horario", href: "#", icone: Clock, emBreve: true },
-  { rotulo: "Evolution", href: "#", icone: MessageSquareDot, emBreve: true },
-  { rotulo: "Agente IA", href: "#", icone: Bot, emBreve: true },
-  { rotulo: "Geral", href: "#", icone: Settings, emBreve: true },
-  { rotulo: "Relatorios", href: "#", icone: BarChart3, emBreve: true },
+  { rotulo: "Respostas rapidas", href: "/admin/respostas", icone: Zap },
+  { rotulo: "Geral e horario", href: "/admin/geral", icone: Clock },
+  { rotulo: "Evolution", href: "/admin/evolution", icone: MessageSquareDot },
+  { rotulo: "Agente IA", href: "/admin/ia", icone: Bot },
+  { rotulo: "Relatorios", href: "/admin/relatorios", icone: BarChart3 },
 ];
 
 export function AdminNav() {

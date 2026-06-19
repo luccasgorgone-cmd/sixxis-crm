@@ -1,0 +1,51 @@
+// Admin: edita ou remove uma resposta rapida.
+import { NextResponse, type NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { obterAdmin } from "@/lib/autorizacao";
+import { Prisma } from "@/generated/prisma/client";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const admin = await obterAdmin();
+  if (!admin) {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
+  const { id } = await ctx.params;
+  let body: {
+    titulo?: string;
+    atalho?: string | null;
+    texto?: string;
+    ativo?: boolean;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
+  }
+  const data: Prisma.RespostaRapidaUncheckedUpdateInput = {};
+  if (body.titulo !== undefined) data.titulo = body.titulo.trim();
+  if (body.atalho !== undefined) data.atalho = body.atalho?.trim() || null;
+  if (body.texto !== undefined) data.texto = body.texto.trim();
+  if (body.ativo !== undefined) data.ativo = body.ativo;
+
+  const resposta = await prisma.respostaRapida.update({ where: { id }, data });
+  return NextResponse.json({ resposta });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const admin = await obterAdmin();
+  if (!admin) {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
+  const { id } = await ctx.params;
+  await prisma.respostaRapida.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

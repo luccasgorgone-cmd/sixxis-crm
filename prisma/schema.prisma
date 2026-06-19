@@ -326,3 +326,37 @@ model Atividade {
 
   @@index([leadId, criadoEm])
 }
+
+// Resposta rapida (snippet) usavel no compositor do inbox.
+model RespostaRapida {
+  id           String   @id @default(cuid())
+  titulo       String
+  atalho       String?
+  texto        String   @db.Text
+  ativo        Boolean  @default(true)
+  ordem        Int      @default(0)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// Configuracao geral do CRM (singleton). horarios = JSON por dia da semana.
+model ConfiguracaoCRM {
+  id                 String   @id @default(cuid())
+  nomeEmpresa        String?
+  fuso               String   @default("America/Sao_Paulo")
+  horarios           Json?
+  mensagemForaHorario String?
+  atualizadoEm       DateTime @updatedAt
+}
+
+// Configuracao do Agente IA (singleton). Apenas config nesta fase (sem inferencia).
+model ConfigAgenteIA {
+  id                  String   @id @default(cuid())
+  ativo               Boolean  @default(false)
+  modelo              String   @default("claude-haiku-4-5")
+  promptSistema       String?  @db.Text
+  responderForaHorario Boolean @default(false)
+  responderLeadNovo   Boolean  @default(false)
+  handoffPalavras     String?
+  atualizadoEm        DateTime @updatedAt
+}

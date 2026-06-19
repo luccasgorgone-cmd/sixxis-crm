@@ -12,6 +12,7 @@ import {
   seedVendedorTeste,
   seedRoteamentoEPresets,
   seedFinalidadeEInstancias,
+  seedConfiguracoes,
   backfillAcesso,
   purgarDadosTeste,
   backfillNegocios,
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();
+  await seedConfiguracoes();
   await backfillAcesso();
   await purgarDadosTeste();
   await backfillNegocios();

@@ -264,6 +264,68 @@ export async function seedFinalidadeEInstancias(): Promise<void> {
   }
 }
 
+// Horario comercial padrao (0=Dom ... 6=Sab).
+export const HORARIOS_PADRAO = [
+  { dia: 0, aberto: false, faixas: [] as { inicio: string; fim: string }[] },
+  { dia: 1, aberto: true, faixas: [{ inicio: "09:00", fim: "18:00" }] },
+  { dia: 2, aberto: true, faixas: [{ inicio: "09:00", fim: "18:00" }] },
+  { dia: 3, aberto: true, faixas: [{ inicio: "09:00", fim: "18:00" }] },
+  { dia: 4, aberto: true, faixas: [{ inicio: "09:00", fim: "18:00" }] },
+  { dia: 5, aberto: true, faixas: [{ inicio: "09:00", fim: "18:00" }] },
+  { dia: 6, aberto: true, faixas: [{ inicio: "09:00", fim: "13:00" }] },
+];
+
+const RESPOSTAS_PADRAO: { titulo: string; atalho: string; texto: string }[] = [
+  { titulo: "Saudacao", atalho: "/saudacao", texto: "Ola! Tudo bem? Como posso ajudar voce hoje?" },
+  { titulo: "Pedir CEP", atalho: "/cep", texto: "Pode me informar seu CEP, por favor? Assim calculo o frete." },
+  { titulo: "Enviar PIX", atalho: "/pix", texto: "Segue nossa chave PIX para pagamento. Assim que enviar, me avise por aqui." },
+  { titulo: "Agradecimento", atalho: "/obrigado", texto: "Obrigado pelo contato! Qualquer coisa, estou a disposicao." },
+  { titulo: "Fechamento", atalho: "/fechamento", texto: "Posso fechar o pedido para voce agora?" },
+];
+
+// Singletons de configuracao + respostas rapidas padrao. Idempotente.
+export async function seedConfiguracoes(): Promise<void> {
+  try {
+    const crm = await prisma.configuracaoCRM.findFirst();
+    if (!crm) {
+      await prisma.configuracaoCRM.create({
+        data: {
+          nomeEmpresa: "Sixxis",
+          fuso: "America/Sao_Paulo",
+          horarios: HORARIOS_PADRAO,
+        },
+      });
+      console.log("[seed] configuracao CRM criada");
+    } else {
+      console.log("[seed] configuracao CRM ok");
+    }
+
+    const ia = await prisma.configAgenteIA.findFirst();
+    if (!ia) {
+      await prisma.configAgenteIA.create({ data: {} });
+      console.log("[seed] config Agente IA criada");
+    } else {
+      console.log("[seed] config Agente IA ok");
+    }
+
+    const totalResp = await prisma.respostaRapida.count();
+    if (totalResp === 0) {
+      await prisma.respostaRapida.createMany({
+        data: RESPOSTAS_PADRAO.map((r, i) => ({ ...r, ordem: i + 1 })),
+      });
+      console.log(
+        `[seed] ${RESPOSTAS_PADRAO.length} respostas rapidas criadas`,
+      );
+    } else {
+      console.log("[seed] respostas rapidas ok");
+    }
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear configuracoes: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill de acesso por papel (legado). Idempotente. Agentes editados pela
 // tela de Equipe passam a ter papel COLABORADOR/ADMIN e nao sao mais tocados.
 export async function backfillAcesso(): Promise<void> {
@@ -333,6 +395,7 @@ export async function purgarDadosTeste(): Promise<void> {
     "teste.vendedora@sixxis.local",
     "teste.vendedorb@sixxis.local",
     "teste.ambos@sixxis.local",
+    "teste.sup@sixxis.local",
   ];
   const telefonesTeste = ["5500000000001", "5500000000002"];
   try {
