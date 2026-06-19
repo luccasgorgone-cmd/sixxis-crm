@@ -114,9 +114,13 @@ async function processarEvento(
   payload: EventoEvolution,
   io: Server | null,
 ): Promise<void> {
-  const event = payload?.event;
+  // A Evolution envia o nome do evento em formatos diferentes conforme a versao/
+  // config: "MESSAGES_UPSERT" (maiusculo, underscore) ou "messages.upsert"
+  // (minusculo, ponto). Normaliza antes de comparar para aceitar ambos.
+  const evtRaw = String(payload?.event ?? "");
+  const evt = evtRaw.toUpperCase().replace(/\./g, "_");
   // So processamos recebimento/insercao de mensagens. Demais eventos: ignora.
-  if (event !== "MESSAGES_UPSERT") return;
+  if (evt !== "MESSAGES_UPSERT") return;
 
   const data = payload?.data;
   const jid = data?.key?.remoteJid;
