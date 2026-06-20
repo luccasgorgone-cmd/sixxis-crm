@@ -1,0 +1,240 @@
+"use client";
+
+// Tela "Minhas metas" do colaborador: cards com donut de progresso, numero
+// grande, ritmo colorido, dias restantes, ranking e celebracao ao bater a meta.
+import { useEffect, useState } from "react";
+import {
+  Target,
+  Trophy,
+  PartyPopper,
+  CalendarClock,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { corFinalidade } from "@/components/BadgeFinalidade";
+import { Donut } from "./Donut";
+import {
+  type Meta,
+  ROTULO_METRICA,
+  ROTULO_PERIODO,
+  RITMO_INFO,
+  formatarValor,
+  pctExibido,
+} from "./tipos";
+
+type Resposta = { minhas: Meta[]; equipe: Meta[] };
+
+export function MinhasMetas() {
+  const [dados, setDados] = useState<Resposta | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/metas");
+        if (r.ok && vivo) setDados(await r.json());
+      } finally {
+        if (vivo) setCarregando(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const minhas = dados?.minhas ?? [];
+  const equipe = dados?.equipe ?? [];
+  const batidas = [...minhas, ...equipe].filter((m) => m.progresso.atingida);
+  const vazio = !carregando && minhas.length === 0 && equipe.length === 0;
+
+  return (
+    <div className="space-y-5 p-6">
+      <div>
+        <h2 className="text-lg font-semibold text-escuro">Minhas metas</h2>
+        <p className="text-sm text-medio/60">
+          Acompanhe seu progresso, ritmo e posicao na equipe
+        </p>
+      </div>
+
+      {batidas.length > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-tiffany/5 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-green-600">
+            <PartyPopper className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-escuro">
+              {batidas.length === 1
+                ? "Voce bateu 1 meta!"
+                : `Voce bateu ${batidas.length} metas!`}
+            </p>
+            <p className="text-xs text-medio/70">
+              Mandou muito bem. Continue assim ate o fim do periodo.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {carregando ? (
+        <GradeSkeleton />
+      ) : vazio ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-black/10 bg-white py-16 text-center">
+          <Target className="h-8 w-8 text-medio/30" />
+          <p className="text-sm font-medium text-escuro">Nenhuma meta ativa</p>
+          <p className="text-xs text-medio/60">
+            Assim que o admin definir metas, elas aparecem aqui.
+          </p>
+        </div>
+      ) : (
+        <>
+          {minhas.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+                <Target className="h-4 w-4 text-tiffany" /> Suas metas
+              </h3>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {minhas.map((m) => (
+                  <CartaoMeta key={m.id} meta={m} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {equipe.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+                <Users className="h-4 w-4 text-tiffany" /> Metas da equipe
+              </h3>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {equipe.map((m) => (
+                  <CartaoMeta key={m.id} meta={m} daEquipe />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
+  const p = meta.progresso;
+  const c = corFinalidade(meta.finalidade);
+  const ritmo = RITMO_INFO[p.ritmo];
+  // Arco verde quando batida; senao na cor da finalidade.
+  const corArco = p.atingida ? "#16a34a" : c.hex;
+  const titulo = meta.nome ?? ROTULO_METRICA[meta.metrica];
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl border bg-white p-5 transition-shadow hover:shadow-sm ${
+        p.atingida ? "border-green-300 ring-1 ring-green-200" : "border-black/5"
+      }`}
+    >
+      {p.atingida && (
+        <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+          <Trophy className="h-3.5 w-3.5" /> Meta batida
+        </span>
+      )}
+
+      <div className="flex items-center gap-2">
+        <ChipFinalidade finalidade={meta.finalidade} />
+        <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/70">
+          {ROTULO_PERIODO[meta.periodo]}
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-escuro">{titulo}</p>
+      <p className="text-xs text-medio/60">
+        {ROTULO_METRICA[meta.metrica]}
+        {!p.maiorMelhor && " · abaixo de"}
+      </p>
+
+      <div className="mt-4 flex items-center gap-5">
+        <Donut
+          pct={pctExibido(p)}
+          cor={corArco}
+          centro={`${pctExibido(p)}%`}
+          legenda="do alvo"
+        />
+        <div className="min-w-0 flex-1 space-y-3">
+          <div>
+            <p className="text-2xl font-semibold leading-none text-escuro">
+              {formatarValor(meta.metrica, p.atual)}
+            </p>
+            <p className="mt-1 text-xs text-medio/60">
+              {p.maiorMelhor ? "de " : "alvo: abaixo de "}
+              {formatarValor(meta.metrica, p.alvo)}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${ritmo.classe}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${ritmo.ponto}`} />
+              {ritmo.rotulo}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-medium text-medio/70">
+              <CalendarClock className="h-3.5 w-3.5" />
+              {p.encerrada
+                ? "Encerrada"
+                : p.diasRestantes === 0
+                  ? "Ultimo dia"
+                  : `${p.diasRestantes} ${p.diasRestantes === 1 ? "dia" : "dias"}`}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-medio/60">
+            <span className="inline-flex items-center gap-1">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Projecao {formatarValor(meta.metrica, p.projecao)}
+            </span>
+            {!daEquipe && meta.ranking && meta.ranking.posicao > 0 && (
+              <span className="inline-flex items-center gap-1 font-medium text-escuro">
+                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                {meta.ranking.posicao}o de {meta.ranking.total}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChipFinalidade({ finalidade }: { finalidade: Meta["finalidade"] }) {
+  if (finalidade === "AMBAS") {
+    return (
+      <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/70">
+        Geral
+      </span>
+    );
+  }
+  const c = corFinalidade(finalidade);
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${c.badge}`}>
+      {c.rotulo}
+    </span>
+  );
+}
+
+function GradeSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border border-black/5 bg-white p-5">
+          <div className="skeleton h-4 w-24" />
+          <div className="mt-4 flex items-center gap-5">
+            <div className="skeleton h-32 w-32 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <div className="skeleton h-7 w-24" />
+              <div className="skeleton h-4 w-32" />
+              <div className="skeleton h-6 w-28 rounded-full" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

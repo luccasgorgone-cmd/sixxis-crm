@@ -30,7 +30,7 @@ export function Sidebar({ papel }: { papel: string }) {
       : { rotulo: "Painel", href: "/dashboard", icone: LayoutDashboard },
     { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
     { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
-    { rotulo: "Metas", href: "#", icone: Target, emBreve: true },
+    { rotulo: "Metas", href: "/metas", icone: Target },
     papel === "ADMIN"
       ? { rotulo: "Admin", href: "/admin", icone: Shield }
       : { rotulo: "Admin", href: "#", icone: Shield, emBreve: true },

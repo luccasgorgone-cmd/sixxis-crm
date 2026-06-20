@@ -18,6 +18,7 @@ import {
   MessageSquareDot,
   Bot,
   BarChart3,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ const SECOES: Secao[] = [
   { rotulo: "Painel", href: "/admin/dashboard", icone: LayoutDashboard },
   { rotulo: "Colaboradores", href: "/admin/colaboradores", icone: Eye },
   { rotulo: "Equipe", href: "/admin/vendedores", icone: Users },
+  { rotulo: "Metas", href: "/admin/metas", icone: Target },
   { rotulo: "Numeros WhatsApp", href: "/admin/numeros", icone: Smartphone },
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },

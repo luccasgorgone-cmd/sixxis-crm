@@ -93,6 +93,31 @@ enum FinalidadeEtapa {
   AMBAS
 }
 
+// Metrica acompanhada por uma meta. As tres primeiras "maior e melhor"; os dois
+// tempos "menor e melhor" (alvo = teto a nao ultrapassar).
+enum MetricaMeta {
+  VALOR_VENDIDO
+  QTD_GANHOS
+  CONVERSAO
+  CLIENTES_ATENDIDOS
+  TEMPO_RESPOSTA
+  TEMPO_RESOLUCAO
+}
+
+// Escopo de uma meta: de um colaborador especifico ou da equipe inteira.
+enum EscopoMeta {
+  COLABORADOR
+  EQUIPE
+}
+
+// Janela de apuracao da meta.
+enum PeriodoMeta {
+  DIARIA
+  SEMANAL
+  MENSAL
+  CUSTOM
+}
+
 // Tipos de evento na linha do tempo do CLIENTE (nivel lead).
 enum AtividadeTipo {
   CONTATO
@@ -128,6 +153,7 @@ model Agente {
   leadsComoDono         Lead[]             @relation("LeadDono")
   leadsComoDonoPosVenda Lead[]             @relation("LeadDonoPosVenda")
   atividades            Atividade[]
+  metas                 Meta[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -347,6 +373,27 @@ model ConfiguracaoCRM {
   horarios           Json?
   mensagemForaHorario String?
   atualizadoEm       DateTime @updatedAt
+}
+
+// Meta de desempenho. agenteId null = meta de EQUIPE (toda a equipe); preenchido
+// = meta de um COLABORADOR. finalidade AMBAS = sem recorte de funil.
+model Meta {
+  id           String          @id @default(cuid())
+  nome         String?
+  escopo       EscopoMeta
+  agenteId     String?
+  agente       Agente?         @relation(fields: [agenteId], references: [id])
+  finalidade   FinalidadeEtapa @default(AMBAS)
+  metrica      MetricaMeta
+  alvo         Float
+  periodo      PeriodoMeta
+  inicio       DateTime
+  fim          DateTime
+  ativo        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  @@index([agenteId, ativo])
 }
 
 // Configuracao do Agente IA (singleton). Apenas config nesta fase (sem inferencia).
