@@ -30,6 +30,7 @@ import {
   ROTULO_METRICA,
   ROTULO_PERIODO,
   RITMO_INFO,
+  corRitmoHex,
   formatarValor,
   pctExibido,
   alvoParaInput,
@@ -232,15 +233,15 @@ function CartaoAdmin({
   onAtivo: () => void;
 }) {
   const p = meta.progresso;
-  const c = corFinalidade(meta.finalidade);
   const ritmo = RITMO_INFO[p.ritmo];
-  const corBarra = p.atingida ? "#16a34a" : c.hex;
+  // Barra/percentual verde quando batida; senao na cor do ritmo.
+  const corBarra = p.atingida ? "#16a34a" : corRitmoHex(p.ritmo);
   const titulo = meta.nome ?? ROTULO_METRICA[meta.metrica];
   const larguraBarra = Math.max(2, Math.min(pctExibido(p), 100));
 
   return (
     <div
-      className={`rounded-2xl border bg-white p-5 ${
+      className={`rounded-2xl border bg-white p-5 transition-all duration-200 hover:shadow-md ${
         p.atingida ? "border-green-300" : "border-black/5"
       } ${meta.ativo ? "" : "opacity-60"}`}
     >

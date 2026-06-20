@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Loader2, X, Pencil } from "lucide-react";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
+import { BadgeAcesso } from "@/components/badges";
 
 type Agente = {
   id: string;
@@ -122,9 +123,7 @@ export function VendedoresAdmin() {
                     {ROTULO_PAPEL[a.papel] ?? a.papel}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-tiffany/10 px-2 py-0.5 text-xs font-medium text-tiffany">
-                      {rotuloAcesso(a)}
-                    </span>
+                    <BadgeAcesso acesso={rotuloAcesso(a)} />
                   </td>
                   <td className="px-4 py-3">
                     <button

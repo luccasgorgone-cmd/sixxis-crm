@@ -19,6 +19,7 @@ import {
   ROTULO_METRICA,
   ROTULO_PERIODO,
   RITMO_INFO,
+  corRitmoHex,
   formatarValor,
   pctExibido,
 } from "./tipos";
@@ -133,21 +134,26 @@ export function MinhasMetas() {
 
 function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
   const p = meta.progresso;
-  const c = corFinalidade(meta.finalidade);
   const ritmo = RITMO_INFO[p.ritmo];
-  // Arco verde quando batida; senao na cor da finalidade.
-  const corArco = p.atingida ? "#16a34a" : c.hex;
+  // Arco verde quando batida; senao na cor do ritmo (verde/ambar/vermelho).
+  const corRitmo = corRitmoHex(p.ritmo);
+  const corArco = p.atingida ? "#16a34a" : corRitmo;
+  // Cor do numero grande do %: verde quando batida, senao acompanha o ritmo.
+  const corPct = p.atingida ? "#16a34a" : corRitmo;
   const titulo = meta.nome ?? ROTULO_METRICA[meta.metrica];
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border bg-white p-5 transition-shadow hover:shadow-sm ${
+      className={`relative overflow-hidden rounded-2xl border bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
         p.atingida ? "border-green-300 ring-1 ring-green-200" : "border-black/5"
       }`}
     >
       {p.atingida && (
-        <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-[11px] font-semibold text-green-700">
-          <Trophy className="h-3.5 w-3.5" /> Meta batida
+        <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-green-500/15 px-2.5 py-1 text-[11px] font-semibold text-green-700 ring-1 ring-green-300/60">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-white">
+            <Trophy className="h-2.5 w-2.5" />
+          </span>
+          Meta batida
         </span>
       )}
 
@@ -172,7 +178,10 @@ function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
         />
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <p className="text-2xl font-semibold leading-none text-escuro">
+            <p
+              className="text-2xl font-semibold leading-none"
+              style={{ color: corPct }}
+            >
               {formatarValor(meta.metrica, p.atual)}
             </p>
             <p className="mt-1 text-xs text-medio/60">
@@ -198,14 +207,24 @@ function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-medio/60">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-medio/60">
             <span className="inline-flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5" />
               Projecao {formatarValor(meta.metrica, p.projecao)}
             </span>
             {!daEquipe && meta.ranking && meta.ranking.posicao > 0 && (
-              <span className="inline-flex items-center gap-1 font-medium text-escuro">
-                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${
+                  meta.ranking.posicao === 1
+                    ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300/60"
+                    : "bg-black/5 text-escuro"
+                }`}
+              >
+                <Trophy
+                  className={`h-3.5 w-3.5 ${
+                    meta.ranking.posicao === 1 ? "text-amber-500" : "text-medio/60"
+                  }`}
+                />
                 {meta.ranking.posicao}o de {meta.ranking.total}
               </span>
             )}

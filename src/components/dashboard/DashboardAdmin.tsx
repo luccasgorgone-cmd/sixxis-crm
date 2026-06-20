@@ -25,6 +25,7 @@ import {
 } from "./tipos";
 import { formatarBRL, formatarPct, formatarDuracao } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
+import { BadgeAcesso } from "@/components/badges";
 
 type Linha = { id: string; nome: string; acesso: string; metricas: Metricas };
 type Resposta = {
@@ -202,7 +203,9 @@ export function DashboardAdmin() {
                     <td className="px-3 py-2.5 font-medium text-escuro">
                       {l.nome}
                     </td>
-                    <td className="px-3 py-2.5 text-medio/60">{l.acesso}</td>
+                    <td className="px-3 py-2.5">
+                      <BadgeAcesso acesso={l.acesso} />
+                    </td>
                     <td className="px-3 py-2.5">{l.metricas.clientesAtendidos}</td>
                     <td className="px-3 py-2.5">{l.metricas.abertos}</td>
                     <td className="px-3 py-2.5">{l.metricas.pendentes}</td>

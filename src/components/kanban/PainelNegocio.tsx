@@ -1,7 +1,9 @@
 "use client";
 
-// Painel do negocio (drawer lateral). Abas: Resumo, Conversa, Notas, Linha do
-// tempo. Acoes rapidas respeitam papel (vendedor nao atribui a terceiros).
+// Painel do cliente/negocio (drawer largo). Layout de DUAS COLUNAS em telas
+// largas: esquerda = conversa (thread + compositor); direita = detalhes com
+// ROLAGEM PROPRIA (cliente, acoes, etiquetas, produtos, historico, loja, notas).
+// Header fixo. Em telas estreitas, empilha com abas Conversa | Detalhes.
 import { useState, useEffect, useCallback } from "react";
 import {
   X,
@@ -10,22 +12,32 @@ import {
   Plus,
   Trophy,
   XCircle,
-  CreditCard,
   ArrowRight,
   StickyNote,
   UserCheck,
   DollarSign,
   Sparkles,
   Trash2,
+  Repeat,
+  UserPlus,
+  MessageSquare,
+  ListChecks,
+  ShoppingBag,
+  History,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
-import { ClienteAba } from "./ClienteAba";
 import { LojaCliente } from "@/components/loja/LojaCliente";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
+import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
+import {
+  BadgeFinalidade,
+  BadgeStatusNegocio,
+  BadgeTemperatura,
+} from "@/components/badges";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -35,9 +47,10 @@ import {
   type Temperatura,
   type ObservacaoOpcao,
 } from "./tipos";
-import { formatarBRL } from "@/lib/format";
+import { formatarBRL, formatarTelefone } from "@/lib/format";
 
-type Aba = "resumo" | "conversa" | "notas" | "cliente" | "loja" | "timeline";
+type AbaMobile = "conversa" | "detalhes";
+type SubAba = "historico" | "loja" | "notas" | "negocio";
 
 const ICONE_HIST: Record<string, typeof Tag> = {
   CRIACAO: Sparkles,
@@ -84,10 +97,12 @@ export function PainelNegocio({
   onAtualizado: () => void;
 }) {
   const ehAdmin = papel === "ADMIN";
+  const toast = useToast();
   const [detalhe, setDetalhe] = useState<DetalheNegocio | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
-  const [aba, setAba] = useState<Aba>("resumo");
+  const [abaMobile, setAbaMobile] = useState<AbaMobile>("conversa");
+  const [subAba, setSubAba] = useState<SubAba>("historico");
   const [presets, setPresets] = useState<ObservacaoOpcao[]>([]);
   const [modal, setModal] = useState<{
     tipo: "ganho" | "perdido";
@@ -113,7 +128,6 @@ export function PainelNegocio({
     void carregar();
   }, [carregar]);
 
-  // Observacoes preset (uma vez).
   useEffect(() => {
     fetch("/api/observacoes")
       .then((r) => (r.ok ? r.json() : { observacoes: [] }))
@@ -121,9 +135,6 @@ export function PainelNegocio({
       .catch(() => undefined);
   }, []);
 
-  const toast = useToast();
-
-  // Aplica um PATCH e recarrega detalhe + quadro. Erro -> toast.
   const salvar = useCallback(
     async (body: Record<string, unknown>): Promise<boolean> => {
       try {
@@ -148,151 +159,208 @@ export function PainelNegocio({
     [negocioId, carregar, onAtualizado, toast],
   );
 
+  const etapasFunil = detalhe
+    ? etapas.filter(
+        (e) =>
+          !e.finalidade ||
+          e.finalidade === "AMBAS" ||
+          e.finalidade === detalhe.finalidade,
+      )
+    : [];
+
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="fade-in absolute inset-0 bg-black/30" onClick={onFechar} />
 
-      <aside className="drawer-in relative flex h-full w-full max-w-md flex-col bg-fundo shadow-xl">
-        {/* Cabecalho */}
-        <header className="flex shrink-0 items-center justify-between border-b border-black/5 bg-white px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {detalhe && (
+      <aside className="drawer-in relative flex h-full w-full max-w-[64rem] flex-col bg-fundo shadow-xl">
+        {/* Cabecalho fixo */}
+        <header className="shrink-0 border-b border-black/5 bg-white">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
               <AvatarCliente
-                nome={detalhe.cliente.nomeEfetivo}
-                telefone={detalhe.cliente.telefone}
-                fotoUrl={detalhe.cliente.fotoUrl}
+                nome={detalhe?.cliente.nomeEfetivo ?? null}
+                telefone={detalhe?.cliente.telefone ?? ""}
+                fotoUrl={detalhe?.cliente.fotoUrl ?? null}
                 tamanho={40}
               />
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-escuro">
-                {detalhe?.cliente.nomeEfetivo ||
-                  detalhe?.cliente.telefone ||
-                  "Negocio"}
-              </p>
-              {detalhe && <StatusBadge status={detalhe.status} />}
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-escuro">
+                    {detalhe?.cliente.nomeEfetivo ||
+                      detalhe?.cliente.telefone ||
+                      "Negocio"}
+                  </p>
+                  {detalhe && (
+                    <>
+                      <BadgeFinalidade finalidade={detalhe.finalidade} />
+                      <BadgeStatusNegocio status={detalhe.status} />
+                    </>
+                  )}
+                </div>
+                {detalhe && (
+                  <p className="truncate text-xs text-medio/60">
+                    {formatarTelefone(detalhe.cliente.telefone)}
+                  </p>
+                )}
+              </div>
             </div>
+            <button
+              onClick={onFechar}
+              aria-label="Fechar"
+              className="rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-black/5 hover:text-escuro"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            onClick={onFechar}
-            className="rounded-lg p-1.5 text-medio/60 hover:bg-black/5"
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          {/* Abas (so em telas estreitas) */}
+          {detalhe && (
+            <div className="flex gap-1 border-t border-black/5 px-2 lg:hidden">
+              {(
+                [
+                  ["conversa", "Conversa", MessageSquare],
+                  ["detalhes", "Detalhes", ListChecks],
+                ] as [AbaMobile, string, typeof MessageSquare][]
+              ).map(([chave, rotulo, Icone]) => (
+                <button
+                  key={chave}
+                  onClick={() => setAbaMobile(chave)}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    abaMobile === chave
+                      ? "border-tiffany text-tiffany"
+                      : "border-transparent text-medio/60 hover:text-escuro"
+                  }`}
+                >
+                  <Icone className="h-4 w-4" />
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+          )}
         </header>
 
-        {/* Abas */}
-        <nav className="flex shrink-0 gap-1 border-b border-black/5 bg-white px-2">
-          {(
-            [
-              ["resumo", "Resumo"],
-              ["conversa", "Conversa"],
-              ["notas", "Notas"],
-              ["cliente", "Cliente"],
-              ["loja", "Loja"],
-              ["timeline", "Negocio"],
-            ] as [Aba, string][]
-          ).map(([chave, rotulo]) => (
-            <button
-              key={chave}
-              onClick={() => setAba(chave)}
-              className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                aba === chave
-                  ? "border-tiffany text-tiffany"
-                  : "border-transparent text-medio/60 hover:text-escuro"
-              }`}
+        {/* Corpo */}
+        {carregando ? (
+          <div className="flex-1 space-y-3 p-4">
+            <div className="skeleton h-6 w-2/3" />
+            <div className="skeleton h-24 w-full" />
+            <div className="skeleton h-24 w-full" />
+          </div>
+        ) : !detalhe ? (
+          <div className="flex-1 p-4">
+            <EstadoErro
+              mensagem={
+                erro
+                  ? "Nao foi possivel carregar este negocio."
+                  : "Negocio nao encontrado."
+              }
+              onRetry={() => {
+                setCarregando(true);
+                void carregar();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1">
+            {/* Conversa */}
+            <div
+              className={`${
+                abaMobile === "conversa" ? "flex" : "hidden"
+              } min-h-0 w-full flex-col lg:flex lg:w-1/2 lg:border-r lg:border-black/5`}
             >
-              {rotulo}
-            </button>
-          ))}
-        </nav>
+              {detalhe.conversaId ? (
+                <ConversaEmbed
+                  conversaId={detalhe.conversaId}
+                  leadNome={detalhe.cliente.nomeEfetivo}
+                  leadTelefone={detalhe.cliente.telefone}
+                  atendidoPor={detalhe.atendidoPor}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-medio/50">
+                  <MessageSquare className="h-8 w-8 text-medio/30" />
+                  <p className="text-sm">Este lead ainda nao tem conversa.</p>
+                </div>
+              )}
+            </div>
 
-        {/* Conteudo */}
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {carregando ? (
-            <div className="space-y-3 p-4">
-              <div className="skeleton h-6 w-2/3" />
-              <div className="skeleton h-20 w-full" />
-              <div className="skeleton h-20 w-full" />
-            </div>
-          ) : !detalhe ? (
-            <div className="p-4">
-              <EstadoErro
-                mensagem={
-                  erro
-                    ? "Nao foi possivel carregar este negocio."
-                    : "Negocio nao encontrado."
-                }
-                onRetry={() => {
-                  setCarregando(true);
-                  void carregar();
-                }}
-              />
-            </div>
-          ) : aba === "conversa" ? (
-            detalhe.conversaId ? (
-              <ConversaEmbed
-                conversaId={detalhe.conversaId}
-                leadNome={detalhe.cliente.nome}
-                leadTelefone={detalhe.cliente.telefone}
-                atendidoPor={detalhe.atendidoPor}
-              />
-            ) : (
-              <p className="p-6 text-sm text-medio/50">
-                Este lead ainda nao tem conversa.
-              </p>
-            )
-          ) : (
-            <div className="scroll-fino h-full overflow-y-auto p-4">
-              {aba === "resumo" && (
-                <Resumo
+            {/* Detalhes (rolagem propria) */}
+            <div
+              className={`${
+                abaMobile === "detalhes" ? "flex" : "hidden"
+              } min-h-0 w-full flex-col lg:flex lg:w-1/2`}
+            >
+              <div className="scroll-fino flex-1 space-y-5 overflow-y-auto p-4">
+                <BlocoCliente
+                  cliente={detalhe.cliente}
+                  onAtualizado={() => {
+                    void carregar();
+                    onAtualizado();
+                  }}
+                />
+
+                <NegocioAcoes
                   detalhe={detalhe}
                   ehAdmin={ehAdmin}
                   agenteIdAtual={agenteIdAtual}
                   agentes={agentes}
                   etiquetas={etiquetas}
-                  etapas={etapas.filter(
-                    (e) =>
-                      !e.finalidade ||
-                      e.finalidade === "AMBAS" ||
-                      e.finalidade === detalhe.finalidade,
-                  )}
+                  etapas={etapasFunil}
                   negocioId={negocioId}
                   salvar={salvar}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
                   abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
                 />
-              )}
-              {aba === "notas" && (
-                <Notas
-                  detalhe={detalhe}
-                  negocioId={negocioId}
-                  presets={presets}
-                  recarregar={carregar}
-                />
-              )}
-              {aba === "cliente" && (
-                <ClienteAba
-                  leadId={detalhe.cliente.id}
-                  dono={detalhe.dono}
-                  finalidade={detalhe.finalidade}
-                  onMudou={() => {
-                    void carregar();
-                    onAtualizado();
-                  }}
-                />
-              )}
-              {aba === "loja" && (
-                <LojaCliente
-                  telefone={detalhe.cliente.telefone}
-                  origem={detalhe.cliente.origem}
-                />
-              )}
-              {aba === "timeline" && <Timeline detalhe={detalhe} />}
+
+                {/* Sub-navegacao dos paineis inferiores */}
+                <div>
+                  <div className="mb-3 flex gap-1 overflow-x-auto border-b border-black/5">
+                    {(
+                      [
+                        ["historico", "Historico", History],
+                        ["negocio", "Negocio", ListChecks],
+                        ["loja", "Loja", ShoppingBag],
+                        ["notas", "Notas", StickyNote],
+                      ] as [SubAba, string, typeof History][]
+                    ).map(([chave, rotulo, Icone]) => (
+                      <button
+                        key={chave}
+                        onClick={() => setSubAba(chave)}
+                        className={`flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                          subAba === chave
+                            ? "border-tiffany text-tiffany"
+                            : "border-transparent text-medio/60 hover:text-escuro"
+                        }`}
+                      >
+                        <Icone className="h-3.5 w-3.5" />
+                        {rotulo}
+                      </button>
+                    ))}
+                  </div>
+
+                  {subAba === "historico" && (
+                    <HistoricoCliente leadId={detalhe.cliente.id} />
+                  )}
+                  {subAba === "negocio" && <TimelineNegocio detalhe={detalhe} />}
+                  {subAba === "loja" && (
+                    <LojaCliente
+                      telefone={detalhe.cliente.telefone}
+                      origem={detalhe.cliente.origem}
+                    />
+                  )}
+                  {subAba === "notas" && (
+                    <Notas
+                      detalhe={detalhe}
+                      negocioId={negocioId}
+                      presets={presets}
+                      recarregar={carregar}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
 
       {modal && detalhe && (
@@ -311,26 +379,11 @@ export function PainelNegocio({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const mapa: Record<string, { rotulo: string; classe: string }> = {
-    ABERTO: { rotulo: "Aberto", classe: "bg-sky-100 text-sky-700" },
-    GANHO: { rotulo: "Ganho", classe: "bg-green-100 text-green-700" },
-    PERDIDO: { rotulo: "Perdido", classe: "bg-red-100 text-red-700" },
-  };
-  const info = mapa[status] ?? mapa.ABERTO;
-  return (
-    <span
-      className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${info.classe}`}
-    >
-      {info.rotulo}
-    </span>
-  );
-}
-
 // ----------------------------------------------------------------------------
-// Aba Resumo
+// Acoes do negocio: valor, temperatura, etapa, dono/transferencia, etiquetas,
+// produtos e fechamento (ganho/perdido).
 // ----------------------------------------------------------------------------
-function Resumo({
+function NegocioAcoes({
   detalhe,
   ehAdmin,
   agenteIdAtual,
@@ -355,16 +408,30 @@ function Resumo({
   onAtualizado: () => void;
   abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
-  const toast = useToast();
   const [valor, setValor] = useState(
     detalhe.valor != null ? String(detalhe.valor) : "",
   );
-  const [popEtiqueta, setPopEtiqueta] = useState(false);
+  const [addEtiqueta, setAddEtiqueta] = useState(false);
   const [novoProduto, setNovoProduto] = useState("");
+  const [transferindo, setTransferindo] = useState(false);
+  const [destino, setDestino] = useState("");
+  const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const produtos = produtosParaLista(detalhe.produtos);
 
   const etapaGanho = etapas.find((e) => e.tipo === "GANHO");
   const etapaPerda = etapas.find((e) => e.tipo === "PERDIDO");
+  const naoAplicadas = etiquetas.filter(
+    (e) => !detalhe.etiquetas.some((ap) => ap.id === e.id),
+  );
+
+  // Vendedores da finalidade (para transferir), carregados sob demanda.
+  useEffect(() => {
+    if (!transferindo || vendedores.length > 0) return;
+    fetch(`/api/vendedores?finalidade=${detalhe.finalidade}`)
+      .then((r) => (r.ok ? r.json() : { vendedores: [] }))
+      .then((d) => setVendedores(d.vendedores ?? []))
+      .catch(() => undefined);
+  }, [transferindo, vendedores.length, detalhe.finalidade]);
 
   function aoTrocarEtapa(novaEtapaId: string) {
     const et = etapas.find((e) => e.id === novaEtapaId);
@@ -374,8 +441,8 @@ function Resumo({
     void salvar({ etapaId: novaEtapaId });
   }
 
-  async function addEtiqueta(etiquetaId: string) {
-    setPopEtiqueta(false);
+  async function aplicarEtiqueta(etiquetaId: string) {
+    setAddEtiqueta(false);
     await fetch(`/api/negocios/${negocioId}/etiquetas`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -385,7 +452,7 @@ function Resumo({
     onAtualizado();
   }
 
-  async function removeEtiqueta(etiquetaId: string) {
+  async function removerEtiqueta(etiquetaId: string) {
     await fetch(`/api/negocios/${negocioId}/etiquetas/${etiquetaId}`, {
       method: "DELETE",
     });
@@ -393,173 +460,79 @@ function Resumo({
     onAtualizado();
   }
 
-  async function salvarProdutos(lista: string[]) {
-    await salvar({ produtos: lista });
+  async function transferir() {
+    if (!destino) return;
+    await fetch(`/api/leads/${detalhe.cliente.id}/transferir`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agenteId: destino, finalidade: detalhe.finalidade }),
+    });
+    setTransferindo(false);
+    setDestino("");
+    await recarregar();
+    onAtualizado();
   }
 
-  const naoAplicadas = etiquetas.filter(
-    (e) => !detalhe.etiquetas.some((ap) => ap.id === e.id),
-  );
-
   return (
-    <div className="space-y-5">
-      {/* Cliente (avatar, dados editaveis, refresh de foto) */}
-      <BlocoCliente
-        cliente={detalhe.cliente}
-        onAtualizado={() => {
-          void recarregar();
-          onAtualizado();
-        }}
-      />
-      {detalhe.cliente.origem && (
-        <Secao titulo="Origem">
-          <Campo rotulo="Origem" valor={detalhe.cliente.origem} />
-        </Secao>
-      )}
+    <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-medio/50">
+        Negocio
+      </h4>
 
-      {/* Valor */}
-      <Secao titulo="Valor">
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            onBlur={() => {
-              const v = valor.trim() === "" ? null : Number(valor.replace(",", "."));
-              if (v !== detalhe.valor) void salvar({ valor: v });
-            }}
-            placeholder="0,00"
-            className="w-40 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-          />
-          <span className="text-sm text-medio/60">
-            {formatarBRL(detalhe.valor)}
-          </span>
-        </div>
-      </Secao>
-
-      {/* Temperatura */}
-      <Secao titulo="Temperatura">
-        <div className="flex gap-2">
-          {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
-            const info = TEMPERATURA_INFO[t];
-            const ativo = detalhe.temperatura === t;
-            return (
-              <button
-                key={t}
-                onClick={() => {
-                  if (!ativo) void salvar({ temperatura: t });
-                }}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  ativo
-                    ? "border-tiffany bg-tiffany/10 text-escuro"
-                    : "border-black/10 bg-white text-medio hover:bg-black/5"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${info.ponto}`} />
-                {info.rotulo}
-              </button>
-            );
-          })}
-        </div>
-      </Secao>
-
-      {/* Etiquetas */}
-      <Secao titulo="Etiquetas">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {detalhe.etiquetas.map((e) => (
-            <span
-              key={e.id}
-              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              style={{ backgroundColor: e.cor }}
-            >
-              {e.nome}
-              <button
-                onClick={() => void removeEtiqueta(e.id)}
-                className="rounded-full hover:bg-black/20"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          <div className="relative">
-            <button
-              onClick={() => setPopEtiqueta((v) => !v)}
-              disabled={naoAplicadas.length === 0}
-              className="flex items-center gap-1 rounded-full border border-dashed border-medio/30 px-2 py-0.5 text-xs text-medio hover:bg-black/5 disabled:opacity-40"
-            >
-              <Plus className="h-3 w-3" /> Etiqueta
-            </button>
-            {popEtiqueta && (
-              <div className="absolute z-10 mt-1 w-44 rounded-lg border border-black/10 bg-white p-1 shadow-lg">
-                {naoAplicadas.map((e) => (
-                  <button
-                    key={e.id}
-                    onClick={() => void addEtiqueta(e.id)}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-fundo"
-                  >
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: e.cor }}
-                    />
-                    {e.nome}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </Secao>
-
-      {/* Produtos */}
-      <Secao titulo="Produtos">
-        <div className="space-y-1.5">
-          {produtos.length === 0 && (
-            <p className="text-sm text-medio/50">Nenhum produto.</p>
-          )}
-          {produtos.map((p, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm"
-            >
-              <span>{p}</span>
-              <button
-                onClick={() =>
-                  void salvarProdutos(produtos.filter((_, j) => j !== i))
-                }
-                className="text-medio/50 hover:text-erro"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2">
+      {/* Valor + temperatura */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Rotulo>Valor</Rotulo>
+          <div className="flex items-center gap-2">
             <input
-              value={novoProduto}
-              onChange={(e) => setNovoProduto(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && novoProduto.trim()) {
-                  void salvarProdutos([...produtos, novoProduto.trim()]);
-                  setNovoProduto("");
-                }
+              type="number"
+              min="0"
+              step="0.01"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              onBlur={() => {
+                const v =
+                  valor.trim() === "" ? null : Number(valor.replace(",", "."));
+                if (v !== detalhe.valor) void salvar({ valor: v });
               }}
-              placeholder="Adicionar produto"
-              className="flex-1 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
+              placeholder="0,00"
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
             />
           </div>
+          <p className="mt-1 text-xs text-medio/50">{formatarBRL(detalhe.valor)}</p>
         </div>
-      </Secao>
+        <div>
+          <Rotulo>Temperatura</Rotulo>
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
+              const ativo = detalhe.temperatura === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => {
+                    if (!ativo) void salvar({ temperatura: t });
+                  }}
+                  className={`rounded-lg border px-1.5 py-1 transition-colors ${
+                    ativo
+                      ? "border-tiffany bg-tiffany/5"
+                      : "border-transparent hover:bg-black/5"
+                  }`}
+                >
+                  <BadgeTemperatura temperatura={t} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-      {/* Etapa + atribuicao */}
-      <Secao titulo="Acoes">
-        <label className="mb-1 block text-xs font-medium text-medio/70">
-          Etapa
-        </label>
+      {/* Etapa */}
+      <div>
+        <Rotulo>Etapa</Rotulo>
         <select
           value={detalhe.etapaId ?? ""}
           onChange={(e) => aoTrocarEtapa(e.target.value)}
-          className="mb-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
         >
           {etapas.map((e) => (
             <option key={e.id} value={e.id}>
@@ -567,15 +540,16 @@ function Resumo({
             </option>
           ))}
         </select>
+      </div>
 
-        <label className="mb-1 block text-xs font-medium text-medio/70">
-          Vendedor
-        </label>
+      {/* Dono / atribuicao / transferencia */}
+      <div>
+        <Rotulo>Dono</Rotulo>
         {ehAdmin ? (
           <select
             value={detalhe.agente?.id ?? ""}
             onChange={(e) => void salvar({ agenteId: e.target.value || null })}
-            className="mb-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           >
             <option value="">Sem dono</option>
             {agentes.map((a) => (
@@ -585,88 +559,169 @@ function Resumo({
             ))}
           </select>
         ) : (
-          <div className="mb-3 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-escuro">
               {detalhe.agente?.nome ?? "Sem dono"}
             </span>
             {!detalhe.agente && (
               <button
                 onClick={() => void salvar({ agenteId: agenteIdAtual })}
-                className="rounded-lg bg-tiffany px-2.5 py-1 text-xs font-semibold text-white hover:bg-tiffany-escuro"
+                className="flex items-center gap-1 rounded-lg bg-tiffany px-2.5 py-1 text-xs font-semibold text-white hover:bg-tiffany-escuro"
               >
-                Assumir
+                <UserPlus className="h-3.5 w-3.5" /> Assumir
               </button>
             )}
           </div>
         )}
-
-        <div className="flex gap-2">
-          {etapaGanho && (
-            <button
-              onClick={() => abrirModal("ganho", etapaGanho.id)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+        <button
+          onClick={() => setTransferindo((v) => !v)}
+          className="mt-2 flex items-center gap-1.5 text-xs font-medium text-medio transition-colors hover:text-tiffany"
+        >
+          <Repeat className="h-3.5 w-3.5" /> Transferir cliente
+        </button>
+        {transferindo && (
+          <div className="mt-2 flex gap-2">
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              className="flex-1 rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-tiffany"
             >
-              <Trophy className="h-4 w-4" /> Ganho
+              <option value="">Escolher...</option>
+              {vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nome}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => void transferir()}
+              disabled={!destino}
+              className="rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+            >
+              Ok
             </button>
-          )}
-          {etapaPerda && (
-            <button
-              onClick={() => abrirModal("perdido", etapaPerda.id)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-erro px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          </div>
+        )}
+      </div>
+
+      {/* Etiquetas */}
+      <div>
+        <Rotulo>Etiquetas</Rotulo>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {detalhe.etiquetas.map((e) => (
+            <span
+              key={e.id}
+              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+              style={{ backgroundColor: e.cor }}
             >
-              <XCircle className="h-4 w-4" /> Perdido
+              {e.nome}
+              <button
+                onClick={() => void removerEtiqueta(e.id)}
+                aria-label={`Remover ${e.nome}`}
+                className="rounded-full hover:bg-black/20"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {naoAplicadas.length > 0 && (
+            <button
+              onClick={() => setAddEtiqueta((v) => !v)}
+              className="flex items-center gap-1 rounded-full border border-dashed border-medio/30 px-2 py-0.5 text-xs text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+            >
+              <Plus className="h-3 w-3" /> Etiqueta
             </button>
           )}
         </div>
-      </Secao>
+        {addEtiqueta && naoAplicadas.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-black/5 bg-fundo p-2">
+            {naoAplicadas.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => void aplicarEtiqueta(e.id)}
+                className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-0.5 text-xs text-escuro hover:bg-black/5"
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: e.cor }}
+                />
+                {e.nome}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Integracoes */}
-      <Secao titulo="Integracoes">
-        <button
-          onClick={() => toast.info("Integracao de pagamento chega em breve.")}
-          className="flex w-full items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-medio transition-colors hover:border-tiffany hover:text-escuro"
-        >
-          <CreditCard className="h-4 w-4 text-tiffany" />
-          Enviar link de pagamento
-          <span className="ml-auto rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/50">
-            em breve
-          </span>
-        </button>
-      </Secao>
-    </div>
-  );
-}
+      {/* Produtos */}
+      <div>
+        <Rotulo>Produtos</Rotulo>
+        <div className="space-y-1.5">
+          {produtos.length === 0 && (
+            <p className="text-sm text-medio/50">Nenhum produto.</p>
+          )}
+          {produtos.map((p, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-lg bg-fundo px-3 py-1.5 text-sm"
+            >
+              <span>{p}</span>
+              <button
+                onClick={() =>
+                  void salvar({ produtos: produtos.filter((_, j) => j !== i) })
+                }
+                aria-label="Remover produto"
+                className="text-medio/50 hover:text-erro"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <input
+            value={novoProduto}
+            onChange={(e) => setNovoProduto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && novoProduto.trim()) {
+                void salvar({ produtos: [...produtos, novoProduto.trim()] });
+                setNovoProduto("");
+              }
+            }}
+            placeholder="Adicionar produto e Enter"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
+          />
+        </div>
+      </div>
 
-function Secao({
-  titulo,
-  children,
-}: {
-  titulo: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
-        {titulo}
-      </h4>
-      {children}
+      {/* Fechamento */}
+      <div className="flex gap-2">
+        {etapaGanho && (
+          <button
+            onClick={() => abrirModal("ganho", etapaGanho.id)}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sucesso px-3 py-2 text-sm font-semibold text-white transition-colors hover:brightness-95"
+          >
+            <Trophy className="h-4 w-4" /> Ganho
+          </button>
+        )}
+        {etapaPerda && (
+          <button
+            onClick={() => abrirModal("perdido", etapaPerda.id)}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-erro px-3 py-2 text-sm font-semibold text-white transition-colors hover:brightness-95"
+          >
+            <XCircle className="h-4 w-4" /> Perdido
+          </button>
+        )}
+      </div>
     </section>
   );
 }
 
-function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Rotulo({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-3 py-1 text-sm">
-      <span className="text-medio/60">{rotulo}</span>
-      <span className="min-w-0 truncate text-right font-medium text-escuro">
-        {valor}
-      </span>
-    </div>
+    <label className="mb-1 block text-xs font-medium text-medio/70">{children}</label>
   );
 }
 
 // ----------------------------------------------------------------------------
-// Aba Notas
+// Notas internas do negocio.
 // ----------------------------------------------------------------------------
 function Notas({
   detalhe,
@@ -735,15 +790,10 @@ function Notas({
       </div>
 
       {detalhe.notas.length === 0 ? (
-        <p className="py-6 text-center text-sm text-medio/50">
-          Nenhuma nota ainda.
-        </p>
+        <p className="py-6 text-center text-sm text-medio/50">Nenhuma nota ainda.</p>
       ) : (
         detalhe.notas.map((n) => (
-          <div
-            key={n.id}
-            className="rounded-xl border border-black/5 bg-white p-3"
-          >
+          <div key={n.id} className="rounded-xl border border-black/5 bg-white p-3">
             <p className="whitespace-pre-wrap text-sm text-escuro">{n.texto}</p>
             <p className="mt-2 text-[11px] text-medio/50">
               {n.agente ?? "—"} &middot; {dataHora(n.criadoEm)}
@@ -756,14 +806,12 @@ function Notas({
 }
 
 // ----------------------------------------------------------------------------
-// Aba Linha do tempo
+// Linha do tempo do NEGOCIO (HistoricoNegocio).
 // ----------------------------------------------------------------------------
-function Timeline({ detalhe }: { detalhe: DetalheNegocio }) {
+function TimelineNegocio({ detalhe }: { detalhe: DetalheNegocio }) {
   if (detalhe.historico.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-medio/50">
-        Sem eventos ainda.
-      </p>
+      <p className="py-6 text-center text-sm text-medio/50">Sem eventos ainda.</p>
     );
   }
   return (

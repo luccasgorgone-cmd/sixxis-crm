@@ -12,7 +12,7 @@ export type Metrica =
 export type Escopo = "COLABORADOR" | "EQUIPE";
 export type Periodo = "DIARIA" | "SEMANAL" | "MENSAL" | "CUSTOM";
 export type Finalidade = "VENDA" | "POS_VENDA" | "AMBAS";
-export type Ritmo = "acima" | "no_ritmo" | "abaixo" | "sem_dados";
+export type Ritmo = "acima" | "no_ritmo" | "limite" | "abaixo" | "sem_dados";
 
 export type Progresso = {
   alvo: number;
@@ -110,13 +110,18 @@ export const RITMO_INFO: Record<
   },
   no_ritmo: {
     rotulo: "No ritmo",
-    classe: "bg-tiffany/10 text-tiffany",
-    ponto: "bg-tiffany",
+    classe: "bg-green-100 text-green-700",
+    ponto: "bg-green-500",
+  },
+  limite: {
+    rotulo: "No limite",
+    classe: "bg-amber-100 text-amber-700",
+    ponto: "bg-amber-500",
   },
   abaixo: {
     rotulo: "Abaixo do ritmo",
-    classe: "bg-amber-100 text-amber-700",
-    ponto: "bg-amber-500",
+    classe: "bg-red-100 text-red-700",
+    ponto: "bg-red-500",
   },
   sem_dados: {
     rotulo: "Sem dados",
@@ -124,6 +129,21 @@ export const RITMO_INFO: Record<
     ponto: "bg-medio/40",
   },
 };
+
+// Hex do ritmo para arco do donut / barra de progresso.
+export function corRitmoHex(ritmo: Ritmo): string {
+  switch (ritmo) {
+    case "acima":
+    case "no_ritmo":
+      return "#16a34a";
+    case "limite":
+      return "#f59e0b";
+    case "abaixo":
+      return "#dc2626";
+    case "sem_dados":
+      return "#94a3b8";
+  }
+}
 
 // Percentual inteiro para exibir (pode passar de 100).
 export function pctExibido(p: Progresso): number {

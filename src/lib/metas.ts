@@ -25,7 +25,7 @@ export type MetaBase = {
   ativo: boolean;
 };
 
-export type Ritmo = "acima" | "no_ritmo" | "abaixo" | "sem_dados";
+export type Ritmo = "acima" | "no_ritmo" | "limite" | "abaixo" | "sem_dados";
 
 export type ProgressoMeta = {
   alvo: number;
@@ -128,6 +128,7 @@ export function montarProgresso(
     else if (esperado <= 0) ritmo = "no_ritmo";
     else if (atual >= esperado * 1.05) ritmo = "acima";
     else if (atual >= esperado * 0.95) ritmo = "no_ritmo";
+    else if (atual >= esperado * 0.8) ritmo = "limite";
     else ritmo = "abaixo";
   } else {
     // Menor e melhor (tempos). atual <= 0 = sem dados no periodo.
@@ -140,8 +141,9 @@ export function montarProgresso(
       percentual = meta.alvo > 0 ? Math.min(meta.alvo / atual, 1) : 0;
       atingida = atual <= meta.alvo;
       projecao = atual; // a media tende a se manter
-      if (!atingida) ritmo = "abaixo";
-      else ritmo = atual <= meta.alvo * 0.9 ? "acima" : "no_ritmo";
+      if (atingida) ritmo = atual <= meta.alvo * 0.9 ? "acima" : "no_ritmo";
+      else if (atual <= meta.alvo * 1.25) ritmo = "limite";
+      else ritmo = "abaixo";
     }
   }
 
