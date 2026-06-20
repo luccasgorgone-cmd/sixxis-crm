@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { Cabecalho } from "@/components/admin/VendedoresAdmin";
 import { corFinalidade } from "@/components/BadgeFinalidade";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 import {
   type Meta,
   type Metrica,
@@ -39,9 +41,11 @@ type Vendedor = { id: string; nome: string };
 type FiltroEscopo = "TODAS" | "COLABORADOR" | "EQUIPE";
 
 export function MetasAdmin() {
+  const toast = useToast();
   const [metas, setMetas] = useState<Meta[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<Meta | null>(null);
   const [filtroEscopo, setFiltroEscopo] = useState<FiltroEscopo>("TODAS");
@@ -49,9 +53,19 @@ export function MetasAdmin() {
   const [incluirInativas, setIncluirInativas] = useState(false);
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/metas");
-    if (r.ok) setMetas((await r.json()).metas);
-    setCarregando(false);
+    try {
+      const r = await fetch("/api/admin/metas");
+      if (r.ok) {
+        setMetas((await r.json()).metas);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -64,17 +78,27 @@ export function MetasAdmin() {
 
   async function remover(id: string) {
     if (!confirm("Remover esta meta? A acao nao pode ser desfeita.")) return;
-    await fetch(`/api/admin/metas/${id}`, { method: "DELETE" });
-    await carregar();
+    const r = await fetch(`/api/admin/metas/${id}`, { method: "DELETE" });
+    if (r.ok) {
+      toast.sucesso("Meta removida.");
+      await carregar();
+    } else {
+      toast.erro("Nao foi possivel remover a meta.");
+    }
   }
 
   async function alternarAtivo(m: Meta) {
-    await fetch(`/api/admin/metas/${m.id}`, {
+    const r = await fetch(`/api/admin/metas/${m.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ativo: !m.ativo }),
     });
-    await carregar();
+    if (r.ok) {
+      toast.sucesso(m.ativo ? "Meta pausada." : "Meta ativada.");
+      await carregar();
+    } else {
+      toast.erro("Nao foi possivel atualizar a meta.");
+    }
   }
 
   const filtradas = useMemo(
@@ -141,6 +165,16 @@ export function MetasAdmin() {
         <div className="space-y-4 xl:col-span-2">
           {carregando ? (
             <ListaSkeleton />
+          ) : erro ? (
+            <div className="rounded-xl border border-black/5 bg-white">
+              <EstadoErro
+                mensagem="Nao foi possivel carregar as metas."
+                onRetry={() => {
+                  setCarregando(true);
+                  void carregar();
+                }}
+              />
+            </div>
           ) : filtradas.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-black/10 bg-white py-16 text-center">
               <Target className="h-8 w-8 text-medio/30" />
@@ -412,6 +446,7 @@ function ModalMeta({
   onSalvo: () => void;
 }) {
   const edicao = Boolean(meta);
+  const toast = useToast();
   const [nome, setNome] = useState(meta?.nome ?? "");
   const [escopo, setEscopo] = useState<Escopo>(meta?.escopo ?? "COLABORADOR");
   const [agenteId, setAgenteId] = useState(meta?.agenteId ?? "");
@@ -487,6 +522,7 @@ function ModalMeta({
         setSalvando(false);
         return;
       }
+      toast.sucesso(edicao ? "Meta atualizada." : "Meta criada.");
       onSalvo();
     } catch {
       setErro("Falha ao salvar.");
@@ -495,8 +531,8 @@ function ModalMeta({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="scroll-fino max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
             {edicao ? "Editar meta" : "Nova meta"}

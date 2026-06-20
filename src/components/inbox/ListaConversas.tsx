@@ -1,11 +1,12 @@
 "use client";
 
 // Coluna esquerda da inbox: busca, filtros e a lista de conversas.
-import { Search, Bot, User as UserIcon } from "lucide-react";
+import { Search, Bot, User as UserIcon, Inbox as InboxIcon } from "lucide-react";
 import type { ConversaItem, Filtro, Finalidade } from "./tipos";
 import { horarioLista } from "@/lib/format";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
+import { EstadoErro, EstadoVazio } from "@/components/ui/Estado";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "minhas", rotulo: "Minhas" },
@@ -32,6 +33,7 @@ export function ListaConversas({
   onFiltro,
   onFinalidade,
   onSelecionar,
+  onTentar,
 }: {
   conversas: ConversaItem[];
   carregando: boolean;
@@ -45,6 +47,7 @@ export function ListaConversas({
   onFiltro: (f: Filtro) => void;
   onFinalidade: (f: Finalidade | "") => void;
   onSelecionar: (id: string) => void;
+  onTentar?: () => void;
 }) {
   return (
     <div className="flex h-full w-full flex-col border-r border-black/5 bg-white sm:w-80 md:w-96">
@@ -98,11 +101,14 @@ export function ListaConversas({
         {carregando ? (
           <SkeletonLista />
         ) : erro ? (
-          <p className="p-4 text-sm text-erro">{erro}</p>
+          <EstadoErro mensagem={erro} onRetry={onTentar} compacto />
         ) : conversas.length === 0 ? (
-          <p className="p-6 text-center text-sm text-medio/60">
-            Nenhuma conversa por aqui.
-          </p>
+          <EstadoVazio
+            icone={InboxIcon}
+            titulo="Nenhuma conversa"
+            texto="As conversas aparecem aqui conforme os clientes entram em contato."
+            compacto
+          />
         ) : (
           conversas.map((c) => (
             <ItemConversa

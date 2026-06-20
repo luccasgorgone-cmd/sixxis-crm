@@ -1,7 +1,7 @@
 "use client";
 
-// Sub-navegacao do painel administrativo. Secoes implementadas viram links;
-// as demais ficam "em breve" (desabilitadas).
+// Sub-navegacao do painel administrativo. Realca a secao atual (rota exata ou
+// subrota), para nao acender dois itens ao mesmo tempo.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -26,7 +26,6 @@ type Secao = {
   rotulo: string;
   href: string;
   icone: LucideIcon;
-  emBreve?: boolean;
 };
 
 const SECOES: Secao[] = [
@@ -56,26 +55,13 @@ export function AdminNav() {
       <div className="flex flex-col gap-0.5">
         {SECOES.map((s) => {
           const Icone = s.icone;
-          if (s.emBreve) {
-            return (
-              <div
-                key={s.rotulo}
-                title="Em breve"
-                className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-medio/35"
-              >
-                <Icone className="h-4 w-4 shrink-0" />
-                <span className="truncate">{s.rotulo}</span>
-                <span className="ml-auto rounded bg-black/5 px-1.5 py-0.5 text-[10px]">
-                  breve
-                </span>
-              </div>
-            );
-          }
-          const ativo = pathname.startsWith(s.href);
+          const ativo =
+            pathname === s.href || pathname.startsWith(`${s.href}/`);
           return (
             <Link
               key={s.rotulo}
               href={s.href}
+              aria-current={ativo ? "page" : undefined}
               className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
                 ativo
                   ? "bg-tiffany/10 text-tiffany"

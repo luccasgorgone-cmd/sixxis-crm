@@ -11,10 +11,12 @@ export function ColunaKanban({
   etapa,
   cards,
   onAbrir,
+  mostrarFinalidade = false,
 }: {
   etapa: Etapa;
   cards: Card[];
   onAbrir: (id: string) => void;
+  mostrarFinalidade?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
   const soma = cards.reduce((acc, c) => acc + (c.valor ?? 0), 0);
@@ -53,7 +55,12 @@ export function ColunaKanban({
           </p>
         ) : (
           cards.map((c) => (
-            <CardNegocio key={c.id} card={c} onAbrir={onAbrir} />
+            <CardNegocio
+              key={c.id}
+              card={c}
+              onAbrir={onAbrir}
+              mostrarFinalidade={mostrarFinalidade}
+            />
           ))
         )}
       </div>

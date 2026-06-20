@@ -1,37 +1,38 @@
 "use client";
 
-// Card do Kanban (negocio). Arrastavel via @dnd-kit. Mostra cliente, valor,
-// etiquetas, temperatura, vendedor, tempo na etapa e origem.
+// Card do Kanban (negocio). Arrastavel via @dnd-kit. Mostra cliente (avatar),
+// valor, etiquetas, temperatura, dono (avatar) e tempo na etapa. Acento lateral
+// pela finalidade; badge de finalidade para o admin.
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock } from "lucide-react";
+import { Clock, User } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
-import { TEMPERATURA_INFO } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
-import {
-  formatarBRL,
-  tempoDesde,
-  iniciais,
-} from "@/lib/format";
+import { BadgeTemperatura } from "@/components/BadgeTemperatura";
+import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
+import { formatarBRL, tempoDesde } from "@/lib/format";
 
 export function CardNegocio({
   card,
   onAbrir,
   arrastando = false,
+  mostrarFinalidade = false,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
   arrastando?: boolean;
+  mostrarFinalidade?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
 
-  const temp = TEMPERATURA_INFO[card.temperatura];
   const nome = card.leadNome?.trim() || card.leadTelefone;
+  const cor = corFinalidade(card.finalidade);
 
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform) }
-    : undefined;
+  const style = {
+    borderLeftColor: cor.hex,
+    ...(transform ? { transform: CSS.Translate.toString(transform) } : {}),
+  };
 
   return (
     <div
@@ -40,8 +41,8 @@ export function CardNegocio({
       {...listeners}
       {...attributes}
       onClick={() => onAbrir?.(card.id)}
-      className={`group cursor-grab touch-none rounded-xl border border-black/5 bg-white p-3 shadow-sm transition-shadow active:cursor-grabbing ${
-        arrastando ? "rotate-1 shadow-lg" : "hover:shadow-md"
+      className={`group cursor-grab touch-none rounded-xl border border-l-[3px] border-black/5 bg-white p-3 shadow-sm transition-all active:cursor-grabbing ${
+        arrastando ? "rotate-1 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"
       } ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -56,9 +57,10 @@ export function CardNegocio({
             {nome}
           </p>
         </div>
-        <span
-          title={temp.rotulo}
-          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${temp.ponto}`}
+        <BadgeTemperatura
+          temperatura={card.temperatura}
+          variante="ponto"
+          className="mt-1.5"
         />
       </div>
 
@@ -88,22 +90,25 @@ export function CardNegocio({
           {tempoDesde(card.entrouEtapaEm)}
         </span>
         <div className="flex items-center gap-1.5">
+          {mostrarFinalidade && <BadgeFinalidade finalidade={card.finalidade} />}
           {card.origem && (
             <span className="rounded bg-fundo px-1.5 py-0.5">{card.origem}</span>
           )}
           {card.agente ? (
-            <span
-              title={card.agente.nome}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-medio/15 text-[9px] font-semibold text-medio"
-            >
-              {iniciais(card.agente.nome, "")}
+            <span title={`Dono: ${card.agente.nome}`}>
+              <AvatarCliente
+                nome={card.agente.nome}
+                telefone=""
+                fotoUrl={card.agente.avatarUrl}
+                tamanho={22}
+              />
             </span>
           ) : (
             <span
-              title="Sem vendedor"
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-medio/30 text-[9px] text-medio/40"
+              title="Sem dono"
+              className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-medio/30 text-medio/40"
             >
-              ?
+              <User className="h-3 w-3" />
             </span>
           )}
         </div>

@@ -18,6 +18,7 @@ import { Cartao, CartaoSkeleton } from "./Cartao";
 import { GraficoTendencia } from "./GraficoTendencia";
 import { queryDoFiltro, type FiltroValor, type Metricas, type PontoTendencia } from "./tipos";
 import { formatarBRL, formatarPct, formatarDuracao } from "@/lib/format";
+import { EstadoErro } from "@/components/ui/Estado";
 
 type Resposta = {
   metricas: Metricas;
@@ -29,12 +30,20 @@ export function DashboardColaborador() {
   const [filtro, setFiltro] = useState<FiltroValor>({ periodo: "mes" });
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
       const r = await fetch(`/api/dashboard?${queryDoFiltro(filtro)}`);
-      if (r.ok) setDados(await r.json());
+      if (r.ok) {
+        setDados(await r.json());
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
     } finally {
       setCarregando(false);
     }
@@ -58,12 +67,17 @@ export function DashboardColaborador() {
         <FiltroPeriodo valor={filtro} onChange={setFiltro} />
       </div>
 
-      {carregando || !m ? (
+      {carregando ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <CartaoSkeleton key={i} />
           ))}
         </div>
+      ) : erro || !m ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar suas metricas."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

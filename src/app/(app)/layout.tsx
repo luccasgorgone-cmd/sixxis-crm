@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export default async function AppLayout({
   children,
@@ -14,12 +15,14 @@ export default async function AppLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-fundo">
-      <Sidebar papel={session.user.papel} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar nome={session.user.name} papel={session.user.papel} />
-        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+    <ToastProvider>
+      <div className="flex h-screen overflow-hidden bg-fundo">
+        <Sidebar papel={session.user.papel} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar nome={session.user.name} papel={session.user.papel} />
+          <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 }

@@ -6,15 +6,19 @@ import { LogoutButton } from "./LogoutButton";
 
 const ROTULO_PAPEL: Record<string, string> = {
   ADMIN: "Administrador",
+  COLABORADOR: "Colaborador",
   VENDEDOR: "Vendedor",
   POS_VENDA: "Pos-venda",
 };
 
+// Ordem importa: prefixos mais especificos primeiro.
 const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
+  { prefixo: "/admin/metas", titulo: "Metas" },
   { prefixo: "/admin", titulo: "Administracao" },
   { prefixo: "/dashboard", titulo: "Painel" },
   { prefixo: "/inbox", titulo: "Inbox" },
   { prefixo: "/kanban", titulo: "Kanban" },
+  { prefixo: "/metas", titulo: "Metas" },
 ];
 
 export function Topbar({

@@ -43,8 +43,8 @@ export function SeletorProduto({
   }, [buscaAplicada]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in flex h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-black/5 p-4">
           <h3 className="flex items-center gap-2 text-base font-semibold text-escuro">
             <Package className="h-5 w-5 text-tiffany" /> Enviar produto

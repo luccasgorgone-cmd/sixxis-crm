@@ -9,6 +9,8 @@ import {
   SkeletonTabela,
   CampoTexto,
 } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Numero = {
   id: string;
@@ -29,14 +31,25 @@ const COR_STATUS: Record<string, string> = {
 export function NumerosAdmin() {
   const [numeros, setNumeros] = useState<Numero[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [statusCarregado, setStatusCarregado] = useState(false);
   const [editando, setEditando] = useState<Numero | null>(null);
   const [criando, setCriando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const toast = useToast();
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/numeros");
-    if (r.ok) setNumeros((await r.json()).numeros);
+    try {
+      const r = await fetch("/api/admin/numeros");
+      if (r.ok) {
+        setNumeros((await r.json()).numeros);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    }
     setCarregando(false);
   }, []);
 
@@ -59,16 +72,28 @@ export function NumerosAdmin() {
   }, [carregando, statusCarregado, numeros, carregar]);
 
   async function patch(id: string, body: Record<string, unknown>) {
-    await fetch(`/api/admin/numeros/${id}`, {
+    const r = await fetch(`/api/admin/numeros/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (r.ok) {
+      toast.sucesso("Numero atualizado");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+    }
     await carregar();
   }
 
   async function remover(id: string) {
-    await fetch(`/api/admin/numeros/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/numeros/${id}`, { method: "DELETE" });
+    if (r.ok) {
+      toast.sucesso("Numero removido");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel remover.");
+    }
     await carregar();
   }
 
@@ -113,6 +138,11 @@ export function NumerosAdmin() {
 
       {carregando ? (
         <SkeletonTabela />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <div className="space-y-2">
           {numeros.map((n) => (
@@ -230,6 +260,7 @@ function ModalNumero({
   const [finalidade, setFinalidade] = useState(numero?.finalidade ?? "VENDA");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const toast = useToast();
 
   async function salvar() {
     setErro(null);
@@ -259,6 +290,7 @@ function ModalNumero({
         setSalvando(false);
         return;
       }
+      toast.sucesso(edicao ? "Numero salvo" : "Numero adicionado");
       onSalvo();
     } catch {
       setErro("Falha ao salvar.");
@@ -267,8 +299,8 @@ function ModalNumero({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
             {edicao ? "Editar numero" : "Novo numero"}

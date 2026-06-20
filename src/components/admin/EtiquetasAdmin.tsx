@@ -4,16 +4,29 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Etiqueta = { id: string; nome: string; cor: string; usos: number };
 
 export function EtiquetasAdmin() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+  const toast = useToast();
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/etiquetas");
-    if (r.ok) setEtiquetas((await r.json()).etiquetas);
+    try {
+      const r = await fetch("/api/admin/etiquetas");
+      if (r.ok) {
+        setEtiquetas((await r.json()).etiquetas);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    }
     setCarregando(false);
   }, []);
 
@@ -22,11 +35,17 @@ export function EtiquetasAdmin() {
   }, [carregar]);
 
   async function patch(id: string, body: Record<string, unknown>) {
-    await fetch(`/api/admin/etiquetas/${id}`, {
+    const r = await fetch(`/api/admin/etiquetas/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (r.ok) {
+      toast.sucesso("Etiqueta atualizada");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+    }
   }
 
   async function criar() {
@@ -35,11 +54,23 @@ export function EtiquetasAdmin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nome: "Nova etiqueta" }),
     });
-    if (r.ok) await carregar();
+    if (r.ok) {
+      toast.sucesso("Etiqueta criada");
+      await carregar();
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel criar.");
+    }
   }
 
   async function remover(id: string) {
-    await fetch(`/api/admin/etiquetas/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/etiquetas/${id}`, { method: "DELETE" });
+    if (r.ok) {
+      toast.sucesso("Etiqueta removida");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel remover.");
+    }
     await carregar();
   }
 
@@ -60,6 +91,11 @@ export function EtiquetasAdmin() {
 
       {carregando ? (
         <SkeletonTabela />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {etiquetas.map((e) => (

@@ -5,6 +5,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Cabecalho, SkeletonTabela, CampoTexto } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Faixa = { inicio: string; fim: string };
 type DiaHorario = { dia: number; aberto: boolean; faixas: Faixa[] };
@@ -26,20 +28,31 @@ const NOMES = [
 ];
 
 export function GeralAdmin() {
+  const toast = useToast();
   const [config, setConfig] = useState<Config | null>(null);
   const [abertoAgora, setAbertoAgora] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/config");
-    if (r.ok) {
-      const d = await r.json();
-      setConfig(d.config);
-      setAbertoAgora(d.abertoAgora);
+    setCarregando(true);
+    try {
+      const r = await fetch("/api/admin/config");
+      if (r.ok) {
+        const d = await r.json();
+        setConfig(d.config);
+        setAbertoAgora(d.abertoAgora);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
     }
-    setCarregando(false);
   }, []);
 
   useEffect(() => {
@@ -124,23 +137,37 @@ export function GeralAdmin() {
         setConfig(d.config);
         setAbertoAgora(d.abertoAgora);
         setAviso("Configuracao salva.");
+        toast.sucesso("Configuracao salva");
       } else {
         const d = await r.json().catch(() => null);
         setAviso(
           d?.erro ? `Erro: ${d.erro}` : "Nao foi possivel salvar a configuracao.",
         );
+        toast.erro(d?.erro ?? "Nao foi possivel salvar.");
       }
     } catch {
       setAviso("Falha de rede ao salvar.");
+      toast.erro("Nao foi possivel salvar.");
     } finally {
       setSalvando(false);
     }
   }
 
-  if (carregando || !config) {
+  if (carregando) {
     return (
       <div className="p-6">
         <SkeletonTabela />
+      </div>
+    );
+  }
+
+  if (erro || !config) {
+    return (
+      <div className="p-6">
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       </div>
     );
   }

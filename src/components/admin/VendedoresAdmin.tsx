@@ -4,6 +4,8 @@
 // senha). Restrito a ADMIN (API valida tambem).
 import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Loader2, X, Pencil } from "lucide-react";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Agente = {
   id: string;
@@ -37,14 +39,23 @@ function rotuloAcesso(a: Agente): string {
 export function VendedoresAdmin() {
   const [agentes, setAgentes] = useState<Agente[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [editando, setEditando] = useState<Agente | null>(null);
   const [criando, setCriando] = useState(false);
+  const toast = useToast();
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/vendedores");
-    if (r.ok) {
-      const d = await r.json();
-      setAgentes(d.agentes);
+    try {
+      const r = await fetch("/api/admin/vendedores");
+      if (r.ok) {
+        const d = await r.json();
+        setAgentes(d.agentes);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
     }
     setCarregando(false);
   }, []);
@@ -54,11 +65,17 @@ export function VendedoresAdmin() {
   }, [carregar]);
 
   async function alternarAtivo(a: Agente) {
-    await fetch(`/api/admin/vendedores/${a.id}`, {
+    const r = await fetch(`/api/admin/vendedores/${a.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ativo: !a.ativo }),
     });
+    if (r.ok) {
+      toast.sucesso(a.ativo ? "Colaborador desativado" : "Colaborador ativado");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+    }
     await carregar();
   }
 
@@ -79,6 +96,11 @@ export function VendedoresAdmin() {
 
       {carregando ? (
         <SkeletonTabela />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <div className="overflow-hidden rounded-xl border border-black/5 bg-white">
           <table className="w-full text-sm">
@@ -178,6 +200,7 @@ function ModalVendedor({
   );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const toast = useToast();
 
   async function salvar() {
     setErro(null);
@@ -212,6 +235,7 @@ function ModalVendedor({
         setSalvando(false);
         return;
       }
+      toast.sucesso("Colaborador salvo");
       onSalvo();
     } catch {
       setErro("Falha ao salvar.");
@@ -220,8 +244,8 @@ function ModalVendedor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
             {edicao ? "Editar colaborador" : "Novo colaborador"}

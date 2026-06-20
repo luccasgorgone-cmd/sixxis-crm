@@ -20,6 +20,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, GripVertical, Trash2 } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Etapa = {
   id: string;
@@ -43,13 +45,24 @@ const ROTULO_FIN: Record<string, string> = {
 export function EtapasAdmin() {
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+  const toast = useToast();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/etapas");
-    if (r.ok) setEtapas((await r.json()).etapas);
+    try {
+      const r = await fetch("/api/admin/etapas");
+      if (r.ok) {
+        setEtapas((await r.json()).etapas);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    }
     setCarregando(false);
   }, []);
 
@@ -58,11 +71,17 @@ export function EtapasAdmin() {
   }, [carregar]);
 
   async function patch(id: string, body: Record<string, unknown>) {
-    await fetch(`/api/admin/etapas/${id}`, {
+    const r = await fetch(`/api/admin/etapas/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (r.ok) {
+      toast.sucesso("Etapa atualizada");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+    }
   }
 
   function atualizarLocal(id: string, campos: Partial<Etapa>) {
@@ -75,16 +94,23 @@ export function EtapasAdmin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nome: "Nova etapa" }),
     });
-    if (r.ok) await carregar();
+    if (r.ok) {
+      toast.sucesso("Etapa criada");
+      await carregar();
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel criar.");
+    }
   }
 
   async function remover(id: string) {
     const r = await fetch(`/api/admin/etapas/${id}`, { method: "DELETE" });
     if (!r.ok) {
       const d = await r.json().catch(() => null);
-      alert(d?.erro ?? "Nao foi possivel remover.");
+      toast.erro(d?.erro ?? "Nao foi possivel remover.");
       return;
     }
+    toast.sucesso("Etapa removida");
     await carregar();
   }
 
@@ -98,11 +124,17 @@ export function EtapasAdmin() {
       ids.indexOf(String(over.id)),
     );
     setEtapas(novo);
-    await fetch("/api/admin/etapas", {
+    const r = await fetch("/api/admin/etapas", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ordem: novo.map((x) => x.id) }),
     });
+    if (r.ok) {
+      toast.sucesso("Ordem atualizada");
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel reordenar.");
+    }
   }
 
   return (
@@ -122,6 +154,11 @@ export function EtapasAdmin() {
 
       {carregando ? (
         <SkeletonTabela />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <DndContext
           sensors={sensors}

@@ -17,6 +17,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
+import { useToast } from "@/components/ui/Toast";
 import { formatarTelefone } from "@/lib/format";
 
 export type ClientePainel = {
@@ -43,6 +44,7 @@ export function BlocoCliente({
   podeEditar?: boolean;
   onAtualizado?: () => void;
 }) {
+  const toast = useToast();
   const [editando, setEditando] = useState(false);
   const [foto, setFoto] = useState(cliente.fotoUrl);
   const [atualizandoFoto, setAtualizandoFoto] = useState(false);
@@ -60,7 +62,14 @@ export function BlocoCliente({
         const d = await r.json();
         setFoto(d.fotoUrl ?? foto);
         onAtualizado?.();
+        toast.sucesso(
+          d.encontrada ? "Foto atualizada." : "Nenhuma foto encontrada no WhatsApp.",
+        );
+      } else {
+        toast.erro("Nao foi possivel atualizar a foto.");
       }
+    } catch {
+      toast.erro("Falha ao atualizar a foto.");
     } finally {
       setAtualizandoFoto(false);
     }
@@ -184,6 +193,7 @@ function Formulario({
   onCancelar: () => void;
   onSalvo: () => void;
 }) {
+  const toast = useToast();
   const [nomeManual, setNomeManual] = useState(cliente.nomeManual ?? "");
   const [email, setEmail] = useState(cliente.email ?? "");
   const [empresa, setEmpresa] = useState(cliente.empresa ?? "");
@@ -212,6 +222,7 @@ function Formulario({
         setSalvando(false);
         return;
       }
+      toast.sucesso("Dados do cliente salvos.");
       onSalvo();
     } catch {
       setErro("Falha ao salvar.");

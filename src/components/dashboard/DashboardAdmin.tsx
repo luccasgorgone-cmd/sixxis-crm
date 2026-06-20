@@ -24,6 +24,7 @@ import {
   type PontoTendencia,
 } from "./tipos";
 import { formatarBRL, formatarPct, formatarDuracao } from "@/lib/format";
+import { EstadoErro } from "@/components/ui/Estado";
 
 type Linha = { id: string; nome: string; acesso: string; metricas: Metricas };
 type Resposta = {
@@ -47,6 +48,7 @@ export function DashboardAdmin() {
   const [filtro, setFiltro] = useState<FiltroValor>({ periodo: "mes" });
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [ordem, setOrdem] = useState<{ chave: ChaveOrdem; dir: 1 | -1 }>({
     chave: "valorVendido",
     dir: -1,
@@ -56,7 +58,14 @@ export function DashboardAdmin() {
     setCarregando(true);
     try {
       const r = await fetch(`/api/admin/dashboard?${queryDoFiltro(filtro)}`);
-      if (r.ok) setDados(await r.json());
+      if (r.ok) {
+        setDados(await r.json());
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
     } finally {
       setCarregando(false);
     }
@@ -102,12 +111,17 @@ export function DashboardAdmin() {
         <FiltroPeriodo valor={filtro} onChange={setFiltro} />
       </div>
 
-      {carregando || !g || !dados ? (
+      {carregando ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <CartaoSkeleton key={i} />
           ))}
         </div>
+      ) : erro || !g || !dados ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar o painel da operacao."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <>
           {/* Visao geral combinada */}

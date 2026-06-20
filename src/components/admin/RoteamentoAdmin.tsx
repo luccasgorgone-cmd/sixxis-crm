@@ -5,6 +5,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { RotateCcw, ArrowRight } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Vendedor = { id: string; nome: string; papel: string };
 type Config = {
@@ -15,20 +17,31 @@ type Config = {
 };
 
 export function RoteamentoAdmin() {
+  const toast = useToast();
   const [config, setConfig] = useState<Config | null>(null);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [proximoId, setProximoId] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/roteamento");
-    if (r.ok) {
-      const d = await r.json();
-      setConfig(d.config);
-      setVendedores(d.vendedores);
-      setProximoId(d.proximoId);
+    setCarregando(true);
+    try {
+      const r = await fetch("/api/admin/roteamento");
+      if (r.ok) {
+        const d = await r.json();
+        setConfig(d.config);
+        setVendedores(d.vendedores);
+        setProximoId(d.proximoId);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
     }
-    setCarregando(false);
   }, []);
 
   useEffect(() => {
@@ -36,23 +49,54 @@ export function RoteamentoAdmin() {
   }, [carregar]);
 
   async function patch(body: Record<string, unknown>) {
-    await fetch("/api/admin/roteamento", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    try {
+      const r = await fetch("/api/admin/roteamento", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        toast.sucesso("Roteamento atualizado");
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+      }
+    } catch {
+      toast.erro("Nao foi possivel salvar.");
+    }
     await carregar();
   }
 
   async function resetar() {
-    await fetch("/api/admin/roteamento", { method: "POST" });
+    try {
+      const r = await fetch("/api/admin/roteamento", { method: "POST" });
+      if (r.ok) {
+        toast.sucesso("Ciclo resetado");
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+      }
+    } catch {
+      toast.erro("Nao foi possivel salvar.");
+    }
     await carregar();
   }
 
-  if (carregando || !config) {
+  if (carregando) {
     return (
       <div className="p-6">
         <SkeletonTabela />
+      </div>
+    );
+  }
+
+  if (erro || !config) {
+    return (
+      <div className="p-6">
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       </div>
     );
   }

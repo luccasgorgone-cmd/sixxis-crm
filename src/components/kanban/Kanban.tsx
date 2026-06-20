@@ -20,6 +20,7 @@ import { corFinalidade } from "@/components/BadgeFinalidade";
 import { BarraFiltros } from "./BarraFiltros";
 import { ModalFechamento } from "./ModalFechamento";
 import { PainelNegocio } from "./PainelNegocio";
+import { EstadoErro } from "@/components/ui/Estado";
 import type {
   Etapa,
   CardNegocio as Card,
@@ -332,7 +333,13 @@ export function Kanban({
       {carregando ? (
         <SkeletonQuadro />
       ) : erro ? (
-        <p className="p-6 text-sm text-erro">{erro}</p>
+        <EstadoErro
+          mensagem={erro}
+          onRetry={() => {
+            setCarregando(true);
+            void carregar();
+          }}
+        />
       ) : (
         <DndContext
           sensors={sensors}
@@ -370,6 +377,7 @@ export function Kanban({
                           etapa={etapa}
                           cards={colunas[etapa.id] ?? []}
                           onAbrir={setDrawerId}
+                          mostrarFinalidade={ehAdmin}
                         />
                       ))}
                     </div>
@@ -385,6 +393,7 @@ export function Kanban({
                   etapa={etapa}
                   cards={colunas[etapa.id] ?? []}
                   onAbrir={setDrawerId}
+                  mostrarFinalidade={ehAdmin}
                 />
               ))}
             </div>

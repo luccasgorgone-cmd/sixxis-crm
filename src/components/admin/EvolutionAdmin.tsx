@@ -6,6 +6,7 @@ import Link from "next/link";
 import { RefreshCw, ArrowRight, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import { EstadoErro } from "@/components/ui/Estado";
 
 type Instancia = {
   id: string;
@@ -28,6 +29,7 @@ export function EvolutionAdmin() {
   const [temApiKey, setTemApiKey] = useState(false);
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -38,7 +40,12 @@ export function EvolutionAdmin() {
         setBaseUrl(d.baseUrl);
         setTemApiKey(d.temApiKey);
         setInstancias(d.instancias);
+        setErro(false);
+      } else {
+        setErro(true);
       }
+    } catch {
+      setErro(true);
     } finally {
       setCarregando(false);
     }
@@ -92,6 +99,11 @@ export function EvolutionAdmin() {
 
       {carregando ? (
         <SkeletonTabela />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : (
         <div className="space-y-2">
           {instancias.map((i) => (

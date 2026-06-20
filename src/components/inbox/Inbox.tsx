@@ -205,6 +205,7 @@ export function Inbox({
         onFiltro={setFiltro}
         onFinalidade={setFinalidade}
         onSelecionar={abrirConversa}
+        onTentar={() => void carregarConversas()}
       />
 
       {conversaAberta ? (

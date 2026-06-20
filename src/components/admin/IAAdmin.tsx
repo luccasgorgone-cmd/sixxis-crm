@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Bot, Info } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 
 type Config = {
   ativo: boolean;
@@ -21,15 +23,28 @@ const MODELOS: { id: string; rotulo: string }[] = [
 ];
 
 export function IAAdmin() {
+  const toast = useToast();
   const [config, setConfig] = useState<Config | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
-    const r = await fetch("/api/admin/ia");
-    if (r.ok) setConfig((await r.json()).config);
-    setCarregando(false);
+    setCarregando(true);
+    try {
+      const r = await fetch("/api/admin/ia");
+      if (r.ok) {
+        setConfig((await r.json()).config);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -49,23 +64,37 @@ export function IAAdmin() {
       if (r.ok) {
         setConfig((await r.json()).config);
         setAviso("Configuracao salva.");
+        toast.sucesso("Agente IA salvo");
       } else {
         const d = await r.json().catch(() => null);
         setAviso(
           d?.erro ? `Erro: ${d.erro}` : "Nao foi possivel salvar a configuracao.",
         );
+        toast.erro(d?.erro ?? "Nao foi possivel salvar.");
       }
     } catch {
       setAviso("Falha de rede ao salvar.");
+      toast.erro("Nao foi possivel salvar.");
     } finally {
       setSalvando(false);
     }
   }
 
-  if (carregando || !config) {
+  if (carregando) {
     return (
       <div className="p-6">
         <SkeletonTabela />
+      </div>
+    );
+  }
+
+  if (erro || !config) {
+    return (
+      <div className="p-6">
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       </div>
     );
   }

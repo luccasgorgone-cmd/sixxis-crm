@@ -7,6 +7,7 @@ import { Download, Loader2, FileSpreadsheet } from "lucide-react";
 import { Cabecalho } from "./VendedoresAdmin";
 import { FiltroPeriodo } from "@/components/dashboard/FiltroPeriodo";
 import { queryDoFiltro, type FiltroValor } from "@/components/dashboard/tipos";
+import { useToast } from "@/components/ui/Toast";
 
 // Monta um CSV a partir de cabecalhos e linhas (escapando aspas/virgulas).
 function paraCsv(headers: string[], linhas: (string | number)[][]): string {
@@ -46,6 +47,7 @@ const COLS_METRICA = [
 ] as const;
 
 export function RelatoriosAdmin() {
+  const toast = useToast();
   const [filtro, setFiltro] = useState<FiltroValor>({ periodo: "mes" });
   const [ocupado, setOcupado] = useState<string | null>(null);
 
@@ -53,7 +55,10 @@ export function RelatoriosAdmin() {
     setOcupado("metricas");
     try {
       const r = await fetch(`/api/admin/dashboard?${queryDoFiltro(filtro)}`);
-      if (!r.ok) return;
+      if (!r.ok) {
+        toast.erro("Nao foi possivel exportar o relatorio.");
+        return;
+      }
       const d = await r.json();
       const headers = ["escopo", "nome", "acesso", ...COLS_METRICA];
       const linhas: (string | number)[][] = [];
@@ -68,6 +73,9 @@ export function RelatoriosAdmin() {
         linhas.push(linhaM("Colaborador", c.nome, c.acesso, c.metricas));
       }
       baixar(`metricas-${Date.now()}.csv`, paraCsv(headers, linhas));
+      toast.sucesso("Relatorio exportado.");
+    } catch {
+      toast.erro("Nao foi possivel exportar o relatorio.");
     } finally {
       setOcupado(null);
     }
@@ -78,7 +86,10 @@ export function RelatoriosAdmin() {
     try {
       const qs = queryDoFiltro(filtro);
       const rc = await fetch(`/api/admin/colaboradores?${qs}`);
-      if (!rc.ok) return;
+      if (!rc.ok) {
+        toast.erro("Nao foi possivel exportar o relatorio.");
+        return;
+      }
       const { colaboradores } = await rc.json();
       const headers = [
         "colaborador",
@@ -115,6 +126,9 @@ export function RelatoriosAdmin() {
         }
       }
       baixar(`atendimentos-${Date.now()}.csv`, paraCsv(headers, linhas));
+      toast.sucesso("Relatorio exportado.");
+    } catch {
+      toast.erro("Nao foi possivel exportar o relatorio.");
     } finally {
       setOcupado(null);
     }

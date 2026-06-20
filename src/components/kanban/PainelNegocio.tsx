@@ -11,7 +11,6 @@ import {
   Trophy,
   XCircle,
   CreditCard,
-  Store,
   ArrowRight,
   StickyNote,
   UserCheck,
@@ -25,6 +24,8 @@ import { ClienteAba } from "./ClienteAba";
 import { LojaCliente } from "@/components/loja/LojaCliente";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
+import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -85,6 +86,7 @@ export function PainelNegocio({
   const ehAdmin = papel === "ADMIN";
   const [detalhe, setDetalhe] = useState<DetalheNegocio | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [aba, setAba] = useState<Aba>("resumo");
   const [presets, setPresets] = useState<ObservacaoOpcao[]>([]);
   const [modal, setModal] = useState<{
@@ -98,8 +100,10 @@ export function PainelNegocio({
       if (!r.ok) throw new Error();
       const d = await r.json();
       setDetalhe(d.negocio as DetalheNegocio);
+      setErro(false);
     } catch {
       setDetalhe(null);
+      setErro(true);
     } finally {
       setCarregando(false);
     }
@@ -117,21 +121,31 @@ export function PainelNegocio({
       .catch(() => undefined);
   }, []);
 
-  // Aplica um PATCH e recarrega detalhe + quadro.
+  const toast = useToast();
+
+  // Aplica um PATCH e recarrega detalhe + quadro. Erro -> toast.
   const salvar = useCallback(
     async (body: Record<string, unknown>): Promise<boolean> => {
-      const r = await fetch(`/api/negocios/${negocioId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (r.ok) {
-        await carregar();
-        onAtualizado();
+      try {
+        const r = await fetch(`/api/negocios/${negocioId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          await carregar();
+          onAtualizado();
+        } else {
+          const d = await r.json().catch(() => null);
+          toast.erro(d?.erro ?? "Nao foi possivel salvar a alteracao.");
+        }
+        return r.ok;
+      } catch {
+        toast.erro("Falha de conexao ao salvar.");
+        return false;
       }
-      return r.ok;
     },
-    [negocioId, carregar, onAtualizado],
+    [negocioId, carregar, onAtualizado, toast],
   );
 
   return (
@@ -195,11 +209,25 @@ export function PainelNegocio({
 
         {/* Conteudo */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {carregando || !detalhe ? (
+          {carregando ? (
             <div className="space-y-3 p-4">
               <div className="skeleton h-6 w-2/3" />
               <div className="skeleton h-20 w-full" />
               <div className="skeleton h-20 w-full" />
+            </div>
+          ) : !detalhe ? (
+            <div className="p-4">
+              <EstadoErro
+                mensagem={
+                  erro
+                    ? "Nao foi possivel carregar este negocio."
+                    : "Negocio nao encontrado."
+                }
+                onRetry={() => {
+                  setCarregando(true);
+                  void carregar();
+                }}
+              />
             </div>
           ) : aba === "conversa" ? (
             detalhe.conversaId ? (
@@ -327,6 +355,7 @@ function Resumo({
   onAtualizado: () => void;
   abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
+  const toast = useToast();
   const [valor, setValor] = useState(
     detalhe.valor != null ? String(detalhe.valor) : "",
   );
@@ -591,19 +620,18 @@ function Resumo({
         </div>
       </Secao>
 
-      {/* Integracoes (stubs) */}
+      {/* Integracoes */}
       <Secao titulo="Integracoes">
         <button
-          onClick={() => alert("Integracao com Mercado Pago em breve.")}
-          className="mb-2 flex w-full items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-medio hover:bg-black/5"
+          onClick={() => toast.info("Integracao de pagamento chega em breve.")}
+          className="flex w-full items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-medio transition-colors hover:border-tiffany hover:text-escuro"
         >
           <CreditCard className="h-4 w-4 text-tiffany" />
           Enviar link de pagamento
+          <span className="ml-auto rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/50">
+            em breve
+          </span>
         </button>
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/10 px-3 py-2 text-sm text-medio/50">
-          <Store className="h-4 w-4" />
-          Historico de pedidos da loja (conectar a loja)
-        </div>
       </Secao>
     </div>
   );

@@ -2,7 +2,7 @@
 
 // Tela "Minhas metas" do colaborador: cards com donut de progresso, numero
 // grande, ritmo colorido, dias restantes, ranking e celebracao ao bater a meta.
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Target,
   Trophy,
@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { EstadoErro } from "@/components/ui/Estado";
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { Donut } from "./Donut";
 import {
@@ -27,21 +28,28 @@ type Resposta = { minhas: Meta[]; equipe: Meta[] };
 export function MinhasMetas() {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const r = await fetch("/api/metas");
+      if (r.ok) {
+        setDados(await r.json());
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const r = await fetch("/api/metas");
-        if (r.ok && vivo) setDados(await r.json());
-      } finally {
-        if (vivo) setCarregando(false);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
+    void carregar();
+  }, [carregar]);
 
   const minhas = dados?.minhas ?? [];
   const equipe = dados?.equipe ?? [];
@@ -77,6 +85,11 @@ export function MinhasMetas() {
 
       {carregando ? (
         <GradeSkeleton />
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar suas metas."
+          onRetry={() => void carregar()}
+        />
       ) : vazio ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-black/10 bg-white py-16 text-center">
           <Target className="h-8 w-8 text-medio/30" />

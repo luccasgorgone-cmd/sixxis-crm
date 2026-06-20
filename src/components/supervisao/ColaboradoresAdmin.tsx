@@ -8,6 +8,7 @@ import { Radio, Clock4, CheckCircle2, ChevronRight } from "lucide-react";
 import { FiltroPeriodo } from "@/components/dashboard/FiltroPeriodo";
 import { queryDoFiltro, type FiltroValor } from "@/components/dashboard/tipos";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import { EstadoErro } from "@/components/ui/Estado";
 import { horarioLista } from "@/lib/format";
 import type { ResumoColaborador } from "./tipos";
 
@@ -16,12 +17,20 @@ export function ColaboradoresAdmin() {
   const [filtro, setFiltro] = useState<FiltroValor>({ periodo: "mes" });
   const [lista, setLista] = useState<ResumoColaborador[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
       const r = await fetch(`/api/admin/colaboradores?${queryDoFiltro(filtro)}`);
-      if (r.ok) setLista((await r.json()).colaboradores);
+      if (r.ok) {
+        setLista((await r.json()).colaboradores);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
     } finally {
       setCarregando(false);
     }
@@ -49,6 +58,11 @@ export function ColaboradoresAdmin() {
             <div key={i} className="skeleton h-16 w-full rounded-xl" />
           ))}
         </div>
+      ) : erro ? (
+        <EstadoErro
+          mensagem="Nao foi possivel carregar."
+          onRetry={() => void carregar()}
+        />
       ) : lista.length === 0 ? (
         <p className="py-10 text-center text-sm text-medio/50">
           Nenhum colaborador cadastrado.
