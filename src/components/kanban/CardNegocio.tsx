@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Clock } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { TEMPERATURA_INFO } from "./tipos";
+import { AvatarCliente } from "@/components/AvatarCliente";
 import {
   formatarBRL,
   tempoDesde,
@@ -44,9 +45,17 @@ export function CardNegocio({
       } ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-escuro">
-          {nome}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <AvatarCliente
+            nome={card.leadNome}
+            telefone={card.leadTelefone}
+            fotoUrl={card.leadFoto}
+            tamanho={28}
+          />
+          <p className="min-w-0 truncate text-sm font-semibold text-escuro">
+            {nome}
+          </p>
+        </div>
         <span
           title={temp.rotulo}
           className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${temp.ponto}`}

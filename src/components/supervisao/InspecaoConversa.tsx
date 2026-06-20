@@ -1,64 +1,23 @@
 "use client";
 
-// Inspecao de uma conversa (admin): thread SOMENTE LEITURA + timeline de
-// atividade + dados do cliente/negocio + acoes Assumir/Transferir. Atualiza a
-// thread em tempo real (Socket.io). Sem compositor.
+// Inspecao de uma conversa (admin): thread SOMENTE LEITURA + dados do cliente
+// (editaveis) + historico COMPLETO + acoes Assumir/Transferir. Thread em tempo
+// real (Socket.io). Sem compositor.
 import { useState, useEffect, useCallback } from "react";
-import {
-  UserPlus,
-  Repeat,
-  Loader2,
-  Sparkles,
-  ArrowRight,
-  UserCheck,
-  StickyNote,
-  Tag,
-  Trophy,
-  XCircle,
-  DollarSign,
-  Phone,
-} from "lucide-react";
+import { UserPlus, Repeat, Loader2 } from "lucide-react";
 import { Thread } from "@/components/inbox/Thread";
 import { getSocket } from "@/lib/socketClient";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import { AvatarCliente } from "@/components/AvatarCliente";
+import { BlocoCliente, type ClientePainel } from "@/components/cliente/BlocoCliente";
+import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { LojaCliente } from "@/components/loja/LojaCliente";
-import { formatarBRL, formatarTelefone } from "@/lib/format";
+import { formatarBRL } from "@/lib/format";
 import type {
   MensagemItem,
   ConversaItem,
   EventoMensagemNova,
 } from "@/components/inbox/tipos";
-
-const ICONE_ATIV: Record<string, typeof Tag> = {
-  CRIACAO: Sparkles,
-  CONTATO: Phone,
-  ATRIBUICAO: UserCheck,
-  TRANSFERENCIA: Repeat,
-  ASSUMIDO: UserPlus,
-  NOTA: StickyNote,
-  ETIQUETA: Tag,
-  ETAPA: ArrowRight,
-  VALOR: DollarSign,
-  GANHO: Trophy,
-  PERDA: XCircle,
-};
-
-type Atividade = {
-  id: string;
-  tipo: string;
-  descricao: string;
-  agente: string | null;
-  criadoEm: string;
-};
-
-function dataHora(v: string) {
-  return new Date(v).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export function InspecaoConversa({
   conversaId,
@@ -79,14 +38,14 @@ export function InspecaoConversa({
 }) {
   const [mensagens, setMensagens] = useState<MensagemItem[]>([]);
   const [carregandoMsg, setCarregandoMsg] = useState(true);
-  const [atividades, setAtividades] = useState<Atividade[]>([]);
+  const [cliente, setCliente] = useState<ClientePainel | null>(null);
   const [dono, setDono] = useState<{ id: string; nome: string } | null>(null);
   const [valor, setValor] = useState<number | null>(null);
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const [acao, setAcao] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
-  const [abaLado, setAbaLado] = useState<"timeline" | "loja">("timeline");
+  const [abaLado, setAbaLado] = useState<"historico" | "loja">("historico");
 
   const carregarTudo = useCallback(async () => {
     // Mensagens.
@@ -101,27 +60,24 @@ export function InspecaoConversa({
       setMensagens([]);
       setCarregandoMsg(false);
     }
-    // Atividades do cliente.
-    fetch(`/api/leads/${leadId}/atividades`)
-      .then((r) => (r.ok ? r.json() : { atividades: [] }))
-      .then((d) => setAtividades(d.atividades ?? []))
-      .catch(() => undefined);
-    // Dono/valor via detalhe do negocio.
+    // Cliente/dono/valor via detalhe do negocio.
     if (negocioId) {
       fetch(`/api/negocios/${negocioId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
           if (d?.negocio) {
+            setCliente(d.negocio.cliente ?? null);
             setDono(d.negocio.dono ?? null);
             setValor(d.negocio.valor ?? null);
           }
         })
         .catch(() => undefined);
     } else {
+      setCliente(null);
       setDono(null);
       setValor(null);
     }
-  }, [conversaId, leadId, negocioId]);
+  }, [conversaId, negocioId]);
 
   useEffect(() => {
     void carregarTudo();
@@ -196,9 +152,11 @@ export function InspecaoConversa({
     }
   }
 
+  const nomeMostrar = cliente?.nomeEfetivo ?? (leadNome?.trim() || leadTelefone);
   const conversa: ConversaItem = {
     id: conversaId ?? "",
-    leadNome,
+    leadNome: nomeMostrar,
+    leadFoto: cliente?.fotoUrl ?? null,
     leadTelefone,
     atendidoPor: "HUMANO",
     naoLidas: 0,
@@ -226,30 +184,36 @@ export function InspecaoConversa({
         )}
       </div>
 
-      {/* Painel lateral: cliente, acoes e timeline */}
-      <aside className="scroll-fino flex w-80 shrink-0 flex-col overflow-y-auto border-l border-black/5 bg-white p-4">
-        <div className="mb-3">
-          <div className="mb-1 flex items-center gap-2">
-            <p className="text-sm font-semibold text-escuro">
-              {leadNome?.trim() || leadTelefone}
+      {/* Painel lateral: cliente, acoes e historico */}
+      <aside className="scroll-fino flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-black/5 bg-white p-4">
+        {/* Cabecalho com avatar */}
+        <div className="flex items-center gap-3">
+          <AvatarCliente
+            nome={nomeMostrar}
+            telefone={leadTelefone}
+            fotoUrl={cliente?.fotoUrl ?? null}
+            tamanho={44}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-semibold text-escuro">
+                {nomeMostrar}
+              </p>
+              <BadgeFinalidade finalidade={finalidade} />
+            </div>
+            {valor != null && (
+              <p className="text-sm font-semibold text-tiffany-escuro">
+                {formatarBRL(valor)}
+              </p>
+            )}
+            <p className="text-xs text-medio/50">
+              Dono: {dono?.nome ?? "Sem dono"}
             </p>
-            <BadgeFinalidade finalidade={finalidade} />
           </div>
-          <p className="text-xs text-medio/60">
-            {formatarTelefone(leadTelefone)}
-          </p>
-          {valor != null && (
-            <p className="mt-1 text-sm font-semibold text-tiffany-escuro">
-              {formatarBRL(valor)}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-medio/50">
-            Dono: {dono?.nome ?? "Sem dono"}
-          </p>
         </div>
 
         {/* Acoes do admin */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => void assumir()}
             disabled={acao}
@@ -270,7 +234,7 @@ export function InspecaoConversa({
           </button>
         </div>
         {transferindo && (
-          <div className="mb-4 flex gap-2">
+          <div className="flex gap-2">
             <select
               value={destino}
               onChange={(e) => setDestino(e.target.value)}
@@ -293,13 +257,18 @@ export function InspecaoConversa({
           </div>
         )}
 
-        {/* Alternancia Atividade | Loja */}
-        <div className="mb-3 flex gap-1 border-b border-black/5">
+        {/* Dados do cliente (editaveis pelo admin) */}
+        {cliente && (
+          <BlocoCliente cliente={cliente} onAtualizado={() => void carregarTudo()} />
+        )}
+
+        {/* Alternancia Historico | Loja */}
+        <div className="flex gap-1 border-b border-black/5">
           {(
             [
-              ["timeline", "Atividade"],
+              ["historico", "Historico"],
               ["loja", "Loja"],
-            ] as ["timeline" | "loja", string][]
+            ] as ["historico" | "loja", string][]
           ).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -316,29 +285,9 @@ export function InspecaoConversa({
         </div>
 
         {abaLado === "loja" ? (
-          <LojaCliente telefone={leadTelefone} />
-        ) : atividades.length === 0 ? (
-          <p className="text-sm text-medio/50">Sem atividades.</p>
+          <LojaCliente telefone={leadTelefone} origem={cliente?.origem} />
         ) : (
-          <ol className="space-y-3">
-            {atividades.map((a) => {
-              const Icone = ICONE_ATIV[a.tipo] ?? StickyNote;
-              return (
-                <li key={a.id} className="flex gap-2.5">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-tiffany/10 text-tiffany">
-                    <Icone className="h-3 w-3" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-escuro">{a.descricao}</p>
-                    <p className="text-[10px] text-medio/50">
-                      {a.agente ? `${a.agente} · ` : ""}
-                      {dataHora(a.criadoEm)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          <HistoricoCliente leadId={leadId} />
         )}
       </aside>
     </div>

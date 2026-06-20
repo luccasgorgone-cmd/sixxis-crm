@@ -1,46 +1,11 @@
 "use client";
 
-// Aba "Cliente" do painel: dono atual, acoes Assumir/Transferir e a linha do
-// tempo do CLIENTE (Atividade).
-import { useState, useEffect, useCallback } from "react";
-import {
-  UserPlus,
-  Repeat,
-  Loader2,
-  Sparkles,
-  ArrowRight,
-  UserCheck,
-  StickyNote,
-  Tag,
-  Trophy,
-  XCircle,
-  DollarSign,
-  Phone,
-} from "lucide-react";
-import type { ItemAtividade, VendedorOpcao, Finalidade } from "./tipos";
-
-const ICONE_ATIV: Record<string, typeof Tag> = {
-  CRIACAO: Sparkles,
-  CONTATO: Phone,
-  ATRIBUICAO: UserCheck,
-  TRANSFERENCIA: Repeat,
-  ASSUMIDO: UserPlus,
-  NOTA: StickyNote,
-  ETIQUETA: Tag,
-  ETAPA: ArrowRight,
-  VALOR: DollarSign,
-  GANHO: Trophy,
-  PERDA: XCircle,
-};
-
-function dataHora(valor: string): string {
-  return new Date(valor).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// Aba "Cliente" do painel: dono atual, acoes Assumir/Transferir e o historico
+// COMPLETO do cliente (contatos, compras, pedidos da loja e atividades).
+import { useState, useEffect } from "react";
+import { UserPlus, Repeat, Loader2 } from "lucide-react";
+import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
+import type { VendedorOpcao, Finalidade } from "./tipos";
 
 export function ClienteAba({
   leadId,
@@ -53,22 +18,10 @@ export function ClienteAba({
   finalidade: Finalidade;
   onMudou: () => void;
 }) {
-  const [atividades, setAtividades] = useState<ItemAtividade[]>([]);
   const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
-  const [carregando, setCarregando] = useState(true);
   const [acao, setAcao] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
-
-  const carregar = useCallback(async () => {
-    const r = await fetch(`/api/leads/${leadId}/atividades`);
-    if (r.ok) setAtividades((await r.json()).atividades);
-    setCarregando(false);
-  }, [leadId]);
-
-  useEffect(() => {
-    void carregar();
-  }, [carregar]);
 
   // Vendedores da equipe da finalidade (para transferir).
   useEffect(() => {
@@ -86,7 +39,6 @@ export function ClienteAba({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ finalidade }),
       });
-      await carregar();
       onMudou();
     } finally {
       setAcao(false);
@@ -104,7 +56,6 @@ export function ClienteAba({
       });
       setTransferindo(false);
       setDestino("");
-      await carregar();
       onMudou();
     } finally {
       setAcao(false);
@@ -170,39 +121,10 @@ export function ClienteAba({
       </section>
 
       <section>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
+        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
           Historico do cliente
         </h4>
-        {carregando ? (
-          <div className="space-y-2">
-            <div className="skeleton h-10 w-full" />
-            <div className="skeleton h-10 w-full" />
-          </div>
-        ) : atividades.length === 0 ? (
-          <p className="py-4 text-center text-sm text-medio/50">
-            Sem atividades ainda.
-          </p>
-        ) : (
-          <ol className="space-y-3">
-            {atividades.map((a) => {
-              const Icone = ICONE_ATIV[a.tipo] ?? StickyNote;
-              return (
-                <li key={a.id} className="flex gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-tiffany/10 text-tiffany">
-                    <Icone className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-escuro">{a.descricao}</p>
-                    <p className="text-[11px] text-medio/50">
-                      {a.agente ? `${a.agente} · ` : ""}
-                      {dataHora(a.criadoEm)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
+        <HistoricoCliente leadId={leadId} />
       </section>
     </div>
   );

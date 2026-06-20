@@ -10,6 +10,8 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
+import { fetchFotoPerfil } from "./evolution";
+import { nomeEfetivo } from "./cliente";
 import { TipoMsg, DirecaoMsg, Finalidade, Prisma } from "../generated/prisma/client";
 
 const NOME_FILA = "messages-in";
@@ -58,6 +60,49 @@ export function getMessagesQueue(): Queue {
     });
   }
   return queueSingleton;
+}
+
+// Throttle da busca de foto de perfil: nao buscar a cada mensagem. Memoria do
+// processo (reset no restart, aceitavel). Re-busca quando a foto envelhece (a
+// URL do WhatsApp expira) ou apos a janela de throttle quando ainda nao ha foto.
+const ultimaTentativaFoto = new Map<string, number>();
+const THROTTLE_FOTO_MS = 6 * 60 * 60 * 1000; // 6h entre tentativas
+const VALIDADE_FOTO_MS = 7 * 24 * 60 * 60 * 1000; // re-busca foto com >7d
+
+// Best-effort, NAO bloqueia a ingestao: dispara em background e ignora erros.
+function agendarFotoPerfil(
+  lead: { id: string; fotoUrl: string | null; fotoAtualizadaEm: Date | null },
+  telefone: string,
+  instancia: string,
+  io: Server | null,
+): void {
+  const agora = Date.now();
+  const fotoFresca =
+    !!lead.fotoUrl &&
+    !!lead.fotoAtualizadaEm &&
+    agora - lead.fotoAtualizadaEm.getTime() < VALIDADE_FOTO_MS;
+  if (fotoFresca) return;
+  const ultima = ultimaTentativaFoto.get(lead.id) ?? 0;
+  if (agora - ultima < THROTTLE_FOTO_MS) return;
+  ultimaTentativaFoto.set(lead.id, agora);
+
+  void (async () => {
+    try {
+      const url = await fetchFotoPerfil(instancia, telefone);
+      await prisma.lead.update({
+        where: { id: lead.id },
+        // Carimba fotoAtualizadaEm mesmo sem foto, para nao reinsistir a cada msg.
+        data: { fotoAtualizadaEm: new Date(), ...(url ? { fotoUrl: url } : {}) },
+      });
+      if (url) {
+        (io ?? getIO())?.emit("cliente:atualizado", { leadId: lead.id, fotoUrl: url });
+      }
+    } catch (erro) {
+      console.warn(
+        `[foto] falha ao atualizar foto do lead ${lead.id}: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    }
+  })();
 }
 
 // Estrutura minima esperada do evento da Evolution v2.
@@ -169,10 +214,18 @@ async function processarEvento(
     create: {
       telefone,
       nome: pushName ?? undefined,
+      pushName: pushName ?? undefined,
       origem: "whatsapp",
     },
   });
-  // Se chegou pushName e o Lead ainda nao tinha nome, preenche.
+  // Mantem o pushName do WhatsApp sempre atualizado quando vier no payload.
+  if (pushName && lead.pushName !== pushName) {
+    lead = await prisma.lead.update({
+      where: { id: lead.id },
+      data: { pushName },
+    });
+  }
+  // Compat: se o nome legado ainda estava vazio, preenche com o pushName.
   if (!lead.nome && pushName) {
     lead = await prisma.lead.update({
       where: { id: lead.id },
@@ -194,6 +247,14 @@ async function processarEvento(
     );
   }
   const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
+
+  // Foto de perfil do WhatsApp (best-effort, throttled, nao bloqueia ingestao).
+  agendarFotoPerfil(
+    { id: lead.id, fotoUrl: lead.fotoUrl, fotoAtualizadaEm: lead.fotoAtualizadaEm },
+    telefone,
+    nomeInstancia,
+    io,
+  );
 
   // Conversa: garante UMA conversa "aberta" para o Lead NAQUELA finalidade.
   let conversa = await prisma.conversa.findFirst({
@@ -245,7 +306,8 @@ async function processarEvento(
     // O payload carrega o suficiente para a UI atualizar lista E thread.
     (io ?? getIO())?.emit("mensagem:nova", {
       leadId: lead.id,
-      leadNome: lead.nome,
+      leadNome: nomeEfetivo(lead),
+      leadFoto: lead.fotoUrl,
       leadTelefone: telefone,
       conversaId: conversa.id,
       mensagemId: mensagem.id,

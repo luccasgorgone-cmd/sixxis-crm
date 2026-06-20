@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
+import { nomeEfetivo } from "@/lib/cliente";
 import { getIO } from "@/lib/socket";
 import { Prisma } from "@/generated/prisma/client";
 import {
@@ -44,8 +45,14 @@ export async function GET(
         select: {
           id: true,
           nome: true,
+          pushName: true,
+          nomeManual: true,
+          fotoUrl: true,
           telefone: true,
           email: true,
+          empresa: true,
+          cpf: true,
+          anotacoes: true,
           origem: true,
           donoId: true,
           dono: { select: { id: true, nome: true } },
@@ -87,8 +94,15 @@ export async function GET(
       cliente: {
         id: negocio.lead.id,
         nome: negocio.lead.nome,
+        pushName: negocio.lead.pushName,
+        nomeManual: negocio.lead.nomeManual,
+        nomeEfetivo: nomeEfetivo(negocio.lead),
+        fotoUrl: negocio.lead.fotoUrl,
         telefone: negocio.lead.telefone,
         email: negocio.lead.email,
+        empresa: negocio.lead.empresa,
+        cpf: negocio.lead.cpf,
+        anotacoes: negocio.lead.anotacoes,
         origem: negocio.lead.origem,
       },
       // Dono mostrado conforme a finalidade do negocio.

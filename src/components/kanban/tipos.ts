@@ -28,6 +28,7 @@ export type AgenteResumo = {
 export type CardNegocio = {
   id: string;
   leadNome: string | null;
+  leadFoto: string | null;
   leadTelefone: string;
   origem: string | null;
   valor: number | null;
@@ -80,8 +81,15 @@ export type DetalheNegocio = CardNegocio & {
   cliente: {
     id: string;
     nome: string | null;
+    pushName: string | null;
+    nomeManual: string | null;
+    nomeEfetivo: string;
+    fotoUrl: string | null;
     telefone: string;
     email: string | null;
+    empresa: string | null;
+    cpf: string | null;
+    anotacoes: string | null;
     origem: string | null;
   };
   dono: { id: string; nome: string } | null;

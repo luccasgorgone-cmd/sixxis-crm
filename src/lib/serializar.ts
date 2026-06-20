@@ -1,12 +1,16 @@
 // Serializa um Negocio (com includes) para o formato consumido pela UI do
 // Kanban e do painel. Centraliza a conversao de Decimal -> number.
 import type { Prisma } from "@/generated/prisma/client";
+import { nomeEfetivo } from "./cliente";
 
 // Include padrao usado nas consultas que viram "card".
 export const includeCard = {
   lead: {
     select: {
       nome: true,
+      pushName: true,
+      nomeManual: true,
+      fotoUrl: true,
       telefone: true,
       origem: true,
       etiquetas: { include: { etiqueta: true } },
@@ -21,7 +25,8 @@ type NegocioCard = Prisma.NegocioGetPayload<{ include: typeof includeCard }>;
 export function cardNegocio(n: NegocioCard) {
   return {
     id: n.id,
-    leadNome: n.lead.nome,
+    leadNome: nomeEfetivo(n.lead),
+    leadFoto: n.lead.fotoUrl,
     leadTelefone: n.lead.telefone,
     origem: n.lead.origem,
     valor: n.valor != null ? Number(n.valor) : null,

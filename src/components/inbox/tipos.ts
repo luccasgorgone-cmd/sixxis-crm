@@ -17,6 +17,7 @@ export type Finalidade = "VENDA" | "POS_VENDA";
 export type ConversaItem = {
   id: string;
   leadNome: string | null;
+  leadFoto?: string | null;
   leadTelefone: string;
   ultimaMensagemPreview: string | null;
   ultimaMensagemEm: string | null;
@@ -42,6 +43,7 @@ export type EventoMensagemNova = {
   conversaId: string;
   leadId: string;
   leadNome: string | null;
+  leadFoto?: string | null;
   leadTelefone: string;
   mensagemId: string;
   direcao: Direcao;

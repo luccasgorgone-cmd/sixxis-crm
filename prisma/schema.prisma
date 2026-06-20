@@ -131,6 +131,7 @@ enum AtividadeTipo {
   GANHO
   PERDA
   CRIACAO
+  EDICAO
 }
 
 model Agente {
@@ -160,8 +161,17 @@ model Agente {
 model Lead {
   id            String         @id @default(cuid())
   nome          String?
+  // Nome vindo do WhatsApp (pushName) e override manual editavel pelo atendente.
+  // Nome efetivo na UI = nomeManual || pushName || nome || telefone (lib/cliente.ts).
+  pushName      String?
+  nomeManual    String?
+  fotoUrl       String?
+  fotoAtualizadaEm DateTime?
   telefone      String         @unique
   email         String?
+  empresa       String?
+  cpf           String?
+  anotacoes     String?        @db.Text
   origem        String?
   ctwaClid      String?
   clienteSiteId  String?

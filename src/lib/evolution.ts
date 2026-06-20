@@ -49,6 +49,36 @@ export async function enviarTexto(
   }
 }
 
+// Busca a URL da foto de perfil de um numero no WhatsApp.
+// POST {BASE}/chat/fetchProfilePictureUrl/{instance}  body { number }.
+// Retorna a URL ou null (sem foto / erro / config ausente) — nunca lanca.
+// A URL do WhatsApp expira; re-buscar quando necessario (endpoint de refresh).
+export async function fetchFotoPerfil(
+  instancia: string,
+  numero: string,
+): Promise<string | null> {
+  const cfg = baseEKey();
+  if (!cfg || !instancia || !numero) return null;
+  try {
+    const resp = await fetch(
+      `${cfg.base}/chat/fetchProfilePictureUrl/${instancia}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+        body: JSON.stringify({ number: numero }),
+      },
+    );
+    if (!resp.ok) return null;
+    const raw = (await resp.json().catch(() => null)) as {
+      profilePictureUrl?: string | null;
+    } | null;
+    const url = raw?.profilePictureUrl;
+    return typeof url === "string" && url ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 // Estado de conexao de uma instancia: GET /instance/connectionState/{instance}.
 // Retorna "open" | "close" | "connecting" | "desconhecido".
 export async function estadoConexao(instancia: string): Promise<string> {

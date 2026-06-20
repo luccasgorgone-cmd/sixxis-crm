@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { previewMensagem } from "@/lib/preview";
+import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
 import type { Prisma } from "@/generated/prisma/client";
 import { Finalidade } from "@/generated/prisma/enums";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where,
     orderBy: [{ ultimaMensagemEm: "desc" }, { criadoEm: "desc" }],
     include: {
-      lead: { select: { nome: true, telefone: true } },
+      lead: { select: selectClienteBasico },
       instanciaRef: { select: { nome: true, numero: true } },
       mensagens: {
         orderBy: { hora: "desc" },
@@ -47,7 +48,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const admin = ehAdmin(agente.papel);
   const lista = conversas.map((c) => ({
     id: c.id,
-    leadNome: c.lead.nome,
+    leadNome: nomeEfetivo(c.lead),
+    leadFoto: c.lead.fotoUrl,
     leadTelefone: c.lead.telefone,
     ultimaMensagemPreview: c.mensagens[0]
       ? previewMensagem(c.mensagens[0].tipo, c.mensagens[0].conteudo)

@@ -17,11 +17,11 @@ import {
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import { AvatarCliente } from "@/components/AvatarCliente";
 import {
   horaCurta,
   rotuloDia,
   chaveDia,
-  iniciais,
   formatarTelefone,
 } from "@/lib/format";
 
@@ -51,9 +51,12 @@ export function Thread({
     <div className="flex h-full min-w-0 flex-1 flex-col bg-fundo">
       {/* Cabecalho */}
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-black/5 bg-white px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-medio/10 text-sm font-semibold text-medio">
-          {iniciais(conversa.leadNome, conversa.leadTelefone)}
-        </div>
+        <AvatarCliente
+          nome={conversa.leadNome}
+          telefone={conversa.leadTelefone}
+          fotoUrl={conversa.leadFoto}
+          tamanho={36}
+        />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
           <p className="truncate text-xs text-medio/60">

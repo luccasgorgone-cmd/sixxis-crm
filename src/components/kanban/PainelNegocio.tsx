@@ -23,6 +23,8 @@ import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
 import { ClienteAba } from "./ClienteAba";
 import { LojaCliente } from "@/components/loja/LojaCliente";
+import { AvatarCliente } from "@/components/AvatarCliente";
+import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -32,7 +34,7 @@ import {
   type Temperatura,
   type ObservacaoOpcao,
 } from "./tipos";
-import { formatarBRL, formatarTelefone } from "@/lib/format";
+import { formatarBRL } from "@/lib/format";
 
 type Aba = "resumo" | "conversa" | "notas" | "cliente" | "loja" | "timeline";
 
@@ -139,15 +141,23 @@ export function PainelNegocio({
       <aside className="drawer-in relative flex h-full w-full max-w-md flex-col bg-fundo shadow-xl">
         {/* Cabecalho */}
         <header className="flex shrink-0 items-center justify-between border-b border-black/5 bg-white px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-escuro">
-              {detalhe?.cliente.nome?.trim() ||
-                detalhe?.cliente.telefone ||
-                "Negocio"}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
             {detalhe && (
-              <StatusBadge status={detalhe.status} />
+              <AvatarCliente
+                nome={detalhe.cliente.nomeEfetivo}
+                telefone={detalhe.cliente.telefone}
+                fotoUrl={detalhe.cliente.fotoUrl}
+                tamanho={40}
+              />
             )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-escuro">
+                {detalhe?.cliente.nomeEfetivo ||
+                  detalhe?.cliente.telefone ||
+                  "Negocio"}
+              </p>
+              {detalhe && <StatusBadge status={detalhe.status} />}
+            </div>
           </div>
           <button
             onClick={onFechar}
@@ -364,16 +374,19 @@ function Resumo({
 
   return (
     <div className="space-y-5">
-      {/* Cliente */}
-      <Secao titulo="Cliente">
-        <Campo rotulo="Nome" valor={detalhe.cliente.nome ?? "—"} />
-        <Campo
-          rotulo="Telefone"
-          valor={formatarTelefone(detalhe.cliente.telefone)}
-        />
-        <Campo rotulo="Email" valor={detalhe.cliente.email ?? "—"} />
-        <Campo rotulo="Origem" valor={detalhe.cliente.origem ?? "—"} />
-      </Secao>
+      {/* Cliente (avatar, dados editaveis, refresh de foto) */}
+      <BlocoCliente
+        cliente={detalhe.cliente}
+        onAtualizado={() => {
+          void recarregar();
+          onAtualizado();
+        }}
+      />
+      {detalhe.cliente.origem && (
+        <Secao titulo="Origem">
+          <Campo rotulo="Origem" valor={detalhe.cliente.origem} />
+        </Secao>
+      )}
 
       {/* Valor */}
       <Secao titulo="Valor">

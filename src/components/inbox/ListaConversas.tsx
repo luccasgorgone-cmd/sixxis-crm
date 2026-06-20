@@ -3,8 +3,9 @@
 // Coluna esquerda da inbox: busca, filtros e a lista de conversas.
 import { Search, Bot, User as UserIcon } from "lucide-react";
 import type { ConversaItem, Filtro, Finalidade } from "./tipos";
-import { horarioLista, iniciais } from "@/lib/format";
+import { horarioLista } from "@/lib/format";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
+import { AvatarCliente } from "@/components/AvatarCliente";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "minhas", rotulo: "Minhas" },
@@ -137,9 +138,12 @@ function ItemConversa({
       }`}
     >
       <div className="relative shrink-0">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-medio/10 text-sm font-semibold text-medio">
-          {iniciais(conversa.leadNome, conversa.leadTelefone)}
-        </div>
+        <AvatarCliente
+          nome={conversa.leadNome}
+          telefone={conversa.leadTelefone}
+          fotoUrl={conversa.leadFoto}
+          tamanho={44}
+        />
         <span
           title={conversa.atendidoPor === "IA" ? "Atendido pela IA" : "Atendido por humano"}
           className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white"
