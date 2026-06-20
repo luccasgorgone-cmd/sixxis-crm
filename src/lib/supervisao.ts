@@ -35,9 +35,10 @@ export type ContagemAtendimentos = {
   ultimoAtendimento: Date | null;
 };
 
+// aovivo/pendentes sao estados ATUAIS; finalizados e o total acumulado (sem
+// recorte de periodo — a lista nao tem filtro de periodo).
 export async function contagemAtendimentos(
   agenteId: string,
-  p: Periodo,
 ): Promise<ContagemAtendimentos> {
   const [aovivo, pendentes, finalizados, ultima] = await Promise.all([
     prisma.conversa.count({
@@ -50,7 +51,6 @@ export async function contagemAtendimentos(
       where: {
         agenteId,
         status: { in: [StatusNeg.GANHO, StatusNeg.PERDIDO] },
-        fechadoEm: { gte: p.inicio, lt: p.fim },
       },
     }),
     prisma.conversa.findFirst({

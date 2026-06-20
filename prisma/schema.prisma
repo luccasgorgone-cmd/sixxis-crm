@@ -415,5 +415,17 @@ model ConfigAgenteIA {
   responderForaHorario Boolean @default(false)
   responderLeadNovo   Boolean  @default(false)
   handoffPalavras     String?
+  // Horario de operacao da IA.
+  opera24h             Boolean @default(true)
+  usarHorarioComercial Boolean @default(false)
+  horarios             Json?
+  // Comportamento.
+  saudacaoAutomatica       String? @db.Text
+  segundosAntesDeResponder Int?
+  // Handoff (passar para humano).
+  maxMensagensAntesHandoff Int?
+  mensagemHandoff          String? @db.Text
+  handoffSeClientePedir    Boolean @default(true)
+  handoffSeLeadQuente      Boolean @default(false)
   atualizadoEm        DateTime @updatedAt
 }

@@ -5,8 +5,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Radio, Clock4, CheckCircle2, ChevronRight } from "lucide-react";
-import { FiltroPeriodo } from "@/components/dashboard/FiltroPeriodo";
-import { queryDoFiltro, type FiltroValor } from "@/components/dashboard/tipos";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
 import { EstadoErro } from "@/components/ui/Estado";
 import { horarioLista } from "@/lib/format";
@@ -14,7 +12,6 @@ import type { ResumoColaborador } from "./tipos";
 
 export function ColaboradoresAdmin() {
   const router = useRouter();
-  const [filtro, setFiltro] = useState<FiltroValor>({ periodo: "mes" });
   const [lista, setLista] = useState<ResumoColaborador[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -22,7 +19,7 @@ export function ColaboradoresAdmin() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const r = await fetch(`/api/admin/colaboradores?${queryDoFiltro(filtro)}`);
+      const r = await fetch("/api/admin/colaboradores");
       if (r.ok) {
         setLista((await r.json()).colaboradores);
         setErro(false);
@@ -34,7 +31,7 @@ export function ColaboradoresAdmin() {
     } finally {
       setCarregando(false);
     }
-  }, [filtro]);
+  }, []);
 
   useEffect(() => {
     void carregar();
@@ -46,10 +43,9 @@ export function ColaboradoresAdmin() {
         <div>
           <h2 className="text-lg font-semibold text-escuro">Colaboradores</h2>
           <p className="text-sm text-medio/60">
-            Acompanhe os atendimentos de cada um
+            Estado atual dos atendimentos de cada um
           </p>
         </div>
-        <FiltroPeriodo valor={filtro} onChange={setFiltro} />
       </div>
 
       {carregando ? (

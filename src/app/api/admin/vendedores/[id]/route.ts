@@ -23,7 +23,6 @@ export async function PATCH(
     nome?: string;
     email?: string;
     papel?: string;
-    telefone?: string | null;
     avatarUrl?: string | null;
     ativo?: boolean;
     senha?: string;
@@ -43,7 +42,6 @@ export async function PATCH(
   if (body.papel !== undefined) {
     data.papel = body.papel === Papel.ADMIN ? Papel.ADMIN : Papel.COLABORADOR;
   }
-  if (body.telefone !== undefined) data.telefone = body.telefone?.trim() || null;
   if (body.avatarUrl !== undefined) {
     data.avatarUrl = body.avatarUrl?.trim() || null;
   }
@@ -72,7 +70,6 @@ export async function PATCH(
         nome: true,
         email: true,
         papel: true,
-        telefone: true,
         avatarUrl: true,
         ativo: true,
         acessoVenda: true,

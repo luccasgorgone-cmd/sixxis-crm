@@ -1,11 +1,11 @@
 "use client";
 
-// Sub-navegacao do painel administrativo. Realca a secao atual (rota exata ou
-// subrota), para nao acender dois itens ao mesmo tempo.
+// Sub-navegacao da AREA DE CONFIGURACAO (segundo nivel, sob o "Admin"). So
+// aparece nas paginas de configuracao — escondida no Painel e nas Metas, que sao
+// itens de topo. Realca a secao atual (rota exata ou subrota).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Eye,
   Users,
   Columns3,
@@ -18,7 +18,7 @@ import {
   MessageSquareDot,
   Bot,
   BarChart3,
-  Target,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,11 +28,10 @@ type Secao = {
   icone: LucideIcon;
 };
 
+// Apenas itens de CONFIGURACAO (Painel e Metas vivem no menu principal).
 const SECOES: Secao[] = [
-  { rotulo: "Painel", href: "/admin/dashboard", icone: LayoutDashboard },
   { rotulo: "Colaboradores", href: "/admin/colaboradores", icone: Eye },
   { rotulo: "Equipe", href: "/admin/vendedores", icone: Users },
-  { rotulo: "Metas", href: "/admin/metas", icone: Target },
   { rotulo: "Numeros WhatsApp", href: "/admin/numeros", icone: Smartphone },
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },
@@ -45,10 +44,24 @@ const SECOES: Secao[] = [
   { rotulo: "Relatorios", href: "/admin/relatorios", icone: BarChart3 },
 ];
 
+// Rotas de topo (nao sao configuracao): nelas a sub-nav nao aparece.
+const SEM_SUBNAV = ["/admin/dashboard", "/admin/metas"];
+
 export function AdminNav() {
   const pathname = usePathname();
+  if (SEM_SUBNAV.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return null;
+  }
+
   return (
-    <nav className="w-56 shrink-0 overflow-y-auto border-r border-black/5 bg-white p-3 scroll-fino">
+    <nav className="scroll-fino w-56 shrink-0 overflow-y-auto border-r border-black/5 bg-white p-3">
+      <Link
+        href="/inbox"
+        className="mb-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-medio transition-colors hover:bg-black/5 hover:text-escuro"
+      >
+        <ArrowLeft className="h-4 w-4 shrink-0" />
+        Voltar ao app
+      </Link>
       <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
         Configuracoes
       </p>

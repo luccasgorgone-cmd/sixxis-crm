@@ -21,7 +21,6 @@ export async function GET(): Promise<NextResponse> {
       nome: true,
       email: true,
       papel: true,
-      telefone: true,
       avatarUrl: true,
       ativo: true,
       acessoVenda: true,
@@ -44,7 +43,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     email?: string;
     senha?: string;
     papel?: string;
-    telefone?: string;
     avatarUrl?: string;
     ativo?: boolean;
     acessoVenda?: boolean;
@@ -81,7 +79,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         email,
         senha: hash,
         papel,
-        telefone: body.telefone?.trim() || null,
         avatarUrl: body.avatarUrl?.trim() || null,
         ativo: body.ativo ?? true,
         acessoVenda,

@@ -3,6 +3,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
+import { normalizarHorarios } from "@/lib/horario";
+import { HORARIOS_PADRAO } from "@/lib/seed";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -16,13 +18,29 @@ async function pegar() {
   return prisma.configAgenteIA.create({ data: {} });
 }
 
+// Serializa a config para a UI, com horarios sempre normalizados (default quando
+// nulo) para o editor de faixas.
+function paraUI(c: Awaited<ReturnType<typeof pegar>>) {
+  return {
+    ...c,
+    horarios: normalizarHorarios(c.horarios) ?? HORARIOS_PADRAO,
+  };
+}
+
+// Inteiro >= 0 a partir de um valor desconhecido; null para vazio/invalido.
+function inteiroOuNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export async function GET(): Promise<NextResponse> {
   const admin = await obterAdmin();
   if (!admin) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const c = await pegar();
-  return NextResponse.json({ config: c });
+  return NextResponse.json({ config: paraUI(c) });
 }
 
 export async function PUT(req: NextRequest): Promise<NextResponse> {
@@ -30,14 +48,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (!admin) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
-  let body: {
-    ativo?: boolean;
-    modelo?: string;
-    promptSistema?: string;
-    responderForaHorario?: boolean;
-    responderLeadNovo?: boolean;
-    handoffPalavras?: string;
-  };
+  let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
@@ -47,27 +58,47 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   try {
     // Whitelist dos campos aceitos.
     const data: Prisma.ConfigAgenteIAUpdateManyMutationInput = {};
-    if (body.ativo !== undefined) data.ativo = Boolean(body.ativo);
-    if (body.modelo !== undefined && MODELOS.includes(body.modelo)) {
-      data.modelo = body.modelo;
+
+    const booleanos: (keyof Prisma.ConfigAgenteIAUpdateManyMutationInput)[] = [
+      "ativo",
+      "responderForaHorario",
+      "responderLeadNovo",
+      "opera24h",
+      "usarHorarioComercial",
+      "handoffSeClientePedir",
+      "handoffSeLeadQuente",
+    ];
+    for (const k of booleanos) {
+      if (body[k] !== undefined) {
+        (data as Record<string, unknown>)[k] = Boolean(body[k]);
+      }
     }
-    if (body.promptSistema !== undefined) {
-      data.promptSistema =
-        typeof body.promptSistema === "string"
-          ? body.promptSistema.trim() || null
-          : null;
+
+    const textos: (keyof Prisma.ConfigAgenteIAUpdateManyMutationInput)[] = [
+      "promptSistema",
+      "handoffPalavras",
+      "saudacaoAutomatica",
+      "mensagemHandoff",
+    ];
+    for (const k of textos) {
+      if (body[k] !== undefined) {
+        (data as Record<string, unknown>)[k] =
+          typeof body[k] === "string" ? (body[k] as string).trim() || null : null;
+      }
     }
-    if (body.responderForaHorario !== undefined) {
-      data.responderForaHorario = Boolean(body.responderForaHorario);
+
+    if (body.modelo !== undefined && MODELOS.includes(String(body.modelo))) {
+      data.modelo = String(body.modelo);
     }
-    if (body.responderLeadNovo !== undefined) {
-      data.responderLeadNovo = Boolean(body.responderLeadNovo);
+    if (body.segundosAntesDeResponder !== undefined) {
+      data.segundosAntesDeResponder = inteiroOuNull(body.segundosAntesDeResponder);
     }
-    if (body.handoffPalavras !== undefined) {
-      data.handoffPalavras =
-        typeof body.handoffPalavras === "string"
-          ? body.handoffPalavras.trim() || null
-          : null;
+    if (body.maxMensagensAntesHandoff !== undefined) {
+      data.maxMensagensAntesHandoff = inteiroOuNull(body.maxMensagensAntesHandoff);
+    }
+    if (body.horarios !== undefined) {
+      const h = normalizarHorarios(body.horarios);
+      if (h) data.horarios = h as unknown as Prisma.InputJsonValue;
     }
 
     // Singleton: atualiza sem depender do id; cria se nao houver linha.
@@ -82,7 +113,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     }
 
     const config = await pegar();
-    return NextResponse.json({ config });
+    return NextResponse.json({ config: paraUI(config) });
   } catch (erro) {
     return NextResponse.json(
       {

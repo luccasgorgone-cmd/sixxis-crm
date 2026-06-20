@@ -12,7 +12,6 @@ type Agente = {
   nome: string;
   email: string;
   papel: string;
-  telefone: string | null;
   avatarUrl: string | null;
   ativo: boolean;
   acessoVenda: boolean;
@@ -185,7 +184,6 @@ function ModalVendedor({
   const [nome, setNome] = useState(agente?.nome ?? "");
   const [email, setEmail] = useState(agente?.email ?? "");
   const [senha, setSenha] = useState("");
-  const [telefone, setTelefone] = useState(agente?.telefone ?? "");
   const [ehAdminSel, setEhAdminSel] = useState(agente?.papel === "ADMIN");
   // Acesso: "venda" | "posvenda" | "ambos".
   const acessoInicial: "venda" | "posvenda" | "ambos" = agente
@@ -213,7 +211,6 @@ function ModalVendedor({
       const corpo: Record<string, unknown> = {
         nome,
         email,
-        telefone,
         papel: ehAdminSel ? "ADMIN" : "COLABORADOR",
         acessoVenda: acesso === "venda" || acesso === "ambos",
         acessoPosVenda: acesso === "posvenda" || acesso === "ambos",
@@ -271,11 +268,6 @@ function ModalVendedor({
             valor={senha}
             onChange={setSenha}
             tipo="password"
-          />
-          <CampoTexto
-            rotulo="Telefone"
-            valor={telefone}
-            onChange={setTelefone}
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-escuro">
