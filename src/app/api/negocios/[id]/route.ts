@@ -296,9 +296,26 @@ export async function PATCH(
     if (body.agenteId) {
       const alvo = await prisma.agente.findUnique({
         where: { id: body.agenteId },
-        select: { nome: true },
+        select: { nome: true, acessoVenda: true, acessoPosVenda: true },
       });
-      nomeAlvo = alvo?.nome ?? "vendedor";
+      if (!alvo) {
+        return NextResponse.json(
+          { erro: "colaborador nao encontrado" },
+          { status: 404 },
+        );
+      }
+      // NUNCA atribuir uma finalidade a quem nao tem acesso a ela.
+      const acesso =
+        negocio.finalidade === Finalidade.VENDA
+          ? alvo.acessoVenda
+          : alvo.acessoPosVenda;
+      if (!acesso) {
+        return NextResponse.json(
+          { erro: "colaborador sem acesso a essa finalidade" },
+          { status: 403 },
+        );
+      }
+      nomeAlvo = alvo.nome ?? "vendedor";
     }
     historicos.push({
       tipo: TipoHistorico.ATRIBUICAO,

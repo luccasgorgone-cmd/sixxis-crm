@@ -1,8 +1,10 @@
 "use client";
 
 // Coluna do Kanban = uma etapa. Area de soltar (droppable) com header colorido,
-// contagem e soma de valor.
+// contagem e soma de valor. Na coluna de ENTRADA (Novo), mostra um botao para
+// atribuir em massa os cards sem dono.
 import { useDroppable } from "@dnd-kit/core";
+import { UserPlus } from "lucide-react";
 import type { Etapa, CardNegocio as Card } from "./tipos";
 import { CardNegocio } from "./CardNegocio";
 import { formatarBRL } from "@/lib/format";
@@ -12,14 +14,25 @@ export function ColunaKanban({
   cards,
   onAbrir,
   mostrarFinalidade = false,
+  ehAdmin = false,
+  onAssumir,
+  onAtribuir,
+  ehEntrada = false,
+  onAtribuirMassa,
 }: {
   etapa: Etapa;
   cards: Card[];
   onAbrir: (id: string) => void;
   mostrarFinalidade?: boolean;
+  ehAdmin?: boolean;
+  onAssumir?: (negocioId: string) => void;
+  onAtribuir?: (card: Card) => void;
+  ehEntrada?: boolean;
+  onAtribuirMassa?: (negocioIds: string[]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
   const soma = cards.reduce((acc, c) => acc + (c.valor ?? 0), 0);
+  const semDono = cards.filter((c) => !c.agente);
 
   return (
     <div className="flex h-full w-72 shrink-0 flex-col">
@@ -43,6 +56,16 @@ export function ColunaKanban({
         )}
       </div>
 
+      {ehAdmin && ehEntrada && semDono.length > 0 && onAtribuirMassa && (
+        <button
+          onClick={() => onAtribuirMassa(semDono.map((c) => c.id))}
+          className="mb-2 flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-tiffany/40 bg-tiffany/5 px-2 py-1.5 text-xs font-medium text-tiffany transition-colors hover:bg-tiffany/10"
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          Atribuir sem dono ({semDono.length})
+        </button>
+      )}
+
       <div
         ref={setNodeRef}
         className={`scroll-fino flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl p-2 transition-colors ${
@@ -50,9 +73,7 @@ export function ColunaKanban({
         }`}
       >
         {cards.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-medio/40">
-            Vazio
-          </p>
+          <p className="px-2 py-6 text-center text-xs text-medio/40">Vazio</p>
         ) : (
           cards.map((c) => (
             <CardNegocio
@@ -60,6 +81,9 @@ export function ColunaKanban({
               card={c}
               onAbrir={onAbrir}
               mostrarFinalidade={mostrarFinalidade}
+              ehAdmin={ehAdmin}
+              onAssumir={onAssumir}
+              onAtribuir={onAtribuir}
             />
           ))
         )}

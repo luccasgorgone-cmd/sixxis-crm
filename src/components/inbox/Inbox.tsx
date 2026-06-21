@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { MessageSquare } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
 import { previewMensagem } from "@/lib/preview";
+import { normalizarTexto } from "@/lib/format";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
 import type {
@@ -33,7 +34,14 @@ export function Inbox({
   const [carregandoThread, setCarregandoThread] = useState(false);
 
   const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");
+
+  // Debounce da busca (~250ms).
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaAplicada(busca), 250);
+    return () => clearTimeout(t);
+  }, [busca]);
   // Finalidade: "" = todas (so faz sentido para ADMIN, que ve as duas).
   const [finalidade, setFinalidade] = useState<Finalidade | "">("");
 
@@ -167,15 +175,15 @@ export function Inbox({
     });
   }, []);
 
-  // Aplica busca + filtro.
+  // Aplica busca (sem acento, case-insensitive; telefone so digitos) + filtro.
   const filtradas = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    const qDigitos = q.replace(/\D/g, "");
+    const q = normalizarTexto(buscaAplicada);
+    const qDigitos = buscaAplicada.replace(/\D/g, "");
     return conversas.filter((c) => {
       if (filtro === "minhas" && c.agenteId !== agenteIdAtual) return false;
       if (filtro === "naoLidas" && c.naoLidas <= 0) return false;
       if (q) {
-        const nome = (c.leadNome ?? "").toLowerCase();
+        const nome = normalizarTexto(c.leadNome ?? "");
         const tel = c.leadTelefone.replace(/\D/g, "");
         const casaNome = nome.includes(q);
         const casaTel = qDigitos.length > 0 && tel.includes(qDigitos);
@@ -183,7 +191,7 @@ export function Inbox({
       }
       return true;
     });
-  }, [conversas, busca, filtro, agenteIdAtual]);
+  }, [conversas, buscaAplicada, filtro, agenteIdAtual]);
 
   const conversaAberta = useMemo(
     () => conversas.find((c) => c.id === selecionada) ?? null,
@@ -214,6 +222,7 @@ export function Inbox({
           mensagens={mensagens}
           carregando={carregandoThread}
           onEnviada={aoEnviada}
+          ehAdmin={ehAdmin}
         />
       ) : (
         <div className="hidden flex-1 flex-col items-center justify-center gap-3 bg-fundo text-center sm:flex">

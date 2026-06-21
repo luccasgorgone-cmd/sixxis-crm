@@ -42,9 +42,11 @@ function dataCurta(v: string): string {
 export function LojaCliente({
   telefone,
   origem,
+  ehAdmin = false,
 }: {
   telefone: string;
   origem?: string | null;
+  ehAdmin?: boolean;
 }) {
   const [dados, setDados] = useState<ClienteLoja | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -84,8 +86,12 @@ export function LojaCliente({
     return (
       <Vazio
         icone={WifiOff}
-        titulo="Loja indisponivel"
-        texto="Nao foi possivel consultar a loja agora. Tente novamente."
+        titulo="Integracao com a loja indisponivel"
+        texto={
+          ehAdmin
+            ? "Integracao com a loja nao configurada — defina STORE_API_URL e STORE_INTERNAL_KEY no Railway do CRM."
+            : "Integracao com a loja indisponivel no momento."
+        }
       />
     );
   }

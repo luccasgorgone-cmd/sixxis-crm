@@ -19,8 +19,12 @@ import { CardNegocio } from "./CardNegocio";
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { BarraFiltros } from "./BarraFiltros";
 import { ModalFechamento } from "./ModalFechamento";
+import { ModalAtribuir } from "./ModalAtribuir";
 import { PainelNegocio } from "./PainelNegocio";
 import { EstadoErro } from "@/components/ui/Estado";
+import { BannerAviso } from "@/components/ui/Banner";
+import { useToast } from "@/components/ui/Toast";
+import { normalizarTexto } from "@/lib/format";
 import type {
   Etapa,
   CardNegocio as Card,
@@ -47,6 +51,7 @@ export function Kanban({
   agenteIdAtual: string;
 }) {
   const ehAdmin = papel === "ADMIN";
+  const toast = useToast();
 
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [colunas, setColunas] = useState<Record<string, Card[]>>({});
@@ -55,6 +60,11 @@ export function Kanban({
 
   const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
   const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
+  // Atribuicao manual (modal): lista de negocioIds + titulo.
+  const [atribuir, setAtribuir] = useState<{
+    negocioIds: string[];
+    titulo: string;
+  } | null>(null);
 
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
@@ -83,18 +93,17 @@ export function Kanban({
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Servidor: so finalidade + dono (papel). Busca/temperatura/etiqueta sao
+  // aplicadas no cliente sobre os cards ja carregados.
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set("finalidade", finalidade);
-    if (buscaAplicada) p.set("busca", buscaAplicada);
-    if (etiquetaId) p.set("etiquetaId", etiquetaId);
-    if (temperatura) p.set("temperatura", temperatura);
     if (ehAdmin) {
       p.set("filtro", filtroDono);
       if (filtroDono === "todos" && agenteId) p.set("agenteId", agenteId);
     }
     return p.toString();
-  }, [finalidade, buscaAplicada, etiquetaId, temperatura, ehAdmin, filtroDono, agenteId]);
+  }, [finalidade, ehAdmin, filtroDono, agenteId]);
 
   const carregar = useCallback(async () => {
     try {
@@ -193,6 +202,27 @@ export function Kanban({
     }
   }
 
+  // Assumir (atribuir a si): mesmo endpoint do seletor de vendedor do painel.
+  async function assumir(negocioId: string) {
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agenteId: agenteIdAtual }),
+      });
+      if (r.ok) {
+        toast.sucesso("Cliente assumido.");
+        void carregar();
+      } else if (r.status === 403) {
+        toast.erro("Voce nao tem acesso a essa finalidade.");
+      } else {
+        toast.erro("Nao foi possivel assumir.");
+      }
+    } catch {
+      toast.erro("Falha de conexao ao assumir.");
+    }
+  }
+
   // ---- Drag handlers ----
   function aoIniciar(e: DragStartEvent) {
     arrastandoRef.current = true;
@@ -270,10 +300,54 @@ export function Kanban({
     void carregar();
   }
 
-  const vazio =
+  // Busca/temperatura/etiqueta aplicadas no cliente (sobre os cards carregados).
+  const colunasFiltradas = useMemo(() => {
+    const q = normalizarTexto(buscaAplicada);
+    const qDig = buscaAplicada.replace(/\D/g, "");
+    const out: Record<string, Card[]> = {};
+    for (const [eid, cards] of Object.entries(colunas)) {
+      out[eid] = cards.filter((c) => {
+        if (temperatura && c.temperatura !== temperatura) return false;
+        if (etiquetaId && !c.etiquetas.some((e) => e.id === etiquetaId)) {
+          return false;
+        }
+        if (q) {
+          const nome = normalizarTexto(c.leadNome ?? "");
+          const tel = c.leadTelefone.replace(/\D/g, "");
+          if (!nome.includes(q) && !(qDig.length > 0 && tel.includes(qDig))) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+    return out;
+  }, [colunas, buscaAplicada, temperatura, etiquetaId]);
+
+  const temFiltro = Boolean(buscaAplicada.trim() || temperatura || etiquetaId);
+  const vazioReal =
     !carregando &&
     !erro &&
     Object.values(colunas).every((c) => c.length === 0);
+  const semResultado =
+    !carregando &&
+    !erro &&
+    !vazioReal &&
+    Object.values(colunasFiltradas).every((c) => c.length === 0);
+
+  // Colaboradores (nao-admin, ativos) com acesso a finalidade atual.
+  const elegiveis = useMemo(
+    () =>
+      agentes.filter(
+        (a) =>
+          a.papel !== "ADMIN" &&
+          (finalidade === "VENDA" ? a.acessoVenda : a.acessoPosVenda),
+      ),
+    [agentes, finalidade],
+  );
+  // Banner (admin): nenhum colaborador ativo com acesso a finalidade atual.
+  const semColaboradorAtivo =
+    ehAdmin && agentes.length > 0 && elegiveis.length === 0;
 
   // Agrupa as etapas por funil (finalidade). Quando ha mais de uma finalidade
   // (acesso duplo do colaborador), o quadro mostra secoes separadas e coloridas.
@@ -330,6 +404,15 @@ export function Kanban({
         onAgente={setAgenteId}
       />
 
+      {semColaboradorAtivo && (
+        <BannerAviso>
+          Nenhum colaborador ativo com acesso a{" "}
+          {finalidade === "VENDA" ? "Vendas" : "Pos-venda"} — novos leads nao
+          serao distribuidos automaticamente. Cadastre/ative colaboradores ou
+          atribua manualmente.
+        </BannerAviso>
+      )}
+
       {carregando ? (
         <SkeletonQuadro />
       ) : erro ? (
@@ -371,13 +454,28 @@ export function Kanban({
                       className="scroll-fino flex gap-3 overflow-x-auto rounded-xl border-l-2 pl-2"
                       style={{ borderColor: cor.hex }}
                     >
-                      {s.etapas.map((etapa) => (
+                      {s.etapas.map((etapa, j) => (
                         <ColunaKanban
                           key={etapa.id}
                           etapa={etapa}
-                          cards={colunas[etapa.id] ?? []}
+                          cards={colunasFiltradas[etapa.id] ?? []}
                           onAbrir={setDrawerId}
                           mostrarFinalidade={ehAdmin}
+                          ehAdmin={ehAdmin}
+                          onAssumir={assumir}
+                          onAtribuir={(c) =>
+                            setAtribuir({
+                              negocioIds: [c.id],
+                              titulo: "Atribuir cliente",
+                            })
+                          }
+                          ehEntrada={j === 0}
+                          onAtribuirMassa={(ids) =>
+                            setAtribuir({
+                              negocioIds: ids,
+                              titulo: "Atribuir sem dono",
+                            })
+                          }
                         />
                       ))}
                     </div>
@@ -387,13 +485,28 @@ export function Kanban({
             </div>
           ) : (
             <div className="scroll-fino flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
-              {etapas.map((etapa) => (
+              {etapas.map((etapa, j) => (
                 <ColunaKanban
                   key={etapa.id}
                   etapa={etapa}
-                  cards={colunas[etapa.id] ?? []}
+                  cards={colunasFiltradas[etapa.id] ?? []}
                   onAbrir={setDrawerId}
                   mostrarFinalidade={ehAdmin}
+                  ehAdmin={ehAdmin}
+                  onAssumir={assumir}
+                  onAtribuir={(c) =>
+                    setAtribuir({
+                      negocioIds: [c.id],
+                      titulo: "Atribuir cliente",
+                    })
+                  }
+                  ehEntrada={j === 0}
+                  onAtribuirMassa={(ids) =>
+                    setAtribuir({
+                      negocioIds: ids,
+                      titulo: "Atribuir sem dono",
+                    })
+                  }
                 />
               ))}
             </div>
@@ -405,9 +518,16 @@ export function Kanban({
         </DndContext>
       )}
 
-      {vazio && (
+      {vazioReal && (
         <p className="px-6 pb-6 text-sm text-medio/50">
           Nenhum negocio por aqui ainda. Eles aparecem conforme os leads chegam.
+        </p>
+      )}
+      {semResultado && (
+        <p className="px-6 pb-6 text-sm text-medio/50">
+          {buscaAplicada.trim()
+            ? `Nenhum resultado para "${buscaAplicada.trim()}".`
+            : "Nenhum card com esses filtros."}
         </p>
       )}
 
@@ -417,6 +537,17 @@ export function Kanban({
           valorInicial={pendente.valorInicial}
           onConfirmar={confirmarFechamento}
           onCancelar={() => setPendente(null)}
+        />
+      )}
+
+      {atribuir && (
+        <ModalAtribuir
+          negocioIds={atribuir.negocioIds}
+          titulo={atribuir.titulo}
+          agenteIdAtual={agenteIdAtual}
+          elegiveis={elegiveis}
+          onConcluido={() => void carregar()}
+          onFechar={() => setAtribuir(null)}
         />
       )}
 

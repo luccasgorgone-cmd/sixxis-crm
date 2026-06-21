@@ -1,7 +1,9 @@
 "use client";
 
 // Barra lateral do app. Realca a rota atual (maior prefixo correspondente, para
-// nao acender dois itens ao mesmo tempo). Admin so aparece para ADMIN.
+// nao acender dois itens ao mesmo tempo). Admin so aparece para ADMIN. O Inbox
+// mostra um badge com o total de conversas nao lidas, atualizado ao vivo.
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { getSocket } from "@/lib/socketClient";
 
 type Item = {
   rotulo: string;
@@ -23,6 +26,35 @@ type Item = {
 export function Sidebar({ papel }: { papel: string }) {
   const pathname = usePathname();
   const ehAdmin = papel === "ADMIN";
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  const carregarNaoLidas = useCallback(async () => {
+    try {
+      const r = await fetch("/api/conversas/nao-lidas");
+      if (r.ok) setNaoLidas((await r.json()).total ?? 0);
+    } catch {
+      // silencioso: o badge apenas nao atualiza
+    }
+  }, []);
+
+  useEffect(() => {
+    void carregarNaoLidas();
+    const socket = getSocket();
+    const atualizar = () => void carregarNaoLidas();
+    socket.on("mensagem:nova", atualizar);
+    socket.on("conversa:lida", atualizar);
+    socket.on("conversa:atualizada", atualizar);
+    return () => {
+      socket.off("mensagem:nova", atualizar);
+      socket.off("conversa:lida", atualizar);
+      socket.off("conversa:atualizada", atualizar);
+    };
+  }, [carregarNaoLidas]);
+
+  // Reconfere ao navegar (ex.: abriu/leu uma conversa).
+  useEffect(() => {
+    void carregarNaoLidas();
+  }, [pathname, carregarNaoLidas]);
 
   const itens: Item[] = [
     {
@@ -55,20 +87,41 @@ export function Sidebar({ papel }: { papel: string }) {
         {itens.map((item) => {
           const Icone = item.icone;
           const ativo = item.href === ativoHref;
+          const mostrarBadge = item.rotulo === "Inbox" && naoLidas > 0;
           return (
             <Link
               key={item.rotulo}
               href={item.href}
               aria-current={ativo ? "page" : undefined}
-              title={item.rotulo}
-              className={`flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors justify-center md:justify-start ${
+              title={
+                mostrarBadge
+                  ? `${item.rotulo} (${naoLidas} nao lidas)`
+                  : item.rotulo
+              }
+              className={`relative flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors justify-center md:justify-start ${
                 ativo
                   ? "bg-tiffany text-white"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
-              <Icone className="h-5 w-5 shrink-0" />
+              <span className="relative shrink-0">
+                <Icone className="h-5 w-5" />
+                {mostrarBadge && (
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-tiffany px-1 text-[10px] font-semibold text-white ring-2 ring-escuro md:hidden">
+                    {naoLidas > 99 ? "99+" : naoLidas}
+                  </span>
+                )}
+              </span>
               <span className="hidden md:inline">{item.rotulo}</span>
+              {mostrarBadge && (
+                <span
+                  className={`ml-auto hidden h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold md:inline-flex ${
+                    ativo ? "bg-white text-tiffany" : "bg-tiffany text-white"
+                  }`}
+                >
+                  {naoLidas > 99 ? "99+" : naoLidas}
+                </span>
+              )}
             </Link>
           );
         })}

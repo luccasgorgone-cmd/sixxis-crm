@@ -204,13 +204,23 @@ export function PainelNegocio({
                 )}
               </div>
             </div>
-            <button
-              onClick={onFechar}
-              aria-label="Fechar"
-              className="rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-black/5 hover:text-escuro"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {detalhe && !detalhe.agente && (
+                <button
+                  onClick={() => void salvar({ agenteId: agenteIdAtual })}
+                  className="flex items-center gap-1 rounded-lg bg-tiffany px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-tiffany-escuro"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> Assumir
+                </button>
+              )}
+              <button
+                onClick={onFechar}
+                aria-label="Fechar"
+                className="rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-black/5 hover:text-escuro"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Abas (so em telas estreitas) */}
@@ -274,6 +284,7 @@ export function PainelNegocio({
                   leadNome={detalhe.cliente.nomeEfetivo}
                   leadTelefone={detalhe.cliente.telefone}
                   atendidoPor={detalhe.atendidoPor}
+                  ehAdmin={ehAdmin}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-medio/50">
@@ -289,7 +300,7 @@ export function PainelNegocio({
                 abaMobile === "detalhes" ? "flex" : "hidden"
               } min-h-0 w-full flex-col lg:flex lg:w-1/2`}
             >
-              <div className="scroll-fino flex-1 space-y-5 overflow-y-auto p-4">
+              <div className="scroll-fino flex-1 space-y-5 overflow-y-auto p-4 pb-6">
                 <BlocoCliente
                   cliente={detalhe.cliente}
                   onAtualizado={() => {
@@ -346,6 +357,7 @@ export function PainelNegocio({
                     <LojaCliente
                       telefone={detalhe.cliente.telefone}
                       origem={detalhe.cliente.origem}
+                      ehAdmin={ehAdmin}
                     />
                   )}
                   {subAba === "notas" && (

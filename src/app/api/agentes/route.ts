@@ -18,7 +18,14 @@ export async function GET(): Promise<NextResponse> {
   const agentes = await prisma.agente.findMany({
     where: { ativo: true },
     orderBy: { nome: "asc" },
-    select: { id: true, nome: true, avatarUrl: true, papel: true },
+    select: {
+      id: true,
+      nome: true,
+      avatarUrl: true,
+      papel: true,
+      acessoVenda: true,
+      acessoPosVenda: true,
+    },
   });
   return NextResponse.json({ agentes });
 }

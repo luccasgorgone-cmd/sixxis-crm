@@ -10,9 +10,11 @@ import type { ProdutoLoja } from "./tipos";
 export function SeletorProduto({
   onEscolher,
   onFechar,
+  ehAdmin = false,
 }: {
   onEscolher: (p: ProdutoLoja) => void;
   onFechar: () => void;
+  ehAdmin?: boolean;
 }) {
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
@@ -72,9 +74,13 @@ export function SeletorProduto({
 
         <div className="scroll-fino min-h-0 flex-1 overflow-y-auto p-3">
           {offline ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-medio/50">
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-medio/50">
               <WifiOff className="h-7 w-7" />
-              <p className="text-sm">Loja indisponivel no momento.</p>
+              <p className="max-w-sm text-sm">
+                {ehAdmin
+                  ? "Integracao com a loja nao configurada — defina STORE_API_URL e STORE_INTERNAL_KEY no Railway do CRM."
+                  : "Integracao com a loja indisponivel no momento."}
+              </p>
             </div>
           ) : carregando ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

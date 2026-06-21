@@ -1,7 +1,13 @@
 "use client";
 
 // Coluna esquerda da inbox: busca, filtros e a lista de conversas.
-import { Search, Bot, User as UserIcon, Inbox as InboxIcon } from "lucide-react";
+import {
+  Search,
+  Bot,
+  User as UserIcon,
+  Inbox as InboxIcon,
+  SearchX,
+} from "lucide-react";
 import type { ConversaItem, Filtro, Finalidade } from "./tipos";
 import { horarioLista } from "@/lib/format";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
@@ -103,12 +109,25 @@ export function ListaConversas({
         ) : erro ? (
           <EstadoErro mensagem={erro} onRetry={onTentar} compacto />
         ) : conversas.length === 0 ? (
-          <EstadoVazio
-            icone={InboxIcon}
-            titulo="Nenhuma conversa"
-            texto="As conversas aparecem aqui conforme os clientes entram em contato."
-            compacto
-          />
+          busca.trim() || filtro !== "todas" ? (
+            <EstadoVazio
+              icone={SearchX}
+              titulo="Nenhum resultado"
+              texto={
+                busca.trim()
+                  ? `Nada encontrado para "${busca.trim()}".`
+                  : "Nenhuma conversa com esse filtro."
+              }
+              compacto
+            />
+          ) : (
+            <EstadoVazio
+              icone={InboxIcon}
+              titulo="Nenhuma conversa"
+              texto="As conversas aparecem aqui conforme os clientes entram em contato."
+              compacto
+            />
+          )
         ) : (
           conversas.map((c) => (
             <ItemConversa

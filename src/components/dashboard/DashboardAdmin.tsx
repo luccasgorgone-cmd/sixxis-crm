@@ -26,6 +26,7 @@ import {
 import { formatarBRL, formatarPct, formatarDuracao } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
 import { BadgeAcesso } from "@/components/badges";
+import { BannerAviso } from "@/components/ui/Banner";
 
 type Linha = { id: string; nome: string; acesso: string; metricas: Metricas };
 type Resposta = {
@@ -50,10 +51,25 @@ export function DashboardAdmin() {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
+  const [semColaborador, setSemColaborador] = useState(false);
   const [ordem, setOrdem] = useState<{ chave: ChaveOrdem; dir: 1 | -1 }>({
     chave: "valorVendido",
     dir: -1,
   });
+
+  // Existe colaborador ativo (nao-admin) com acesso a alguma finalidade?
+  useEffect(() => {
+    fetch("/api/admin/vendedores")
+      .then((r) => (r.ok ? r.json() : { agentes: [] }))
+      .then((d) => {
+        const algum = (d.agentes ?? []).some(
+          (a: { papel: string; ativo: boolean; acessoVenda: boolean; acessoPosVenda: boolean }) =>
+            a.papel !== "ADMIN" && a.ativo && (a.acessoVenda || a.acessoPosVenda),
+        );
+        setSemColaborador(!algum);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -102,6 +118,12 @@ export function DashboardAdmin() {
 
   return (
     <div className="space-y-4 p-6">
+      {semColaborador && (
+        <BannerAviso className="-mx-6 -mt-6 mb-2">
+          Nenhum colaborador ativo — novos leads nao serao distribuidos
+          automaticamente. Cadastre/ative colaboradores ou atribua manualmente.
+        </BannerAviso>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-escuro">

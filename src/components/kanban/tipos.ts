@@ -23,6 +23,8 @@ export type AgenteResumo = {
   nome: string;
   avatarUrl: string | null;
   papel?: string;
+  acessoVenda?: boolean;
+  acessoPosVenda?: boolean;
 };
 
 export type CardNegocio = {

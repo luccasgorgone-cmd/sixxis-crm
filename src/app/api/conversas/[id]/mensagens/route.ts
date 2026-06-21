@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getIO } from "@/lib/socket";
 import { DirecaoMsg } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
@@ -45,7 +46,7 @@ export async function GET(
 
   // Marca como lidas / zera o badge APENAS para o dono da conversa (quem
   // realmente esta atendendo). A inspecao do admin nao zera o contador alheio.
-  if (conversa.agenteId === session.user.id) {
+  if (conversa.agenteId === session.user.id && conversa.naoLidas > 0) {
     await prisma.$transaction([
       prisma.mensagem.updateMany({
         where: { conversaId: id, direcao: DirecaoMsg.IN, lida: false },
@@ -56,6 +57,11 @@ export async function GET(
         data: { naoLidas: 0 },
       }),
     ]);
+    // Avisa a sidebar para reduzir o contador de nao lidas ao vivo.
+    getIO()?.emit("conversa:lida", {
+      conversaId: id,
+      agenteId: conversa.agenteId,
+    });
   }
 
   return NextResponse.json({

@@ -16,11 +16,13 @@ export function ConversaEmbed({
   leadNome,
   leadTelefone,
   atendidoPor,
+  ehAdmin = false,
 }: {
   conversaId: string;
   leadNome: string | null;
   leadTelefone: string;
   atendidoPor: "HUMANO" | "IA" | null;
+  ehAdmin?: boolean;
 }) {
   const [mensagens, setMensagens] = useState<MensagemItem[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -92,6 +94,7 @@ export function ConversaEmbed({
         mensagens={mensagens}
         carregando={carregando}
         onEnviada={aoEnviada}
+        ehAdmin={ehAdmin}
       />
     </div>
   );

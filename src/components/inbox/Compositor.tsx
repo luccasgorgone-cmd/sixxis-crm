@@ -19,9 +19,11 @@ type Resposta = {
 export function Compositor({
   conversaId,
   onEnviada,
+  ehAdmin = false,
 }: {
   conversaId: string;
   onEnviada: (msg: MensagemItem) => void;
+  ehAdmin?: boolean;
 }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -170,6 +172,7 @@ export function Compositor({
 
       {seletorProduto && (
         <SeletorProduto
+          ehAdmin={ehAdmin}
           onEscolher={inserirProduto}
           onFechar={() => setSeletorProduto(false)}
         />

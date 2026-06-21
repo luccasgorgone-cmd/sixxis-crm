@@ -80,6 +80,12 @@ export function formatarDuracao(seg: number | null | undefined): string {
   return restoH ? `${d} d ${restoH} h` : `${d} d`;
 }
 
+// Normaliza texto para busca: minusculo, sem acentos, sem espacos nas pontas.
+const ACENTOS = new RegExp("[\\u0300-\\u036f]", "g");
+export function normalizarTexto(s: string): string {
+  return s.normalize("NFD").replace(ACENTOS, "").toLowerCase().trim();
+}
+
 // Percentual a partir de 0..1: "62%".
 export function formatarPct(v: number | null | undefined): string {
   if (v == null) return "0%";

@@ -5,7 +5,7 @@
 // pela finalidade; badge de finalidade para o admin.
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, User } from "lucide-react";
+import { Clock, UserPlus } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -17,11 +17,17 @@ export function CardNegocio({
   onAbrir,
   arrastando = false,
   mostrarFinalidade = false,
+  ehAdmin = false,
+  onAssumir,
+  onAtribuir,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
   arrastando?: boolean;
   mostrarFinalidade?: boolean;
+  ehAdmin?: boolean;
+  onAssumir?: (negocioId: string) => void;
+  onAtribuir?: (card: Card) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
@@ -103,12 +109,36 @@ export function CardNegocio({
                 tamanho={22}
               />
             </span>
+          ) : ehAdmin && onAtribuir ? (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAtribuir(card);
+              }}
+              title="Atribuir a um colaborador"
+              className="flex items-center gap-1 rounded-full border border-dashed border-medio/30 px-2 py-0.5 text-[10px] font-medium text-medio/70 transition-colors hover:border-tiffany hover:text-tiffany"
+            >
+              <UserPlus className="h-3 w-3" /> Atribuir
+            </button>
+          ) : onAssumir ? (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAssumir(card.id);
+              }}
+              title="Assumir este cliente"
+              className="flex items-center gap-1 rounded-full bg-tiffany/10 px-2 py-0.5 text-[10px] font-semibold text-tiffany transition-colors hover:bg-tiffany/20"
+            >
+              <UserPlus className="h-3 w-3" /> Assumir
+            </button>
           ) : (
             <span
               title="Sem dono"
               className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-medio/30 text-medio/40"
             >
-              <User className="h-3 w-3" />
+              <UserPlus className="h-3 w-3" />
             </span>
           )}
         </div>

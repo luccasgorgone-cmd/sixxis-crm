@@ -31,12 +31,14 @@ export function Thread({
   carregando,
   onEnviada,
   somenteLeitura = false,
+  ehAdmin = false,
 }: {
   conversa: ConversaItem;
   mensagens: MensagemItem[];
   carregando: boolean;
   onEnviada?: (msg: MensagemItem) => void;
   somenteLeitura?: boolean;
+  ehAdmin?: boolean;
 }) {
   const fimRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +114,7 @@ export function Thread({
         <Compositor
           conversaId={conversa.id}
           onEnviada={onEnviada ?? (() => undefined)}
+          ehAdmin={ehAdmin}
         />
       )}
     </div>

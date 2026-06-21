@@ -285,7 +285,7 @@ export function InspecaoConversa({
         </div>
 
         {abaLado === "loja" ? (
-          <LojaCliente telefone={leadTelefone} origem={cliente?.origem} />
+          <LojaCliente telefone={leadTelefone} origem={cliente?.origem} ehAdmin />
         ) : (
           <HistoricoCliente leadId={leadId} />
         )}
