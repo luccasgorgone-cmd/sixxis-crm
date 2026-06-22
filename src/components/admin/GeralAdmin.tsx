@@ -3,10 +3,12 @@
 // Admin > Geral: nome da empresa, fuso, horario comercial (por dia da semana,
 // com faixas) e mensagem de fora do horario. Indicador Aberto/Fechado agora.
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Cabecalho, SkeletonTabela, CampoTexto } from "./VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
+import { LogoUploader } from "./LogoUploader";
 
 type Faixa = { inicio: string; fim: string };
 type DiaHorario = { dia: number; aberto: boolean; faixas: Faixa[] };
@@ -15,6 +17,8 @@ type Config = {
   fuso: string;
   horarios: DiaHorario[];
   mensagemForaHorario: string | null;
+  temLogo: boolean;
+  logoEm: number;
 };
 
 const NOMES = [
@@ -29,6 +33,7 @@ const NOMES = [
 
 export function GeralAdmin() {
   const toast = useToast();
+  const router = useRouter();
   const [config, setConfig] = useState<Config | null>(null);
   const [abertoAgora, setAbertoAgora] = useState(false);
   const [carregando, setCarregando] = useState(true);
@@ -205,6 +210,17 @@ export function GeralAdmin() {
             onChange={(v) => setConfig({ ...config, fuso: v })}
           />
         </div>
+
+        <LogoUploader
+          temLogo={config.temLogo}
+          logoEm={config.logoEm}
+          onChange={() => {
+            // Recarrega o estado local e revalida os server components (sidebar,
+            // login, favicon) para refletir a troca sem reload manual.
+            void carregar();
+            router.refresh();
+          }}
+        />
 
         <div>
           <p className="mb-2 text-sm font-medium text-escuro">

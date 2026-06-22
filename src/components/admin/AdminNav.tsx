@@ -5,6 +5,8 @@
 // itens de topo. Realca a secao atual (rota exata ou subrota).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "@/components/Logo";
+import type { Marca } from "@/lib/marca";
 import {
   Eye,
   Users,
@@ -47,7 +49,7 @@ const SECOES: Secao[] = [
 // Rotas de topo (nao sao configuracao): nelas a sub-nav nao aparece.
 const SEM_SUBNAV = ["/admin/dashboard", "/admin/metas"];
 
-export function AdminNav() {
+export function AdminNav({ marca }: { marca?: Marca }) {
   const pathname = usePathname();
   if (SEM_SUBNAV.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return null;
@@ -55,6 +57,16 @@ export function AdminNav() {
 
   return (
     <nav className="scroll-fino w-56 shrink-0 overflow-y-auto border-r border-black/5 bg-white p-3">
+      <div className="mb-3 flex items-center px-2.5 py-1">
+        <Logo
+          tom="escuro"
+          className="text-base"
+          temLogo={marca?.temLogo}
+          logoEm={marca?.logoEm}
+          nomeEmpresa={marca?.nomeEmpresa}
+          alturaImg="h-7"
+        />
+      </div>
       <Link
         href="/inbox"
         className="mb-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-medio transition-colors hover:bg-black/5 hover:text-escuro"

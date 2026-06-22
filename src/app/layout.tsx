@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { obterMarca } from "@/lib/marca";
 
 // Inter nos pesos usados pela UI. A variavel alimenta --font-inter no CSS.
 const inter = Inter({
@@ -10,10 +11,21 @@ const inter = Inter({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Sixxis CRM",
-  description: "CRM de WhatsApp da Sixxis",
-};
+// Titulo da aba = nome da empresa (se houver). Favicon dinamico derivado da
+// logo quando configurada; senao mantem o padrao do app.
+export async function generateMetadata(): Promise<Metadata> {
+  const { nomeEmpresa, temLogo, logoEm } = await obterMarca();
+  const titulo = nomeEmpresa ? `${nomeEmpresa} CRM` : "Sixxis CRM";
+  return {
+    title: titulo,
+    description: nomeEmpresa
+      ? `CRM de WhatsApp da ${nomeEmpresa}`
+      : "CRM de WhatsApp da Sixxis",
+    ...(temLogo
+      ? { icons: { icon: `/api/logo?v=${logoEm}` } }
+      : {}),
+  };
+}
 
 export default function RootLayout({
   children,

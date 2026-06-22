@@ -382,6 +382,11 @@ model ConfiguracaoCRM {
   fuso               String   @default("America/Sao_Paulo")
   horarios           Json?
   mensagemForaHorario String?
+  // Logo da empresa guardada no proprio banco (sem storage externo).
+  // logoData = data URL (base64) ou SVG sanitizado; logoEm versiona o cache.
+  logoData           String?   @db.Text
+  logoMime           String?
+  logoEm             DateTime?
   atualizadoEm       DateTime @updatedAt
 }
 

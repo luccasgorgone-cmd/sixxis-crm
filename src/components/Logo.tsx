@@ -1,12 +1,35 @@
-// Logo textual da marca. "sixxis" com o ponto tiffany. Sem imagem externa
-// para nao depender de asset nesta fase.
+// Logo da marca. Se a empresa configurou uma logo (temLogo), renderiza a imagem
+// servida por /api/logo (com cache-busting por logoEm). Senao, mantem a
+// identidade textual Sixxis ("sixxis" com o ponto tiffany).
 export function Logo({
   className = "",
   tom = "escuro",
+  temLogo = false,
+  logoEm = 0,
+  nomeEmpresa = null,
+  // Altura da imagem da logo (Tailwind). Ex.: "h-8". Largura e auto.
+  alturaImg = "h-8",
 }: {
   className?: string;
   tom?: "escuro" | "claro";
+  temLogo?: boolean;
+  logoEm?: number;
+  nomeEmpresa?: string | null;
+  alturaImg?: string;
 }) {
+  if (temLogo) {
+    return (
+      <span className={`inline-flex items-center ${className}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/logo?v=${logoEm}`}
+          alt={nomeEmpresa ?? "Logo"}
+          className={`${alturaImg} w-auto max-w-full object-contain`}
+        />
+      </span>
+    );
+  }
+
   const corTexto = tom === "claro" ? "text-white" : "text-escuro";
   return (
     <span

@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import type { Marca } from "@/lib/marca";
 import { getSocket } from "@/lib/socketClient";
 
 type Item = {
@@ -23,7 +24,7 @@ type Item = {
   icone: LucideIcon;
 };
 
-export function Sidebar({ papel }: { papel: string }) {
+export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
   const pathname = usePathname();
   const ehAdmin = papel === "ADMIN";
   const [naoLidas, setNaoLidas] = useState(0);
@@ -80,7 +81,14 @@ export function Sidebar({ papel }: { papel: string }) {
   return (
     <aside className="flex h-full w-16 flex-col items-center border-r border-black/5 bg-escuro py-4 md:w-56 md:items-stretch md:px-3">
       <div className="mb-6 flex items-center justify-center md:justify-start md:px-2">
-        <Logo tom="claro" className="text-lg" />
+        <Logo
+          tom="claro"
+          className="text-lg"
+          temLogo={marca?.temLogo}
+          logoEm={marca?.logoEm}
+          nomeEmpresa={marca?.nomeEmpresa}
+          alturaImg="h-8"
+        />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">

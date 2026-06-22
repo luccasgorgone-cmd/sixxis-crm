@@ -9,6 +9,7 @@ import {
   type DiaHorario,
 } from "@/lib/horario";
 import { HORARIOS_PADRAO } from "@/lib/seed";
+import { validarLogo } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,8 @@ export async function GET(): Promise<NextResponse> {
       fuso: config.fuso,
       horarios,
       mensagemForaHorario: config.mensagemForaHorario,
+      temLogo: Boolean(config.logoData),
+      logoEm: config.logoEm?.getTime() ?? 0,
     },
     abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
   });
@@ -53,6 +56,10 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     fuso?: string;
     horarios?: unknown;
     mensagemForaHorario?: string;
+    logoData?: unknown;
+    logoMime?: unknown;
+    // Sinal explicito para remover a logo atual.
+    removerLogo?: boolean;
   };
   try {
     body = await req.json();
@@ -81,6 +88,25 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
           : null;
     }
 
+    // Logo: remover, ou validar/sanitizar e salvar com nova versao (logoEm).
+    if (body.removerLogo === true) {
+      data.logoData = null;
+      data.logoMime = null;
+      data.logoEm = null;
+    } else if (body.logoData !== undefined) {
+      try {
+        const { data: logoData, mime } = validarLogo(body.logoData, body.logoMime);
+        data.logoData = logoData;
+        data.logoMime = mime;
+        data.logoEm = new Date();
+      } catch (e) {
+        return NextResponse.json(
+          { erro: e instanceof Error ? e.message : "logo invalida" },
+          { status: 400 },
+        );
+      }
+    }
+
     // Singleton: atualiza a linha existente sem depender do id; cria se nao houver.
     if (Object.keys(data).length > 0) {
       const res = await prisma.configuracaoCRM.updateMany({ data });
@@ -106,6 +132,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         fuso: config.fuso,
         horarios,
         mensagemForaHorario: config.mensagemForaHorario,
+        temLogo: Boolean(config.logoData),
+        logoEm: config.logoEm?.getTime() ?? 0,
       },
       abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
     });

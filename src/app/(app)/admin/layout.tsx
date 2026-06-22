@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { obterMarca } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,10 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
   if (!session || session.user.papel !== "ADMIN") redirect("/inbox");
+  const marca = await obterMarca();
   return (
     <div className="flex h-full min-h-0">
-      <AdminNav />
+      <AdminNav marca={marca} />
       <div className="scroll-fino min-h-0 flex-1 overflow-y-auto">
         {children}
       </div>

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { ToastProvider } from "@/components/ui/Toast";
+import { obterMarca } from "@/lib/marca";
 
 export default async function AppLayout({
   children,
@@ -13,11 +14,12 @@ export default async function AppLayout({
 }) {
   const session = await auth();
   if (!session) redirect("/login");
+  const marca = await obterMarca();
 
   return (
     <ToastProvider>
       <div className="flex h-screen overflow-hidden bg-fundo">
-        <Sidebar papel={session.user.papel} />
+        <Sidebar papel={session.user.papel} marca={marca} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar nome={session.user.name} papel={session.user.papel} />
           <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
