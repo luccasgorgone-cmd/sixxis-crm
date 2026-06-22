@@ -104,6 +104,18 @@ type Resposta = {
 
 type Aba = "ganhos" | "pendentes" | "perdidos" | "abertos";
 
+// "Nice step": arredonda para 1/2/5 x 10^k. Para valor, mantem multiplos de 1000
+// para casar com o passo base de R$ 2.000 (gera 1000/2000/5000/10000...).
+function passoBonito(x: number, ehValor: boolean): number {
+  if (x <= 0) return ehValor ? 1000 : 1;
+  const exp = Math.floor(Math.log10(x));
+  const base = Math.pow(10, exp);
+  const f = x / base;
+  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  const passo = nice * base;
+  return ehValor ? Math.max(1000, Math.round(passo)) : Math.max(1, Math.round(passo));
+}
+
 function dataCurta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -216,6 +228,21 @@ export function DetalheMeta({
   const titulo = meta.nome ?? ROTULO_METRICA[meta.metrica];
   const ehFechamento =
     meta.metrica === "VALOR_VENDIDO" || meta.metrica === "QTD_GANHOS";
+  const ehValor = meta.metrica === "VALOR_VENDIDO";
+
+  // Eixo Y do grafico: ticks "redondos" incluindo o alvo. Para VALOR, passo base
+  // R$ 2.000, escalando para um "nice step" quando o alvo for grande (~6 ticks).
+  const topoSerie = serie.length
+    ? Math.max(serie[serie.length - 1]?.acumulado ?? 0, meta.alvo, 1)
+    : Math.max(meta.alvo, 1);
+  const passoBase = ehValor ? 2000 : 1;
+  const passoY = Math.max(passoBase, passoBonito(topoSerie / 6, ehValor));
+  const yMax = Math.ceil(topoSerie / passoY) * passoY;
+  const ticksY: number[] = [];
+  for (let v = 0; v <= yMax + passoY * 0.001; v += passoY) ticksY.push(v);
+  const larguraY = ehValor ? 78 : 46;
+  const formatarTickY = (v: number) =>
+    ehValor ? `R$ ${Math.round(v).toLocaleString("pt-BR")}` : `${v}`;
 
   const valorGanhos = ganhos.reduce((s, g) => s + (g.valor ?? 0), 0);
 
@@ -358,8 +385,8 @@ export function DetalheMeta({
           <p className="mb-3 text-sm font-semibold text-escuro">
             Evolucao acumulada vs alvo
           </p>
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={serie} margin={{ left: -16, right: 8, top: 4 }}>
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={serie} margin={{ left: 12, right: 16, top: 8, bottom: 4 }}>
               <defs>
                 <linearGradient id="gMeta" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#3cbfb3" stopOpacity={0.35} />
@@ -373,10 +400,17 @@ export function DetalheMeta({
                 tick={{ fontSize: 11, fill: "#1a4f4a99" }}
                 interval="preserveStartEnd"
               />
-              <YAxis tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+              <YAxis
+                width={larguraY}
+                domain={[0, yMax]}
+                ticks={ticksY}
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: "#1a4f4a99" }}
+                tickFormatter={formatarTickY}
+              />
               <Tooltip
                 formatter={(value) => [
-                  meta.metrica === "VALOR_VENDIDO"
+                  ehValor
                     ? formatarBRL(Number(value ?? 0))
                     : Number(value ?? 0).toLocaleString("pt-BR"),
                   "",
