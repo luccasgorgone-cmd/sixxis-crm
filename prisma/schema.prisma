@@ -485,6 +485,8 @@ model CampanhaDestino {
   leadId     String
   lead       Lead          @relation(fields: [leadId], references: [id])
   destino    String
+  // Texto renderizado (modelo + variaveis) realmente enviado a este destino.
+  mensagem   String?       @db.Text
   status     StatusDestino @default(PENDENTE)
   erro       String?
   enviadoEm  DateTime?

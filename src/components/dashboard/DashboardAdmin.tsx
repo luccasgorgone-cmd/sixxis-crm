@@ -156,7 +156,11 @@ export function DashboardAdmin() {
               destaque
             />
             <Cartao rotulo="Em aberto" valor={g.abertos} icone={FolderOpen} />
-            <Cartao rotulo="Pendentes" valor={g.pendentes} icone={Clock4} />
+            <Cartao
+              rotulo="Atendimentos pendentes"
+              valor={g.pendentes}
+              icone={Clock4}
+            />
             <Cartao
               rotulo="Finalizados"
               valor={g.finalizados}
@@ -208,7 +212,7 @@ export function DashboardAdmin() {
                   <th className="px-3 py-2.5 font-medium">Acesso</th>
                   <Th label="Clientes" onClick={() => ordenar("clientesAtendidos")} />
                   <Th label="Abertos" onClick={() => ordenar("abertos")} />
-                  <Th label="Pendentes" onClick={() => ordenar("pendentes")} />
+                  <Th label="Atend. pendentes" onClick={() => ordenar("pendentes")} />
                   <Th label="Finalizados" onClick={() => ordenar("finalizados")} />
                   <Th label="Conversao" onClick={() => ordenar("conversao")} />
                   <Th label="Valor" onClick={() => ordenar("valorVendido")} />

@@ -119,7 +119,7 @@ const CARDS: {
   },
   {
     chave: "pendente",
-    rotulo: "Pendentes",
+    rotulo: "Negocios pendentes",
     icone: PauseCircle,
     cor: "text-orange-700",
     fundo: "bg-orange-100",
@@ -364,7 +364,7 @@ export function MinhaCarteira({
                 c.chave === "totalClientes"
                   ? { tipo: "clientes", titulo: "Todos os clientes" }
                   : c.chave === "pendente"
-                    ? { tipo: "pendente", titulo: "Pendentes" }
+                    ? { tipo: "pendente", titulo: "Negocios pendentes" }
                     : {
                         tipo: "status",
                         status: c.chave.toUpperCase() as
@@ -502,7 +502,7 @@ export function MinhaCarteira({
           {/* Pendentes */}
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
-              <PauseCircle className="h-4 w-4 text-orange-500" /> Pendentes
+              <PauseCircle className="h-4 w-4 text-orange-500" /> Negocios pendentes
               {dados.pendentes.length > 0 && (
                 <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">
                   {dados.pendentes.length}

@@ -178,6 +178,8 @@ async function processarCampanha(
       data: {
         status: ok ? StatusDestino.ENVIADO : StatusDestino.FALHA,
         erro,
+        // Guarda o texto exato enviado a este destinatario (auditoria/admin).
+        mensagem: texto,
         enviadoEm: ok ? new Date() : null,
       },
     });

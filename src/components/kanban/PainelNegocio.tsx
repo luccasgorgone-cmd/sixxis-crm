@@ -852,7 +852,7 @@ function BlocoPendencia({
           onClick={() => setAbrindo(true)}
           className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100"
         >
-          <PauseCircle className="h-4 w-4" /> Marcar como pendente
+          <PauseCircle className="h-4 w-4" /> Marcar negocio como pendente
         </button>
       )}
     </div>

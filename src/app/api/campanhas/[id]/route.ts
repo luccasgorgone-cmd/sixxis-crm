@@ -47,6 +47,7 @@ export async function GET(
           destino: true,
           status: true,
           erro: true,
+          mensagem: true,
           enviadoEm: true,
           lead: {
             select: {
@@ -76,6 +77,7 @@ export async function GET(
         destino: d.destino,
         status: d.status,
         erro: d.erro,
+        mensagem: d.mensagem,
         enviadoEm: d.enviadoEm,
         leadId: d.lead.id,
         nomeEfetivo: nomeEfetivo(d.lead),

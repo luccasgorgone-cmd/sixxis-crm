@@ -160,7 +160,9 @@ function NovaCampanha({
   toast: ReturnType<typeof useToast>;
   onEnviada: () => void;
 }) {
-  const [escopoTodos, setEscopoTodos] = useState(ehAdmin && !agenteSel);
+  // Opt-in explicito: "todos da finalidade" comeca SEMPRE desligado (evita
+  // disparar para a base inteira sem intencao).
+  const [escopoTodos, setEscopoTodos] = useState(false);
   const [canal, setCanal] = useState<Canal>("WHATSAPP");
   const [canais, setCanais] = useState<CanalStatus[]>([]);
   const [status, setStatus] = useState<"todos" | "ABERTO" | "GANHO" | "PERDIDO">(
@@ -322,6 +324,14 @@ function NovaCampanha({
               Todos da finalidade
             </BotaoToggle>
           </div>
+          {escopoTodos && (
+            <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-medium text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Esta campanha sera enviada para TODOS os clientes de{" "}
+              {finalidade === "VENDA" ? "Venda" : "Pos-venda"}
+              {preview ? ` (${preview.total} destinatarios)` : ""}.
+            </p>
+          )}
         </Secao>
       )}
 
@@ -535,13 +545,37 @@ function NovaCampanha({
                 Confirmar envio
               </h3>
             </div>
-            <p className="text-sm text-medio/80">
-              Esta campanha sera enviada para{" "}
-              <strong className="text-escuro">{preview.total}</strong> destinatarios
-              por <strong className="text-escuro">{canal === "WHATSAPP" ? "WhatsApp" : canal === "SMS" ? "SMS" : "Email"}</strong>.
-              {preview.pulados.total > 0 &&
-                ` ${preview.pulados.total} serao pulados (opt-out/sem canal).`}
-            </p>
+
+            {/* Contagem em destaque */}
+            <div className="mb-3 flex items-center gap-3 rounded-xl border border-tiffany/20 bg-tiffany/5 p-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-tiffany/10 text-tiffany">
+                <Users className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-2xl font-bold leading-none text-escuro">
+                  {preview.total}
+                </p>
+                <p className="text-xs text-medio/70">
+                  destinatarios por{" "}
+                  {canal === "WHATSAPP" ? "WhatsApp" : canal === "SMS" ? "SMS" : "Email"}
+                </p>
+              </div>
+            </div>
+
+            {ehAdmin && escopoTodos && (
+              <p className="mb-2 flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Atencao: TODOS os clientes de{" "}
+                {finalidade === "VENDA" ? "Venda" : "Pos-venda"} ({preview.total}{" "}
+                destinatarios) vao receber esta campanha.
+              </p>
+            )}
+
+            {preview.pulados.total > 0 && (
+              <p className="text-sm text-medio/80">
+                {preview.pulados.total} serao pulados (opt-out/sem canal).
+              </p>
+            )}
             <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               O envio respeita um intervalo entre mensagens (anti-bloqueio); pode
@@ -704,6 +738,7 @@ type DestinoDetalhe = {
   destino: string;
   status: string;
   erro: string | null;
+  mensagem: string | null;
   nomeEfetivo: string;
 };
 type CampanhaDetalhe = CampanhaResumo & {
@@ -820,18 +855,25 @@ export function DetalheCampanha({
                 {c.destinos.map((d) => (
                   <div
                     key={d.id}
-                    className="flex items-center gap-2 rounded-lg border border-black/5 bg-white px-3 py-2"
+                    className="rounded-lg border border-black/5 bg-white px-3 py-2"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-escuro">{d.nomeEfetivo}</p>
-                      <p className="truncate text-[11px] text-medio/50">{d.destino}</p>
-                      {d.erro && (
-                        <p className="truncate text-[11px] text-red-500">{d.erro}</p>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-escuro">{d.nomeEfetivo}</p>
+                        <p className="truncate text-[11px] text-medio/50">{d.destino}</p>
+                        {d.erro && (
+                          <p className="truncate text-[11px] text-red-500">{d.erro}</p>
+                        )}
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${COR_DESTINO[d.status] ?? ""}`}>
+                        {d.status}
+                      </span>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${COR_DESTINO[d.status] ?? ""}`}>
-                      {d.status}
-                    </span>
+                    {d.mensagem && (
+                      <p className="mt-1.5 whitespace-pre-wrap rounded-md bg-fundo px-2 py-1.5 text-[11px] text-medio/80">
+                        {d.mensagem}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

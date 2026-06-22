@@ -52,15 +52,17 @@ export async function PATCH(
     data.concluidoEm = null;
   }
 
-  // Concluir / cancelar.
+  // Concluir / cancelar / reabrir. Comparacao case-insensitive (aceita "feito",
+  // "FEITO", "Cancelar", "CANCELADO", "pendente", etc.).
   if (body.status !== undefined) {
-    if (body.status === "feito") {
+    const st = String(body.status).toLowerCase();
+    if (st === "feito") {
       data.status = StatusLembrete.FEITO;
       data.concluidoEm = new Date();
-    } else if (body.status === "cancelar" || body.status === "CANCELADO") {
+    } else if (st === "cancelar" || st === "cancelado") {
       data.status = StatusLembrete.CANCELADO;
       data.concluidoEm = new Date();
-    } else if (body.status === "pendente" || body.status === "PENDENTE") {
+    } else if (st === "pendente") {
       data.status = StatusLembrete.PENDENTE;
       data.concluidoEm = null;
     }

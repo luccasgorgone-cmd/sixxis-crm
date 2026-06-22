@@ -88,7 +88,11 @@ export function DashboardColaborador() {
               destaque
             />
             <Cartao rotulo="Em aberto" valor={m.abertos} icone={FolderOpen} />
-            <Cartao rotulo="Pendentes" valor={m.pendentes} icone={Clock4} />
+            <Cartao
+              rotulo="Atendimentos pendentes"
+              valor={m.pendentes}
+              icone={Clock4}
+            />
             <Cartao
               rotulo="Finalizados"
               valor={m.finalizados}

@@ -92,10 +92,18 @@ const ETIQUETAS_PADRAO: { nome: string; cor: string }[] = [
 // Etiquetas de pos-venda. Semeadas por nome (so cria a que faltar), com
 // finalidade POS_VENDA, para organizar as marcacoes da carteira de pos-venda.
 const ETIQUETAS_POS_VENDA: { nome: string; cor: string }[] = [
-  { nome: "Aguardando orcamento", cor: "#0ea5e9" },
+  { nome: "Aguardando orçamento", cor: "#0ea5e9" },
   { nome: "Aguardando pagamento", cor: "#f59e0b" },
-  { nome: "Orcamento aprovado", cor: "#16a34a" },
-  { nome: "Aguardando peca", cor: "#7c3aed" },
+  { nome: "Orçamento aprovado", cor: "#16a34a" },
+  { nome: "Aguardando peça", cor: "#7c3aed" },
+];
+
+// Correcao idempotente: acentua nomes semeados sem acento em producao. Renomeia
+// somente quando o nome acentuado ainda nao existe (nao cria duplicatas).
+const RENOMEAR_ETIQUETAS: { de: string; para: string }[] = [
+  { de: "Aguardando orcamento", para: "Aguardando orçamento" },
+  { de: "Orcamento aprovado", para: "Orçamento aprovado" },
+  { de: "Aguardando peca", para: "Aguardando peça" },
 ];
 
 // Modelos de mensagem profissionais (categoria + finalidade). Semeados por
@@ -189,6 +197,21 @@ export async function seedFunil(): Promise<void> {
       console.log(`[seed] ${ETIQUETAS_PADRAO.length} etiquetas criadas`);
     } else {
       console.log("[seed] etiquetas ok");
+    }
+
+    // Correcao de dados: acentua etiquetas pos-venda criadas sem acento. So
+    // renomeia se o nome acentuado ainda nao existir (idempotente, sem duplicar).
+    for (const { de, para } of RENOMEAR_ETIQUETAS) {
+      const jaTemAcentuado = await prisma.etiqueta.count({ where: { nome: para } });
+      if (jaTemAcentuado === 0) {
+        const r = await prisma.etiqueta.updateMany({
+          where: { nome: de },
+          data: { nome: para },
+        });
+        if (r.count > 0) {
+          console.log(`[seed] etiqueta renomeada: "${de}" -> "${para}"`);
+        }
+      }
     }
 
     // Etiquetas de pos-venda: cria por nome apenas as que faltarem (nao
