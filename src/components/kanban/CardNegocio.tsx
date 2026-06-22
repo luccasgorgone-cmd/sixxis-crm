@@ -83,6 +83,15 @@ export function CardNegocio({
         </div>
       )}
 
+      {card.status === "PERDIDO" && card.motivoPerdaLabel && (
+        <p
+          title={card.motivoPerdaObs ?? undefined}
+          className="mb-2 truncate rounded-md bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700"
+        >
+          Perdido: {card.motivoPerdaLabel}
+        </p>
+      )}
+
       {card.etiquetas.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           {card.etiquetas.slice(0, 4).map((e) => (

@@ -39,6 +39,9 @@ export type CardNegocio = {
   finalidade: Finalidade;
   pendente: boolean;
   motivoPendencia: string | null;
+  motivoPerda: string | null;
+  motivoPerdaLabel: string | null;
+  motivoPerdaObs: string | null;
   etapaId: string | null;
   entrouEtapaEm: string;
   agente: AgenteResumo | null;

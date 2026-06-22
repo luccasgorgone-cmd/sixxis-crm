@@ -4,6 +4,7 @@
 // (pede MOTIVO). Confirma ou cancela o movimento.
 import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
+import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
 
 export function ModalFechamento({
   tipo,
@@ -13,7 +14,11 @@ export function ModalFechamento({
 }: {
   tipo: "ganho" | "perdido";
   valorInicial?: number | null;
-  onConfirmar: (dados: { valor?: number; motivoPerda?: string }) => Promise<void>;
+  onConfirmar: (dados: {
+    valor?: number;
+    motivoPerda?: string;
+    motivoPerdaObs?: string;
+  }) => Promise<void>;
   onCancelar: () => void;
 }) {
   const ehGanho = tipo === "ganho";
@@ -21,6 +26,7 @@ export function ModalFechamento({
     valorInicial != null ? String(valorInicial) : "",
   );
   const [motivo, setMotivo] = useState("");
+  const [obs, setObs] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -40,13 +46,20 @@ export function ModalFechamento({
         setSalvando(false);
       }
     } else {
-      if (!motivo.trim()) {
-        setErro("Informe o motivo da perda.");
+      if (!motivo) {
+        setErro("Selecione o motivo da perda.");
+        return;
+      }
+      if (motivo === "OUTRO" && !obs.trim()) {
+        setErro("Descreva o motivo no campo de observacao.");
         return;
       }
       setSalvando(true);
       try {
-        await onConfirmar({ motivoPerda: motivo.trim() });
+        await onConfirmar({
+          motivoPerda: motivo,
+          motivoPerdaObs: obs.trim() || undefined,
+        });
       } catch {
         setErro("Nao foi possivel concluir.");
         setSalvando(false);
@@ -90,12 +103,30 @@ export function ModalFechamento({
             <label className="mb-1 block text-sm font-medium text-escuro">
               Motivo da perda
             </label>
-            <textarea
+            <select
               autoFocus
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              rows={3}
-              placeholder="Ex.: comprou com concorrente, sem orcamento..."
+              className="w-full rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none focus:border-tiffany"
+            >
+              <option value="">Selecione um motivo...</option>
+              {MOTIVOS_PERDA.map((m) => (
+                <option key={m.code} value={m.code}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <label className="mb-1 mt-3 block text-sm font-medium text-escuro">
+              Observacao{" "}
+              <span className="text-medio/50">
+                {motivo === "OUTRO" ? "(obrigatoria)" : "(opcional)"}
+              </span>
+            </label>
+            <textarea
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              rows={2}
+              placeholder="Detalhe o que aconteceu (opcional)"
               className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none focus:border-tiffany"
             />
           </>

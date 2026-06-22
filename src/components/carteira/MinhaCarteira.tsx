@@ -29,6 +29,7 @@ import {
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { EnvioMassa } from "@/components/campanhas/EnvioMassa";
+import { PerdidosAnalise } from "@/components/perdidos/PerdidosAnalise";
 import type {
   Etapa,
   EtiquetaChip,
@@ -540,6 +541,18 @@ export function MinhaCarteira({
                 ))}
               </div>
             )}
+          </section>
+
+          {/* Perdidos por motivo */}
+          <section className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+              <XCircle className="h-4 w-4 text-red-500" /> Perdidos
+            </h3>
+            <PerdidosAnalise
+              finalidade={finalidade}
+              agenteId={ehAdmin ? agenteSel : undefined}
+              onAbrir={(id) => setPainelId(id)}
+            />
           </section>
         </>
       )}

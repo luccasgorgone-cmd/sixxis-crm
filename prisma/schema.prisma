@@ -321,7 +321,9 @@ model Negocio {
   // pagamento...). motivoPendencia descreve o porque para a carteira/tooltip.
   pendente        Boolean          @default(false)
   motivoPendencia String?          @db.Text
+  // motivoPerda guarda o CODE (ver lib/motivosPerda); obs e a observacao livre.
   motivoPerda   String?
+  motivoPerdaObs String?           @db.Text
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
   historicos    HistoricoNegocio[]

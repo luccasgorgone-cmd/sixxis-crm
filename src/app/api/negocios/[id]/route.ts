@@ -16,6 +16,7 @@ import {
   Finalidade,
 } from "@/generated/prisma/enums";
 import { espelharDonoNasConversas } from "@/lib/dono";
+import { rotuloMotivo } from "@/lib/motivosPerda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -135,6 +136,10 @@ export async function GET(
             : null,
       produtos: negocio.produtos ?? null,
       motivoPerda: negocio.motivoPerda,
+      motivoPerdaLabel: negocio.motivoPerda
+        ? rotuloMotivo(negocio.motivoPerda)
+        : null,
+      motivoPerdaObs: negocio.motivoPerdaObs,
       fechadoEm: negocio.fechadoEm,
       conversaId: conversa?.id ?? null,
       atendidoPor: conversa?.atendidoPor ?? null,
@@ -181,6 +186,7 @@ export async function PATCH(
     temperatura?: Temperatura;
     agenteId?: string | null;
     motivoPerda?: string;
+    motivoPerdaObs?: string | null;
     produtos?: unknown;
     pendente?: boolean;
     motivoPendencia?: string | null;
@@ -283,12 +289,24 @@ export async function PATCH(
           { status: 422 },
         );
       }
+      const obs = body.motivoPerdaObs?.trim() || null;
+      // Quando o motivo e OUTRO, a observacao livre e obrigatoria.
+      if (motivo === "OUTRO" && !obs) {
+        return NextResponse.json(
+          { erro: "observacao e obrigatoria para o motivo Outro" },
+          { status: 422 },
+        );
+      }
       data.motivoPerda = motivo;
+      data.motivoPerdaObs = obs;
       data.status = StatusNeg.PERDIDO;
       data.fechadoEm = agora;
+      const rotulo = rotuloMotivo(motivo);
       historicos.push({
         tipo: TipoHistorico.PERDA,
-        descricao: `Negocio perdido: ${motivo}`,
+        descricao: obs
+          ? `Negocio perdido: ${rotulo} — ${obs}`
+          : `Negocio perdido: ${rotulo}`,
       });
     } else {
       // Etapa ABERTA: reabre se estava fechado.
@@ -357,6 +375,9 @@ export async function PATCH(
   // ---- Motivo de perda avulso ----
   if (body.motivoPerda !== undefined && data.motivoPerda === undefined) {
     data.motivoPerda = body.motivoPerda;
+  }
+  if (body.motivoPerdaObs !== undefined && data.motivoPerdaObs === undefined) {
+    data.motivoPerdaObs = body.motivoPerdaObs?.trim() || null;
   }
 
   // ---- Produtos (lista simples) ----

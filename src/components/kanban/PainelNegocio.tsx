@@ -503,6 +503,20 @@ function NegocioAcoes({
         Negocio
       </h4>
 
+      {/* Motivo da perda (quando perdido) */}
+      {detalhe.status === "PERDIDO" && detalhe.motivoPerdaLabel && (
+        <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
+          <p className="text-xs font-semibold text-red-700">
+            Motivo da perda: {detalhe.motivoPerdaLabel}
+          </p>
+          {detalhe.motivoPerdaObs && (
+            <p className="mt-0.5 text-xs text-red-900/80">
+              {detalhe.motivoPerdaObs}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Valor + temperatura */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>

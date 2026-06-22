@@ -2,6 +2,7 @@
 // Kanban e do painel. Centraliza a conversao de Decimal -> number.
 import type { Prisma } from "@/generated/prisma/client";
 import { nomeEfetivo } from "./cliente";
+import { rotuloMotivo } from "./motivosPerda";
 
 // Include padrao usado nas consultas que viram "card".
 export const includeCard = {
@@ -35,6 +36,9 @@ export function cardNegocio(n: NegocioCard) {
     finalidade: n.finalidade,
     pendente: n.pendente,
     motivoPendencia: n.motivoPendencia,
+    motivoPerda: n.motivoPerda,
+    motivoPerdaLabel: n.motivoPerda ? rotuloMotivo(n.motivoPerda) : null,
+    motivoPerdaObs: n.motivoPerdaObs,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
     agente: n.agente
