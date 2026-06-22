@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Target,
   Briefcase,
+  Contact,
   Shield,
   type LucideIcon,
 } from "lucide-react";
@@ -66,6 +67,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     },
     { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
     { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
+    { rotulo: "Clientes", href: "/clientes", icone: Contact },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
