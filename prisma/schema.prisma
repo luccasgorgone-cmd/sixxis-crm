@@ -422,9 +422,12 @@ model RespostaRapida {
   atalho       String?
   texto        String      @db.Text
   // atalho | aniversario | cupom | data_comemorativa | desconto_relampago |
-  // retomada | geral
+  // retomada | geral | boas_vindas | agradecimento | avaliacao | follow_up
   categoria    String      @default("atalho")
   finalidade   Finalidade?
+  // Redacoes alternativas da MESMA intencao (texto e a principal). aplicarModelo
+  // sorteia uma entre [texto, ...variacoes] por destinatario.
+  variacoes    String[]    @default([])
   ativo        Boolean     @default(true)
   ordem        Int         @default(0)
   criadoEm     DateTime    @default(now())
@@ -465,6 +468,9 @@ model Campanha {
   assunto     String?
   mensagem    String            @db.Text
   valoresJson Json?
+  // Redacoes alternativas do modelo (copiadas na criacao) para o worker sortear
+  // por destinatario sem depender do modelo original (que pode mudar).
+  variacoesJson Json?
   filtroJson  Json
   total       Int
   enviados    Int               @default(0)

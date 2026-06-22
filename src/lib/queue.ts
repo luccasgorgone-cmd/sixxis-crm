@@ -109,11 +109,19 @@ async function processarCampanha(
       mensagem: true,
       assunto: true,
       valoresJson: true,
+      variacoesJson: true,
       status: true,
     },
   });
   if (!campanha) return;
   if (campanha.status === StatusCampanha.CANCELADA) return;
+
+  // Redacoes alternativas (copiadas na criacao) para variar por destinatario.
+  const variacoes = Array.isArray(campanha.variacoesJson)
+    ? (campanha.variacoesJson as unknown[]).filter(
+        (v): v is string => typeof v === "string",
+      )
+    : [];
 
   // Instancia de WhatsApp da finalidade (para o canal WhatsApp).
   let instancia: string | null = null;
@@ -155,6 +163,7 @@ async function processarCampanha(
     const texto = aplicarModelo(campanha.mensagem, {
       lead: { nomeEfetivo: nomeEfetivo(d.lead), empresa: d.lead.empresa },
       valoresDigitados: valores,
+      variacoes,
     });
 
     let ok = false;

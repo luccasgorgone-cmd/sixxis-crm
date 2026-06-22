@@ -77,18 +77,33 @@ function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] || nome;
 }
 
+// Sorteia uma redacao entre as opcoes (ignora vazias). Sempre devolve uma string.
+export function sortearRedacao(textos: (string | null | undefined)[]): string {
+  const validas = textos.filter((t): t is string => !!t && t.trim().length > 0);
+  if (validas.length === 0) return "";
+  const i = Math.floor(Math.random() * validas.length);
+  return validas[i];
+}
+
 // Aplica o modelo: resolve automaticas do lead/contexto e digitadas dos valores
-// informados. Variaveis sem valor viram string vazia; variaveis desconhecidas
+// informados. Quando ctx.variacoes existir, sorteia UMA redacao entre
+// [texto, ...variacoes] antes de substituir (recipientes diferentes recebem
+// redacoes diferentes). Variaveis sem valor viram string vazia; desconhecidas
 // permanecem como literais.
 export function aplicarModelo(
   texto: string,
   ctx: {
     lead?: LeadModelo | null;
     valoresDigitados?: Record<string, string>;
+    variacoes?: string[];
   },
 ): string {
   const lead = ctx.lead ?? null;
   const valores = ctx.valoresDigitados ?? {};
+  const base =
+    ctx.variacoes && ctx.variacoes.length > 0
+      ? sortearRedacao([texto, ...ctx.variacoes])
+      : texto;
   const auto: Record<string, string> = {
     nome: lead?.nomeEfetivo ?? "",
     primeiro_nome: lead ? primeiroNome(lead.nomeEfetivo) : "",
@@ -97,7 +112,7 @@ export function aplicarModelo(
     link: linkLoja(),
   };
 
-  return texto.replace(RE_VAR, (literal, nome: string) => {
+  return base.replace(RE_VAR, (literal, nome: string) => {
     if (nome in auto) return auto[nome];
     if ((VARIAVEIS_DIGITADAS as readonly string[]).includes(nome)) {
       return valores[nome] ?? "";
@@ -114,6 +129,10 @@ export const CATEGORIAS_MODELO: { valor: string; rotulo: string }[] = [
   { valor: "data_comemorativa", rotulo: "Data comemorativa" },
   { valor: "desconto_relampago", rotulo: "Desconto relampago" },
   { valor: "retomada", rotulo: "Retomada de interesse" },
+  { valor: "boas_vindas", rotulo: "Boas-vindas" },
+  { valor: "agradecimento", rotulo: "Agradecimento pos-compra" },
+  { valor: "avaliacao", rotulo: "Pedido de avaliacao" },
+  { valor: "follow_up", rotulo: "Follow-up pos-venda" },
   { valor: "geral", rotulo: "Geral" },
 ];
 

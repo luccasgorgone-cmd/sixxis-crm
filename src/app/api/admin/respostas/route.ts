@@ -12,6 +12,15 @@ function normalizarFinalidade(v: unknown): Finalidade | null {
   return v === Finalidade.VENDA || v === Finalidade.POS_VENDA ? v : null;
 }
 
+// Array de variacoes: so strings nao-vazias (trim), sem limite rigido.
+function normalizarVariacoes(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+}
+
 export async function GET(): Promise<NextResponse> {
   const admin = await obterAdmin();
   if (!admin) {
@@ -34,6 +43,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     texto?: string;
     categoria?: string;
     finalidade?: unknown;
+    variacoes?: unknown;
   };
   try {
     body = await req.json();
@@ -59,6 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       texto,
       categoria: body.categoria?.trim() || "geral",
       finalidade: normalizarFinalidade(body.finalidade),
+      variacoes: normalizarVariacoes(body.variacoes),
       ordem: (ultima?.ordem ?? 0) + 1,
     },
   });

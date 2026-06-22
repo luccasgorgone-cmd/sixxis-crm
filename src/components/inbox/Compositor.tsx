@@ -11,6 +11,7 @@ import type { ProdutoLoja } from "@/components/loja/tipos";
 import {
   detectarVariaveis,
   aplicarModelo,
+  sortearRedacao,
   INFO_VARIAVEL,
   type LeadModelo,
 } from "@/lib/modelos";
@@ -22,6 +23,7 @@ type Resposta = {
   texto: string;
   categoria?: string;
   finalidade?: "VENDA" | "POS_VENDA" | null;
+  variacoes?: string[];
 };
 
 export function Compositor({
@@ -44,9 +46,11 @@ export function Compositor({
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
-  // Modelo escolhido que pede variaveis digitadas (cupom etc.).
+  // Modelo escolhido que pede variaveis digitadas (cupom etc.). redacao = a
+  // redacao sorteada (texto principal ou uma variacao).
   const [modeloPendente, setModeloPendente] = useState<{
     resposta: Resposta;
+    redacao: string;
     digitadas: string[];
     valores: Record<string, string>;
   } | null>(null);
@@ -97,11 +101,14 @@ export function Compositor({
   }
 
   function selecionar(r: Resposta) {
-    const { digitadas } = detectarVariaveis(r.texto);
+    // Sorteia uma redacao entre [texto, ...variacoes].
+    const redacao = sortearRedacao([r.texto, ...(r.variacoes ?? [])]);
+    const { digitadas } = detectarVariaveis(redacao);
     if (digitadas.length > 0) {
       // Abre mini-form para o usuario preencher cupom/desconto/etc.
       setModeloPendente({
         resposta: r,
+        redacao,
         digitadas,
         valores: Object.fromEntries(digitadas.map((d) => [d, ""])),
       });
@@ -110,17 +117,35 @@ export function Compositor({
       return;
     }
     // So automaticas (ou nenhuma): aplica e insere direto.
-    inserirTexto(aplicarModelo(r.texto, { lead }));
+    inserirTexto(aplicarModelo(redacao, { lead }));
   }
 
   function confirmarModelo() {
     if (!modeloPendente) return;
-    const final = aplicarModelo(modeloPendente.resposta.texto, {
+    const final = aplicarModelo(modeloPendente.redacao, {
       lead,
       valoresDigitados: modeloPendente.valores,
     });
     setModeloPendente(null);
     inserirTexto(final);
+  }
+
+  // Re-sorteia a redacao do modelo pendente (botao "variar").
+  function variarRedacao() {
+    setModeloPendente((m) => {
+      if (!m) return m;
+      const r = m.resposta;
+      const nova = sortearRedacao([r.texto, ...(r.variacoes ?? [])]);
+      const digitadas = detectarVariaveis(nova).digitadas;
+      return {
+        ...m,
+        redacao: nova,
+        digitadas,
+        valores: Object.fromEntries(
+          digitadas.map((d) => [d, m.valores[d] ?? ""]),
+        ),
+      };
+    });
   }
 
   async function enviar() {
@@ -228,9 +253,18 @@ export function Compositor({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mb-3 text-xs text-medio/60">
+            <p className="mb-2 text-xs text-medio/60">
               Preencha os campos para inserir a mensagem.
             </p>
+            {(modeloPendente.resposta.variacoes?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={variarRedacao}
+                className="mb-3 rounded-lg border border-black/10 px-2.5 py-1 text-xs font-medium text-medio hover:bg-black/5"
+              >
+                Variar redacao
+              </button>
+            )}
             <div className="space-y-2.5">
               {modeloPendente.digitadas.map((d) => (
                 <div key={d}>

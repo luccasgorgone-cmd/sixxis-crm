@@ -113,18 +113,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? body.canal
       : CanalEnvio.WHATSAPP;
 
-  // Mensagem: do modelo (se informado) ou do texto livre.
+  // Mensagem: do modelo (se informado) ou do texto livre. Quando do modelo,
+  // copia as variacoes para o worker sortear por destinatario.
   let mensagem = (body.mensagem ?? "").trim();
   let modeloId: string | null = body.modeloId ?? null;
+  let variacoes: string[] = [];
   if (modeloId) {
     const modelo = await prisma.respostaRapida.findUnique({
       where: { id: modeloId },
-      select: { texto: true },
+      select: { texto: true, variacoes: true },
     });
     if (!modelo) {
       return NextResponse.json({ erro: "modelo invalido" }, { status: 400 });
     }
     if (!mensagem) mensagem = modelo.texto;
+    variacoes = modelo.variacoes ?? [];
   } else {
     modeloId = null;
   }
@@ -188,6 +191,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       assunto: body.assunto?.trim() || null,
       mensagem,
       valoresJson: valores as Prisma.InputJsonValue,
+      variacoesJson:
+        variacoes.length > 0 ? (variacoes as Prisma.InputJsonValue) : undefined,
       filtroJson: filtro as unknown as Prisma.InputJsonValue,
       total: incluidos.length,
       pulados,

@@ -28,6 +28,7 @@ import {
   rotuloCategoria,
   detectarVariaveis,
   aplicarModelo,
+  sortearRedacao,
   INFO_VARIAVEL,
   VARIAVEIS_AUTOMATICAS,
   VARIAVEIS_DIGITADAS,
@@ -42,6 +43,7 @@ type Resposta = {
   ordem: number;
   categoria: string;
   finalidade: "VENDA" | "POS_VENDA" | null;
+  variacoes: string[];
 };
 
 export function RespostasAdmin() {
@@ -279,6 +281,8 @@ function Modal({
   const [finalidade, setFinalidade] = useState<string>(
     resposta?.finalidade ?? "AMBAS",
   );
+  const [variacoes, setVariacoes] = useState<string[]>(resposta?.variacoes ?? []);
+  const [sorteio, setSorteio] = useState(0); // re-roll do preview
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const toast = useToast();
@@ -303,14 +307,20 @@ function Modal({
     }, 0);
   }
 
-  // Preview com dados de exemplo (automaticas resolvidas, digitadas de exemplo).
-  const preview = aplicarModelo(texto, {
+  // Preview com dados de exemplo. Quando ha variacoes, sorteia uma redacao
+  // (re-rola via botao "variar"); senao usa o texto principal.
+  const redacoes = [texto, ...variacoes].filter((t) => t.trim());
+  // sorteio entra como dependencia implicita (muda a cada clique no botao).
+  void sorteio;
+  const baseRedacao =
+    redacoes.length > 1 ? sortearRedacao(redacoes) : texto;
+  const preview = aplicarModelo(baseRedacao, {
     lead: { nomeEfetivo: "Maria Silva", empresa: "Acme" },
     valoresDigitados: Object.fromEntries(
       VARIAVEIS_DIGITADAS.map((v) => [v, INFO_VARIAVEL[v].exemplo]),
     ),
   });
-  const usadas = detectarVariaveis(texto);
+  const usadas = detectarVariaveis(redacoes.join(" "));
 
   async function salvar() {
     setErro(null);
@@ -331,6 +341,7 @@ function Modal({
             texto,
             categoria,
             finalidade: finalidade === "AMBAS" ? null : finalidade,
+            variacoes: variacoes.map((v) => v.trim()).filter(Boolean),
           }),
         },
       );
@@ -439,17 +450,80 @@ function Modal({
             </p>
           </div>
 
+          {/* Variacoes (redacoes alternativas da mesma intencao) */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm font-medium text-escuro">
+                Variacoes de redacao
+              </label>
+              <button
+                type="button"
+                onClick={() => setVariacoes((v) => [...v, ""])}
+                className="flex items-center gap-1 rounded-lg border border-black/10 px-2 py-1 text-xs font-medium text-medio hover:bg-black/5"
+              >
+                <Plus className="h-3.5 w-3.5" /> Adicionar
+              </button>
+            </div>
+            <p className="mb-2 text-[11px] text-medio/50">
+              Redacoes diferentes da mesma mensagem; cada destinatario recebe uma
+              sorteada. Use as mesmas variaveis.
+            </p>
+            <div className="space-y-2">
+              {variacoes.map((vtxt, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <textarea
+                    value={vtxt}
+                    onChange={(e) =>
+                      setVariacoes((arr) =>
+                        arr.map((x, i) => (i === idx ? e.target.value : x)),
+                      )
+                    }
+                    rows={2}
+                    placeholder={`Variacao ${idx + 1}`}
+                    className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVariacoes((arr) => arr.filter((_, i) => i !== idx))
+                    }
+                    aria-label="Remover variacao"
+                    className="shrink-0 rounded-lg p-1.5 text-medio/50 hover:bg-black/5 hover:text-erro"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Preview */}
           <div className="rounded-lg border border-black/5 bg-fundo p-3">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-medio/50">
-              Preview (dados de exemplo)
-            </p>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
+                Preview (dados de exemplo)
+              </p>
+              {redacoes.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setSorteio((n) => n + 1)}
+                  className="rounded-lg border border-black/10 px-2 py-0.5 text-[11px] font-medium text-medio hover:bg-black/5"
+                >
+                  Variar
+                </button>
+              )}
+            </div>
             <p className="whitespace-pre-wrap text-sm text-escuro">
               {preview || "Escreva o texto para ver o preview."}
             </p>
             {usadas.digitadas.length > 0 && (
               <p className="mt-2 text-[11px] text-medio/60">
                 Pedira ao enviar: {usadas.digitadas.join(", ")}
+              </p>
+            )}
+            {redacoes.length > 1 && (
+              <p className="mt-1 text-[11px] text-medio/50">
+                {redacoes.length} redacoes — uma e sorteada por destinatario.
               </p>
             )}
           </div>

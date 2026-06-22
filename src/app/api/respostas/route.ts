@@ -21,6 +21,7 @@ export async function GET(): Promise<NextResponse> {
       texto: true,
       categoria: true,
       finalidade: true,
+      variacoes: true,
     },
   });
   return NextResponse.json({ respostas });

@@ -24,6 +24,7 @@ export async function PATCH(
     ativo?: boolean;
     categoria?: string;
     finalidade?: unknown;
+    variacoes?: unknown;
   };
   try {
     body = await req.json();
@@ -42,6 +43,14 @@ export async function PATCH(
       body.finalidade === Finalidade.POS_VENDA
         ? body.finalidade
         : null;
+  }
+  if (body.variacoes !== undefined) {
+    data.variacoes = Array.isArray(body.variacoes)
+      ? body.variacoes
+          .filter((x): x is string => typeof x === "string")
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0)
+      : [];
   }
 
   const resposta = await prisma.respostaRapida.update({ where: { id }, data });
