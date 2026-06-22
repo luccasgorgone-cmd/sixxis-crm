@@ -41,6 +41,9 @@ export type Meta = {
   ativo: boolean;
   progresso: Progresso;
   ranking?: { posicao: number; total: number } | null;
+  // Autonomia (fatia 2.18): se o usuario atual pode editar/excluir, e o autor.
+  podeEditar?: boolean;
+  criadoPorId?: string | null;
 };
 
 export const METRICAS: {

@@ -44,17 +44,28 @@ export async function analisarPerdidos(opts: {
 }): Promise<AnalisePerdidos> {
   const { finalidade, alvoId, inicio, fim } = opts;
   const campo = campoDono(finalidade);
+  const base: Prisma.NegocioWhereInput = { finalidade };
+  if (alvoId) base.lead = { [campo]: alvoId };
+  return analisarPerdidosWhere(base, { inicio, fim });
+}
 
-  const where: Prisma.NegocioWhereInput = {
-    finalidade,
-    status: StatusNeg.PERDIDO,
-  };
-  if (alvoId) where.lead = { [campo]: alvoId };
-  if (inicio || fim) {
-    where.fechadoEm = {};
-    if (inicio) where.fechadoEm.gte = inicio;
-    if (fim) where.fechadoEm.lte = fim;
+// Variante generica: recebe um filtro-base de negocios (finalidade/dono/escopo)
+// e aplica status=PERDIDO + periodo. Usada pela meta (escopo via whereNegociosMeta).
+export async function analisarPerdidosWhere(
+  base: Prisma.NegocioWhereInput,
+  periodo?: { inicio?: Date | null; fim?: Date | null },
+): Promise<AnalisePerdidos> {
+  const condicoes: Prisma.NegocioWhereInput[] = [
+    base,
+    { status: StatusNeg.PERDIDO },
+  ];
+  if (periodo?.inicio || periodo?.fim) {
+    const fechadoEm: Prisma.DateTimeFilter = {};
+    if (periodo.inicio) fechadoEm.gte = periodo.inicio;
+    if (periodo.fim) fechadoEm.lte = periodo.fim;
+    condicoes.push({ fechadoEm });
   }
+  const where: Prisma.NegocioWhereInput = { AND: condicoes };
 
   const negocios = await prisma.negocio.findMany({
     where,

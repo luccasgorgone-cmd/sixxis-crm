@@ -187,7 +187,8 @@ model Agente {
   leadsComoDono         Lead[]             @relation("LeadDono")
   leadsComoDonoPosVenda Lead[]             @relation("LeadDonoPosVenda")
   atividades            Atividade[]
-  metas                 Meta[]
+  metas                 Meta[]             @relation("MetaAlvo")
+  metasCriadas          Meta[]             @relation("MetaCriador")
   lembretes             Lembrete[]
   campanhas             Campanha[]
   criadoEm              DateTime           @default(now())
@@ -519,7 +520,11 @@ model Meta {
   nome         String?
   escopo       EscopoMeta
   agenteId     String?
-  agente       Agente?         @relation(fields: [agenteId], references: [id])
+  agente       Agente?         @relation("MetaAlvo", fields: [agenteId], references: [id])
+  // Quem criou a meta. null = tratada como criada pela administracao. Trava a
+  // edicao: colaborador so edita as proprias (criadoPorId = ele mesmo).
+  criadoPorId  String?
+  criadoPor    Agente?         @relation("MetaCriador", fields: [criadoPorId], references: [id])
   finalidade   FinalidadeEtapa @default(AMBAS)
   metrica      MetricaMeta
   alvo         Float

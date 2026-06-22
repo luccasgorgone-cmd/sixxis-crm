@@ -3,6 +3,7 @@
 // Tela "Minhas metas" do colaborador: cards com donut de progresso, numero
 // grande, ritmo colorido, dias restantes, ranking e celebracao ao bater a meta.
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Target,
   Trophy,
@@ -10,10 +11,18 @@ import {
   CalendarClock,
   TrendingUp,
   Users,
+  Plus,
+  Pencil,
+  Trash2,
+  UserCog,
+  Shield,
+  ChevronRight,
 } from "lucide-react";
 import { EstadoErro } from "@/components/ui/Estado";
+import { useToast } from "@/components/ui/Toast";
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { Donut } from "./Donut";
+import { FormMetaColaborador } from "./FormMetaColaborador";
 import {
   type Meta,
   ROTULO_METRICA,
@@ -30,6 +39,11 @@ export function MinhasMetas() {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
+  const [form, setForm] = useState<{ aberta: boolean; meta: Meta | null }>({
+    aberta: false,
+    meta: null,
+  });
+  const toast = useToast();
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -52,6 +66,17 @@ export function MinhasMetas() {
     void carregar();
   }, [carregar]);
 
+  async function remover(id: string) {
+    const r = await fetch(`/api/metas/${id}`, { method: "DELETE" });
+    if (r.ok) {
+      toast.sucesso("Meta excluida.");
+      await carregar();
+    } else {
+      const d = await r.json().catch(() => null);
+      toast.erro(d?.erro ?? "Nao foi possivel excluir.");
+    }
+  }
+
   const minhas = dados?.minhas ?? [];
   const equipe = dados?.equipe ?? [];
   const batidas = [...minhas, ...equipe].filter((m) => m.progresso.atingida);
@@ -59,11 +84,19 @@ export function MinhasMetas() {
 
   return (
     <div className="space-y-5 p-6">
-      <div>
-        <h2 className="text-lg font-semibold text-escuro">Minhas metas</h2>
-        <p className="text-sm text-medio/60">
-          Acompanhe seu progresso, ritmo e posicao na equipe
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-escuro">Minhas metas</h2>
+          <p className="text-sm text-medio/60">
+            Acompanhe seu progresso, ritmo e posicao na equipe
+          </p>
+        </div>
+        <button
+          onClick={() => setForm({ aberta: true, meta: null })}
+          className="flex items-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+        >
+          <Plus className="h-4 w-4" /> Nova meta
+        </button>
       </div>
 
       {batidas.length > 0 && (
@@ -96,8 +129,14 @@ export function MinhasMetas() {
           <Target className="h-8 w-8 text-medio/30" />
           <p className="text-sm font-medium text-escuro">Nenhuma meta ativa</p>
           <p className="text-xs text-medio/60">
-            Assim que o admin definir metas, elas aparecem aqui.
+            Crie uma meta para voce ou aguarde as definidas pela administracao.
           </p>
+          <button
+            onClick={() => setForm({ aberta: true, meta: null })}
+            className="mt-2 flex items-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+          >
+            <Plus className="h-4 w-4" /> Nova meta
+          </button>
         </div>
       ) : (
         <>
@@ -108,7 +147,12 @@ export function MinhasMetas() {
               </h3>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {minhas.map((m) => (
-                  <CartaoMeta key={m.id} meta={m} />
+                  <CartaoMeta
+                    key={m.id}
+                    meta={m}
+                    onEditar={() => setForm({ aberta: true, meta: m })}
+                    onRemover={() => void remover(m.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -128,11 +172,32 @@ export function MinhasMetas() {
           )}
         </>
       )}
+
+      {form.aberta && (
+        <FormMetaColaborador
+          meta={form.meta}
+          onFechar={() => setForm({ aberta: false, meta: null })}
+          onSalvo={() => {
+            setForm({ aberta: false, meta: null });
+            void carregar();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
+function CartaoMeta({
+  meta,
+  daEquipe,
+  onEditar,
+  onRemover,
+}: {
+  meta: Meta;
+  daEquipe?: boolean;
+  onEditar?: () => void;
+  onRemover?: () => void;
+}) {
   const p = meta.progresso;
   const ritmo = RITMO_INFO[p.ritmo];
   // Arco verde quando batida; senao na cor do ritmo (verde/ambar/vermelho).
@@ -141,6 +206,7 @@ function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
   // Cor do numero grande do %: verde quando batida, senao acompanha o ritmo.
   const corPct = p.atingida ? "#16a34a" : corRitmo;
   const titulo = meta.nome ?? ROTULO_METRICA[meta.metrica];
+  const minha = meta.podeEditar === true;
 
   return (
     <div
@@ -162,12 +228,63 @@ function CartaoMeta({ meta, daEquipe }: { meta: Meta; daEquipe?: boolean }) {
         <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/70">
           {ROTULO_PERIODO[meta.periodo]}
         </span>
+        {!daEquipe && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              minha
+                ? "bg-tiffany/10 text-tiffany"
+                : "bg-black/5 text-medio/70"
+            }`}
+          >
+            {minha ? (
+              <>
+                <UserCog className="h-3 w-3" /> Definida por voce
+              </>
+            ) : (
+              <>
+                <Shield className="h-3 w-3" /> Definida pela administracao
+              </>
+            )}
+          </span>
+        )}
       </div>
-      <p className="mt-2 text-sm font-semibold text-escuro">{titulo}</p>
-      <p className="text-xs text-medio/60">
-        {ROTULO_METRICA[meta.metrica]}
-        {!p.maiorMelhor && " · abaixo de"}
-      </p>
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <Link
+          href={`/metas/${meta.id}`}
+          className="group min-w-0 flex-1"
+        >
+          <p className="flex items-center gap-1 text-sm font-semibold text-escuro group-hover:text-tiffany">
+            <span className="truncate">{titulo}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+          </p>
+          <p className="text-xs text-medio/60">
+            {ROTULO_METRICA[meta.metrica]}
+            {!p.maiorMelhor && " · abaixo de"}
+          </p>
+        </Link>
+        {minha && (onEditar || onRemover) && (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onEditar && (
+              <button
+                onClick={onEditar}
+                aria-label="Editar meta"
+                className="rounded-lg p-1.5 text-medio/60 hover:bg-black/5 hover:text-escuro"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            {onRemover && (
+              <button
+                onClick={onRemover}
+                aria-label="Excluir meta"
+                className="rounded-lg p-1.5 text-medio/50 hover:bg-black/5 hover:text-erro"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex items-center gap-5">
         <Donut

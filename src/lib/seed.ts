@@ -12,6 +12,37 @@ import {
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
 
+// Backfill (idempotente): metas sem autor (criadas antes da 2.18) recebem
+// criadoPorId = primeiro ADMIN, para a trava de edicao funcionar. Metas de
+// EQUIPE tambem ficam atreladas ao admin (so admin edita).
+export async function backfillCriadorMetas(): Promise<void> {
+  try {
+    const pendentes = await prisma.meta.count({ where: { criadoPorId: null } });
+    if (pendentes === 0) {
+      console.log("[seed] metas com autor ok");
+      return;
+    }
+    const admin = await prisma.agente.findFirst({
+      where: { papel: Papel.ADMIN },
+      orderBy: { criadoEm: "asc" },
+      select: { id: true },
+    });
+    if (!admin) {
+      console.warn("[seed] backfill de metas adiado: nenhum admin ainda");
+      return;
+    }
+    const r = await prisma.meta.updateMany({
+      where: { criadoPorId: null },
+      data: { criadoPorId: admin.id },
+    });
+    console.log(`[seed] backfill criadoPorId em ${r.count} metas`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha no backfill de metas: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 export async function seedAdmin(): Promise<void> {
   const email = process.env.ADMIN_EMAIL?.toLowerCase().trim();
   const senha = process.env.ADMIN_SENHA;

@@ -18,6 +18,7 @@ import {
   purgarDadosTeste,
   backfillNegocios,
   backfillDonoConversas,
+  backfillCriadorMetas,
 } from "./src/lib/seed";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -42,6 +43,7 @@ async function main(): Promise<void> {
   await purgarDadosTeste();
   await backfillNegocios();
   await backfillDonoConversas();
+  await backfillCriadorMetas();
 
   // Servidor HTTP usando o request handler do Next.
   const httpServer = createServer((req, res) => {

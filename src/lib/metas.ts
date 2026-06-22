@@ -3,12 +3,14 @@
 // Para TEMPO_RESPOSTA/TEMPO_RESOLUCAO "menor e melhor" (alvo = teto).
 import { prisma } from "./prisma";
 import { calcularMetricas, type Metricas, type Periodo } from "./metricas";
+import { campoDono } from "./dono";
 import {
   MetricaMeta,
   EscopoMeta,
   Papel,
   Finalidade,
 } from "../generated/prisma/enums";
+import type { Prisma } from "../generated/prisma/client";
 
 // Dados minimos de uma meta para apurar progresso (espelha o model Meta).
 export type MetaBase = {
@@ -190,4 +192,66 @@ export async function rankingMetrica(
   });
   const idx = ordenado.findIndex((r) => r.id === agenteId);
   return { posicao: idx >= 0 ? idx + 1 : 0, total: agentes.length };
+}
+
+// ---- Autonomia/propriedade (fatia 2.18) ----
+
+type MetaProp = {
+  escopo: EscopoMeta;
+  agenteId: string | null;
+  criadoPorId: string | null;
+};
+
+// Colaborador so edita as PROPRIAS metas: escopo COLABORADOR, para ele mesmo e
+// criadas por ele mesmo. Admin edita todas.
+export function podeEditarMeta(
+  agente: { id: string; papel: Papel },
+  meta: MetaProp,
+): boolean {
+  if (agente.papel === Papel.ADMIN) return true;
+  return (
+    meta.escopo === EscopoMeta.COLABORADOR &&
+    meta.agenteId === agente.id &&
+    meta.criadoPorId === agente.id
+  );
+}
+
+// A meta se aplica ao agente (pode visualizar)? Admin ve tudo. Colaborador ve
+// as proprias (COLABORADOR para ele) e as de EQUIPE que incluem sua finalidade.
+export function metaSeAplica(
+  agente: { id: string; papel: Papel },
+  meta: { escopo: EscopoMeta; agenteId: string | null; finalidade: string },
+  acesso: { acessoVenda: boolean; acessoPosVenda: boolean },
+): boolean {
+  if (agente.papel === Papel.ADMIN) return true;
+  if (meta.escopo === EscopoMeta.COLABORADOR) {
+    return meta.agenteId === agente.id;
+  }
+  // EQUIPE: aplica se a finalidade bate com algum acesso do agente.
+  if (meta.finalidade === "AMBAS") return true;
+  if (meta.finalidade === "VENDA") return acesso.acessoVenda;
+  return acesso.acessoPosVenda;
+}
+
+// Filtro de negocios que "contam" para uma meta (finalidade + dono), sem status
+// nem periodo — usado nos drill-downs (ganhos/pendentes/perdidos/abertos).
+export function whereNegociosMeta(meta: {
+  escopo: EscopoMeta;
+  agenteId: string | null;
+  finalidade: "VENDA" | "POS_VENDA" | "AMBAS";
+}): Prisma.NegocioWhereInput {
+  const fins: Finalidade[] =
+    meta.finalidade === "AMBAS"
+      ? [Finalidade.VENDA, Finalidade.POS_VENDA]
+      : [meta.finalidade as Finalidade];
+
+  if (meta.escopo === EscopoMeta.COLABORADOR && meta.agenteId) {
+    return {
+      OR: fins.map((f) => ({
+        finalidade: f,
+        lead: { [campoDono(f)]: meta.agenteId } as Prisma.LeadWhereInput,
+      })),
+    };
+  }
+  return { finalidade: { in: fins } };
 }

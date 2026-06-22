@@ -48,19 +48,23 @@ export function PerdidosAnalise({
   agenteId,
   inicio,
   fim,
+  dadosFixos,
   onAbrir,
 }: {
-  finalidade: string;
+  finalidade?: string;
   agenteId?: string;
   inicio?: string;
   fim?: string;
+  // Quando informado, usa estes dados (sem fetch) — ex.: detalhe da meta.
+  dadosFixos?: AnalisePerdidos;
   onAbrir?: (negocioId: string) => void;
 }) {
-  const [dados, setDados] = useState<AnalisePerdidos | null>(null);
-  const [carregando, setCarregando] = useState(true);
+  const [dados, setDados] = useState<AnalisePerdidos | null>(dadosFixos ?? null);
+  const [carregando, setCarregando] = useState(!dadosFixos);
   const [motivoSel, setMotivoSel] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
+    if (dadosFixos || !finalidade) return;
     setCarregando(true);
     try {
       const p = new URLSearchParams({ finalidade });
@@ -75,11 +79,16 @@ export function PerdidosAnalise({
     } finally {
       setCarregando(false);
     }
-  }, [finalidade, agenteId, inicio, fim]);
+  }, [finalidade, agenteId, inicio, fim, dadosFixos]);
 
   useEffect(() => {
+    if (dadosFixos) {
+      setDados(dadosFixos);
+      setCarregando(false);
+      return;
+    }
     void carregar();
-  }, [carregar]);
+  }, [carregar, dadosFixos]);
 
   if (carregando) {
     return <div className="skeleton h-56 rounded-xl" />;
