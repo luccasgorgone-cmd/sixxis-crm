@@ -1,21 +1,36 @@
-// Carteira de um colaborador numa finalidade: contagens por status, total de
-// clientes, contagem por etiqueta (so etiquetas da finalidade ou "Ambas") e a
-// lista de pendentes. Respeita dono (donoId/donoPosVendaId), finalidade e papel.
+// Carteira de um colaborador numa finalidade, com FILTRO DE PERIODO. Distingue
+// claramente o que e "no periodo" (ganhos/perdidos/valor/conversao/tempo) do que
+// e "atual" (em aberto/pendentes/clientes/etiquetas). Respeita dono + finalidade
+// + papel.
 //
-// GET /api/carteira?finalidade=VENDA|POS_VENDA[&agenteId=...(admin)]
-//   - Colaborador: sempre a propria carteira (agenteId ignorado), so finalidade
-//     a que tem acesso.
-//   - Admin: pode escolher o colaborador e a finalidade.
+// GET /api/carteira?finalidade=VENDA|POS_VENDA[&agenteId=(admin)]
+//                  [&periodo=hoje|semana|15d|mes][&inicio=&fim=]
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
 import { fimDoDia } from "@/lib/lembrete";
-import { Finalidade, StatusLembrete } from "@/generated/prisma/enums";
+import { calcularMetricas, resolverPeriodo } from "@/lib/metricas";
+import { analisarPerdidos } from "@/lib/perdidos";
+import {
+  Finalidade,
+  StatusLembrete,
+  StatusNeg,
+} from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const selectCliente = {
+  id: true,
+  nome: true,
+  pushName: true,
+  nomeManual: true,
+  telefone: true,
+  fotoUrl: true,
+  etiquetas: { include: { etiqueta: true } },
+} as const;
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -23,16 +38,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   const admin = ehAdmin(agente.papel);
+  const sp = req.nextUrl.searchParams;
 
-  // Finalidade (obrigatoria).
-  const f = req.nextUrl.searchParams.get("finalidade");
+  const f = sp.get("finalidade");
   if (f !== Finalidade.VENDA && f !== Finalidade.POS_VENDA) {
     return NextResponse.json({ erro: "finalidade invalida" }, { status: 400 });
   }
   const finalidade = f;
 
-  // Colaborador alvo: admin pode escolher; demais so veem a propria carteira.
-  const paramAgente = req.nextUrl.searchParams.get("agenteId");
+  const paramAgente = sp.get("agenteId");
   const alvoId = admin && paramAgente ? paramAgente : agente.id;
 
   const alvo = await prisma.agente.findUnique({
@@ -49,71 +63,120 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Periodo (default: 30 dias).
+  const preset = sp.get("periodo") ?? "mes";
+  const { inicio, fim } = resolverPeriodo(
+    preset,
+    sp.get("inicio"),
+    sp.get("fim"),
+    new Date(),
+  );
+
   const campo = campoDono(finalidade);
 
-  // Negocios da carteira (finalidade + dono do lead). Inclui dados do cliente e
-  // etiquetas para montar os itens de drilldown.
-  const [negocios, totalClientes, etiquetasValidas] = await Promise.all([
-    prisma.negocio.findMany({
-      where: { finalidade, lead: { [campo]: alvoId } },
-      orderBy: { atualizadoEm: "desc" },
-      select: {
-        id: true,
-        status: true,
-        valor: true,
-        pendente: true,
-        motivoPendencia: true,
-        lead: {
-          select: {
-            id: true,
-            nome: true,
-            pushName: true,
-            nomeManual: true,
-            telefone: true,
-            fotoUrl: true,
-            etiquetas: { include: { etiqueta: true } },
-          },
+  // Portfolio ATUAL (todos os negocios da finalidade do colaborador) — para
+  // em aberto, pendentes, clientes, etiquetas e a lista com busca.
+  const [portfolio, totalClientes, etiquetasValidas, ganhosPeriodo, perdidos, metricas, lembretes] =
+    await Promise.all([
+      prisma.negocio.findMany({
+        where: { finalidade, lead: { [campo]: alvoId } },
+        orderBy: { atualizadoEm: "desc" },
+        select: {
+          id: true,
+          status: true,
+          valor: true,
+          pendente: true,
+          motivoPendencia: true,
+          lead: { select: selectCliente },
         },
-      },
-    }),
-    prisma.lead.count({ where: { [campo]: alvoId } }),
-    // Etiquetas que valem para a finalidade (dela ou "Ambas" = null).
-    prisma.etiqueta.findMany({
-      where: { OR: [{ finalidade }, { finalidade: null }] },
-      orderBy: { nome: "asc" },
-      select: { id: true, nome: true, cor: true },
-    }),
-  ]);
+      }),
+      prisma.lead.count({ where: { [campo]: alvoId } }),
+      prisma.etiqueta.findMany({
+        where: { OR: [{ finalidade }, { finalidade: null }] },
+        orderBy: { nome: "asc" },
+        select: { id: true, nome: true, cor: true },
+      }),
+      // Ganhos NO PERIODO (por fechadoEm).
+      prisma.negocio.findMany({
+        where: {
+          finalidade,
+          lead: { [campo]: alvoId },
+          status: StatusNeg.GANHO,
+          fechadoEm: { gte: inicio, lte: fim },
+        },
+        orderBy: { fechadoEm: "desc" },
+        select: {
+          id: true,
+          valor: true,
+          fechadoEm: true,
+          lead: { select: selectCliente },
+        },
+      }),
+      analisarPerdidos({ finalidade, alvoId, inicio, fim }),
+      // Conversa/mensagens do periodo (clientes atendidos, 1a resposta) — mesmo
+      // motor do dashboard.
+      calcularMetricas({ inicio, fim }, { agenteId: alvoId, finalidade }),
+      prisma.lembrete.findMany({
+        where: {
+          agenteId: alvoId,
+          finalidade,
+          status: StatusLembrete.PENDENTE,
+          dataHora: { lte: fimDoDia() },
+        },
+        orderBy: { dataHora: "asc" },
+        select: {
+          id: true,
+          negocioId: true,
+          dataHora: true,
+          nota: true,
+          lead: { select: selectCliente },
+        },
+      }),
+    ]);
 
-  // Serializa cada negocio num item da carteira (Decimal -> number).
-  const itens = negocios.map((n) => ({
-    negocioId: n.id,
-    leadId: n.lead.id,
-    nomeEfetivo: nomeEfetivo(n.lead),
-    telefone: n.lead.telefone,
-    fotoUrl: n.lead.fotoUrl,
-    valor: n.valor != null ? Number(n.valor) : null,
-    status: n.status,
-    pendente: n.pendente,
-    motivoPendencia: n.motivoPendencia,
-    etiquetas: n.lead.etiquetas.map((le) => ({
-      id: le.etiqueta.id,
-      nome: le.etiqueta.nome,
-      cor: le.etiqueta.cor,
-    })),
-  }));
+  function mapItem(n: {
+    id: string;
+    status?: StatusNeg;
+    valor: unknown;
+    pendente?: boolean;
+    motivoPendencia?: string | null;
+    fechadoEm?: Date | null;
+    lead: {
+      id: string;
+      nome: string | null;
+      pushName: string | null;
+      nomeManual: string | null;
+      telefone: string;
+      fotoUrl: string | null;
+      etiquetas: { etiqueta: { id: string; nome: string; cor: string } }[];
+    };
+  }) {
+    return {
+      negocioId: n.id,
+      leadId: n.lead.id,
+      nomeEfetivo: nomeEfetivo(n.lead),
+      telefone: n.lead.telefone,
+      fotoUrl: n.lead.fotoUrl,
+      valor: n.valor != null ? Number(n.valor) : null,
+      status: n.status ?? null,
+      pendente: n.pendente ?? false,
+      motivoPendencia: n.motivoPendencia ?? null,
+      fechadoEm: n.fechadoEm ?? null,
+      etiquetas: n.lead.etiquetas.map((le) => ({
+        id: le.etiqueta.id,
+        nome: le.etiqueta.nome,
+        cor: le.etiqueta.cor,
+      })),
+    };
+  }
 
-  // Contagens por status (por negocio) + pendentes.
-  const resumo = {
-    aberto: itens.filter((i) => i.status === "ABERTO").length,
-    ganho: itens.filter((i) => i.status === "GANHO").length,
-    perdido: itens.filter((i) => i.status === "PERDIDO").length,
-    pendente: itens.filter((i) => i.pendente).length,
-    totalClientes,
-  };
+  const itens = portfolio.map(mapItem);
+  const abertos = itens.filter((i) => i.status === "ABERTO");
+  const pendentesLista = itens.filter((i) => i.pendente);
+  const ganhosLista = ganhosPeriodo.map(mapItem);
+  const valorGanhos = ganhosLista.reduce((s, g) => s + (g.valor ?? 0), 0);
 
-  // Contagem por etiqueta: clientes DISTINTOS com a etiqueta, apenas para as
-  // etiquetas validas da finalidade.
+  // Contagem por etiqueta (clientes distintos), so etiquetas validas.
   const validas = new Map(etiquetasValidas.map((e) => [e.id, e]));
   const leadsPorEtiqueta = new Map<string, Set<string>>();
   for (const i of itens) {
@@ -134,36 +197,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     .filter((e) => e.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  // Lista de pendentes (cliente + motivo + link para o negocio).
-  const pendentes = itens.filter((i) => i.pendente);
+  const ganhosCount = ganhosLista.length;
+  const conversao =
+    ganhosCount + perdidos.total > 0
+      ? ganhosCount / (ganhosCount + perdidos.total)
+      : 0;
+  const ticketMedio = ganhosCount > 0 ? valorGanhos / ganhosCount : 0;
 
-  // "A contatar": lembretes do colaborador alvo nessa finalidade, vencidos+hoje.
-  const fimHoje = fimDoDia();
-  const lembretes = await prisma.lembrete.findMany({
-    where: {
-      agenteId: alvoId,
-      finalidade,
-      status: StatusLembrete.PENDENTE,
-      dataHora: { lte: fimHoje },
-    },
-    orderBy: { dataHora: "asc" },
-    select: {
-      id: true,
-      negocioId: true,
-      dataHora: true,
-      nota: true,
-      lead: {
-        select: {
-          id: true,
-          nome: true,
-          pushName: true,
-          nomeManual: true,
-          telefone: true,
-          fotoUrl: true,
-        },
-      },
-    },
-  });
   const aContatar = lembretes.map((l) => ({
     id: l.id,
     negocioId: l.negocioId,
@@ -179,10 +219,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     finalidade,
     agente: { id: alvo.id, nome: alvo.nome },
-    resumo,
+    periodo: { preset, inicio, fim },
+    kpis: {
+      // atual
+      abertos: abertos.length,
+      pendentes: pendentesLista.length,
+      totalClientes,
+      // periodo
+      ganhos: ganhosCount,
+      valorGanhos,
+      perdidos: perdidos.total,
+      valorPerdidos: perdidos.valorTotal,
+      conversao,
+      ticketMedio,
+      clientesAtendidos: metricas.clientesAtendidos,
+      tempoPrimeiraRespostaSeg: metricas.tempoPrimeiraRespostaSeg,
+    },
     etiquetas,
     itens,
-    pendentes,
+    abertos,
+    pendentesLista,
+    ganhosPeriodo: ganhosLista,
+    perdidos,
     aContatar,
   });
 }

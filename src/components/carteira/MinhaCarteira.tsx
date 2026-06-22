@@ -1,10 +1,21 @@
 "use client";
 
-// "Minha carteira": visao da carteira do colaborador (ou, para admin, de um
-// colaborador escolhido) numa finalidade. Mostra cards de status, total de
-// clientes, grade de etiquetas e a lista de pendentes — TUDO clicavel: cada
-// recorte abre uma lista filtrada e, dali, o painel do cliente.
+// "Minha carteira" completa: filtro de periodo (diario/semanal/15/30/custom),
+// KPIs do periodo + estado atual, mini-tendencia (ganhos x perdidos), perdidos
+// por motivo, etiquetas, "a contatar", e lista de clientes com busca. Tudo
+// clicavel ate o painel do cliente. Seletor de colaborador (admin) + alternador
+// Venda/Pos-venda. Botao de envio em massa.
 import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 import {
   Briefcase,
   CircleDot,
@@ -16,11 +27,15 @@ import {
   ChevronRight,
   CalendarClock,
   Megaphone,
+  TrendingUp,
+  Clock,
+  Search,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { EstadoErro } from "@/components/ui/Estado";
+import { FiltroPeriodo, type ValorPeriodo } from "@/components/ui/FiltroPeriodo";
 import {
   BadgeStatusNegocio,
   BadgePendente,
@@ -29,14 +44,17 @@ import {
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { EnvioMassa } from "@/components/campanhas/EnvioMassa";
-import { PerdidosAnalise } from "@/components/perdidos/PerdidosAnalise";
+import {
+  PerdidosAnalise,
+  type AnalisePerdidos,
+} from "@/components/perdidos/PerdidosAnalise";
 import type {
   Etapa,
   EtiquetaChip,
   AgenteResumo,
   Finalidade,
 } from "@/components/kanban/tipos";
-import { formatarBRL, formatarTelefone } from "@/lib/format";
+import { formatarBRL, formatarTelefone, formatarDuracao } from "@/lib/format";
 
 type Item = {
   negocioId: string;
@@ -45,9 +63,10 @@ type Item = {
   telefone: string;
   fotoUrl: string | null;
   valor: number | null;
-  status: "ABERTO" | "GANHO" | "PERDIDO";
+  status: "ABERTO" | "GANHO" | "PERDIDO" | null;
   pendente: boolean;
   motivoPendencia: string | null;
+  fechadoEm: string | null;
   etiquetas: EtiquetaChip[];
 };
 
@@ -68,71 +87,31 @@ type AContatar = {
 type Carteira = {
   finalidade: Finalidade;
   agente: { id: string; nome: string | null };
-  resumo: {
-    aberto: number;
-    ganho: number;
-    perdido: number;
-    pendente: number;
+  periodo: { preset: string; inicio: string; fim: string };
+  kpis: {
+    abertos: number;
+    pendentes: number;
     totalClientes: number;
+    ganhos: number;
+    valorGanhos: number;
+    perdidos: number;
+    valorPerdidos: number;
+    conversao: number;
+    ticketMedio: number;
+    clientesAtendidos: number;
+    tempoPrimeiraRespostaSeg: number;
   };
   etiquetas: EtiquetaContagem[];
   itens: Item[];
-  pendentes: Item[];
+  abertos: Item[];
+  pendentesLista: Item[];
+  ganhosPeriodo: Item[];
+  perdidos: AnalisePerdidos;
   aContatar: AContatar[];
 };
 
-// Recorte do drilldown (qual subconjunto de itens mostrar na lista).
-type Recorte =
-  | { tipo: "status"; status: "ABERTO" | "GANHO" | "PERDIDO"; titulo: string }
-  | { tipo: "pendente"; titulo: string }
-  | { tipo: "clientes"; titulo: string }
-  | { tipo: "etiqueta"; etiquetaId: string; titulo: string };
-
+type Recorte = { titulo: string; itens: Item[] };
 type Vendedor = { id: string; nome: string };
-
-const CARDS: {
-  chave: keyof Carteira["resumo"];
-  rotulo: string;
-  icone: LucideIcon;
-  cor: string; // texto/icone
-  fundo: string; // fundo do icone
-}[] = [
-  {
-    chave: "aberto",
-    rotulo: "Em aberto",
-    icone: CircleDot,
-    cor: "text-sky-700",
-    fundo: "bg-sky-100",
-  },
-  {
-    chave: "ganho",
-    rotulo: "Ganhos",
-    icone: Trophy,
-    cor: "text-green-700",
-    fundo: "bg-green-100",
-  },
-  {
-    chave: "perdido",
-    rotulo: "Perdidos",
-    icone: XCircle,
-    cor: "text-red-700",
-    fundo: "bg-red-100",
-  },
-  {
-    chave: "pendente",
-    rotulo: "Negocios pendentes",
-    icone: PauseCircle,
-    cor: "text-orange-700",
-    fundo: "bg-orange-100",
-  },
-  {
-    chave: "totalClientes",
-    rotulo: "Clientes",
-    icone: Users,
-    cor: "text-tiffany-escuro",
-    fundo: "bg-tiffany/10",
-  },
-];
 
 export function MinhaCarteira({
   papel,
@@ -146,7 +125,6 @@ export function MinhaCarteira({
   acessoPosVenda: boolean;
 }) {
   const ehAdmin = papel === "ADMIN";
-  // Alternador de finalidade: admin vê as duas; colaborador, as que tem acesso.
   const finalidadesDisponiveis = ehAdmin
     ? (["VENDA", "POS_VENDA"] as Finalidade[])
     : ([
@@ -157,18 +135,18 @@ export function MinhaCarteira({
   const [finalidade, setFinalidade] = useState<Finalidade>(
     finalidadesDisponiveis[0] ?? "VENDA",
   );
+  const [periodo, setPeriodo] = useState<ValorPeriodo>({ preset: "mes" });
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [agenteSel, setAgenteSel] = useState("");
   const [dados, setDados] = useState<Carteira | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
 
-  // Recorte aberto (lista) e negocio aberto (painel).
   const [recorte, setRecorte] = useState<Recorte | null>(null);
   const [painelId, setPainelId] = useState<string | null>(null);
   const [envioAberto, setEnvioAberto] = useState(false);
 
-  // Listas auxiliares para o painel do negocio.
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etiquetasPanel, setEtiquetasPanel] = useState<EtiquetaChip[]>([]);
   const [agentesPanel, setAgentesPanel] = useState<AgenteResumo[]>([]);
@@ -190,7 +168,6 @@ export function MinhaCarteira({
     }
   }, [ehAdmin]);
 
-  // Admin: lista de colaboradores da finalidade (para o seletor).
   useEffect(() => {
     if (!ehAdmin) return;
     fetch(`/api/vendedores?finalidade=${finalidade}`)
@@ -210,26 +187,34 @@ export function MinhaCarteira({
   const semAcesso = !ehAdmin && finalidadesDisponiveis.length === 0;
 
   const carregar = useCallback(async () => {
-    // Colaborador sem acesso a nenhuma finalidade: nada a carregar.
     if (semAcesso) {
       setDados(null);
       setCarregando(false);
       setErro(null);
       return;
     }
-    // Admin precisa de um colaborador escolhido.
     if (ehAdmin && !agenteSel) {
       setDados(null);
       setCarregando(false);
       setErro(null);
       return;
     }
+    // Custom incompleto: aguarda as duas datas.
+    if (periodo.preset === "custom" && (!periodo.inicio || !periodo.fim)) {
+      return;
+    }
     setCarregando(true);
     setErro(null);
     try {
-      const params = new URLSearchParams({ finalidade });
-      if (ehAdmin && agenteSel) params.set("agenteId", agenteSel);
-      const r = await fetch(`/api/carteira?${params.toString()}`);
+      const p = new URLSearchParams({ finalidade });
+      if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
+      if (periodo.preset === "custom") {
+        p.set("inicio", `${periodo.inicio}T00:00:00`);
+        p.set("fim", `${periodo.fim}T23:59:59`);
+      } else {
+        p.set("periodo", periodo.preset);
+      }
+      const r = await fetch(`/api/carteira?${p.toString()}`);
       if (r.ok) {
         setDados(await r.json());
       } else {
@@ -243,26 +228,53 @@ export function MinhaCarteira({
     } finally {
       setCarregando(false);
     }
-  }, [finalidade, ehAdmin, agenteSel, semAcesso]);
+  }, [finalidade, ehAdmin, agenteSel, periodo, semAcesso]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
 
-  // Itens do recorte atual (filtro client-side sobre a lista ja carregada).
-  const itensRecorte = useMemo(() => {
-    if (!dados || !recorte) return [];
-    if (recorte.tipo === "clientes") return dados.itens;
-    if (recorte.tipo === "pendente") return dados.pendentes;
-    if (recorte.tipo === "status")
-      return dados.itens.filter((i) => i.status === recorte.status);
-    return dados.itens.filter((i) =>
-      i.etiquetas.some((e) => e.id === recorte.etiquetaId),
-    );
-  }, [dados, recorte]);
-
   const cor = corFinalidade(finalidade);
   const semColaborador = ehAdmin && !agenteSel;
+
+  // Mini-tendencia: ganhos x perdidos por dia no periodo.
+  const tendencia = useMemo(() => {
+    if (!dados) return [];
+    const mapa = new Map<string, { dia: string; ganhos: number; perdidos: number }>();
+    const add = (iso: string | null, chave: "ganhos" | "perdidos") => {
+      if (!iso) return;
+      const dia = iso.slice(0, 10);
+      const e = mapa.get(dia) ?? { dia, ganhos: 0, perdidos: 0 };
+      e[chave] += 1;
+      mapa.set(dia, e);
+    };
+    for (const g of dados.ganhosPeriodo) add(g.fechadoEm, "ganhos");
+    for (const pp of dados.perdidos.itens) add(pp.fechadoEm, "perdidos");
+    return [...mapa.values()]
+      .sort((a, b) => a.dia.localeCompare(b.dia))
+      .map((d) => ({ ...d, rotulo: d.dia.slice(8, 10) + "/" + d.dia.slice(5, 7) }));
+  }, [dados]);
+
+  // Lista de clientes (busca sobre o portfolio).
+  const clientesFiltrados = useMemo(() => {
+    if (!dados) return [];
+    const q = busca.trim().toLowerCase();
+    const qDig = busca.replace(/\D/g, "");
+    // Distintos por lead.
+    const vistos = new Set<string>();
+    const lista: Item[] = [];
+    for (const i of dados.itens) {
+      if (vistos.has(i.leadId)) continue;
+      vistos.add(i.leadId);
+      lista.push(i);
+    }
+    if (!q) return lista;
+    return lista.filter(
+      (i) =>
+        i.nomeEfetivo.toLowerCase().includes(q) ||
+        (qDig.length > 0 && i.telefone.replace(/\D/g, "").includes(qDig)),
+    );
+  }, [dados, busca]);
 
   return (
     <div className="space-y-5 p-6">
@@ -278,8 +290,8 @@ export function MinhaCarteira({
             <h2 className="text-lg font-semibold text-escuro">Minha carteira</h2>
             <p className="text-sm text-medio/60">
               {ehAdmin
-                ? "Carteira de um colaborador por finalidade"
-                : "Seus clientes, status e pendencias"}
+                ? "Carteira de um colaborador por finalidade e periodo"
+                : "Seus clientes, resultados e pendencias"}
             </p>
           </div>
         </div>
@@ -289,7 +301,7 @@ export function MinhaCarteira({
             <select
               value={agenteSel}
               onChange={(e) => setAgenteSel(e.target.value)}
-              className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              className="campo"
             >
               {vendedores.length === 0 && <option value="">Sem colaboradores</option>}
               {vendedores.map((v) => (
@@ -301,17 +313,15 @@ export function MinhaCarteira({
           )}
           {finalidadesDisponiveis.length > 1 && (
             <div className="flex rounded-lg border border-black/10 bg-white p-0.5">
-              {finalidadesDisponiveis.map((f) => {
-                const ativo = f === finalidade;
-                const c = corFinalidade(f);
+              {finalidadesDisponiveis.map((ff) => {
+                const ativo = ff === finalidade;
+                const c = corFinalidade(ff);
                 return (
                   <button
-                    key={f}
-                    onClick={() => setFinalidade(f)}
+                    key={ff}
+                    onClick={() => setFinalidade(ff)}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                      ativo
-                        ? `${c.barra} text-white`
-                        : "text-medio/70 hover:bg-black/5"
+                      ativo ? `${c.barra} text-white` : "text-medio/70 hover:bg-black/5"
                     }`}
                   >
                     {c.rotulo}
@@ -334,6 +344,11 @@ export function MinhaCarteira({
         </div>
       </div>
 
+      {/* Filtro de periodo */}
+      {!semAcesso && !semColaborador && (
+        <FiltroPeriodo valor={periodo} onChange={setPeriodo} />
+      )}
+
       {/* Conteudo */}
       {semAcesso ? (
         <Vazio
@@ -350,60 +365,115 @@ export function MinhaCarteira({
           texto="Escolha um colaborador com acesso a essa finalidade para ver a carteira."
         />
       ) : !dados ? (
-        <Vazio
-          titulo="Carteira vazia"
-          texto="Nenhum cliente nesta finalidade ainda."
-        />
+        <Vazio titulo="Carteira vazia" texto="Nenhum cliente nesta finalidade ainda." />
       ) : (
         <>
-          {/* Cards de status + total */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {CARDS.map((c) => {
-              const valor = dados.resumo[c.chave];
-              const Icone = c.icone;
-              const recorteCard: Recorte =
-                c.chave === "totalClientes"
-                  ? { tipo: "clientes", titulo: "Todos os clientes" }
-                  : c.chave === "pendente"
-                    ? { tipo: "pendente", titulo: "Negocios pendentes" }
-                    : {
-                        tipo: "status",
-                        status: c.chave.toUpperCase() as
-                          | "ABERTO"
-                          | "GANHO"
-                          | "PERDIDO",
-                        titulo: c.rotulo,
-                      };
-              return (
-                <button
-                  key={c.chave}
-                  onClick={() => valor > 0 && setRecorte(recorteCard)}
-                  disabled={valor === 0}
-                  className={`group flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4 text-left transition-all ${
-                    valor > 0
-                      ? "hover:-translate-y-0.5 hover:shadow-md"
-                      : "cursor-default opacity-70"
-                  }`}
-                >
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${c.fundo} ${c.cor}`}
-                  >
-                    <Icone className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-2xl font-semibold leading-none text-escuro">
-                      {valor}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-medio/60">
-                      {c.rotulo}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+          {/* KPIs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <Kpi
+              rotulo="Em aberto"
+              valor={`${dados.kpis.abertos}`}
+              icone={CircleDot}
+              cor="text-sky-700"
+              fundo="bg-sky-100"
+              tag="atual"
+              onClick={
+                dados.abertos.length
+                  ? () => setRecorte({ titulo: "Em aberto", itens: dados.abertos })
+                  : undefined
+              }
+            />
+            <Kpi
+              rotulo="Ganhos"
+              valor={`${dados.kpis.ganhos}`}
+              detalhe={formatarBRL(dados.kpis.valorGanhos)}
+              icone={Trophy}
+              cor="text-green-700"
+              fundo="bg-green-100"
+              tag="periodo"
+              onClick={
+                dados.ganhosPeriodo.length
+                  ? () => setRecorte({ titulo: "Ganhos no periodo", itens: dados.ganhosPeriodo })
+                  : undefined
+              }
+            />
+            <Kpi
+              rotulo="Perdidos"
+              valor={`${dados.kpis.perdidos}`}
+              detalhe={formatarBRL(dados.kpis.valorPerdidos)}
+              icone={XCircle}
+              cor="text-red-700"
+              fundo="bg-red-100"
+              tag="periodo"
+            />
+            <Kpi
+              rotulo="Negocios pendentes"
+              valor={`${dados.kpis.pendentes}`}
+              icone={PauseCircle}
+              cor="text-orange-700"
+              fundo="bg-orange-100"
+              tag="atual"
+              onClick={
+                dados.pendentesLista.length
+                  ? () => setRecorte({ titulo: "Negocios pendentes", itens: dados.pendentesLista })
+                  : undefined
+              }
+            />
+            <Kpi
+              rotulo="Clientes"
+              valor={`${dados.kpis.totalClientes}`}
+              icone={Users}
+              cor="text-tiffany-escuro"
+              fundo="bg-tiffany/10"
+              tag="atual"
+            />
+            <Kpi
+              rotulo="Conversao"
+              valor={`${Math.round(dados.kpis.conversao * 100)}%`}
+              icone={TrendingUp}
+              cor="text-violet-700"
+              fundo="bg-violet-100"
+              tag="periodo"
+            />
+            <Kpi
+              rotulo="Ticket medio"
+              valor={formatarBRL(dados.kpis.ticketMedio)}
+              icone={Trophy}
+              cor="text-green-700"
+              fundo="bg-green-100"
+              tag="periodo"
+            />
+            <Kpi
+              rotulo="1a resposta"
+              valor={formatarDuracao(dados.kpis.tempoPrimeiraRespostaSeg)}
+              icone={Clock}
+              cor="text-medio"
+              fundo="bg-black/5"
+              tag="periodo"
+            />
           </div>
 
-          {/* A contatar (lembretes vencidos + hoje) */}
+          {/* Mini-tendencia */}
+          {tendencia.length > 0 && (
+            <section className="rounded-2xl border border-black/5 bg-white p-4">
+              <p className="mb-3 text-sm font-semibold text-escuro">
+                Tendencia do periodo
+              </p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={tendencia} margin={{ left: -20, right: 8, top: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#0000000d" vertical={false} />
+                  <XAxis dataKey="rotulo" tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="ganhos" name="Ganhos" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="perdidos" name="Perdidos" fill="#dc2626" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </section>
+          )}
+
+          {/* A contatar */}
           {dados.aContatar.length > 0 && (
             <section className="space-y-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
@@ -424,33 +494,17 @@ export function MinhaCarteira({
                         : "border-black/5 bg-white hover:bg-fundo"
                     }`}
                   >
-                    <AvatarCliente
-                      nome={l.nomeEfetivo}
-                      telefone={l.telefone}
-                      fotoUrl={l.fotoUrl}
-                      tamanho={36}
-                    />
+                    <AvatarCliente nome={l.nomeEfetivo} telefone={l.telefone} fotoUrl={l.fotoUrl} tamanho={36} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-escuro">
-                        {l.nomeEfetivo}
-                      </p>
+                      <p className="truncate text-sm font-semibold text-escuro">{l.nomeEfetivo}</p>
                       <p className="flex items-center gap-1 text-xs text-medio/70">
                         <CalendarClock className="h-3 w-3" />
                         {new Date(l.dataHora).toLocaleString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
+                          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
                         })}
-                        {l.vencido && (
-                          <span className="font-semibold text-red-600">
-                            · vencido
-                          </span>
-                        )}
+                        {l.vencido && <span className="font-semibold text-red-600">· vencido</span>}
                       </p>
-                      {l.nota && (
-                        <p className="truncate text-xs text-medio/60">{l.nota}</p>
-                      )}
+                      {l.nota && <p className="truncate text-xs text-medio/60">{l.nota}</p>}
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-medio/40" />
                   </button>
@@ -459,7 +513,7 @@ export function MinhaCarteira({
             </section>
           )}
 
-          {/* Grade de etiquetas */}
+          {/* Etiquetas */}
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
               <Tag className="h-4 w-4 text-tiffany" /> Etiquetas
@@ -475,21 +529,17 @@ export function MinhaCarteira({
                     key={e.id}
                     onClick={() =>
                       setRecorte({
-                        tipo: "etiqueta",
-                        etiquetaId: e.id,
                         titulo: e.nome,
+                        itens: dados.itens.filter((i) =>
+                          i.etiquetas.some((x) => x.id === e.id),
+                        ),
                       })
                     }
                     className="flex items-center justify-between gap-2 rounded-xl border border-black/5 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
                     <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: e.cor }}
-                      />
-                      <span className="truncate text-sm font-medium text-escuro">
-                        {e.nome}
-                      </span>
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: e.cor }} />
+                      <span className="truncate text-sm font-medium text-escuro">{e.nome}</span>
                     </span>
                     <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-xs font-semibold text-medio/70">
                       {e.count}
@@ -500,59 +550,44 @@ export function MinhaCarteira({
             )}
           </section>
 
-          {/* Pendentes */}
-          <section className="space-y-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
-              <PauseCircle className="h-4 w-4 text-orange-500" /> Negocios pendentes
-              {dados.pendentes.length > 0 && (
-                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">
-                  {dados.pendentes.length}
-                </span>
-              )}
-            </h3>
-            {dados.pendentes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-black/10 bg-white p-4 text-sm text-medio/60">
-                Nenhuma pendencia nesta carteira. Tudo em dia.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {dados.pendentes.map((i) => (
-                  <button
-                    key={i.negocioId}
-                    onClick={() => setPainelId(i.negocioId)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-orange-200 bg-orange-50/60 p-3 text-left transition-colors hover:bg-orange-50"
-                  >
-                    <AvatarCliente
-                      nome={i.nomeEfetivo}
-                      telefone={i.telefone}
-                      fotoUrl={i.fotoUrl}
-                      tamanho={36}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-escuro">
-                        {i.nomeEfetivo}
-                      </p>
-                      <p className="truncate text-xs text-orange-900/80">
-                        {i.motivoPendencia ?? "Sem motivo informado"}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-medio/40" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-
           {/* Perdidos por motivo */}
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
-              <XCircle className="h-4 w-4 text-red-500" /> Perdidos
+              <XCircle className="h-4 w-4 text-red-500" /> Perdidos no periodo
             </h3>
-            <PerdidosAnalise
-              finalidade={finalidade}
-              agenteId={ehAdmin ? agenteSel : undefined}
-              onAbrir={(id) => setPainelId(id)}
-            />
+            <PerdidosAnalise dadosFixos={dados.perdidos} onAbrir={(id) => setPainelId(id)} />
+          </section>
+
+          {/* Lista de clientes com busca */}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+                <Users className="h-4 w-4 text-tiffany" /> Clientes
+                <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-semibold text-medio/70">
+                  {clientesFiltrados.length}
+                </span>
+              </h3>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar cliente"
+                  className="campo w-56 pl-8"
+                />
+              </div>
+            </div>
+            <div className="scroll-fino max-h-96 space-y-1.5 overflow-y-auto">
+              {clientesFiltrados.length === 0 ? (
+                <p className="py-8 text-center text-sm text-medio/50">
+                  Nenhum cliente encontrado.
+                </p>
+              ) : (
+                clientesFiltrados.map((i) => (
+                  <ItemCliente key={i.leadId} item={i} onAbrir={() => setPainelId(i.negocioId)} />
+                ))
+              )}
+            </div>
           </section>
         </>
       )}
@@ -561,13 +596,12 @@ export function MinhaCarteira({
       {recorte && (
         <ListaRecorte
           titulo={recorte.titulo}
-          itens={itensRecorte}
+          itens={recorte.itens}
           onAbrir={(id) => setPainelId(id)}
           onFechar={() => setRecorte(null)}
         />
       )}
 
-      {/* Painel do cliente/negocio */}
       {painelId && (
         <PainelNegocio
           negocioId={painelId}
@@ -581,7 +615,6 @@ export function MinhaCarteira({
         />
       )}
 
-      {/* Envio em massa */}
       {envioAberto && (
         <EnvioMassa
           finalidade={finalidade}
@@ -596,7 +629,70 @@ export function MinhaCarteira({
   );
 }
 
-// Lista filtrada de um recorte (drawer lateral). Cada item abre o painel.
+function ItemCliente({ item: i, onAbrir }: { item: Item; onAbrir: () => void }) {
+  return (
+    <button
+      onClick={onAbrir}
+      className="flex w-full items-center gap-3 rounded-xl border border-black/5 bg-white p-2.5 text-left transition-colors hover:bg-fundo"
+    >
+      <AvatarCliente nome={i.nomeEfetivo} telefone={i.telefone} fotoUrl={i.fotoUrl} tamanho={34} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-escuro">{i.nomeEfetivo}</p>
+        <p className="truncate text-xs text-medio/60">{formatarTelefone(i.telefone)}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        {i.status && <BadgeStatusNegocio status={i.status} />}
+        {i.pendente && <BadgePendente motivo={i.motivoPendencia} />}
+      </div>
+    </button>
+  );
+}
+
+function Kpi({
+  rotulo,
+  valor,
+  detalhe,
+  icone: Icone,
+  cor,
+  fundo,
+  tag,
+  onClick,
+}: {
+  rotulo: string;
+  valor: string;
+  detalhe?: string;
+  icone: LucideIcon;
+  cor: string;
+  fundo: string;
+  tag?: "atual" | "periodo";
+  onClick?: () => void;
+}) {
+  const clicavel = Boolean(onClick);
+  return (
+    <button
+      onClick={onClick}
+      disabled={!clicavel}
+      className={`relative flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4 text-left transition-all ${
+        clicavel ? "hover:-translate-y-0.5 hover:shadow-md" : "cursor-default"
+      }`}
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${fundo} ${cor}`}>
+        <Icone className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xl font-semibold leading-none text-escuro">{valor}</p>
+        <p className="mt-1 truncate text-xs text-medio/60">{rotulo}</p>
+        {detalhe && <p className="truncate text-[11px] text-medio/50">{detalhe}</p>}
+      </div>
+      {tag && (
+        <span className="absolute right-2 top-2 rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-medio/50">
+          {tag === "atual" ? "atual" : "periodo"}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function ListaRecorte({
   titulo,
   itens,
@@ -616,7 +712,7 @@ function ListaRecorte({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-escuro">{titulo}</p>
             <p className="text-xs text-medio/60">
-              {itens.length} {itens.length === 1 ? "cliente" : "clientes"}
+              {itens.length} {itens.length === 1 ? "negocio" : "negocios"}
             </p>
           </div>
           <button
@@ -639,19 +735,10 @@ function ListaRecorte({
                 onClick={() => onAbrir(i.negocioId)}
                 className="flex w-full items-center gap-3 rounded-xl border border-black/5 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
-                <AvatarCliente
-                  nome={i.nomeEfetivo}
-                  telefone={i.telefone}
-                  fotoUrl={i.fotoUrl}
-                  tamanho={38}
-                />
+                <AvatarCliente nome={i.nomeEfetivo} telefone={i.telefone} fotoUrl={i.fotoUrl} tamanho={38} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-escuro">
-                    {i.nomeEfetivo}
-                  </p>
-                  <p className="truncate text-xs text-medio/60">
-                    {formatarTelefone(i.telefone)}
-                  </p>
+                  <p className="truncate text-sm font-semibold text-escuro">{i.nomeEfetivo}</p>
+                  <p className="truncate text-xs text-medio/60">{formatarTelefone(i.telefone)}</p>
                   {(i.etiquetas.length > 0 || i.valor != null) && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
                       {i.valor != null && (
@@ -672,7 +759,7 @@ function ListaRecorte({
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <BadgeStatusNegocio status={i.status} />
+                  {i.status && <BadgeStatusNegocio status={i.status} />}
                   {i.pendente && <BadgePendente motivo={i.motivoPendencia} />}
                 </div>
               </button>
@@ -697,12 +784,9 @@ function Vazio({ titulo, texto }: { titulo: string; texto: string }) {
 function CarteiraSkeleton() {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4"
-          >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-4">
             <div className="skeleton h-10 w-10 rounded-xl" />
             <div className="flex-1 space-y-2">
               <div className="skeleton h-6 w-10" />
@@ -711,11 +795,7 @@ function CarteiraSkeleton() {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="skeleton h-14 rounded-xl" />
-        ))}
-      </div>
+      <div className="skeleton h-48 rounded-2xl" />
     </div>
   );
 }
