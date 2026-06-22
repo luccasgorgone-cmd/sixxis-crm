@@ -3,11 +3,28 @@
 // Analise de perdidos por motivo: rosca (recharts) + lista drillavel. Reusada na
 // carteira e no detalhe da meta. Busca /api/analise/perdidos com finalidade,
 // agenteId (admin) e periodo (inicio/fim) opcionais.
-import { useState, useEffect, useCallback } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { XCircle, ChevronRight } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+import { XCircle, ChevronRight, PieChart as PieIcon, BarChart3 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
+import { SegmentToggle } from "@/components/ui/SegmentToggle";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TabelaOrdenavel, type Coluna } from "@/components/ui/TabelaOrdenavel";
+import { List, Table2 } from "lucide-react";
 import { formatarBRL } from "@/lib/format";
+
+type PerdidoItem = AnalisePerdidos["itens"][number];
 
 export type AnalisePerdidos = {
   total: number;
@@ -43,6 +60,47 @@ const CORES = [
   "#0f2e2b",
 ];
 
+// Colunas da tabela ordenavel de perdidos.
+const colunasPerdidos: Coluna<PerdidoItem>[] = [
+  {
+    chave: "cliente",
+    rotulo: "Cliente",
+    sortValue: (i) => i.nome.toLowerCase(),
+    render: (i) => <span className="font-medium text-escuro">{i.nome}</span>,
+  },
+  {
+    chave: "motivo",
+    rotulo: "Motivo",
+    sortValue: (i) => i.motivoLabel.toLowerCase(),
+    render: (i) => (
+      <span className="text-medio/80" title={i.obs ?? undefined}>
+        {i.motivoLabel}
+      </span>
+    ),
+  },
+  {
+    chave: "valor",
+    rotulo: "Valor",
+    align: "right",
+    sortValue: (i) => i.valor ?? 0,
+    render: (i) => (i.valor != null ? formatarBRL(i.valor) : "—"),
+  },
+  {
+    chave: "data",
+    rotulo: "Data",
+    align: "right",
+    sortValue: (i) => (i.fechadoEm ? new Date(i.fechadoEm).getTime() : 0),
+    render: (i) =>
+      i.fechadoEm
+        ? new Date(i.fechadoEm).toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+        : "—",
+  },
+];
+
 export function PerdidosAnalise({
   finalidade,
   agenteId,
@@ -62,6 +120,25 @@ export function PerdidosAnalise({
   const [dados, setDados] = useState<AnalisePerdidos | null>(dadosFixos ?? null);
   const [carregando, setCarregando] = useState(!dadosFixos);
   const [motivoSel, setMotivoSel] = useState<string | null>(null);
+  const [formato, setFormato] = useState<"rosca" | "barras">("rosca");
+  const [vistaLista, setVistaLista] = useState<"lista" | "tabela">("lista");
+
+  // Perdidos por dia (para a visao de barras por periodo).
+  const porDia = useMemo(() => {
+    if (!dados) return [];
+    const mapa = new Map<string, number>();
+    for (const i of dados.itens) {
+      if (!i.fechadoEm) continue;
+      const dia = i.fechadoEm.slice(0, 10);
+      mapa.set(dia, (mapa.get(dia) ?? 0) + 1);
+    }
+    return [...mapa.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([dia, count]) => ({
+        rotulo: dia.slice(8, 10) + "/" + dia.slice(5, 7),
+        count,
+      }));
+  }, [dados]);
 
   const carregar = useCallback(async () => {
     if (dadosFixos || !finalidade) return;
@@ -95,13 +172,11 @@ export function PerdidosAnalise({
   }
   if (!dados || dados.total === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-black/10 bg-white py-12 text-center">
-        <XCircle className="h-7 w-7 text-medio/30" />
-        <p className="text-sm font-medium text-escuro">Nenhum perdido no periodo</p>
-        <p className="text-xs text-medio/60">
-          Quando um negocio for marcado como perdido, a analise aparece aqui.
-        </p>
-      </div>
+      <EmptyState
+        icone={XCircle}
+        titulo="Nenhum perdido no periodo"
+        texto="Quando um negocio for marcado como perdido, a analise aparece aqui."
+      />
     );
   }
 
@@ -116,14 +191,38 @@ export function PerdidosAnalise({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {/* Rosca + legenda */}
+      {/* Rosca/barras + legenda */}
       <div className="rounded-xl border border-black/5 bg-white p-4">
-        <div className="mb-2 flex items-baseline justify-between">
-          <p className="text-sm font-semibold text-escuro">Perdidos por motivo</p>
-          <p className="text-xs text-medio/60">
-            {dados.total} · {formatarBRL(dados.valorTotal)}
-          </p>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-escuro">
+              {formato === "rosca" ? "Perdidos por motivo" : "Perdidos por dia"}
+            </p>
+            <p className="text-xs text-medio/60">
+              {dados.total} · {formatarBRL(dados.valorTotal)}
+            </p>
+          </div>
+          <SegmentToggle
+            tamanho="sm"
+            valor={formato}
+            onChange={setFormato}
+            opcoes={[
+              { valor: "rosca", icone: PieIcon, titulo: "Por motivo (rosca)" },
+              { valor: "barras", icone: BarChart3, titulo: "Por periodo (barras)" },
+            ]}
+          />
         </div>
+        {formato === "barras" ? (
+          <ResponsiveContainer width="100%" height={170}>
+            <BarChart data={porDia} margin={{ left: -20, right: 8, top: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#0000000d" vertical={false} />
+              <XAxis dataKey="rotulo" tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+              <Tooltip />
+              <Bar dataKey="count" name="Perdidos" fill="#dc2626" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
         <div className="flex items-center gap-3">
           <ResponsiveContainer width="50%" height={160}>
             <PieChart>
@@ -184,25 +283,48 @@ export function PerdidosAnalise({
             })}
           </ul>
         </div>
+        )}
       </div>
 
-      {/* Lista drillavel */}
+      {/* Lista/tabela drillavel */}
       <div className="rounded-xl border border-black/5 bg-white p-4">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-escuro">
             {motivoSel
               ? dados.porMotivo.find((m) => m.code === motivoSel)?.label
               : "Todos os perdidos"}
           </p>
-          {motivoSel && (
-            <button
-              onClick={() => setMotivoSel(null)}
-              className="text-xs font-medium text-tiffany hover:underline"
-            >
-              Limpar filtro
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {motivoSel && (
+              <button
+                onClick={() => setMotivoSel(null)}
+                className="text-xs font-medium text-tiffany hover:underline"
+              >
+                Limpar filtro
+              </button>
+            )}
+            <SegmentToggle
+              tamanho="sm"
+              valor={vistaLista}
+              onChange={setVistaLista}
+              opcoes={[
+                { valor: "lista", icone: List, titulo: "Lista" },
+                { valor: "tabela", icone: Table2, titulo: "Tabela" },
+              ]}
+            />
+          </div>
         </div>
+        {vistaLista === "tabela" ? (
+          <div className="scroll-fino max-h-72 overflow-y-auto">
+            <TabelaOrdenavel<PerdidoItem>
+              dados={itensFiltrados}
+              chaveLinha={(i) => i.negocioId}
+              ordemInicial={{ chave: "valor", dir: -1 }}
+              onLinha={onAbrir ? (i) => onAbrir(i.negocioId) : undefined}
+              colunas={colunasPerdidos}
+            />
+          </div>
+        ) : (
         <div className="scroll-fino max-h-72 space-y-1.5 overflow-y-auto">
           {itensFiltrados.map((i) => (
             <button
@@ -233,6 +355,7 @@ export function PerdidosAnalise({
             </button>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

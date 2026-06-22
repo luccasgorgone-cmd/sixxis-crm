@@ -5,6 +5,18 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
   Users,
   FolderOpen,
   Clock4,
@@ -13,10 +25,14 @@ import {
   DollarSign,
   Send,
   ArrowUpDown,
+  BarChart3,
+  Table2,
 } from "lucide-react";
 import { FiltroPeriodo } from "./FiltroPeriodo";
 import { Cartao, CartaoSkeleton } from "./Cartao";
 import { GraficoTendencia } from "./GraficoTendencia";
+import { ChartCard } from "@/components/ui/ChartCard";
+import { SegmentToggle } from "@/components/ui/SegmentToggle";
 import {
   queryDoFiltro,
   type FiltroValor,
@@ -56,6 +72,7 @@ export function DashboardAdmin() {
     chave: "valorVendido",
     dir: -1,
   });
+  const [vistaColab, setVistaColab] = useState<"grafico" | "tabela">("tabela");
 
   // Existe colaborador ativo (nao-admin) com acesso a alguma finalidade?
   useEffect(() => {
@@ -115,6 +132,27 @@ export function DashboardAdmin() {
   }
 
   const g = dados?.geral;
+
+  // Top colaboradores por valor vendido (grafico de barras).
+  const dadosBarras = useMemo(
+    () =>
+      [...linhas]
+        .sort((a, b) => b.metricas.valorVendido - a.metricas.valorVendido)
+        .slice(0, 8)
+        .map((l) => ({
+          nome: l.nome.split(" ")[0],
+          valor: l.metricas.valorVendido,
+        })),
+    [linhas],
+  );
+
+  // Conversao geral (rosca ganhos x perdidos).
+  const dadosConversao = g
+    ? [
+        { nome: "Ganhos", valor: g.ganhos, cor: "#16a34a" },
+        { nome: "Perdidos", valor: g.perdidos, cor: "#dc2626" },
+      ]
+    : [];
 
   return (
     <div className="space-y-4 p-6">
@@ -192,18 +230,100 @@ export function DashboardAdmin() {
             />
           </div>
 
-          {/* Recorte por finalidade (so admin) */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {/* Recorte por finalidade + conversao (rosca) */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <RecorteFinalidade titulo="Venda" m={dados.porFinalidade.venda} />
             <RecorteFinalidade
               titulo="Pos-venda"
               m={dados.porFinalidade.posVenda}
             />
+            <ChartCard titulo="Conversao geral" subtitulo={`${formatarPct(g.conversao)} de aproveitamento`}>
+              {g.ganhos + g.perdidos === 0 ? (
+                <p className="py-8 text-center text-sm text-medio/50">
+                  Sem fechamentos no periodo.
+                </p>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <ResponsiveContainer width="55%" height={130}>
+                    <PieChart>
+                      <Pie
+                        data={dadosConversao}
+                        dataKey="valor"
+                        nameKey="nome"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={36}
+                        outerRadius={56}
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {dadosConversao.map((d) => (
+                          <Cell key={d.nome} fill={d.cor} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <ul className="flex-1 space-y-1.5 text-xs">
+                    <li className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
+                      <span className="flex-1 text-escuro">Ganhos</span>
+                      <span className="font-semibold text-medio/70">{g.ganhos}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                      <span className="flex-1 text-escuro">Perdidos</span>
+                      <span className="font-semibold text-medio/70">{g.perdidos}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </ChartCard>
           </div>
 
           <GraficoTendencia dados={dados.tendencia} />
 
-          {/* Tabela por colaborador */}
+          {/* Comparativo por colaborador: grafico (barras) ou tabela */}
+          <ChartCard
+            titulo="Comparativo por colaborador"
+            acoes={
+              <SegmentToggle
+                tamanho="sm"
+                valor={vistaColab}
+                onChange={setVistaColab}
+                opcoes={[
+                  { valor: "grafico", icone: BarChart3, titulo: "Grafico" },
+                  { valor: "tabela", icone: Table2, titulo: "Tabela" },
+                ]}
+              />
+            }
+          >
+            {vistaColab === "grafico" ? (
+              dadosBarras.length === 0 ? (
+                <p className="py-8 text-center text-sm text-medio/50">
+                  Nenhum colaborador.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(180, dadosBarras.length * 38)}>
+                  <BarChart
+                    layout="vertical"
+                    data={dadosBarras}
+                    margin={{ left: 8, right: 16, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#0000000d" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: "#1a4f4a99" }} />
+                    <YAxis
+                      type="category"
+                      dataKey="nome"
+                      width={80}
+                      tick={{ fontSize: 12, fill: "#1a4f4a" }}
+                    />
+                    <Tooltip formatter={(v) => formatarBRL(Number(v ?? 0))} />
+                    <Bar dataKey="valor" name="Valor vendido" fill="#3cbfb3" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
+            ) : (
           <div className="overflow-x-auto rounded-xl border border-black/5 bg-white">
             <table className="w-full text-sm">
               <thead className="border-b border-black/5 text-left text-xs uppercase tracking-wide text-medio/50">
@@ -257,6 +377,8 @@ export function DashboardAdmin() {
               </tbody>
             </table>
           </div>
+            )}
+          </ChartCard>
         </>
       )}
     </div>
