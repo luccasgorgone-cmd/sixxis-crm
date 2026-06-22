@@ -15,7 +15,7 @@ import {
   AtividadeTipo,
   Finalidade,
 } from "@/generated/prisma/enums";
-import { espelharDonoNasConversas } from "@/lib/dono";
+import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
 
 export const runtime = "nodejs";
@@ -77,14 +77,25 @@ export async function GET(
   if (!negocio) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  // Pode ver quem e dono do negocio OU dono do cliente naquela finalidade (cobre
-  // negocios fechados de um lead transferido, que mantem o agenteId antigo mas
-  // pertencem ao novo dono da carteira).
+  // LEITURA (mais permissiva que a edicao): admin le tudo; dono do negocio ou do
+  // cliente le; e qualquer colaborador le negocios de uma FINALIDADE a que tem
+  // acesso — pois e isso que as metas de EQUIPE e telas de equipe mostram
+  // (inclusive negocios de outro vendedor ou sem dono). A escrita (PATCH) segue
+  // estrita.
   const ehDonoCliente =
     negocio.finalidade === Finalidade.VENDA
       ? negocio.lead.donoId === agente.id
       : negocio.lead.donoPosVendaId === agente.id;
-  if (!podeAcessarNegocio(agente, negocio.agenteId) && !ehDonoCliente) {
+  let podeLer =
+    podeAcessarNegocio(agente, negocio.agenteId) || ehDonoCliente;
+  if (!podeLer) {
+    const eu = await prisma.agente.findUnique({
+      where: { id: agente.id },
+      select: { acessoVenda: true, acessoPosVenda: true },
+    });
+    podeLer = !!eu && temAcesso(eu, negocio.finalidade);
+  }
+  if (!podeLer) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
