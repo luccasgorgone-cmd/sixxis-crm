@@ -133,6 +133,38 @@ enum AtividadeTipo {
   CRIACAO
   EDICAO
   PENDENCIA
+  LEMBRETE
+}
+
+// Estado de um lembrete/agendamento de contato.
+enum StatusLembrete {
+  PENDENTE
+  FEITO
+  CANCELADO
+}
+
+// Canal de um envio em massa.
+enum CanalEnvio {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+// Ciclo de vida de uma campanha de envio em massa.
+enum StatusCampanha {
+  RASCUNHO
+  ENVIANDO
+  CONCLUIDA
+  CANCELADA
+}
+
+// Estado do envio para um destinatario de campanha. (Distinto de StatusEnvio,
+// que e o ciclo de uma Mensagem 1:1.)
+enum StatusDestino {
+  PENDENTE
+  ENVIADO
+  FALHA
+  PULADO
 }
 
 model Agente {
@@ -156,6 +188,8 @@ model Agente {
   leadsComoDonoPosVenda Lead[]             @relation("LeadDonoPosVenda")
   atividades            Atividade[]
   metas                 Meta[]
+  lembretes             Lembrete[]
+  campanhas             Campanha[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -174,6 +208,8 @@ model Lead {
   cpf           String?
   anotacoes     String?        @db.Text
   origem        String?
+  // Opt-out de comunicacoes em massa: false = nao incluir em campanhas.
+  aceitaContato Boolean        @default(true)
   ctwaClid      String?
   clienteSiteId  String?
   donoId         String?
@@ -185,6 +221,8 @@ model Lead {
   etiquetas      LeadEtiqueta[]
   notas          Nota[]
   atividades     Atividade[]
+  lembretes      Lembrete[]
+  campanhaDestinos CampanhaDestino[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -288,6 +326,7 @@ model Negocio {
   fechadoEm     DateTime?
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
+  lembretes     Lembrete[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 
@@ -372,16 +411,86 @@ model Atividade {
   @@index([leadId, criadoEm])
 }
 
-// Resposta rapida (snippet) usavel no compositor do inbox.
+// Modelo de mensagem (antiga "Resposta rapida") usavel no compositor do inbox e
+// como base de campanhas. categoria organiza o catalogo; finalidade null = ambas.
 model RespostaRapida {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   titulo       String
   atalho       String?
-  texto        String   @db.Text
-  ativo        Boolean  @default(true)
-  ordem        Int      @default(0)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  texto        String      @db.Text
+  // atalho | aniversario | cupom | data_comemorativa | desconto_relampago |
+  // retomada | geral
+  categoria    String      @default("atalho")
+  finalidade   Finalidade?
+  ativo        Boolean     @default(true)
+  ordem        Int         @default(0)
+  criadoEm     DateTime    @default(now())
+  atualizadoEm DateTime    @updatedAt
+
+  @@index([categoria])
+}
+
+// Lembrete/agendamento de contato com um cliente.
+model Lembrete {
+  id          String         @id @default(cuid())
+  leadId      String
+  lead        Lead           @relation(fields: [leadId], references: [id])
+  negocioId   String?
+  negocio     Negocio?       @relation(fields: [negocioId], references: [id])
+  agenteId    String
+  agente      Agente         @relation(fields: [agenteId], references: [id])
+  finalidade  Finalidade
+  dataHora    DateTime
+  nota        String?        @db.Text
+  status      StatusLembrete @default(PENDENTE)
+  criadoEm    DateTime       @default(now())
+  concluidoEm DateTime?
+
+  @@index([agenteId, status, dataHora])
+  @@index([leadId])
+}
+
+// Campanha de envio em massa (multicanal). filtroJson guarda o recorte usado;
+// valoresJson guarda as variaveis digitadas (cupom, desconto...).
+model Campanha {
+  id          String            @id @default(cuid())
+  agenteId    String
+  agente      Agente            @relation(fields: [agenteId], references: [id])
+  finalidade  Finalidade
+  canal       CanalEnvio
+  modeloId    String?
+  assunto     String?
+  mensagem    String            @db.Text
+  valoresJson Json?
+  filtroJson  Json
+  total       Int
+  enviados    Int               @default(0)
+  falhas      Int               @default(0)
+  pulados     Int               @default(0)
+  status      StatusCampanha    @default(RASCUNHO)
+  criadoEm    DateTime          @default(now())
+  iniciadoEm  DateTime?
+  concluidoEm DateTime?
+  destinos    CampanhaDestino[]
+
+  @@index([agenteId, criadoEm])
+  @@index([status])
+}
+
+// Destinatario resolvido de uma campanha, com status/erro por envio.
+model CampanhaDestino {
+  id         String        @id @default(cuid())
+  campanhaId String
+  campanha   Campanha      @relation(fields: [campanhaId], references: [id])
+  leadId     String
+  lead       Lead          @relation(fields: [leadId], references: [id])
+  destino    String
+  status     StatusDestino @default(PENDENTE)
+  erro       String?
+  enviadoEm  DateTime?
+
+  @@index([campanhaId, status])
+  @@index([leadId])
 }
 
 // Configuracao geral do CRM (singleton). horarios = JSON por dia da semana.

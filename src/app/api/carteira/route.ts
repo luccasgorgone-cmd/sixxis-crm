@@ -11,7 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
-import { Finalidade } from "@/generated/prisma/enums";
+import { fimDoDia } from "@/lib/lembrete";
+import { Finalidade, StatusLembrete } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,6 +137,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Lista de pendentes (cliente + motivo + link para o negocio).
   const pendentes = itens.filter((i) => i.pendente);
 
+  // "A contatar": lembretes do colaborador alvo nessa finalidade, vencidos+hoje.
+  const fimHoje = fimDoDia();
+  const lembretes = await prisma.lembrete.findMany({
+    where: {
+      agenteId: alvoId,
+      finalidade,
+      status: StatusLembrete.PENDENTE,
+      dataHora: { lte: fimHoje },
+    },
+    orderBy: { dataHora: "asc" },
+    select: {
+      id: true,
+      negocioId: true,
+      dataHora: true,
+      nota: true,
+      lead: {
+        select: {
+          id: true,
+          nome: true,
+          pushName: true,
+          nomeManual: true,
+          telefone: true,
+          fotoUrl: true,
+        },
+      },
+    },
+  });
+  const aContatar = lembretes.map((l) => ({
+    id: l.id,
+    negocioId: l.negocioId,
+    leadId: l.lead.id,
+    nomeEfetivo: nomeEfetivo(l.lead),
+    telefone: l.lead.telefone,
+    fotoUrl: l.lead.fotoUrl,
+    dataHora: l.dataHora,
+    nota: l.nota,
+    vencido: l.dataHora.getTime() < Date.now(),
+  }));
+
   return NextResponse.json({
     finalidade,
     agente: { id: alvo.id, nome: alvo.nome },
@@ -143,5 +183,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     etiquetas,
     itens,
     pendentes,
+    aContatar,
   });
 }

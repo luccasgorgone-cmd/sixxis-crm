@@ -26,6 +26,9 @@ import {
   History,
   PauseCircle,
   PlayCircle,
+  CalendarClock,
+  CalendarPlus,
+  Check,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -49,6 +52,7 @@ import {
   type AgenteResumo,
   type Temperatura,
   type ObservacaoOpcao,
+  type LembreteItem,
 } from "./tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -328,6 +332,8 @@ export function PainelNegocio({
                   onAtualizado={onAtualizado}
                   abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
                 />
+
+                <BlocoAgendar detalhe={detalhe} recarregar={carregar} />
 
                 {/* Sub-navegacao dos paineis inferiores */}
                 <div>
@@ -850,6 +856,143 @@ function BlocoPendencia({
         </button>
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Agendar contato: cria um lembrete (data/hora + nota) e lista os proximos
+// lembretes pendentes do cliente, com acao de concluir.
+// ----------------------------------------------------------------------------
+function BlocoAgendar({
+  detalhe,
+  recarregar,
+}: {
+  detalhe: DetalheNegocio;
+  recarregar: () => Promise<void>;
+}) {
+  const toast = useToast();
+  const [quando, setQuando] = useState("");
+  const [nota, setNota] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function agendar() {
+    if (!quando) {
+      toast.erro("Escolha data e hora.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const r = await fetch("/api/lembretes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: detalhe.cliente.id,
+          negocioId: detalhe.id,
+          finalidade: detalhe.finalidade,
+          dataHora: new Date(quando).toISOString(),
+          nota: nota.trim() || null,
+        }),
+      });
+      if (r.ok) {
+        setQuando("");
+        setNota("");
+        toast.sucesso("Contato agendado.");
+        await recarregar();
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel agendar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function concluir(id: string) {
+    try {
+      const r = await fetch(`/api/lembretes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "feito" }),
+      });
+      if (r.ok) await recarregar();
+    } catch {
+      toast.erro("Falha ao concluir.");
+    }
+  }
+
+  const proximos = detalhe.lembretes ?? [];
+
+  return (
+    <section className="space-y-3 rounded-xl border border-black/5 bg-white p-4">
+      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
+        <CalendarClock className="h-3.5 w-3.5" /> Agendar contato
+      </h4>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          type="datetime-local"
+          value={quando}
+          onChange={(e) => setQuando(e.target.value)}
+          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+        />
+        <input
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Nota (opcional)"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void agendar();
+          }}
+          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+        />
+      </div>
+      <button
+        onClick={() => void agendar()}
+        disabled={salvando || !quando}
+        className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+      >
+        {salvando ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <CalendarPlus className="h-4 w-4" />
+        )}
+        Agendar
+      </button>
+
+      {proximos.length > 0 && (
+        <ul className="space-y-1.5 border-t border-black/5 pt-3">
+          {proximos.map((l: LembreteItem) => (
+            <li
+              key={l.id}
+              className="flex items-center gap-2 rounded-lg bg-fundo px-3 py-2 text-sm"
+            >
+              <CalendarClock className="h-3.5 w-3.5 shrink-0 text-tiffany" />
+              <div className="min-w-0 flex-1">
+                <p className="text-escuro">
+                  {new Date(l.dataHora).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+                {l.nota && (
+                  <p className="truncate text-xs text-medio/60">{l.nota}</p>
+                )}
+              </div>
+              <button
+                onClick={() => void concluir(l.id)}
+                title="Marcar feito"
+                className="rounded-lg p-1 text-medio/50 hover:bg-green-50 hover:text-green-600"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

@@ -14,6 +14,8 @@ import {
   Users,
   Tag,
   ChevronRight,
+  CalendarClock,
+  Megaphone,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +28,7 @@ import {
 } from "@/components/badges";
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
+import { EnvioMassa } from "@/components/campanhas/EnvioMassa";
 import type {
   Etapa,
   EtiquetaChip,
@@ -49,6 +52,18 @@ type Item = {
 
 type EtiquetaContagem = EtiquetaChip & { count: number };
 
+type AContatar = {
+  id: string;
+  negocioId: string | null;
+  leadId: string;
+  nomeEfetivo: string;
+  telefone: string;
+  fotoUrl: string | null;
+  dataHora: string;
+  nota: string | null;
+  vencido: boolean;
+};
+
 type Carteira = {
   finalidade: Finalidade;
   agente: { id: string; nome: string | null };
@@ -62,6 +77,7 @@ type Carteira = {
   etiquetas: EtiquetaContagem[];
   itens: Item[];
   pendentes: Item[];
+  aContatar: AContatar[];
 };
 
 // Recorte do drilldown (qual subconjunto de itens mostrar na lista).
@@ -149,6 +165,7 @@ export function MinhaCarteira({
   // Recorte aberto (lista) e negocio aberto (painel).
   const [recorte, setRecorte] = useState<Recorte | null>(null);
   const [painelId, setPainelId] = useState<string | null>(null);
+  const [envioAberto, setEnvioAberto] = useState(false);
 
   // Listas auxiliares para o painel do negocio.
   const [etapas, setEtapas] = useState<Etapa[]>([]);
@@ -305,6 +322,14 @@ export function MinhaCarteira({
           {finalidadesDisponiveis.length === 1 && (
             <BadgeFinalidade finalidade={finalidade} />
           )}
+          {!semAcesso && !semColaborador && (
+            <button
+              onClick={() => setEnvioAberto(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro"
+            >
+              <Megaphone className="h-4 w-4" /> Envio em massa
+            </button>
+          )}
         </div>
       </div>
 
@@ -376,6 +401,62 @@ export function MinhaCarteira({
               );
             })}
           </div>
+
+          {/* A contatar (lembretes vencidos + hoje) */}
+          {dados.aContatar.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+                <CalendarClock className="h-4 w-4 text-tiffany" /> A contatar
+                <span className="rounded-full bg-tiffany/10 px-2 py-0.5 text-xs font-semibold text-tiffany">
+                  {dados.aContatar.length}
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {dados.aContatar.map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => l.negocioId && setPainelId(l.negocioId)}
+                    disabled={!l.negocioId}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                      l.vencido
+                        ? "border-red-200 bg-red-50/60 hover:bg-red-50"
+                        : "border-black/5 bg-white hover:bg-fundo"
+                    }`}
+                  >
+                    <AvatarCliente
+                      nome={l.nomeEfetivo}
+                      telefone={l.telefone}
+                      fotoUrl={l.fotoUrl}
+                      tamanho={36}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-escuro">
+                        {l.nomeEfetivo}
+                      </p>
+                      <p className="flex items-center gap-1 text-xs text-medio/70">
+                        <CalendarClock className="h-3 w-3" />
+                        {new Date(l.dataHora).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {l.vencido && (
+                          <span className="font-semibold text-red-600">
+                            · vencido
+                          </span>
+                        )}
+                      </p>
+                      {l.nota && (
+                        <p className="truncate text-xs text-medio/60">{l.nota}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-medio/40" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Grade de etiquetas */}
           <section className="space-y-3">
@@ -484,6 +565,18 @@ export function MinhaCarteira({
           etapas={etapas}
           onFechar={() => setPainelId(null)}
           onAtualizado={() => void carregar()}
+        />
+      )}
+
+      {/* Envio em massa */}
+      {envioAberto && (
+        <EnvioMassa
+          finalidade={finalidade}
+          ehAdmin={ehAdmin}
+          agenteSel={ehAdmin ? agenteSel : agenteIdAtual}
+          etiquetas={etiquetasPanel}
+          etapas={etapas}
+          onFechar={() => setEnvioAberto(false)}
         />
       )}
     </div>

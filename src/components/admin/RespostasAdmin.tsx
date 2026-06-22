@@ -2,7 +2,7 @@
 
 // Admin > Respostas rapidas: CRUD + reordenar (drag). Modal para titulo, atalho,
 // texto e ativo.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -22,6 +22,16 @@ import { Plus, GripVertical, Trash2, Pencil, X, Loader2 } from "lucide-react";
 import { Cabecalho, SkeletonTabela, CampoTexto } from "./VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
+import { BadgeFinalidade } from "@/components/BadgeFinalidade";
+import {
+  CATEGORIAS_MODELO,
+  rotuloCategoria,
+  detectarVariaveis,
+  aplicarModelo,
+  INFO_VARIAVEL,
+  VARIAVEIS_AUTOMATICAS,
+  VARIAVEIS_DIGITADAS,
+} from "@/lib/modelos";
 
 type Resposta = {
   id: string;
@@ -30,6 +40,8 @@ type Resposta = {
   texto: string;
   ativo: boolean;
   ordem: number;
+  categoria: string;
+  finalidade: "VENDA" | "POS_VENDA" | null;
 };
 
 export function RespostasAdmin() {
@@ -114,14 +126,14 @@ export function RespostasAdmin() {
   return (
     <div className="p-6">
       <Cabecalho
-        titulo="Respostas rapidas"
-        subtitulo="Atalhos de mensagem usados no inbox (digite / no compositor)"
+        titulo="Modelos de mensagem"
+        subtitulo="Atalhos e modelos (aniversario, cupom, retomada...) com variaveis. Use / no inbox."
         acao={
           <button
             onClick={() => setCriando(true)}
             className="flex items-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
           >
-            <Plus className="h-4 w-4" /> Nova resposta
+            <Plus className="h-4 w-4" /> Novo modelo
           </button>
         }
       />
@@ -204,8 +216,18 @@ function Linha({
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-escuro">{resposta.titulo}</p>
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/70">
+            {rotuloCategoria(resposta.categoria)}
+          </span>
+          {resposta.finalidade ? (
+            <BadgeFinalidade finalidade={resposta.finalidade} />
+          ) : (
+            <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/60">
+              Ambas
+            </span>
+          )}
           {resposta.atalho && (
             <span className="rounded bg-tiffany/10 px-1.5 py-0.5 text-[10px] font-medium text-tiffany">
               {resposta.atalho}
@@ -253,9 +275,42 @@ function Modal({
   const [titulo, setTitulo] = useState(resposta?.titulo ?? "");
   const [atalho, setAtalho] = useState(resposta?.atalho ?? "");
   const [texto, setTexto] = useState(resposta?.texto ?? "");
+  const [categoria, setCategoria] = useState(resposta?.categoria ?? "geral");
+  const [finalidade, setFinalidade] = useState<string>(
+    resposta?.finalidade ?? "AMBAS",
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const toast = useToast();
+  const refTexto = useRef<HTMLTextAreaElement>(null);
+
+  // Insere uma variavel na posicao do cursor do textarea.
+  function inserirVar(nome: string) {
+    const el = refTexto.current;
+    const token = `{${nome}}`;
+    if (!el) {
+      setTexto((t) => t + token);
+      return;
+    }
+    const ini = el.selectionStart ?? texto.length;
+    const fim = el.selectionEnd ?? texto.length;
+    const novo = texto.slice(0, ini) + token + texto.slice(fim);
+    setTexto(novo);
+    setTimeout(() => {
+      el.focus();
+      const pos = ini + token.length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
+  }
+
+  // Preview com dados de exemplo (automaticas resolvidas, digitadas de exemplo).
+  const preview = aplicarModelo(texto, {
+    lead: { nomeEfetivo: "Maria Silva", empresa: "Acme" },
+    valoresDigitados: Object.fromEntries(
+      VARIAVEIS_DIGITADAS.map((v) => [v, INFO_VARIAVEL[v].exemplo]),
+    ),
+  });
+  const usadas = detectarVariaveis(texto);
 
   async function salvar() {
     setErro(null);
@@ -270,7 +325,13 @@ function Modal({
         {
           method: edicao ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ titulo, atalho, texto }),
+          body: JSON.stringify({
+            titulo,
+            atalho,
+            texto,
+            categoria,
+            finalidade: finalidade === "AMBAS" ? null : finalidade,
+          }),
         },
       );
       if (!r.ok) {
@@ -278,7 +339,7 @@ function Modal({
         setSalvando(false);
         return;
       }
-      toast.sucesso("Resposta salva");
+      toast.sucesso("Modelo salvo");
       onSalvo();
     } catch {
       setErro("Falha ao salvar.");
@@ -288,10 +349,10 @@ function Modal({
 
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
-            {edicao ? "Editar resposta" : "Nova resposta"}
+            {edicao ? "Editar modelo" : "Novo modelo"}
           </h3>
           <button
             onClick={onFechar}
@@ -302,6 +363,38 @@ function Modal({
         </div>
         <div className="space-y-3">
           <CampoTexto rotulo="Titulo" valor={titulo} onChange={setTitulo} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-escuro">
+                Categoria
+              </label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              >
+                {CATEGORIAS_MODELO.map((c) => (
+                  <option key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-escuro">
+                Finalidade
+              </label>
+              <select
+                value={finalidade}
+                onChange={(e) => setFinalidade(e.target.value)}
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              >
+                <option value="VENDA">Venda</option>
+                <option value="POS_VENDA">Pos-venda</option>
+                <option value="AMBAS">Ambas</option>
+              </select>
+            </div>
+          </div>
           <CampoTexto
             rotulo="Atalho (ex.: /saudacao)"
             valor={atalho}
@@ -312,11 +405,53 @@ function Modal({
               Texto
             </label>
             <textarea
+              ref={refTexto}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               rows={4}
               className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
             />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[...VARIAVEIS_AUTOMATICAS, ...VARIAVEIS_DIGITADAS].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => inserirVar(v)}
+                  title={
+                    INFO_VARIAVEL[v].tipo === "auto"
+                      ? "Automatica (do cliente)"
+                      : "Digitada (na hora)"
+                  }
+                  className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                    INFO_VARIAVEL[v].tipo === "auto"
+                      ? "border-tiffany/30 bg-tiffany/5 text-tiffany hover:bg-tiffany/10"
+                      : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                  }`}
+                >
+                  {`{${v}}`}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-medio/50">
+              <span className="text-tiffany">Tiffany</span> = automaticas (vem do
+              cliente). <span className="text-violet-700">Roxas</span> = digitadas
+              no envio.
+            </p>
+          </div>
+
+          {/* Preview */}
+          <div className="rounded-lg border border-black/5 bg-fundo p-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-medio/50">
+              Preview (dados de exemplo)
+            </p>
+            <p className="whitespace-pre-wrap text-sm text-escuro">
+              {preview || "Escreva o texto para ver o preview."}
+            </p>
+            {usadas.digitadas.length > 0 && (
+              <p className="mt-2 text-[11px] text-medio/60">
+                Pedira ao enviar: {usadas.digitadas.join(", ")}
+              </p>
+            )}
           </div>
         </div>
         {erro && <p className="mt-3 text-xs text-erro">{erro}</p>}

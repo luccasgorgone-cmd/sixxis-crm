@@ -10,11 +10,19 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
-import { fetchFotoPerfil } from "./evolution";
+import { fetchFotoPerfil, enviarTexto } from "./evolution";
 import { nomeEfetivo } from "./cliente";
+import { aplicarModelo } from "./modelos";
+import { enviarSMS, enviarEmail } from "./providers";
 import { TipoMsg, DirecaoMsg, Finalidade, Prisma } from "../generated/prisma/client";
+import {
+  CanalEnvio,
+  StatusCampanha,
+  StatusDestino,
+} from "../generated/prisma/enums";
 
 const NOME_FILA = "messages-in";
+const FILA_CAMPANHAS = "campaigns";
 
 // IMPORTANTE: nada de conexao Redis/BullMQ no topo do modulo. Tudo e criado
 // sob demanda (lazy), so em runtime. Assim o "next build" nao tenta conectar
@@ -60,6 +68,167 @@ export function getMessagesQueue(): Queue {
     });
   }
   return queueSingleton;
+}
+
+// Produtor da fila de campanhas (criado sob demanda, igual a de mensagens).
+let campaignQueueSingleton: Queue | null = null;
+export function getCampaignsQueue(): Queue {
+  if (!campaignQueueSingleton) {
+    campaignQueueSingleton = new Queue(FILA_CAMPANHAS, {
+      connection: getConnection(),
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: { count: 1000 },
+      },
+    });
+  }
+  return campaignQueueSingleton;
+}
+
+function dormir(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// Throttle entre envios (anti-ban). Configuravel por env.
+const THROTTLE_CAMPANHA_MS = Number(process.env.CAMPANHA_THROTTLE_MS ?? 1500);
+
+// Processa UMA campanha: itera os destinos PENDENTE com throttle, aplica o
+// modelo por destinatario, envia pelo canal e grava status/erro + contadores.
+async function processarCampanha(
+  campanhaId: string,
+  io: Server | null,
+): Promise<void> {
+  const campanha = await prisma.campanha.findUnique({
+    where: { id: campanhaId },
+    select: {
+      id: true,
+      canal: true,
+      finalidade: true,
+      mensagem: true,
+      assunto: true,
+      valoresJson: true,
+      status: true,
+    },
+  });
+  if (!campanha) return;
+  if (campanha.status === StatusCampanha.CANCELADA) return;
+
+  // Instancia de WhatsApp da finalidade (para o canal WhatsApp).
+  let instancia: string | null = null;
+  if (campanha.canal === CanalEnvio.WHATSAPP) {
+    const inst = await prisma.instanciaWhatsApp.findFirst({
+      where: { finalidade: campanha.finalidade, ativo: true },
+      select: { instanciaEvolution: true },
+    });
+    instancia = inst?.instanciaEvolution ?? process.env.EVOLUTION_INSTANCE ?? null;
+  }
+
+  const valores = (campanha.valoresJson ?? {}) as Record<string, string>;
+
+  const destinos = await prisma.campanhaDestino.findMany({
+    where: { campanhaId, status: StatusDestino.PENDENTE },
+    select: {
+      id: true,
+      destino: true,
+      lead: {
+        select: {
+          nome: true,
+          pushName: true,
+          nomeManual: true,
+          telefone: true,
+          empresa: true,
+        },
+      },
+    },
+  });
+
+  for (const d of destinos) {
+    // Aborta se a campanha foi cancelada no meio.
+    const atual = await prisma.campanha.findUnique({
+      where: { id: campanhaId },
+      select: { status: true },
+    });
+    if (atual?.status === StatusCampanha.CANCELADA) break;
+
+    const texto = aplicarModelo(campanha.mensagem, {
+      lead: { nomeEfetivo: nomeEfetivo(d.lead), empresa: d.lead.empresa },
+      valoresDigitados: valores,
+    });
+
+    let ok = false;
+    let erro: string | null = null;
+    if (campanha.canal === CanalEnvio.WHATSAPP) {
+      const r = await enviarTexto(d.destino, texto, instancia);
+      ok = r.ok;
+      erro = r.ok ? null : "falha no envio (WhatsApp)";
+    } else if (campanha.canal === CanalEnvio.SMS) {
+      const r = await enviarSMS(d.destino, texto);
+      ok = r.ok;
+      erro = r.erro ?? null;
+    } else {
+      const r = await enviarEmail(d.destino, campanha.assunto ?? "", texto);
+      ok = r.ok;
+      erro = r.erro ?? null;
+    }
+
+    await prisma.campanhaDestino.update({
+      where: { id: d.id },
+      data: {
+        status: ok ? StatusDestino.ENVIADO : StatusDestino.FALHA,
+        erro,
+        enviadoEm: ok ? new Date() : null,
+      },
+    });
+    const campanhaAtualizada = await prisma.campanha.update({
+      where: { id: campanhaId },
+      data: ok ? { enviados: { increment: 1 } } : { falhas: { increment: 1 } },
+      select: { enviados: true, falhas: true, total: true, pulados: true },
+    });
+
+    (io ?? getIO())?.emit("campanha:progresso", {
+      campanhaId,
+      ...campanhaAtualizada,
+    });
+
+    await dormir(THROTTLE_CAMPANHA_MS);
+  }
+
+  // Conclui (a menos que tenha sido cancelada).
+  const fim = await prisma.campanha.findUnique({
+    where: { id: campanhaId },
+    select: { status: true },
+  });
+  if (fim?.status !== StatusCampanha.CANCELADA) {
+    await prisma.campanha.update({
+      where: { id: campanhaId },
+      data: { status: StatusCampanha.CONCLUIDA, concluidoEm: new Date() },
+    });
+  }
+  (io ?? getIO())?.emit("campanha:concluida", { campanhaId });
+}
+
+// Cria e inicia o worker da fila de campanhas.
+export function createCampaignWorker(io?: Server): Worker {
+  const worker = new Worker(
+    FILA_CAMPANHAS,
+    async (job: Job) => {
+      const { campanhaId } = job.data as { campanhaId: string };
+      await processarCampanha(campanhaId, io ?? null);
+    },
+    { connection: getConnection() },
+  );
+  worker.on("failed", (job, err) => {
+    console.error(
+      `[campanha] job ${job?.id ?? "?"} falhou: ${err?.message}`,
+    );
+  });
+  worker.on("error", (err) => {
+    console.error(`[campanha] erro de conexao: ${err?.message}`);
+  });
+  console.log(`[worker] consumindo a fila "${FILA_CAMPANHAS}"`);
+  return worker;
 }
 
 // Throttle da busca de foto de perfil: nao buscar a cada mensagem. Memoria do

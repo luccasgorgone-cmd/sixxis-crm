@@ -8,22 +8,32 @@ import { Send, Loader2, Zap, X, Package } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
 import type { ProdutoLoja } from "@/components/loja/tipos";
+import {
+  detectarVariaveis,
+  aplicarModelo,
+  INFO_VARIAVEL,
+  type LeadModelo,
+} from "@/lib/modelos";
 
 type Resposta = {
   id: string;
   titulo: string;
   atalho: string | null;
   texto: string;
+  categoria?: string;
+  finalidade?: "VENDA" | "POS_VENDA" | null;
 };
 
 export function Compositor({
   conversaId,
   onEnviada,
   ehAdmin = false,
+  lead,
 }: {
   conversaId: string;
   onEnviada: (msg: MensagemItem) => void;
   ehAdmin?: boolean;
+  lead?: LeadModelo | null;
 }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -34,6 +44,22 @@ export function Compositor({
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
+  // Modelo escolhido que pede variaveis digitadas (cupom etc.).
+  const [modeloPendente, setModeloPendente] = useState<{
+    resposta: Resposta;
+    digitadas: string[];
+    valores: Record<string, string>;
+  } | null>(null);
+
+  function inserirTexto(novoTrecho: string) {
+    const base = texto.trim();
+    const novo =
+      base === "" || base.startsWith("/") ? novoTrecho : `${base}\n${novoTrecho}`;
+    setTexto(novo);
+    setMostrar(false);
+    setBusca("");
+    setTimeout(() => ref.current?.focus(), 0);
+  }
 
   function inserirProduto(p: ProdutoLoja) {
     const msg = mensagemProduto(p);
@@ -71,12 +97,30 @@ export function Compositor({
   }
 
   function selecionar(r: Resposta) {
-    const base = texto.trim();
-    const novo = base === "" || base.startsWith("/") ? r.texto : `${base}\n${r.texto}`;
-    setTexto(novo);
-    setMostrar(false);
-    setBusca("");
-    setTimeout(() => ref.current?.focus(), 0);
+    const { digitadas } = detectarVariaveis(r.texto);
+    if (digitadas.length > 0) {
+      // Abre mini-form para o usuario preencher cupom/desconto/etc.
+      setModeloPendente({
+        resposta: r,
+        digitadas,
+        valores: Object.fromEntries(digitadas.map((d) => [d, ""])),
+      });
+      setMostrar(false);
+      setBusca("");
+      return;
+    }
+    // So automaticas (ou nenhuma): aplica e insere direto.
+    inserirTexto(aplicarModelo(r.texto, { lead }));
+  }
+
+  function confirmarModelo() {
+    if (!modeloPendente) return;
+    const final = aplicarModelo(modeloPendente.resposta.texto, {
+      lead,
+      valoresDigitados: modeloPendente.valores,
+    });
+    setModeloPendente(null);
+    inserirTexto(final);
   }
 
   async function enviar() {
@@ -166,6 +210,66 @@ export function Compositor({
                 </button>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {modeloPendente && (
+        <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="modal-in w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-escuro">
+                {modeloPendente.resposta.titulo}
+              </h3>
+              <button
+                onClick={() => setModeloPendente(null)}
+                className="rounded-lg p-1 text-medio/60 hover:bg-black/5"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-medio/60">
+              Preencha os campos para inserir a mensagem.
+            </p>
+            <div className="space-y-2.5">
+              {modeloPendente.digitadas.map((d) => (
+                <div key={d}>
+                  <label className="mb-1 block text-xs font-medium text-medio/70">
+                    {INFO_VARIAVEL[d]?.rotulo ?? d}
+                  </label>
+                  <input
+                    autoFocus={d === modeloPendente.digitadas[0]}
+                    value={modeloPendente.valores[d]}
+                    onChange={(e) =>
+                      setModeloPendente((m) =>
+                        m
+                          ? {
+                              ...m,
+                              valores: { ...m.valores, [d]: e.target.value },
+                            }
+                          : m,
+                      )
+                    }
+                    placeholder={INFO_VARIAVEL[d]?.exemplo ?? ""}
+                    className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setModeloPendente(null)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-medio hover:bg-black/5"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarModelo}
+                className="rounded-lg bg-tiffany px-4 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+              >
+                Inserir
+              </button>
+            </div>
           </div>
         </div>
       )}

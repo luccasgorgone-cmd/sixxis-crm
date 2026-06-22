@@ -15,6 +15,8 @@ import {
   Mail,
   IdCard,
   StickyNote,
+  BellOff,
+  BellRing,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -32,6 +34,7 @@ export type ClientePainel = {
   empresa: string | null;
   cpf: string | null;
   anotacoes: string | null;
+  aceitaContato?: boolean;
   origem: string | null;
 };
 
@@ -159,9 +162,76 @@ export function BlocoCliente({
               </p>
             </div>
           )}
+          {podeEditar && cliente.aceitaContato !== undefined && (
+            <OptOut
+              leadId={cliente.id}
+              aceita={cliente.aceitaContato}
+              onMudou={onAtualizado}
+            />
+          )}
         </div>
       )}
     </section>
+  );
+}
+
+// Opt-out de comunicacoes em massa (campanhas). Toggle otimista.
+function OptOut({
+  leadId,
+  aceita,
+  onMudou,
+}: {
+  leadId: string;
+  aceita: boolean;
+  onMudou?: () => void;
+}) {
+  const toast = useToast();
+  const [valor, setValor] = useState(aceita);
+  const [salvando, setSalvando] = useState(false);
+
+  async function alternar() {
+    const novo = !valor;
+    setValor(novo);
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aceitaContato: novo }),
+      });
+      if (r.ok) {
+        toast.sucesso(novo ? "Cliente aceita campanhas." : "Cliente em opt-out.");
+        onMudou?.();
+      } else {
+        setValor(!novo);
+        toast.erro("Nao foi possivel alterar.");
+      }
+    } catch {
+      setValor(!novo);
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={() => void alternar()}
+      disabled={salvando}
+      title="Inclui/exclui o cliente de campanhas em massa"
+      className={`mt-2 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${
+        valor
+          ? "border-black/5 bg-fundo text-medio/70 hover:bg-black/5"
+          : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+      }`}
+    >
+      {valor ? (
+        <BellRing className="h-3.5 w-3.5" />
+      ) : (
+        <BellOff className="h-3.5 w-3.5" />
+      )}
+      {valor ? "Aceita comunicacoes em massa" : "Opt-out: fora de campanhas"}
+    </button>
   );
 }
 

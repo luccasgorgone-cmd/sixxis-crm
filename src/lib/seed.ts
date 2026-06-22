@@ -98,6 +98,81 @@ const ETIQUETAS_POS_VENDA: { nome: string; cor: string }[] = [
   { nome: "Aguardando peca", cor: "#7c3aed" },
 ];
 
+// Modelos de mensagem profissionais (categoria + finalidade). Semeados por
+// titulo: cria apenas os que faltarem. Tom cordial, direto, sem exageros.
+const MODELOS_PADRAO: {
+  titulo: string;
+  categoria: string;
+  finalidade: Finalidade | null;
+  texto: string;
+}[] = [
+  {
+    titulo: "Feliz aniversario",
+    categoria: "aniversario",
+    finalidade: null,
+    texto:
+      "Ola, {nome}! A equipe {loja} passa para desejar um feliz aniversario e um dia tao especial quanto voce. Para comemorar, use o cupom {cupom} e aproveite uma condicao exclusiva. Conte sempre com a gente!",
+  },
+  {
+    titulo: "Cupom exclusivo",
+    categoria: "cupom",
+    finalidade: null,
+    texto:
+      "Oi, {primeiro_nome}! Separamos um mimo para voce: use o cupom {cupom} e garanta {desconto} de desconto na {loja}, valido ate {validade}. Qualquer duvida, e so chamar por aqui: {link}",
+  },
+  {
+    titulo: "Data comemorativa",
+    categoria: "data_comemorativa",
+    finalidade: null,
+    texto:
+      "Ola, {nome}! Hoje e uma data especial e a {loja} preparou condicoes para celebrar com voce. Aproveite o cupom {cupom} com {desconto} de desconto ate {validade}. Sera um prazer atender voce: {link}",
+  },
+  {
+    titulo: "Desconto relampago",
+    categoria: "desconto_relampago",
+    finalidade: null,
+    texto:
+      "{primeiro_nome}, oferta relampago na {loja}! Use o cupom {cupom} e leve {desconto} de desconto. Corre que e por tempo limitado, ate {validade}: {link}",
+  },
+  {
+    titulo: "Retomada de interesse",
+    categoria: "retomada",
+    finalidade: Finalidade.VENDA,
+    texto:
+      "Oi, {primeiro_nome}, tudo bem? Vi que voce demonstrou interesse na {loja} e queria saber se posso ajudar a concluir com calma. Se fizer sentido, consigo uma condicao especial com o cupom {cupom}. Fico a disposicao!",
+  },
+];
+
+export async function seedModelos(): Promise<void> {
+  try {
+    const existentes = new Set(
+      (await prisma.respostaRapida.findMany({ select: { titulo: true } })).map(
+        (r) => r.titulo.toLowerCase(),
+      ),
+    );
+    const faltantes = MODELOS_PADRAO.filter(
+      (m) => !existentes.has(m.titulo.toLowerCase()),
+    );
+    if (faltantes.length === 0) {
+      console.log("[seed] modelos de mensagem ok");
+      return;
+    }
+    const ultima = await prisma.respostaRapida.findFirst({
+      orderBy: { ordem: "desc" },
+      select: { ordem: true },
+    });
+    let ordem = ultima?.ordem ?? 0;
+    await prisma.respostaRapida.createMany({
+      data: faltantes.map((m) => ({ ...m, ordem: ++ordem })),
+    });
+    console.log(`[seed] ${faltantes.length} modelos de mensagem criados`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear modelos: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 export async function seedFunil(): Promise<void> {
   try {
     const totalEtapas = await prisma.etapa.count();

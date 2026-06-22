@@ -20,6 +20,7 @@ import {
   UserPlus,
   Pencil,
   PauseCircle,
+  CalendarClock,
   History,
   WifiOff,
   type LucideIcon,
@@ -54,6 +55,7 @@ const ICONE_ATIV: Record<string, LucideIcon> = {
   PERDA: XCircle,
   EDICAO: Pencil,
   PENDENCIA: PauseCircle,
+  LEMBRETE: CalendarClock,
 };
 
 // Visual (icone + cor) por evento.

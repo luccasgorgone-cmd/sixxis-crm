@@ -2,9 +2,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
+import { Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// "VENDA" | "POS_VENDA" | outro -> null (ambas).
+function normalizarFinalidade(v: unknown): Finalidade | null {
+  return v === Finalidade.VENDA || v === Finalidade.POS_VENDA ? v : null;
+}
 
 export async function GET(): Promise<NextResponse> {
   const admin = await obterAdmin();
@@ -22,7 +28,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!admin) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
-  let body: { titulo?: string; atalho?: string; texto?: string };
+  let body: {
+    titulo?: string;
+    atalho?: string;
+    texto?: string;
+    categoria?: string;
+    finalidade?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -45,6 +57,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       titulo,
       atalho: body.atalho?.trim() || null,
       texto,
+      categoria: body.categoria?.trim() || "geral",
+      finalidade: normalizarFinalidade(body.finalidade),
       ordem: (ultima?.ordem ?? 0) + 1,
     },
   });

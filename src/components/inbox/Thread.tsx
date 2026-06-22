@@ -115,6 +115,9 @@ export function Thread({
           conversaId={conversa.id}
           onEnviada={onEnviada ?? (() => undefined)}
           ehAdmin={ehAdmin}
+          lead={{
+            nomeEfetivo: conversa.leadNome?.trim() || conversa.leadTelefone,
+          }}
         />
       )}
     </div>

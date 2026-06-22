@@ -44,6 +44,7 @@ export async function PATCH(
       empresa: true,
       cpf: true,
       anotacoes: true,
+      aceitaContato: true,
       donoId: true,
       donoPosVendaId: true,
       conversas: { select: { agenteId: true } },
@@ -80,6 +81,12 @@ export async function PATCH(
       (data as Record<string, unknown>)[chave] = novo;
       mudancas.push(rotulo);
     }
+  }
+
+  // Opt-out de comunicacoes em massa (boolean a parte dos campos de texto).
+  if (typeof body.aceitaContato === "boolean" && body.aceitaContato !== lead.aceitaContato) {
+    data.aceitaContato = body.aceitaContato;
+    mudancas.push(body.aceitaContato ? "aceita contato" : "opt-out de contato");
   }
 
   if (mudancas.length === 0) {

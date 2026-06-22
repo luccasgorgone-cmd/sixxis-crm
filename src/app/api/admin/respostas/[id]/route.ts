@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
 import { Prisma } from "@/generated/prisma/client";
+import { Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export async function PATCH(
     atalho?: string | null;
     texto?: string;
     ativo?: boolean;
+    categoria?: string;
+    finalidade?: unknown;
   };
   try {
     body = await req.json();
@@ -32,6 +35,14 @@ export async function PATCH(
   if (body.atalho !== undefined) data.atalho = body.atalho?.trim() || null;
   if (body.texto !== undefined) data.texto = body.texto.trim();
   if (body.ativo !== undefined) data.ativo = body.ativo;
+  if (body.categoria !== undefined) data.categoria = body.categoria.trim() || "geral";
+  if (body.finalidade !== undefined) {
+    data.finalidade =
+      body.finalidade === Finalidade.VENDA ||
+      body.finalidade === Finalidade.POS_VENDA
+        ? body.finalidade
+        : null;
+  }
 
   const resposta = await prisma.respostaRapida.update({ where: { id }, data });
   return NextResponse.json({ resposta });

@@ -14,7 +14,14 @@ export async function GET(): Promise<NextResponse> {
   const respostas = await prisma.respostaRapida.findMany({
     where: { ativo: true },
     orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
-    select: { id: true, titulo: true, atalho: true, texto: true },
+    select: {
+      id: true,
+      titulo: true,
+      atalho: true,
+      texto: true,
+      categoria: true,
+      finalidade: true,
+    },
   });
   return NextResponse.json({ respostas });
 }

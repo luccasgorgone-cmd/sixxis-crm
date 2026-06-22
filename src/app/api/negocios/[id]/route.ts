@@ -53,6 +53,7 @@ export async function GET(
           empresa: true,
           cpf: true,
           anotacoes: true,
+          aceitaContato: true,
           origem: true,
           donoId: true,
           dono: { select: { id: true, nome: true } },
@@ -93,6 +94,13 @@ export async function GET(
     select: { id: true, atendidoPor: true },
   });
 
+  // Lembretes pendentes deste cliente (para a secao "Agendar contato").
+  const lembretes = await prisma.lembrete.findMany({
+    where: { leadId: negocio.lead.id, status: "PENDENTE" },
+    orderBy: { dataHora: "asc" },
+    include: { agente: { select: { nome: true } } },
+  });
+
   const card = cardNegocio(negocio);
 
   return NextResponse.json({
@@ -110,6 +118,7 @@ export async function GET(
         empresa: negocio.lead.empresa,
         cpf: negocio.lead.cpf,
         anotacoes: negocio.lead.anotacoes,
+        aceitaContato: negocio.lead.aceitaContato,
         origem: negocio.lead.origem,
       },
       // Dono mostrado conforme a finalidade do negocio.
@@ -141,6 +150,13 @@ export async function GET(
         descricao: h.descricao,
         agente: h.agente?.nome ?? null,
         criadoEm: h.criadoEm,
+      })),
+      lembretes: lembretes.map((l) => ({
+        id: l.id,
+        dataHora: l.dataHora,
+        nota: l.nota,
+        finalidade: l.finalidade,
+        agente: l.agente?.nome ?? null,
       })),
     },
   });

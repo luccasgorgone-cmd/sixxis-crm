@@ -81,6 +81,14 @@ export type ItemAtividade = {
 export type VendedorOpcao = { id: string; nome: string };
 export type ObservacaoOpcao = { id: string; texto: string };
 
+export type LembreteItem = {
+  id: string;
+  dataHora: string;
+  nota: string | null;
+  finalidade: Finalidade;
+  agente: string | null;
+};
+
 export type DetalheNegocio = CardNegocio & {
   cliente: {
     id: string;
@@ -94,6 +102,7 @@ export type DetalheNegocio = CardNegocio & {
     empresa: string | null;
     cpf: string | null;
     anotacoes: string | null;
+    aceitaContato: boolean;
     origem: string | null;
   };
   dono: { id: string; nome: string } | null;
@@ -104,6 +113,7 @@ export type DetalheNegocio = CardNegocio & {
   atendidoPor: "HUMANO" | "IA" | null;
   notas: NotaItem[];
   historico: ItemHistorico[];
+  lembretes: LembreteItem[];
 };
 
 // Cores/rotulos de temperatura.

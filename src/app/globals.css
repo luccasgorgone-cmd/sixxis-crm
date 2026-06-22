@@ -55,6 +55,19 @@ body {
   animation: pulsar 1.5s ease-in-out infinite;
 }
 
+/* Campo de formulario padrao (input/select/textarea). */
+.campo {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(0 0 0 / 0.1);
+  background-color: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+.campo:focus {
+  border-color: var(--color-tiffany);
+}
+
 /* Entrada do drawer (painel lateral) e do overlay. */
 @keyframes deslizar-dir {
   from {

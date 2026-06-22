@@ -5,10 +5,11 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
-import { createMessagesWorker } from "./src/lib/queue";
+import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import {
   seedAdmin,
   seedFunil,
+  seedModelos,
   seedVendedorTeste,
   seedRoteamentoEPresets,
   seedFinalidadeEInstancias,
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   // etiquetas), vendedor de teste e backfill de negocios dos leads antigos.
   await seedAdmin();
   await seedFunil();
+  await seedModelos();
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();
@@ -52,6 +54,8 @@ async function main(): Promise<void> {
 
   // Worker da fila "messages-in" (consome os eventos enfileirados pelo webhook).
   createMessagesWorker(io);
+  // Worker da fila "campaigns" (envio em massa com throttle).
+  createCampaignWorker(io);
 
   httpServer.listen(port, () => {
     console.log(`CRM no ar na porta ${port}`);
