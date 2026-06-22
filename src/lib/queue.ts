@@ -19,6 +19,7 @@ import {
   CanalEnvio,
   StatusCampanha,
   StatusDestino,
+  AtividadeTipo,
 } from "../generated/prisma/enums";
 
 const NOME_FILA = "messages-in";
@@ -336,6 +337,51 @@ function extrairConteudo(
   return null;
 }
 
+// Revogacao recebida (cliente apagou a mensagem): preserva o conteudo, so marca
+// apagada=true (apagadaPor=CLIENTE) e registra Atividade. Auditavel pelo admin.
+async function marcarApagadaPeloCliente(
+  externalIdRevogado: string,
+  io: Server | null,
+): Promise<void> {
+  const msg = await prisma.mensagem.findUnique({
+    where: { externalId: externalIdRevogado },
+    select: {
+      id: true,
+      apagada: true,
+      conversa: { select: { id: true, leadId: true } },
+    },
+  });
+  if (!msg || msg.apagada) return;
+  await prisma.mensagem.update({
+    where: { id: msg.id },
+    data: { apagada: true, apagadaEm: new Date(), apagadaPor: "CLIENTE" },
+  });
+  await prisma.atividade.create({
+    data: {
+      leadId: msg.conversa.leadId,
+      tipo: AtividadeTipo.MENSAGEM_APAGADA,
+      descricao: "Mensagem apagada pelo cliente",
+    },
+  });
+  (io ?? getIO())?.emit("mensagem:apagada", {
+    conversaId: msg.conversa.id,
+    mensagemId: msg.id,
+    apagadaPor: "CLIENTE",
+  });
+  console.log(`[ingest] mensagem ${externalIdRevogado} marcada como apagada (CLIENTE)`);
+}
+
+// Detecta o id revogado num evento (protocolMessage REVOKE no upsert, ou a
+// propria key em messages.delete/messages.update).
+function idRevogado(payload: EventoEvolution): string | null {
+  const proto = (payload?.data?.message as Record<string, unknown> | undefined)
+    ?.protocolMessage as { type?: number | string; key?: { id?: string } } | undefined;
+  const ehRevoke =
+    !!proto && (proto.type === 0 || proto.type === "REVOKE" || proto.type === "0");
+  if (ehRevoke && proto?.key?.id) return proto.key.id;
+  return null;
+}
+
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
 async function processarEvento(
   payload: EventoEvolution,
@@ -346,8 +392,22 @@ async function processarEvento(
   // (minusculo, ponto). Normaliza antes de comparar para aceitar ambos.
   const evtRaw = String(payload?.event ?? "");
   const evt = evtRaw.toUpperCase().replace(/\./g, "_");
+
+  // Revogacao via evento dedicado (cliente apagou): preserva, nao deleta.
+  if (evt === "MESSAGES_DELETE" || evt === "MESSAGES_UPDATE") {
+    const revId = payload?.data?.key?.id ?? idRevogado(payload);
+    if (revId) await marcarApagadaPeloCliente(revId, io);
+    return;
+  }
   // So processamos recebimento/insercao de mensagens. Demais eventos: ignora.
   if (evt !== "MESSAGES_UPSERT") return;
+
+  // Revogacao que chega como upsert com protocolMessage REVOKE.
+  const revInline = idRevogado(payload);
+  if (revInline) {
+    await marcarApagadaPeloCliente(revInline, io);
+    return;
+  }
 
   const data = payload?.data;
   const jid = data?.key?.remoteJid;

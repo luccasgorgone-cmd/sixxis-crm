@@ -21,6 +21,7 @@ import {
   Pencil,
   PauseCircle,
   CalendarClock,
+  Ban,
   History,
   WifiOff,
   type LucideIcon,
@@ -56,6 +57,7 @@ const ICONE_ATIV: Record<string, LucideIcon> = {
   EDICAO: Pencil,
   PENDENCIA: PauseCircle,
   LEMBRETE: CalendarClock,
+  MENSAGEM_APAGADA: Ban,
 };
 
 // Visual (icone + cor) por evento.

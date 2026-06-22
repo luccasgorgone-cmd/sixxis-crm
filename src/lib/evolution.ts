@@ -49,6 +49,42 @@ export async function enviarTexto(
   }
 }
 
+// Revoga (apaga para todos) uma mensagem propria ja enviada.
+// Evolution v2: DELETE {BASE}/chat/deleteMessageForEveryone/{instance}
+// body { id, remoteJid, fromMe, participant? }. Nunca lanca.
+export async function revogarMensagem(
+  instancia: string | null | undefined,
+  dados: { id: string; remoteJid: string; fromMe: boolean; participant?: string },
+): Promise<{ ok: boolean; status?: number; raw: unknown }> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  try {
+    const resp = await fetch(
+      `${cfg.base}/chat/deleteMessageForEveryone/${instance}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+        body: JSON.stringify({
+          id: dados.id,
+          remoteJid: dados.remoteJid,
+          fromMe: dados.fromMe,
+          ...(dados.participant ? { participant: dados.participant } : {}),
+        }),
+      },
+    );
+    const raw = await resp.json().catch(() => null);
+    return { ok: resp.ok, status: resp.status, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // Busca a URL da foto de perfil de um numero no WhatsApp.
 // POST {BASE}/chat/fetchProfilePictureUrl/{instance}  body { number }.
 // Retorna a URL ou null (sem foto / erro / config ausente) — nunca lanca.
@@ -120,7 +156,8 @@ export async function configurarWebhook(
           headers: { "x-webhook-secret": secret },
           byEvents: false,
           base64: false,
-          events: ["MESSAGES_UPSERT"],
+          // UPSERT = mensagens; UPDATE/DELETE = status e revogacoes (apagar).
+          events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE"],
         },
       }),
     });

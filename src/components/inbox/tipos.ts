@@ -36,6 +36,9 @@ export type MensagemItem = {
   conteudo: string | null;
   statusEnvio: StatusEnvio;
   hora: string;
+  apagada?: boolean;
+  apagadaPor?: string | null; // "COLABORADOR" | "CLIENTE"
+  apagadaEm?: string | null;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

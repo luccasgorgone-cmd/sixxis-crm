@@ -1,7 +1,7 @@
 "use client";
 
 // Coluna central: cabecalho do contato, mensagens (bolhas) e o compositor.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -13,9 +13,14 @@ import {
   FileText,
   Bot,
   User as UserIcon,
+  Trash2,
+  Ban,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
+import { useToast } from "@/components/ui/Toast";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import {
@@ -101,7 +106,11 @@ export function Thread({
             </p>
           </div>
         ) : (
-          <ListaMensagens mensagens={mensagens} />
+          <ListaMensagens
+            mensagens={mensagens}
+            ehAdmin={ehAdmin}
+            podeApagar={!somenteLeitura}
+          />
         )}
         <div ref={fimRef} />
       </div>
@@ -124,7 +133,15 @@ export function Thread({
   );
 }
 
-function ListaMensagens({ mensagens }: { mensagens: MensagemItem[] }) {
+function ListaMensagens({
+  mensagens,
+  ehAdmin,
+  podeApagar,
+}: {
+  mensagens: MensagemItem[];
+  ehAdmin: boolean;
+  podeApagar: boolean;
+}) {
   const blocos: { dia: string; itens: MensagemItem[] }[] = [];
   let chaveAtual = "";
   for (const m of mensagens) {
@@ -147,7 +164,7 @@ function ListaMensagens({ mensagens }: { mensagens: MensagemItem[] }) {
             </span>
           </div>
           {bloco.itens.map((m) => (
-            <Bolha key={m.id} mensagem={m} />
+            <Bolha key={m.id} mensagem={m} ehAdmin={ehAdmin} podeApagar={podeApagar} />
           ))}
         </div>
       ))}
@@ -169,22 +186,120 @@ const ROTULO_MIDIA: Record<string, string> = {
   OUTRO: "Mensagem",
 };
 
-function Bolha({ mensagem }: { mensagem: MensagemItem }) {
+function Bolha({
+  mensagem,
+  ehAdmin,
+  podeApagar,
+}: {
+  mensagem: MensagemItem;
+  ehAdmin: boolean;
+  podeApagar: boolean;
+}) {
+  const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
   const temTexto = Boolean(mensagem.conteudo && mensagem.conteudo.trim());
   const ehMidia = mensagem.tipo !== "TEXTO" && !temTexto;
   const IconeMidia = ICONE_MIDIA[mensagem.tipo];
 
+  // Estado local de apagamento (otimista) + expandir original (admin).
+  const [apagadaLocal, setApagadaLocal] = useState(false);
+  const [verOriginal, setVerOriginal] = useState(false);
+  const [apagando, setApagando] = useState(false);
+  const apagada = mensagem.apagada || apagadaLocal;
+  const apagadaPor = mensagem.apagadaPor ?? (apagadaLocal ? "COLABORADOR" : null);
+
+  // So pode revogar a propria mensagem enviada, recente e ainda nao apagada.
+  const podeRevogar =
+    podeApagar &&
+    ehOut &&
+    !apagada &&
+    (mensagem.statusEnvio === "ENVIADA" || mensagem.statusEnvio === "ENTREGUE");
+
+  async function apagar() {
+    setApagando(true);
+    try {
+      const r = await fetch(`/api/mensagens/${mensagem.id}/apagar`, {
+        method: "POST",
+      });
+      if (r.ok) {
+        setApagadaLocal(true);
+        toast.sucesso("Mensagem apagada para o cliente.");
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel apagar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setApagando(false);
+    }
+  }
+
+  const rotuloApagada =
+    apagadaPor === "CLIENTE"
+      ? "Mensagem apagada pelo cliente"
+      : "Mensagem apagada";
+
   return (
-    <div className={`flex ${ehOut ? "justify-end" : "justify-start"}`}>
+    <div className={`group flex items-center gap-1.5 ${ehOut ? "justify-end" : "justify-start"}`}>
+      {/* Acao apagar (so na propria mensagem enviada) */}
+      {podeRevogar && (
+        <button
+          onClick={() => void apagar()}
+          disabled={apagando}
+          title="Apagar para todos"
+          aria-label="Apagar para todos"
+          className="order-1 shrink-0 rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-erro group-hover:opacity-100"
+        >
+          {apagando ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+
       <div
-        className={`max-w-[75%] rounded-xl px-3 py-2 text-sm shadow-sm ${
-          ehOut
-            ? "rounded-br-sm bg-tiffany text-white"
-            : "rounded-bl-sm bg-white text-escuro"
+        className={`order-2 max-w-[75%] rounded-xl px-3 py-2 text-sm shadow-sm ${
+          apagada
+            ? "border border-dashed border-black/15 bg-black/5 text-medio/70"
+            : ehOut
+              ? "rounded-br-sm bg-tiffany text-white"
+              : "rounded-bl-sm bg-white text-escuro"
         }`}
       >
-        {ehMidia ? (
+        {apagada ? (
+          <div>
+            <span className="flex items-center gap-1.5 italic text-medio/60">
+              <Ban className="h-3.5 w-3.5" /> {rotuloApagada}
+            </span>
+            {/* Conteudo original visivel apenas ao ADMIN (auditoria). */}
+            {ehAdmin && (mensagem.conteudo || mensagem.apagadaEm) && (
+              <div className="mt-1">
+                <button
+                  onClick={() => setVerOriginal((v) => !v)}
+                  className="flex items-center gap-1 text-[11px] font-medium text-medio/60 hover:text-escuro"
+                >
+                  <Eye className="h-3 w-3" />
+                  {verOriginal ? "Ocultar" : "Ver conteudo original (admin)"}
+                </button>
+                {verOriginal && (
+                  <div className="mt-1 rounded-md bg-white/70 p-2 text-xs text-escuro">
+                    <p className="whitespace-pre-wrap break-words">
+                      {mensagem.conteudo || ROTULO_MIDIA[mensagem.tipo] || "—"}
+                    </p>
+                    {mensagem.apagadaEm && (
+                      <p className="mt-1 text-[10px] text-medio/50">
+                        {apagadaPor === "CLIENTE" ? "Pelo cliente" : "Pelo colaborador"}{" "}
+                        em {horaCurta(mensagem.apagadaEm)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : ehMidia ? (
           <span
             className={`flex items-center gap-2 italic ${
               ehOut ? "text-white/90" : "text-medio/70"
@@ -201,11 +316,11 @@ function Bolha({ mensagem }: { mensagem: MensagemItem }) {
 
         <span
           className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
-            ehOut ? "text-white/70" : "text-medio/50"
+            apagada ? "text-medio/40" : ehOut ? "text-white/70" : "text-medio/50"
           }`}
         >
           {horaCurta(mensagem.hora)}
-          {ehOut && <StatusEnvio status={mensagem.statusEnvio} />}
+          {ehOut && !apagada && <StatusEnvio status={mensagem.statusEnvio} />}
         </span>
       </div>
     </div>

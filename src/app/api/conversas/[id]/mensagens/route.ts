@@ -41,6 +41,9 @@ export async function GET(
       conteudo: true,
       statusEnvio: true,
       hora: true,
+      apagada: true,
+      apagadaPor: true,
+      apagadaEm: true,
     },
   });
 

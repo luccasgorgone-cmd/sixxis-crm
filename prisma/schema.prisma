@@ -134,6 +134,7 @@ enum AtividadeTipo {
   EDICAO
   PENDENCIA
   LEMBRETE
+  MENSAGEM_APAGADA
 }
 
 // Estado de um lembrete/agendamento de contato.
@@ -268,6 +269,12 @@ model Mensagem {
   mediaUrl    String?
   lida        Boolean      @default(false)
   statusEnvio StatusEnvio?
+  // Apagamento (revoke). O conteudo NUNCA e removido — so marcado. apagadaPor:
+  // "COLABORADOR" (revogou para o cliente) | "CLIENTE" (cliente apagou).
+  apagada     Boolean      @default(false)
+  apagadaEm   DateTime?
+  apagadaPor  String?
+  apagadaPorId String?
   raw         Json
   hora        DateTime     @default(now())
 
