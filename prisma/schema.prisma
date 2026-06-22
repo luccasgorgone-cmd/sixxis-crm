@@ -275,7 +275,9 @@ model Mensagem {
   apagadaEm   DateTime?
   apagadaPor  String?
   apagadaPorId String?
-  raw         Json
+  // Payload bruto da Evolution. Podado (NULL) apos RETENCAO_RAW_MESES; o conteudo
+  // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
+  raw         Json?
   hora        DateTime     @default(now())
 
   @@index([conversaId, hora])

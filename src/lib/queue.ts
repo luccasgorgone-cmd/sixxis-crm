@@ -10,11 +10,18 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
-import { fetchFotoPerfil, enviarTexto } from "./evolution";
+import { fetchFotoPerfil, enviarTexto, baixarMidiaBase64 } from "./evolution";
+import { r2Configurado, enviarParaR2, extensaoDoMime } from "./r2";
 import { nomeEfetivo } from "./cliente";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
-import { TipoMsg, DirecaoMsg, Finalidade, Prisma } from "../generated/prisma/client";
+import {
+  TipoMsg,
+  DirecaoMsg,
+  StatusEnvio,
+  Finalidade,
+  Prisma,
+} from "../generated/prisma/client";
 import {
   CanalEnvio,
   StatusCampanha,
@@ -322,18 +329,70 @@ function mapearTipo(msgType?: string): TipoMsg {
   }
 }
 
-// Extrai o texto da mensagem (quando houver). Para midia nao baixamos nada
-// nesta fase: o conteudo fica null e so registramos o tipo.
+// Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
+// tipos sem texto (figurinha/localizacao/contato). Captura o maximo de info.
 function extrairConteudo(
   message?: Record<string, unknown> | null,
 ): string | null {
   if (!message) return null;
-  const conversation = message["conversation"];
+  const m = message as Record<string, Record<string, unknown> | string | undefined>;
+
+  const conversation = m["conversation"];
   if (typeof conversation === "string") return conversation;
-  const estendida = message["extendedTextMessage"] as
-    | { text?: string }
-    | undefined;
+  const estendida = m["extendedTextMessage"] as { text?: string } | undefined;
   if (typeof estendida?.text === "string") return estendida.text;
+
+  // Legendas de midia.
+  const img = m["imageMessage"] as { caption?: string } | undefined;
+  if (img) return img.caption?.trim() || "[imagem]";
+  const vid = m["videoMessage"] as { caption?: string } | undefined;
+  if (vid) return vid.caption?.trim() || "[video]";
+  const doc = m["documentMessage"] as
+    | { caption?: string; fileName?: string }
+    | undefined;
+  if (doc) return doc.caption?.trim() || `[documento] ${doc.fileName ?? ""}`.trim();
+  if (m["audioMessage"]) return "[audio]";
+
+  // Tipos sem texto: resumo legivel.
+  if (m["stickerMessage"]) return "[figurinha]";
+  const loc = m["locationMessage"] as
+    | { degreesLatitude?: number; degreesLongitude?: number; name?: string }
+    | undefined;
+  if (loc) {
+    const lugar = loc.name ? ` ${loc.name}` : "";
+    const coord =
+      loc.degreesLatitude != null && loc.degreesLongitude != null
+        ? ` (${loc.degreesLatitude}, ${loc.degreesLongitude})`
+        : "";
+    return `[localizacao]${lugar}${coord}`.trim();
+  }
+  const contato = m["contactMessage"] as { displayName?: string } | undefined;
+  if (contato) return `[contato] ${contato.displayName ?? ""}`.trim();
+  const contatos = m["contactsArrayMessage"] as
+    | { contacts?: { displayName?: string }[] }
+    | undefined;
+  if (contatos?.contacts) {
+    return `[contatos] ${contatos.contacts
+      .map((c) => c.displayName)
+      .filter(Boolean)
+      .join(", ")}`.trim();
+  }
+  return null;
+}
+
+// Transcricao de audio (speech-to-text), quando a Evolution enviar. Busca em
+// alguns locais conhecidos; ausente = null.
+function extrairTranscricao(data?: EventoEvolution["data"]): string | null {
+  const d = data as Record<string, unknown> | undefined;
+  const direto = d?.["speechToText"];
+  if (typeof direto === "string" && direto.trim()) return direto.trim();
+  const msg = data?.message as Record<string, unknown> | undefined;
+  const noMsg = msg?.["speechToText"];
+  if (typeof noMsg === "string" && noMsg.trim()) return noMsg.trim();
+  const audio = msg?.["audioMessage"] as { transcription?: string } | undefined;
+  if (typeof audio?.transcription === "string" && audio.transcription.trim()) {
+    return audio.transcription.trim();
+  }
   return null;
 }
 
@@ -371,15 +430,145 @@ async function marcarApagadaPeloCliente(
   console.log(`[ingest] mensagem ${externalIdRevogado} marcada como apagada (CLIENTE)`);
 }
 
-// Detecta o id revogado num evento (protocolMessage REVOKE no upsert, ou a
-// propria key em messages.delete/messages.update).
+// Detecta o id revogado num evento: protocolMessage REVOKE (no upsert) ou
+// messageStubType REVOKE (no update). Retorna o id da mensagem original.
 function idRevogado(payload: EventoEvolution): string | null {
-  const proto = (payload?.data?.message as Record<string, unknown> | undefined)
+  const data = payload?.data as Record<string, unknown> | undefined;
+  const proto = (data?.message as Record<string, unknown> | undefined)
     ?.protocolMessage as { type?: number | string; key?: { id?: string } } | undefined;
   const ehRevoke =
     !!proto && (proto.type === 0 || proto.type === "REVOKE" || proto.type === "0");
   if (ehRevoke && proto?.key?.id) return proto.key.id;
+
+  const upd = data?.update as Record<string, unknown> | undefined;
+  const stub = upd?.["messageStubType"] ?? data?.["messageStubType"];
+  if ((stub === 1 || stub === "REVOKE") && payload?.data?.key?.id) {
+    return payload.data.key.id;
+  }
   return null;
+}
+
+// Atualiza o statusEnvio de uma mensagem OUT a partir de um messages.update.
+const ORDEM_STATUS: Record<string, number> = {
+  ENVIANDO: 0,
+  ENVIADA: 1,
+  ENTREGUE: 2,
+  ERRO: 3,
+};
+const MAPA_STATUS: Record<string, StatusEnvio> = {
+  PENDING: StatusEnvio.ENVIADA,
+  SERVER_ACK: StatusEnvio.ENVIADA,
+  DELIVERY_ACK: StatusEnvio.ENTREGUE,
+  READ: StatusEnvio.ENTREGUE,
+  PLAYED: StatusEnvio.ENTREGUE,
+  ERROR: StatusEnvio.ERRO,
+};
+async function atualizarStatusMensagem(
+  payload: EventoEvolution,
+  io: Server | null,
+): Promise<void> {
+  const data = payload?.data as Record<string, unknown> | undefined;
+  const externalId =
+    (data?.key as { id?: string } | undefined)?.id ??
+    (data?.["keyId"] as string | undefined);
+  const upd = data?.update as { status?: string } | undefined;
+  const statusRaw = String(upd?.status ?? (data?.["status"] as string) ?? "");
+  if (!externalId || !statusRaw) return;
+  const novo = MAPA_STATUS[statusRaw.toUpperCase()];
+  if (!novo) return;
+
+  const msg = await prisma.mensagem.findUnique({
+    where: { externalId },
+    select: { id: true, direcao: true, conversaId: true, statusEnvio: true },
+  });
+  if (!msg || msg.direcao !== DirecaoMsg.OUT) return;
+  // Nao regride (ENTREGUE nao volta para ENVIADA), exceto para ERRO.
+  if (
+    msg.statusEnvio &&
+    novo !== StatusEnvio.ERRO &&
+    ORDEM_STATUS[msg.statusEnvio] >= ORDEM_STATUS[novo]
+  ) {
+    return;
+  }
+  await prisma.mensagem.update({
+    where: { id: msg.id },
+    data: { statusEnvio: novo },
+  });
+  (io ?? getIO())?.emit("mensagem:status", {
+    conversaId: msg.conversaId,
+    mensagemId: msg.id,
+    statusEnvio: novo,
+  });
+}
+
+// URL "original" da midia (sub-objeto da mensagem). Pode ser criptografada/
+// efemera; usada apenas como fallback enquanto o R2 nao confirma.
+function extrairMediaUrl(message?: Record<string, unknown> | null): string | null {
+  if (!message) return null;
+  for (const chave of [
+    "imageMessage",
+    "videoMessage",
+    "audioMessage",
+    "documentMessage",
+    "stickerMessage",
+  ]) {
+    const sub = message[chave] as { url?: string } | undefined;
+    if (sub?.url) return sub.url;
+  }
+  return null;
+}
+
+// Tipos que carregam midia para baixar.
+function ehMidia(tipo: TipoMsg): boolean {
+  return (
+    tipo === TipoMsg.IMAGEM ||
+    tipo === TipoMsg.VIDEO ||
+    tipo === TipoMsg.AUDIO ||
+    tipo === TipoMsg.DOCUMENTO
+  );
+}
+
+// Best-effort: baixa a midia da Evolution e sobe no R2, gravando a URL
+// permanente em mediaUrl. Nao bloqueia a ingestao; falha mantem o fallback.
+function agendarMidia(
+  mensagemId: string,
+  conversaId: string,
+  externalId: string,
+  telefone: string,
+  instancia: string,
+  data: EventoEvolution["data"],
+  io: Server | null,
+): void {
+  if (!r2Configurado()) return;
+  void (async () => {
+    try {
+      const midia = await baixarMidiaBase64(instancia, data ?? {});
+      if (!midia) {
+        console.warn(`[midia] download falhou ${externalId} (retry no proximo evento)`);
+        return;
+      }
+      const buffer = Buffer.from(midia.base64, "base64");
+      const ext = extensaoDoMime(midia.mimetype);
+      const idSeguro = externalId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const chave = `whatsapp/${telefone}/${idSeguro}.${ext}`;
+      const url = await enviarParaR2(
+        chave,
+        buffer,
+        midia.mimetype ?? "application/octet-stream",
+      );
+      if (url) {
+        await prisma.mensagem.update({
+          where: { id: mensagemId },
+          data: { mediaUrl: url },
+        });
+        (io ?? getIO())?.emit("mensagem:midia", { conversaId, mensagemId, mediaUrl: url });
+      }
+    } catch (erro) {
+      console.warn(
+        `[midia] erro ao persistir ${externalId}: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    }
+  })();
 }
 
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
@@ -393,10 +582,17 @@ async function processarEvento(
   const evtRaw = String(payload?.event ?? "");
   const evt = evtRaw.toUpperCase().replace(/\./g, "_");
 
-  // Revogacao via evento dedicado (cliente apagou): preserva, nao deleta.
-  if (evt === "MESSAGES_DELETE" || evt === "MESSAGES_UPDATE") {
+  // Revogacao dedicada (cliente apagou): preserva, nao deleta.
+  if (evt === "MESSAGES_DELETE") {
     const revId = payload?.data?.key?.id ?? idRevogado(payload);
     if (revId) await marcarApagadaPeloCliente(revId, io);
+    return;
+  }
+  // Update pode ser revogacao (stub) OU atualizacao de status de entrega/leitura.
+  if (evt === "MESSAGES_UPDATE") {
+    const revId = idRevogado(payload);
+    if (revId) await marcarApagadaPeloCliente(revId, io);
+    else await atualizarStatusMensagem(payload, io);
     return;
   }
   // So processamos recebimento/insercao de mensagens. Demais eventos: ignora.
@@ -434,6 +630,8 @@ async function processarEvento(
 
   const tipo = mapearTipo(data?.messageType);
   const conteudo = extrairConteudo(data?.message);
+  const transcricao = extrairTranscricao(data);
+  const mediaUrlOriginal = extrairMediaUrl(data?.message);
   const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
 
   // IDEMPOTENCIA: a Evolution reenvia eventos. Se a mensagem ja existe,
@@ -524,12 +722,27 @@ async function processarEvento(
         direcao,
         tipo,
         conteudo,
+        ...(transcricao ? { transcricao } : {}),
+        ...(mediaUrlOriginal ? { mediaUrl: mediaUrlOriginal } : {}),
         raw: payload as unknown as Prisma.InputJsonValue,
         ...(hora ? { hora } : {}),
       },
     });
 
     console.log(`[ingest] ${telefone} ${tipo} ${externalId}`);
+
+    // Midia: baixa da Evolution e persiste no R2 (best-effort, em background).
+    if (ehMidia(tipo)) {
+      agendarMidia(
+        mensagem.id,
+        conversa.id,
+        externalId,
+        telefone,
+        nomeInstancia,
+        data,
+        io,
+      );
+    }
 
     // Atualiza a conversa: ultima atividade sempre; nao lidas so na ENTRADA.
     // (mensagens OUT vindas do proprio celular nao contam como nao lidas.)

@@ -49,6 +49,36 @@ export async function enviarTexto(
   }
 }
 
+// Baixa a midia de uma mensagem (base64) via Evolution.
+// POST {BASE}/chat/getBase64FromMediaMessage/{instance} body { message: {...} }.
+// Retorna { base64, mimetype } ou null (sem config / erro / sem midia).
+export async function baixarMidiaBase64(
+  instancia: string,
+  message: { key?: unknown },
+): Promise<{ base64: string; mimetype: string | null } | null> {
+  const cfg = baseEKey();
+  if (!cfg || !instancia) return null;
+  try {
+    const resp = await fetch(
+      `${cfg.base}/chat/getBase64FromMediaMessage/${instancia}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+        body: JSON.stringify({ message, convertToMp4: false }),
+      },
+    );
+    if (!resp.ok) return null;
+    const raw = (await resp.json().catch(() => null)) as {
+      base64?: string;
+      mimetype?: string;
+    } | null;
+    if (!raw?.base64) return null;
+    return { base64: raw.base64, mimetype: raw.mimetype ?? null };
+  } catch {
+    return null;
+  }
+}
+
 // Revoga (apaga para todos) uma mensagem propria ja enviada.
 // Evolution v2: DELETE {BASE}/chat/deleteMessageForEveryone/{instance}
 // body { id, remoteJid, fromMe, participant? }. Nunca lanca.
