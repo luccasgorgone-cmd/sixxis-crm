@@ -36,6 +36,7 @@ import { LojaCliente } from "@/components/loja/LojaCliente";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
+import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -364,7 +365,20 @@ export function PainelNegocio({
                   {subAba === "historico" && (
                     <HistoricoCliente leadId={detalhe.cliente.id} />
                   )}
-                  {subAba === "negocio" && <TimelineNegocio detalhe={detalhe} />}
+                  {subAba === "negocio" && (
+                    <div className="space-y-5">
+                      <Orcamentos
+                        leadId={detalhe.cliente.id}
+                        negocioId={negocioId}
+                      />
+                      <div className="border-t border-black/5 pt-4">
+                        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
+                          Linha do tempo
+                        </h4>
+                        <TimelineNegocio detalhe={detalhe} />
+                      </div>
+                    </div>
+                  )}
                   {subAba === "loja" && (
                     <LojaCliente
                       telefone={detalhe.cliente.telefone}

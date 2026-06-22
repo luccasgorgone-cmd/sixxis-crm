@@ -224,6 +224,7 @@ model Lead {
   atividades     Atividade[]
   lembretes      Lembrete[]
   campanhaDestinos CampanhaDestino[]
+  orcamentos     Orcamento[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -330,6 +331,7 @@ model Negocio {
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
   lembretes     Lembrete[]
+  orcamentos    Orcamento[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 
@@ -453,6 +455,25 @@ model Lembrete {
   concluidoEm DateTime?
 
   @@index([agenteId, status, dataHora])
+  @@index([leadId])
+}
+
+// Orcamento de um cliente. Multiplos por cliente ficam todos armazenados
+// (historico). voltagem e opcional ("110V"/"220V"/"Bivolt"...).
+model Orcamento {
+  id           String   @id @default(cuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  negocioId    String?
+  negocio      Negocio? @relation(fields: [negocioId], references: [id])
+  produto      String
+  valor        Decimal? @db.Decimal(12, 2)
+  voltagem     String?
+  observacao   String?  @db.Text
+  criadoPorId  String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
   @@index([leadId])
 }
 
