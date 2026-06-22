@@ -75,7 +75,14 @@ export async function GET(
   if (!negocio) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  if (!podeAcessarNegocio(agente, negocio.agenteId)) {
+  // Pode ver quem e dono do negocio OU dono do cliente naquela finalidade (cobre
+  // negocios fechados de um lead transferido, que mantem o agenteId antigo mas
+  // pertencem ao novo dono da carteira).
+  const ehDonoCliente =
+    negocio.finalidade === Finalidade.VENDA
+      ? negocio.lead.donoId === agente.id
+      : negocio.lead.donoPosVendaId === agente.id;
+  if (!podeAcessarNegocio(agente, negocio.agenteId) && !ehDonoCliente) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
@@ -159,6 +166,8 @@ export async function PATCH(
     agenteId?: string | null;
     motivoPerda?: string;
     produtos?: unknown;
+    pendente?: boolean;
+    motivoPendencia?: string | null;
   };
   try {
     body = await req.json();
@@ -175,6 +184,7 @@ export async function PATCH(
       valor: true,
       motivoPerda: true,
       finalidade: true,
+      pendente: true,
     },
   });
   if (!negocio) {
@@ -198,6 +208,9 @@ export async function PATCH(
 
   const data: Prisma.NegocioUncheckedUpdateInput = {};
   const historicos: { tipo: TipoHistorico; descricao: string }[] = [];
+  // Descricao da Atividade(PENDENCIA), registrada a parte (PENDENCIA nao existe
+  // em TipoHistorico, so em AtividadeTipo).
+  let atividadePendencia: string | null = null;
   const agora = new Date();
 
   // ---- Mudanca de etapa ----
@@ -338,7 +351,34 @@ export async function PATCH(
         : (body.produtos as Prisma.InputJsonValue);
   }
 
-  if (Object.keys(data).length === 0 && historicos.length === 0) {
+  // ---- Pendencia operacional (marcar/desmarcar com motivo) ----
+  if (body.pendente !== undefined) {
+    const pendente = Boolean(body.pendente);
+    data.pendente = pendente;
+    if (pendente) {
+      const motivo = (body.motivoPendencia ?? "").trim();
+      if (!motivo) {
+        return NextResponse.json(
+          { erro: "motivo e obrigatorio para marcar como pendente" },
+          { status: 422 },
+        );
+      }
+      data.motivoPendencia = motivo;
+      atividadePendencia = `Negocio marcado como pendente: ${motivo}`;
+    } else {
+      data.motivoPendencia = null;
+      atividadePendencia = "Pendencia removida";
+    }
+  } else if (body.motivoPendencia !== undefined) {
+    // Edicao do motivo sem alternar o estado.
+    data.motivoPendencia = body.motivoPendencia?.trim() || null;
+  }
+
+  if (
+    Object.keys(data).length === 0 &&
+    historicos.length === 0 &&
+    atividadePendencia === null
+  ) {
     return NextResponse.json({ erro: "nada a atualizar" }, { status: 400 });
   }
 
@@ -368,6 +408,19 @@ export async function PATCH(
         tipo: h.tipo as unknown as AtividadeTipo,
         descricao: h.descricao,
       })),
+    });
+  }
+
+  // Pendencia: registra a Atividade(PENDENCIA) na linha do tempo do cliente.
+  if (atividadePendencia !== null) {
+    await prisma.atividade.create({
+      data: {
+        leadId: negocio.leadId,
+        negocioId: negocio.id,
+        agenteId: agente.id,
+        tipo: AtividadeTipo.PENDENCIA,
+        descricao: atividadePendencia,
+      },
     });
   }
 

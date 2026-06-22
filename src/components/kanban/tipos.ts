@@ -37,6 +37,8 @@ export type CardNegocio = {
   temperatura: Temperatura;
   status: StatusNeg;
   finalidade: Finalidade;
+  pendente: boolean;
+  motivoPendencia: string | null;
   etapaId: string | null;
   entrouEtapaEm: string;
   agente: AgenteResumo | null;

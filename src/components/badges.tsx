@@ -19,6 +19,7 @@ import {
   MessageCircle,
   Mail,
   Smartphone,
+  PauseCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -66,6 +67,27 @@ export function BadgeStatusNegocio({
     <Pill classe={info.classe} icone={info.icone} className={className}>
       {info.rotulo}
     </Pill>
+  );
+}
+
+// ---- Pendencia operacional do negocio ----
+// Cor propria (laranja) para nao colidir com status/temperatura. O motivo vai
+// no tooltip (atributo title) onde o badge aparece.
+export function BadgePendente({
+  motivo,
+  className = "",
+}: {
+  motivo?: string | null;
+  className?: string;
+}) {
+  return (
+    <span
+      title={motivo ? `Pendente: ${motivo}` : "Pendente"}
+      className={`inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-700 ${className}`}
+    >
+      <PauseCircle className="h-3 w-3" />
+      Pendente
+    </span>
   );
 }
 

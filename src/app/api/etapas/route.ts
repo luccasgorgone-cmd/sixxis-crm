@@ -14,7 +14,14 @@ export async function GET(): Promise<NextResponse> {
   const etapas = await prisma.etapa.findMany({
     where: { ativo: true },
     orderBy: { ordem: "asc" },
-    select: { id: true, nome: true, cor: true, tipo: true, ordem: true },
+    select: {
+      id: true,
+      nome: true,
+      cor: true,
+      tipo: true,
+      ordem: true,
+      finalidade: true,
+    },
   });
   return NextResponse.json({ etapas });
 }

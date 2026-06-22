@@ -7,7 +7,14 @@ import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 
-type Etiqueta = { id: string; nome: string; cor: string; usos: number };
+type Finalidade = "VENDA" | "POS_VENDA";
+type Etiqueta = {
+  id: string;
+  nome: string;
+  cor: string;
+  finalidade: Finalidade | null;
+  usos: number;
+};
 
 export function EtiquetasAdmin() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
@@ -78,7 +85,7 @@ export function EtiquetasAdmin() {
     <div className="p-6">
       <Cabecalho
         titulo="Etiquetas"
-        subtitulo="Marcadores aplicaveis aos clientes"
+        subtitulo="Marcadores aplicaveis aos clientes, organizados por finalidade"
         acao={
           <button
             onClick={() => void criar()}
@@ -138,10 +145,26 @@ function LinhaEtiqueta({
         }}
         className="min-w-0 flex-1 rounded-lg border border-transparent px-2 py-1.5 text-sm font-medium text-escuro outline-none hover:border-black/10 focus:border-tiffany"
       />
-      <span className="text-xs text-medio/50">{etiqueta.usos} usos</span>
+      <select
+        value={etiqueta.finalidade ?? "AMBAS"}
+        onChange={(e) =>
+          onCampo({
+            finalidade: e.target.value === "AMBAS" ? null : e.target.value,
+          })
+        }
+        title="Finalidade da etiqueta"
+        className="shrink-0 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs font-medium text-medio outline-none focus:border-tiffany"
+      >
+        <option value="VENDA">Venda</option>
+        <option value="POS_VENDA">Pos-venda</option>
+        <option value="AMBAS">Ambas</option>
+      </select>
+      <span className="hidden shrink-0 text-xs text-medio/50 sm:inline">
+        {etiqueta.usos} usos
+      </span>
       <button
         onClick={onRemover}
-        className="rounded-lg p-1.5 text-medio/50 hover:bg-black/5 hover:text-erro"
+        className="shrink-0 rounded-lg p-1.5 text-medio/50 hover:bg-black/5 hover:text-erro"
       >
         <Trash2 className="h-4 w-4" />
       </button>

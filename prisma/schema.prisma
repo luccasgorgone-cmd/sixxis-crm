@@ -132,6 +132,7 @@ enum AtividadeTipo {
   PERDA
   CRIACAO
   EDICAO
+  PENDENCIA
 }
 
 model Agente {
@@ -249,7 +250,11 @@ model Etiqueta {
   id    String         @id @default(cuid())
   nome  String
   cor   String         @default("#3cbfb3")
+  // null = serve as duas finalidades (Ambas); senao restringe ao funil indicado.
+  finalidade Finalidade?
   leads LeadEtiqueta[]
+
+  @@index([finalidade])
 }
 
 model LeadEtiqueta {
@@ -274,6 +279,10 @@ model Negocio {
   status        StatusNeg          @default(ABERTO)
   temperatura   Temperatura        @default(MORNO)
   finalidade    Finalidade         @default(VENDA)
+  // Pendencia operacional: negocio travado aguardando algo (orcamento, peca,
+  // pagamento...). motivoPendencia descreve o porque para a carteira/tooltip.
+  pendente        Boolean          @default(false)
+  motivoPendencia String?          @db.Text
   motivoPerda   String?
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?

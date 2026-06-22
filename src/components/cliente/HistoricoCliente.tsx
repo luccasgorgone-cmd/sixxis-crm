@@ -19,6 +19,7 @@ import {
   Sparkles,
   UserPlus,
   Pencil,
+  PauseCircle,
   History,
   WifiOff,
   type LucideIcon,
@@ -52,6 +53,7 @@ const ICONE_ATIV: Record<string, LucideIcon> = {
   VALOR: DollarSign,
   PERDA: XCircle,
   EDICAO: Pencil,
+  PENDENCIA: PauseCircle,
 };
 
 // Visual (icone + cor) por evento.

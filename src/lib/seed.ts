@@ -89,6 +89,15 @@ const ETIQUETAS_PADRAO: { nome: string; cor: string }[] = [
   { nome: "Pos-venda", cor: "#16a34a" },
 ];
 
+// Etiquetas de pos-venda. Semeadas por nome (so cria a que faltar), com
+// finalidade POS_VENDA, para organizar as marcacoes da carteira de pos-venda.
+const ETIQUETAS_POS_VENDA: { nome: string; cor: string }[] = [
+  { nome: "Aguardando orcamento", cor: "#0ea5e9" },
+  { nome: "Aguardando pagamento", cor: "#f59e0b" },
+  { nome: "Orcamento aprovado", cor: "#16a34a" },
+  { nome: "Aguardando peca", cor: "#7c3aed" },
+];
+
 export async function seedFunil(): Promise<void> {
   try {
     const totalEtapas = await prisma.etapa.count();
@@ -105,6 +114,28 @@ export async function seedFunil(): Promise<void> {
       console.log(`[seed] ${ETIQUETAS_PADRAO.length} etiquetas criadas`);
     } else {
       console.log("[seed] etiquetas ok");
+    }
+
+    // Etiquetas de pos-venda: cria por nome apenas as que faltarem (nao
+    // sobrescreve nem duplica), com finalidade POS_VENDA.
+    const existentes = new Set(
+      (await prisma.etiqueta.findMany({ select: { nome: true } })).map((e) =>
+        e.nome.toLowerCase(),
+      ),
+    );
+    const faltantes = ETIQUETAS_POS_VENDA.filter(
+      (e) => !existentes.has(e.nome.toLowerCase()),
+    );
+    if (faltantes.length > 0) {
+      await prisma.etiqueta.createMany({
+        data: faltantes.map((e) => ({
+          ...e,
+          finalidade: Finalidade.POS_VENDA,
+        })),
+      });
+      console.log(`[seed] ${faltantes.length} etiquetas de pos-venda criadas`);
+    } else {
+      console.log("[seed] etiquetas pos-venda ok");
     }
   } catch (erro) {
     console.error(

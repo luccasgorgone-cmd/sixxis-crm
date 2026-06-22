@@ -24,6 +24,8 @@ import {
   ListChecks,
   ShoppingBag,
   History,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -37,6 +39,7 @@ import {
   BadgeFinalidade,
   BadgeStatusNegocio,
   BadgeTemperatura,
+  BadgePendente,
 } from "@/components/badges";
 import {
   TEMPERATURA_INFO,
@@ -194,6 +197,9 @@ export function PainelNegocio({
                     <>
                       <BadgeFinalidade finalidade={detalhe.finalidade} />
                       <BadgeStatusNegocio status={detalhe.status} />
+                      {detalhe.pendente && (
+                        <BadgePendente motivo={detalhe.motivoPendencia} />
+                      )}
                     </>
                   )}
                 </div>
@@ -554,6 +560,9 @@ function NegocioAcoes({
         </select>
       </div>
 
+      {/* Pendencia operacional */}
+      <BlocoPendencia detalhe={detalhe} salvar={salvar} />
+
       {/* Dono / atribuicao / transferencia */}
       <div>
         <Rotulo>Dono</Rotulo>
@@ -729,6 +738,118 @@ function NegocioAcoes({
 function Rotulo({ children }: { children: React.ReactNode }) {
   return (
     <label className="mb-1 block text-xs font-medium text-medio/70">{children}</label>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Pendencia operacional: marcar/desmarcar com motivo. Quando pendente, mostra o
+// motivo atual e permite remover; senao abre um campo de motivo para marcar.
+// ----------------------------------------------------------------------------
+function BlocoPendencia({
+  detalhe,
+  salvar,
+}: {
+  detalhe: DetalheNegocio;
+  salvar: (body: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const toast = useToast();
+  const [abrindo, setAbrindo] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function marcar() {
+    const m = motivo.trim();
+    if (!m) {
+      toast.erro("Descreva o motivo da pendencia.");
+      return;
+    }
+    setSalvando(true);
+    const ok = await salvar({ pendente: true, motivoPendencia: m });
+    setSalvando(false);
+    if (ok) {
+      setMotivo("");
+      setAbrindo(false);
+      toast.sucesso("Negocio marcado como pendente.");
+    }
+  }
+
+  async function desmarcar() {
+    setSalvando(true);
+    const ok = await salvar({ pendente: false });
+    setSalvando(false);
+    if (ok) toast.sucesso("Pendencia removida.");
+  }
+
+  return (
+    <div>
+      <Rotulo>Pendencia</Rotulo>
+      {detalhe.pendente ? (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+          <div className="flex items-start gap-2">
+            <PauseCircle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-orange-700">
+                Negocio pendente
+              </p>
+              {detalhe.motivoPendencia && (
+                <p className="mt-0.5 whitespace-pre-wrap text-xs text-orange-900/80">
+                  {detalhe.motivoPendencia}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => void desmarcar()}
+            disabled={salvando}
+            className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200 transition-colors hover:bg-orange-100 disabled:opacity-60"
+          >
+            {salvando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PlayCircle className="h-3.5 w-3.5" />
+            )}
+            Desmarcar pendencia
+          </button>
+        </div>
+      ) : abrindo ? (
+        <div className="space-y-2 rounded-lg border border-black/10 bg-fundo p-3">
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={2}
+            autoFocus
+            placeholder="Motivo (ex.: aguardando peca, orcamento, pagamento...)"
+            className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setAbrindo(false);
+                setMotivo("");
+              }}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-medio hover:bg-black/5"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => void marcar()}
+              disabled={salvando || !motivo.trim()}
+              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+            >
+              {salvando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Marcar pendente
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAbrindo(true)}
+          className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100"
+        >
+          <PauseCircle className="h-4 w-4" /> Marcar como pendente
+        </button>
+      )}
+    </div>
   );
 }
 

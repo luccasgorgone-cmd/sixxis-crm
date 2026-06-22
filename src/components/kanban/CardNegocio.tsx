@@ -10,6 +10,7 @@ import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
+import { BadgePendente } from "@/components/badges";
 import { formatarBRL, tempoDesde } from "@/lib/format";
 
 export function CardNegocio({
@@ -74,6 +75,12 @@ export function CardNegocio({
         <p className="mb-2 text-sm font-semibold text-tiffany-escuro">
           {formatarBRL(card.valor)}
         </p>
+      )}
+
+      {card.pendente && (
+        <div className="mb-2">
+          <BadgePendente motivo={card.motivoPendencia} />
+        </div>
       )}
 
       {card.etiquetas.length > 0 && (

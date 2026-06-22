@@ -33,6 +33,8 @@ export function cardNegocio(n: NegocioCard) {
     temperatura: n.temperatura,
     status: n.status,
     finalidade: n.finalidade,
+    pendente: n.pendente,
+    motivoPendencia: n.motivoPendencia,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
     agente: n.agente
