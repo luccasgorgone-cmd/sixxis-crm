@@ -29,6 +29,7 @@ import {
   CalendarClock,
   CalendarPlus,
   Check,
+  RotateCcw,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -446,6 +447,7 @@ function NegocioAcoes({
   onAtualizado: () => void;
   abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
+  const toast = useToast();
   const [valor, setValor] = useState(
     detalhe.valor != null ? String(detalhe.valor) : "",
   );
@@ -453,6 +455,7 @@ function NegocioAcoes({
   const [novoProduto, setNovoProduto] = useState("");
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
+  const [reativando, setReativando] = useState(false);
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const produtos = produtosParaLista(detalhe.produtos);
 
@@ -498,6 +501,27 @@ function NegocioAcoes({
     onAtualizado();
   }
 
+  async function reativar() {
+    setReativando(true);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/reativar`, {
+        method: "POST",
+      });
+      if (r.ok) {
+        toast.sucesso("Negocio reativado.");
+        await recarregar();
+        onAtualizado();
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel reativar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setReativando(false);
+    }
+  }
+
   async function transferir() {
     if (!destino) return;
     await fetch(`/api/leads/${detalhe.cliente.id}/transferir`, {
@@ -517,17 +541,33 @@ function NegocioAcoes({
         Negocio
       </h4>
 
-      {/* Motivo da perda (quando perdido) */}
-      {detalhe.status === "PERDIDO" && detalhe.motivoPerdaLabel && (
-        <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
-          <p className="text-xs font-semibold text-red-700">
-            Motivo da perda: {detalhe.motivoPerdaLabel}
-          </p>
-          {detalhe.motivoPerdaObs && (
-            <p className="mt-0.5 text-xs text-red-900/80">
-              {detalhe.motivoPerdaObs}
-            </p>
+      {/* Motivo da perda + reativar (quando perdido) */}
+      {detalhe.status === "PERDIDO" && (
+        <div className="space-y-2">
+          {detalhe.motivoPerdaLabel && (
+            <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
+              <p className="text-xs font-semibold text-red-700">
+                Motivo da perda: {detalhe.motivoPerdaLabel}
+              </p>
+              {detalhe.motivoPerdaObs && (
+                <p className="mt-0.5 text-xs text-red-900/80">
+                  {detalhe.motivoPerdaObs}
+                </p>
+              )}
+            </div>
           )}
+          <button
+            onClick={() => void reativar()}
+            disabled={reativando}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
+          >
+            {reativando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4" />
+            )}
+            Reativar negocio
+          </button>
         </div>
       )}
 
