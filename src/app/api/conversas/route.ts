@@ -39,7 +39,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       mensagens: {
         orderBy: { hora: "desc" },
         take: 1,
-        select: { conteudo: true, tipo: true },
+        select: { conteudo: true, tipo: true, apagada: true, apagadaPor: true },
       },
     },
     take: 200,
@@ -52,7 +52,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     leadFoto: c.lead.fotoUrl,
     leadTelefone: c.lead.telefone,
     ultimaMensagemPreview: c.mensagens[0]
-      ? previewMensagem(c.mensagens[0].tipo, c.mensagens[0].conteudo)
+      ? c.mensagens[0].apagada
+        ? c.mensagens[0].apagadaPor === "CLIENTE"
+          ? "Mensagem apagada pelo cliente"
+          : "Mensagem apagada"
+        : previewMensagem(c.mensagens[0].tipo, c.mensagens[0].conteudo)
       : null,
     ultimaMensagemEm: c.ultimaMensagemEm,
     naoLidas: c.naoLidas,

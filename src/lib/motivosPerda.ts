@@ -5,14 +5,14 @@
 export type MotivoPerda = { code: string; label: string };
 
 export const MOTIVOS_PERDA: MotivoPerda[] = [
-  { code: "NAO_RESPONDE", label: "Cliente nao responde" },
+  { code: "NAO_RESPONDE", label: "Cliente não responde" },
   { code: "SEM_INTERESSE", label: "Sem interesse" },
-  { code: "ACHOU_CARO", label: "Achou caro / fora do orcamento" },
+  { code: "ACHOU_CARO", label: "Achou caro / fora do orçamento" },
   { code: "CONCORRENTE", label: "Comprou com concorrente" },
-  { code: "CONFUSO", label: "Confuso / nao entendeu" },
-  { code: "FORA_AREA", label: "Fora da area de entrega" },
-  { code: "INDISPONIVEL", label: "Produto indisponivel" },
-  { code: "SO_PESQUISANDO", label: "So pesquisando preco" },
+  { code: "CONFUSO", label: "Confuso / não entendeu" },
+  { code: "FORA_AREA", label: "Fora da área de entrega" },
+  { code: "INDISPONIVEL", label: "Produto indisponível" },
+  { code: "SO_PESQUISANDO", label: "Só pesquisando preço" },
   { code: "DESISTIU", label: "Desistiu da compra" },
   { code: "PAGAMENTO", label: "Problema no pagamento" },
   { code: "CONTATO_ERRADO", label: "Contato errado / duplicado" },
