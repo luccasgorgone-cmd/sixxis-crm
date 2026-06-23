@@ -10,6 +10,11 @@ export type LeadModelo = {
   empresa?: string | null;
 };
 
+// Colaborador logado (para resolver {vendedor}/{atendente}).
+export type AgenteModelo = {
+  nome?: string | null;
+};
+
 export const LOJA_NOME = "Sixxis";
 
 // URL publica da loja (configuravel). Default amigavel.
@@ -25,6 +30,8 @@ export const VARIAVEIS_AUTOMATICAS = [
   "nome",
   "primeiro_nome",
   "empresa",
+  "vendedor",
+  "atendente",
   "loja",
   "link",
 ] as const;
@@ -47,6 +54,8 @@ export const INFO_VARIAVEL: Record<
   nome: { rotulo: "Nome", exemplo: "Maria Silva", tipo: "auto" },
   primeiro_nome: { rotulo: "Primeiro nome", exemplo: "Maria", tipo: "auto" },
   empresa: { rotulo: "Empresa", exemplo: "Acme", tipo: "auto" },
+  vendedor: { rotulo: "Atendente", exemplo: "Joao", tipo: "auto" },
+  atendente: { rotulo: "Atendente", exemplo: "Joao", tipo: "auto" },
   loja: { rotulo: "Loja", exemplo: LOJA_NOME, tipo: "auto" },
   link: { rotulo: "Link da loja", exemplo: linkLoja(), tipo: "auto" },
   cupom: { rotulo: "Cupom", exemplo: "SIXXIS10", tipo: "digitada" },
@@ -77,6 +86,35 @@ function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] || nome;
 }
 
+// Limpa o texto FINAL quando alguma variavel (primeiro_nome/vendedor) resolveu
+// vazio: vírgula/espaço órfãos, espaços duplos, pontuação solta. Idempotente em
+// texto bem-formado (não altera mensagens sem variável vazia).
+// Ex.: "Olá , tudo bem?" -> "Olá! Tudo bem?".
+export function normalizarTextoFinal(s: string): string {
+  return (
+    s
+      // Saudação no início cujo nome sumiu ("Olá , ..." -> "Olá! ..."): a virgula
+      // orfa logo apos a 1a palavra vira "!" e capitaliza a proxima palavra.
+      // So dispara quando ha ESPACO antes da virgula (texto bem-formado nao tem).
+      .replace(
+        /^(\s*[A-Za-zÀ-ÿ]+)\s+,\s*([a-zà-ÿ])/,
+        (_m, ini: string, c: string) => `${ini}! ${c.toUpperCase()}`,
+      )
+      // Pontuacao com espaco orfo antes (var vazia antes dela).
+      .replace(/\s+([,;:.!?])/g, "$1")
+      // Virgulas duplicadas (var vazia entre duas).
+      .replace(/,(\s*,)+/g, ",")
+      // Parenteses/aspas vazios resultantes.
+      .replace(/\(\s*\)/g, "")
+      // Pontuacao/virgula solta no inicio (var no comeco sumiu).
+      .replace(/^[\s,;:]+/, "")
+      // Espacos multiplos (preserva quebras de linha) e espaco antes de \n.
+      .replace(/[^\S\n]{2,}/g, " ")
+      .replace(/[^\S\n]+\n/g, "\n")
+      .trim()
+  );
+}
+
 // Sorteia uma redacao entre as opcoes (ignora vazias). Sempre devolve uma string.
 export function sortearRedacao(textos: (string | null | undefined)[]): string {
   const validas = textos.filter((t): t is string => !!t && t.trim().length > 0);
@@ -94,6 +132,7 @@ export function aplicarModelo(
   texto: string,
   ctx: {
     lead?: LeadModelo | null;
+    agente?: AgenteModelo | null;
     valoresDigitados?: Record<string, string>;
     variacoes?: string[];
   },
@@ -104,21 +143,26 @@ export function aplicarModelo(
     ctx.variacoes && ctx.variacoes.length > 0
       ? sortearRedacao([texto, ...ctx.variacoes])
       : texto;
+  // Primeiro nome do colaborador logado (atendente/vendedor).
+  const vendedor = ctx.agente?.nome ? primeiroNome(ctx.agente.nome) : "";
   const auto: Record<string, string> = {
     nome: lead?.nomeEfetivo ?? "",
     primeiro_nome: lead ? primeiroNome(lead.nomeEfetivo) : "",
     empresa: lead?.empresa ?? "",
+    vendedor,
+    atendente: vendedor,
     loja: LOJA_NOME,
     link: linkLoja(),
   };
 
-  return base.replace(RE_VAR, (literal, nome: string) => {
+  const substituido = base.replace(RE_VAR, (literal, nome: string) => {
     if (nome in auto) return auto[nome];
     if ((VARIAVEIS_DIGITADAS as readonly string[]).includes(nome)) {
       return valores[nome] ?? "";
     }
     return literal;
   });
+  return normalizarTextoFinal(substituido);
 }
 
 // Categorias de modelo (rotulos para a UI).

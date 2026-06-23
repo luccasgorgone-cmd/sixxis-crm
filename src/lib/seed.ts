@@ -139,8 +139,10 @@ const RENOMEAR_ETIQUETAS: { de: string; para: string }[] = [
 
 // Modelos de mensagem profissionais (categoria + finalidade + variacoes). Cada
 // intencao tem 2-3 redacoes da MESMA mensagem com palavras diferentes; o sistema
-// sorteia uma por destinatario. Tom cordial, educado, direto, sempre tratando
-// pelo nome. Idempotente: cria os que faltam e completa variacoes vazias.
+// sorteia uma por destinatario. Tom caloroso, educado e direto: {primeiro_nome}
+// trata o cliente (com fallback gracioso da normalizacao) e {vendedor} assina
+// pelo atendente logado. Idempotente: cria os que faltam, completa variacoes
+// vazias e ATUALIZA a copy das mensagens de sistema ja existentes (por titulo).
 const MODELOS_PADRAO: {
   titulo: string;
   categoria: string;
@@ -153,10 +155,10 @@ const MODELOS_PADRAO: {
     categoria: "aniversario",
     finalidade: null,
     texto:
-      "Ola, {nome}! A equipe {loja} passa para desejar um feliz aniversario e um dia tao especial quanto voce. Para comemorar, use o cupom {cupom} e aproveite uma condicao exclusiva. Conte sempre com a gente!",
+      "Olá {primeiro_nome}, é o seu dia! Toda a equipe da {loja} deseja um feliz aniversário, cheio de saúde e alegria. Para comemorar com você, preparamos o cupom {cupom} como nosso presente. Aproveite! {vendedor}",
     variacoes: [
-      "Feliz aniversario, {primeiro_nome}! Que seu dia seja leve e cheio de alegrias. Como presente da {loja}, separamos o cupom {cupom} so para voce. Aproveite!",
-      "{primeiro_nome}, hoje e seu dia! A {loja} deseja muitas felicidades e deixa um mimo: use o cupom {cupom} e comemore com a gente.",
+      "Parabéns {primeiro_nome}! Que este novo ciclo venha repleto de conquistas. A {loja} deixa um mimo para você: o cupom {cupom}. Um grande abraço! {vendedor}",
+      "Feliz aniversário {primeiro_nome}! Hoje a data é toda sua e a {loja} faz questão de celebrar. Use o cupom {cupom} e aproveite uma condição especial. {vendedor}",
     ],
   },
   {
@@ -164,10 +166,10 @@ const MODELOS_PADRAO: {
     categoria: "cupom",
     finalidade: null,
     texto:
-      "Oi, {primeiro_nome}! Separamos um mimo para voce: use o cupom {cupom} e garanta {desconto} de desconto na {loja}, valido ate {validade}. Qualquer duvida, e so chamar por aqui: {link}",
+      "Oi {primeiro_nome}, tudo bem? Separei um presente para você: o cupom {cupom} dá {desconto} de desconto na {loja}, válido até {validade}. Qualquer dúvida, é só me chamar por aqui: {link}. {vendedor}",
     variacoes: [
-      "{primeiro_nome}, um presente da {loja} para voce: o cupom {cupom} da {desconto} de desconto ate {validade}. Aproveite por aqui: {link}",
-      "Ola, {primeiro_nome}! Voce ganhou o cupom {cupom} com {desconto} de desconto na {loja}. Vale ate {validade}. Acesse: {link}",
+      "{primeiro_nome}, uma condição exclusiva para você: com o cupom {cupom} você garante {desconto} de desconto na {loja} até {validade}. Aproveite: {link}. {vendedor}",
+      "Olá {primeiro_nome}! Você ganhou o cupom {cupom}, que dá {desconto} de desconto na {loja}. Vale até {validade} — acesse {link} e aproveite. {vendedor}",
     ],
   },
   {
@@ -175,10 +177,10 @@ const MODELOS_PADRAO: {
     categoria: "data_comemorativa",
     finalidade: null,
     texto:
-      "Ola, {nome}! Hoje e uma data especial e a {loja} preparou condicoes para celebrar com voce. Aproveite o cupom {cupom} com {desconto} de desconto ate {validade}. Sera um prazer atender voce: {link}",
+      "Olá {primeiro_nome}! Hoje é uma data especial e a {loja} preparou algo para celebrar com você: o cupom {cupom} com {desconto} de desconto, válido até {validade}. Vai ser um prazer atender você: {link}. {vendedor}",
     variacoes: [
-      "{primeiro_nome}, e dia de comemorar! A {loja} preparou o cupom {cupom} com {desconto} de desconto, valido ate {validade}. Confira: {link}",
-      "Para celebrar esta data, a {loja} deixa o cupom {cupom} ({desconto} de desconto) ate {validade}. Aproveite, {primeiro_nome}: {link}",
+      "{primeiro_nome}, é dia de comemorar! Para marcar a data, a {loja} liberou o cupom {cupom} com {desconto} de desconto até {validade}. Confira: {link}. {vendedor}",
+      "Para celebrar esta data com você, {primeiro_nome}, a {loja} deixou o cupom {cupom} ({desconto} de desconto) válido até {validade}. Aproveite: {link}. {vendedor}",
     ],
   },
   {
@@ -186,10 +188,10 @@ const MODELOS_PADRAO: {
     categoria: "desconto_relampago",
     finalidade: null,
     texto:
-      "{primeiro_nome}, oferta relampago na {loja}! Use o cupom {cupom} e leve {desconto} de desconto. Corre que e por tempo limitado, ate {validade}: {link}",
+      "{primeiro_nome}, é agora! Oferta relâmpago na {loja}: o cupom {cupom} garante {desconto} de desconto, mas só até {validade}. Corre que é por tempo limitado: {link}. {vendedor}",
     variacoes: [
-      "Rapido, {primeiro_nome}! So ate {validade}, o cupom {cupom} garante {desconto} de desconto na {loja}. Aproveite agora: {link}",
-      "{primeiro_nome}, promocao relampago: {desconto} de desconto com o cupom {cupom} na {loja}, valido ate {validade}. Nao perca: {link}",
+      "Rápido {primeiro_nome}! Só até {validade}, o cupom {cupom} dá {desconto} de desconto na {loja}. Não deixe passar: {link}. {vendedor}",
+      "Promoção relâmpago, {primeiro_nome}: {desconto} de desconto com o cupom {cupom} na {loja}, válido até {validade}. Aproveite agora: {link}. {vendedor}",
     ],
   },
   {
@@ -197,10 +199,10 @@ const MODELOS_PADRAO: {
     categoria: "retomada",
     finalidade: Finalidade.VENDA,
     texto:
-      "Oi, {primeiro_nome}, tudo bem? Vi que voce demonstrou interesse na {loja} e queria saber se posso ajudar a concluir com calma. Se fizer sentido, consigo uma condicao especial com o cupom {cupom}. Fico a disposicao!",
+      "Oi {primeiro_nome}, tudo bem? Vi que você teve interesse em um produto da {loja} e passei para saber se posso te ajudar a concluir com calma. Se fizer sentido, consigo uma condição especial com o cupom {cupom}. Fico à disposição! {vendedor}",
     variacoes: [
-      "{primeiro_nome}, passando para retomar nossa conversa. Ainda posso ajudar voce com aquilo que viu na {loja}? Tenho o cupom {cupom} reservado se quiser seguir.",
-      "Ola, {primeiro_nome}! Lembrei de voce e do seu interesse na {loja}. Se ainda fizer sentido, consigo o cupom {cupom} para facilitar. Como posso ajudar?",
+      "{primeiro_nome}, estou retomando a nossa conversa. Ainda posso te ajudar com o que você viu na {loja}? Deixei o cupom {cupom} reservado caso queira seguir. {vendedor}",
+      "Olá {primeiro_nome}! Lembrei do seu interesse nos produtos da {loja}. Se ainda fizer sentido para você, consigo o cupom {cupom} para facilitar. Como posso ajudar? {vendedor}",
     ],
   },
   {
@@ -208,10 +210,10 @@ const MODELOS_PADRAO: {
     categoria: "boas_vindas",
     finalidade: null,
     texto:
-      "Ola, {primeiro_nome}! Seja bem-vindo a {loja}. E um prazer ter voce com a gente. Estou por aqui para o que precisar, fique a vontade para perguntar qualquer coisa!",
+      "Olá {primeiro_nome}, seja muito bem-vindo à {loja}! É um prazer ter você com a gente. Estou por aqui para o que precisar, então fique à vontade para perguntar qualquer coisa. {vendedor}",
     variacoes: [
-      "{primeiro_nome}, que bom ter voce na {loja}! Qualquer duvida sobre produtos ou pedidos, e so me chamar. Seja muito bem-vindo!",
-      "Bem-vindo a {loja}, {primeiro_nome}! Vou te acompanhar por aqui. Se precisar de ajuda para escolher ou comprar, conte comigo.",
+      "{primeiro_nome}, que bom ter você na {loja}! Qualquer dúvida sobre produtos ou pedidos, é só me chamar. Seja muito bem-vindo! {vendedor}",
+      "Seja bem-vindo à {loja}, {primeiro_nome}! Vou te acompanhar por aqui e ajudar no que precisar para escolher ou comprar. Conte comigo. {vendedor}",
     ],
   },
   {
@@ -219,10 +221,10 @@ const MODELOS_PADRAO: {
     categoria: "agradecimento",
     finalidade: Finalidade.POS_VENDA,
     texto:
-      "{primeiro_nome}, muito obrigado pela sua compra na {loja}! Ja estamos cuidando de tudo para voce. Qualquer duvida sobre seu pedido, e so falar comigo.",
+      "{primeiro_nome}, muito obrigado pela sua compra na {loja}! Já estamos cuidando de tudo para você. Qualquer dúvida sobre o seu pedido, é só falar comigo. {vendedor}",
     variacoes: [
-      "Obrigado pela confianca, {primeiro_nome}! Sua compra na {loja} foi registrada e estamos preparando tudo com carinho. Estou a disposicao.",
-      "{primeiro_nome}, agradecemos por comprar na {loja}! Foi um prazer atender voce. Se precisar de qualquer suporte com o pedido, me avise.",
+      "Obrigado pela confiança, {primeiro_nome}! A sua compra na {loja} foi registrada e estamos preparando tudo com carinho. Estou à disposição. {vendedor}",
+      "{primeiro_nome}, agradecemos por comprar na {loja}! Foi um prazer atender você. Se precisar de qualquer suporte com o pedido, me avise. {vendedor}",
     ],
   },
   {
@@ -230,10 +232,10 @@ const MODELOS_PADRAO: {
     categoria: "avaliacao",
     finalidade: Finalidade.POS_VENDA,
     texto:
-      "{primeiro_nome}, tudo certo com seu pedido da {loja}? Sua opiniao vale muito para a gente. Se puder, conta como foi sua experiencia, leva so um minutinho: {link}",
+      "{primeiro_nome}, tudo certo com o seu pedido da {loja}? A sua opinião vale muito para a gente. Se puder, conte como foi a sua experiência — leva só um minutinho: {link}. {vendedor}",
     variacoes: [
-      "Oi, {primeiro_nome}! Esperamos que esteja gostando da sua compra na {loja}. Pode deixar uma avaliacao rapida? Isso nos ajuda demais: {link}",
-      "{primeiro_nome}, sua experiencia com a {loja} foi boa? Adorariamos saber sua opiniao. Avalie aqui quando puder: {link}",
+      "Oi {primeiro_nome}! Esperamos que esteja gostando da sua compra na {loja}. Pode deixar uma avaliação rápida? Isso nos ajuda demais: {link}. {vendedor}",
+      "{primeiro_nome}, como foi a sua experiência com a {loja}? Adoraríamos saber a sua opinião. Avalie aqui quando puder: {link}. {vendedor}",
     ],
   },
   {
@@ -241,10 +243,10 @@ const MODELOS_PADRAO: {
     categoria: "follow_up",
     finalidade: Finalidade.POS_VENDA,
     texto:
-      "Ola, {primeiro_nome}! So passando para saber se esta tudo certo com seu pedido da {loja}. Qualquer necessidade, estou por aqui para ajudar.",
+      "Olá {primeiro_nome}, tudo bem? Passei só para saber se está tudo certo com o seu pedido da {loja}. Qualquer necessidade, estou por aqui para ajudar. {vendedor}",
     variacoes: [
-      "{primeiro_nome}, tudo bem com sua compra na {loja}? Se surgir qualquer duvida ou precisar de suporte, e so me chamar.",
-      "Oi, {primeiro_nome}! Passando para acompanhar seu pedido da {loja}. Esta tudo funcionando como esperado? Conte comigo para o que precisar.",
+      "{primeiro_nome}, tudo certo com a sua compra na {loja}? Se surgir qualquer dúvida ou você precisar de suporte, é só me chamar. {vendedor}",
+      "Oi {primeiro_nome}! Passando para acompanhar o seu pedido da {loja}. Está tudo funcionando como esperado? Conte comigo para o que precisar. {vendedor}",
     ],
   },
   {
@@ -252,18 +254,23 @@ const MODELOS_PADRAO: {
     categoria: "retomada",
     finalidade: Finalidade.VENDA,
     texto:
-      "{primeiro_nome}, ainda tem interesse no que conversamos na {loja}? Se quiser, posso te ajudar a finalizar ou tirar qualquer duvida. Fico no aguardo!",
+      "{primeiro_nome}, você ainda tem interesse no que conversamos sobre a {loja}? Se quiser, posso te ajudar a finalizar ou tirar qualquer dúvida. Fico no aguardo! {vendedor}",
     variacoes: [
-      "Oi, {primeiro_nome}! Passando para saber se voce ainda quer seguir com a compra na {loja}. Estou aqui para ajudar no que precisar.",
-      "{primeiro_nome}, posso te ajudar a concluir seu pedido na {loja}? Se ainda fizer sentido, e so me dizer que cuido de tudo para voce.",
+      "Oi {primeiro_nome}! Passando para saber se você ainda quer seguir com a compra na {loja}. Estou aqui para ajudar no que precisar. {vendedor}",
+      "{primeiro_nome}, posso te ajudar a concluir o seu pedido na {loja}? Se ainda fizer sentido, é só me dizer que cuido de tudo para você. {vendedor}",
     ],
   },
 ];
 
+// Compara duas listas de variacoes (ordem importa) para evitar writes inuteis.
+function variacoesIguais(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 export async function seedModelos(): Promise<void> {
   try {
     const existentes = await prisma.respostaRapida.findMany({
-      select: { id: true, titulo: true, variacoes: true },
+      select: { id: true, titulo: true, texto: true, variacoes: true },
     });
     const porTitulo = new Map(
       existentes.map((e) => [e.titulo.toLowerCase(), e]),
@@ -274,7 +281,7 @@ export async function seedModelos(): Promise<void> {
     });
     let ordem = ultima?.ordem ?? 0;
     let criados = 0;
-    let completados = 0;
+    let atualizados = 0;
 
     for (const m of MODELOS_PADRAO) {
       const existente = porTitulo.get(m.titulo.toLowerCase());
@@ -290,21 +297,30 @@ export async function seedModelos(): Promise<void> {
           },
         });
         criados++;
-      } else if (
-        (existente.variacoes?.length ?? 0) === 0 &&
-        m.variacoes.length > 0
+        continue;
+      }
+      // Mensagem de SISTEMA ja existente (casada por titulo): atualiza a copy
+      // (texto + variacoes) para a nova redacao oficial. So mensagens com titulo
+      // dos MODELOS_PADRAO sao tocadas — as criadas pelo usuario tem outro titulo
+      // e ficam intactas.
+      if (
+        existente.texto !== m.texto ||
+        !variacoesIguais(existente.variacoes ?? [], m.variacoes)
       ) {
-        // Completa variacoes em modelos ja existentes (nao sobrescreve o texto
-        // nem variacoes ja definidas pelo admin).
         await prisma.respostaRapida.update({
           where: { id: existente.id },
-          data: { variacoes: m.variacoes },
+          data: {
+            texto: m.texto,
+            variacoes: m.variacoes,
+            categoria: m.categoria,
+            finalidade: m.finalidade,
+          },
         });
-        completados++;
+        atualizados++;
       }
     }
     console.log(
-      `[seed] modelos: ${criados} criados, ${completados} com variacoes adicionadas`,
+      `[seed] modelos: ${criados} criados, ${atualizados} atualizados (copy de sistema)`,
     );
   } catch (erro) {
     console.error(

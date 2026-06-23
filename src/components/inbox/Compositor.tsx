@@ -15,6 +15,7 @@ import {
   INFO_VARIAVEL,
   type LeadModelo,
 } from "@/lib/modelos";
+import { useAgente } from "@/components/shell/AgenteContext";
 
 type Resposta = {
   id: string;
@@ -37,6 +38,8 @@ export function Compositor({
   ehAdmin?: boolean;
   lead?: LeadModelo | null;
 }) {
+  const agente = useAgente();
+  const ctxAgente = agente ? { nome: agente.nome } : null;
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -117,13 +120,14 @@ export function Compositor({
       return;
     }
     // So automaticas (ou nenhuma): aplica e insere direto.
-    inserirTexto(aplicarModelo(redacao, { lead }));
+    inserirTexto(aplicarModelo(redacao, { lead, agente: ctxAgente }));
   }
 
   function confirmarModelo() {
     if (!modeloPendente) return;
     const final = aplicarModelo(modeloPendente.redacao, {
       lead,
+      agente: ctxAgente,
       valoresDigitados: modeloPendente.valores,
     });
     setModeloPendente(null);

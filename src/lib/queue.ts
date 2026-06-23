@@ -119,6 +119,7 @@ async function processarCampanha(
       valoresJson: true,
       variacoesJson: true,
       status: true,
+      agente: { select: { nome: true } },
     },
   });
   if (!campanha) return;
@@ -170,6 +171,7 @@ async function processarCampanha(
 
     const texto = aplicarModelo(campanha.mensagem, {
       lead: { nomeEfetivo: nomeEfetivo(d.lead), empresa: d.lead.empresa },
+      agente: { nome: campanha.agente?.nome ?? null },
       valoresDigitados: valores,
       variacoes,
     });

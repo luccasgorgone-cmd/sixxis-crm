@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AgenteProvider } from "@/components/shell/AgenteContext";
 import { obterMarca } from "@/lib/marca";
 
 export default async function AppLayout({
@@ -18,6 +19,13 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      <AgenteProvider
+        valor={{
+          id: session.user.id,
+          nome: session.user.name ?? null,
+          papel: session.user.papel,
+        }}
+      >
       <div className="flex h-screen overflow-hidden bg-fundo">
         <Sidebar papel={session.user.papel} marca={marca} />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -29,6 +37,7 @@ export default async function AppLayout({
           <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
         </div>
       </div>
+      </AgenteProvider>
     </ToastProvider>
   );
 }

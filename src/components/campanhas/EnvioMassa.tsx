@@ -266,6 +266,7 @@ function NovaCampanha({
   };
   const previewTexto = aplicarModelo(texto, {
     lead: amostraLead,
+    agente: { nome: INFO_VARIAVEL.vendedor.exemplo },
     valoresDigitados: Object.fromEntries(
       digitadas.map((d) => [d, valores[d] || INFO_VARIAVEL[d]?.exemplo || ""]),
     ),
