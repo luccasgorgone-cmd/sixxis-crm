@@ -13,6 +13,7 @@ import type {
   ConversaItem,
   MensagemItem,
   EventoMensagemNova,
+  EventoMidia,
   Filtro,
   Finalidade,
 } from "./tipos";
@@ -117,6 +118,7 @@ export function Inbox({
                   direcao: evt.direcao,
                   tipo: evt.tipo,
                   conteudo: evt.conteudo,
+                  mediaUrl: evt.mediaUrl,
                   statusEnvio: evt.statusEnvio,
                   hora: evt.hora,
                 },
@@ -149,9 +151,21 @@ export function Inbox({
       });
     }
 
+    // mediaUrl chegou depois (background/reprocessamento): atualiza a bolha.
+    function onMidia(evt: EventoMidia) {
+      if (selecionadaRef.current !== evt.conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId ? { ...m, mediaUrl: evt.mediaUrl } : m,
+        ),
+      );
+    }
+
     socket.on("mensagem:nova", onNova);
+    socket.on("mensagem:midia", onMidia);
     return () => {
       socket.off("mensagem:nova", onNova);
+      socket.off("mensagem:midia", onMidia);
     };
   }, [carregarConversas]);
 

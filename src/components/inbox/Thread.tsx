@@ -17,6 +17,8 @@ import {
   Ban,
   Eye,
   Loader2,
+  RefreshCw,
+  Download,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -186,6 +188,17 @@ const ROTULO_MIDIA: Record<string, string> = {
   OUTRO: "Mensagem",
 };
 
+const TIPOS_MIDIA = new Set(["IMAGEM", "VIDEO", "AUDIO", "DOCUMENTO"]);
+
+// Legenda placeholder gerada na ingestao ("[imagem]", "[audio]"...): nao deve
+// ser exibida como texto/legenda real do cliente.
+const RE_PLACEHOLDER = /^\[(imagem|video|audio|documento|figurinha|localizacao|contato|contatos)\]/i;
+function legendaReal(conteudo: string | null): string | null {
+  if (!conteudo) return null;
+  const t = conteudo.trim();
+  return t && !RE_PLACEHOLDER.test(t) ? t : null;
+}
+
 function Bolha({
   mensagem,
   ehAdmin,
@@ -197,14 +210,16 @@ function Bolha({
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
-  const temTexto = Boolean(mensagem.conteudo && mensagem.conteudo.trim());
-  const ehMidia = mensagem.tipo !== "TEXTO" && !temTexto;
-  const IconeMidia = ICONE_MIDIA[mensagem.tipo];
+  const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo);
+  const legenda = legendaReal(mensagem.conteudo);
 
   // Estado local de apagamento (otimista) + expandir original (admin).
   const [apagadaLocal, setApagadaLocal] = useState(false);
   const [verOriginal, setVerOriginal] = useState(false);
   const [apagando, setApagando] = useState(false);
+  // mediaUrl pode chegar depois (socket) ou via reprocessamento manual (admin).
+  const [mediaLocal, setMediaLocal] = useState<string | null>(null);
+  const mediaUrl = mensagem.mediaUrl || mediaLocal;
   const apagada = mensagem.apagada || apagadaLocal;
   const apagadaPor = mensagem.apagadaPor ?? (apagadaLocal ? "COLABORADOR" : null);
 
@@ -299,15 +314,21 @@ function Bolha({
               </div>
             )}
           </div>
-        ) : ehMidia ? (
-          <span
-            className={`flex items-center gap-2 italic ${
-              ehOut ? "text-white/90" : "text-medio/70"
-            }`}
-          >
-            {IconeMidia && <IconeMidia className="h-4 w-4" />}
-            {ROTULO_MIDIA[mensagem.tipo] ?? "Mensagem"}
-          </span>
+        ) : ehTipoMidia ? (
+          <div className="space-y-1">
+            <Midia
+              mensagem={mensagem}
+              mediaUrl={mediaUrl}
+              ehOut={ehOut}
+              ehAdmin={ehAdmin}
+              onRecarregada={(url) => setMediaLocal(url)}
+            />
+            {legenda && (
+              <span className="block whitespace-pre-wrap break-words">
+                {legenda}
+              </span>
+            )}
+          </div>
         ) : (
           <span className="whitespace-pre-wrap break-words">
             {mensagem.conteudo}
@@ -323,6 +344,120 @@ function Bolha({
           {ehOut && !apagada && <StatusEnvio status={mensagem.statusEnvio} />}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Renderiza a midia exibivel (R2) por tipo. Sem mediaUrl: mostra placeholder e,
+// para ADMIN, o botao "Recarregar midia" (reprocessa download+upload).
+function Midia({
+  mensagem,
+  mediaUrl,
+  ehOut,
+  ehAdmin,
+  onRecarregada,
+}: {
+  mensagem: MensagemItem;
+  mediaUrl: string | null | undefined;
+  ehOut: boolean;
+  ehAdmin: boolean;
+  onRecarregada: (url: string) => void;
+}) {
+  const toast = useToast();
+  const [recarregando, setRecarregando] = useState(false);
+  const IconeMidia = ICONE_MIDIA[mensagem.tipo];
+
+  async function recarregar() {
+    setRecarregando(true);
+    try {
+      const r = await fetch(`/api/mensagens/${mensagem.id}/reprocessar-midia`, {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.mediaUrl) {
+        onRecarregada(d.mediaUrl as string);
+        toast.sucesso("Midia recuperada.");
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel recuperar a midia.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRecarregando(false);
+    }
+  }
+
+  if (mediaUrl) {
+    if (mensagem.tipo === "IMAGEM") {
+      return (
+        <a href={mediaUrl} target="_blank" rel="noreferrer" className="block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={mediaUrl}
+            alt={ROTULO_MIDIA[mensagem.tipo] ?? "Imagem"}
+            className="max-h-72 w-auto max-w-full rounded-lg object-cover"
+          />
+        </a>
+      );
+    }
+    if (mensagem.tipo === "VIDEO") {
+      return (
+        <video
+          src={mediaUrl}
+          controls
+          className="max-h-72 w-full max-w-xs rounded-lg"
+        />
+      );
+    }
+    if (mensagem.tipo === "AUDIO") {
+      return <audio src={mediaUrl} controls className="w-56 max-w-full" />;
+    }
+    // DOCUMENTO
+    return (
+      <a
+        href={mediaUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium ${
+          ehOut ? "bg-white/15 text-white hover:bg-white/25" : "bg-fundo text-escuro hover:bg-black/5"
+        }`}
+      >
+        <FileText className="h-4 w-4 shrink-0" />
+        <span className="truncate">{legendaReal(mensagem.conteudo) ?? "Documento"}</span>
+        <Download className="h-3.5 w-3.5 shrink-0 opacity-70" />
+      </a>
+    );
+  }
+
+  // Sem mediaUrl: placeholder + (admin) recarregar.
+  return (
+    <div className="space-y-1.5">
+      <span
+        className={`flex items-center gap-2 italic ${
+          ehOut ? "text-white/90" : "text-medio/70"
+        }`}
+      >
+        {IconeMidia && <IconeMidia className="h-4 w-4" />}
+        {ROTULO_MIDIA[mensagem.tipo] ?? "Mensagem"}
+      </span>
+      {ehAdmin && (
+        <button
+          onClick={() => void recarregar()}
+          disabled={recarregando}
+          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
+            ehOut
+              ? "bg-white/15 text-white hover:bg-white/25"
+              : "bg-black/5 text-medio hover:bg-black/10"
+          } disabled:opacity-60`}
+        >
+          {recarregando ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Recarregar midia
+        </button>
+      )}
     </div>
   );
 }

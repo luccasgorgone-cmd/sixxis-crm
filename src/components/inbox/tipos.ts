@@ -34,6 +34,8 @@ export type MensagemItem = {
   direcao: Direcao;
   tipo: TipoMensagem;
   conteudo: string | null;
+  // URL publica (R2) da midia exibivel. Vazio = midia ainda nao persistida.
+  mediaUrl?: string | null;
   statusEnvio: StatusEnvio;
   hora: string;
   apagada?: boolean;
@@ -52,10 +54,18 @@ export type EventoMensagemNova = {
   direcao: Direcao;
   tipo: TipoMensagem;
   conteudo: string | null;
+  mediaUrl?: string | null;
   statusEnvio: StatusEnvio;
   hora: string;
   naoLidas: number;
   ultimaMensagemEm: string;
+};
+
+// Payload do evento "mensagem:midia" (mediaUrl preenchido em background/reproc.).
+export type EventoMidia = {
+  conversaId: string;
+  mensagemId: string;
+  mediaUrl: string;
 };
 
 export type Filtro = "minhas" | "naoLidas" | "todas";

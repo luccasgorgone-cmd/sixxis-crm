@@ -50,31 +50,52 @@ export async function enviarTexto(
 }
 
 // Baixa a midia de uma mensagem (base64) via Evolution.
-// POST {BASE}/chat/getBase64FromMediaMessage/{instance} body { message: {...} }.
-// Retorna { base64, mimetype } ou null (sem config / erro / sem midia).
+// Evolution v2: POST {BASE}/chat/getBase64FromMediaMessage/{instance} espera o
+// OBJETO DE MENSAGEM COMPLETO no campo `message` — { key, message, ... } —, ou
+// seja, o proprio `data` do evento webhook. Aqui recebemos esse objeto e o
+// repassamos como `message`. Retorna { base64, mimetype } ou null (sem config /
+// erro / sem midia). Loga status + corpo truncado quando falha (prefixo [midia]).
 export async function baixarMidiaBase64(
   instancia: string,
-  message: { key?: unknown },
+  mensagem: { key?: unknown; message?: unknown },
 ): Promise<{ base64: string; mimetype: string | null } | null> {
   const cfg = baseEKey();
-  if (!cfg || !instancia) return null;
+  if (!cfg || !instancia) {
+    console.warn("[midia] download abortado: config Evolution/instancia ausente");
+    return null;
+  }
   try {
     const resp = await fetch(
       `${cfg.base}/chat/getBase64FromMediaMessage/${instancia}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: cfg.apikey },
-        body: JSON.stringify({ message, convertToMp4: false }),
+        // convertToMp4: false preserva o formato original (audio ogg etc.).
+        body: JSON.stringify({ message: mensagem, convertToMp4: false }),
       },
     );
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      const corpo = (await resp.text().catch(() => "")).slice(0, 300);
+      console.warn(
+        `[midia] getBase64 status ${resp.status}: ${corpo || "(sem corpo)"}`,
+      );
+      return null;
+    }
     const raw = (await resp.json().catch(() => null)) as {
       base64?: string;
       mimetype?: string;
     } | null;
-    if (!raw?.base64) return null;
+    if (!raw?.base64) {
+      console.warn(
+        `[midia] getBase64 sem base64 (mimetype=${raw?.mimetype ?? "?"})`,
+      );
+      return null;
+    }
     return { base64: raw.base64, mimetype: raw.mimetype ?? null };
-  } catch {
+  } catch (erro) {
+    console.warn(
+      `[midia] erro de rede no getBase64: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
     return null;
   }
 }

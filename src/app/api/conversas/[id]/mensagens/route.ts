@@ -39,6 +39,7 @@ export async function GET(
       direcao: true,
       tipo: true,
       conteudo: true,
+      mediaUrl: true,
       statusEnvio: true,
       hora: true,
       apagada: true,

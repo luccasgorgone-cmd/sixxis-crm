@@ -9,6 +9,7 @@ import type {
   MensagemItem,
   ConversaItem,
   EventoMensagemNova,
+  EventoMidia,
 } from "@/components/inbox/tipos";
 
 export function ConversaEmbed({
@@ -58,15 +59,26 @@ export function ConversaEmbed({
                 direcao: evt.direcao,
                 tipo: evt.tipo,
                 conteudo: evt.conteudo,
+                mediaUrl: evt.mediaUrl,
                 statusEnvio: evt.statusEnvio,
                 hora: evt.hora,
               },
             ],
       );
     }
+    function onMidia(evt: EventoMidia) {
+      if (evt.conversaId !== conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId ? { ...m, mediaUrl: evt.mediaUrl } : m,
+        ),
+      );
+    }
     socket.on("mensagem:nova", onNova);
+    socket.on("mensagem:midia", onMidia);
     return () => {
       socket.off("mensagem:nova", onNova);
+      socket.off("mensagem:midia", onMidia);
     };
   }, [conversaId]);
 

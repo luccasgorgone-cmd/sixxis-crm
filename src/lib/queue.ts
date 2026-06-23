@@ -10,8 +10,8 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
-import { fetchFotoPerfil, enviarTexto, baixarMidiaBase64 } from "./evolution";
-import { r2Configurado, enviarParaR2, extensaoDoMime } from "./r2";
+import { fetchFotoPerfil, enviarTexto } from "./evolution";
+import { persistirMidia } from "./midia";
 import { nomeEfetivo } from "./cliente";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
@@ -528,8 +528,9 @@ function ehMidia(tipo: TipoMsg): boolean {
   );
 }
 
-// Best-effort: baixa a midia da Evolution e sobe no R2, gravando a URL
-// permanente em mediaUrl. Nao bloqueia a ingestao; falha mantem o fallback.
+// Best-effort: baixa a midia da Evolution (com retry/backoff) e sobe no R2,
+// gravando a URL permanente em mediaUrl. Nao bloqueia a ingestao: dispara em
+// background e engole erros (o desfecho ja e logado por persistirMidia).
 function agendarMidia(
   mensagemId: string,
   conversaId: string,
@@ -539,36 +540,19 @@ function agendarMidia(
   data: EventoEvolution["data"],
   io: Server | null,
 ): void {
-  if (!r2Configurado()) return;
-  void (async () => {
-    try {
-      const midia = await baixarMidiaBase64(instancia, data ?? {});
-      if (!midia) {
-        console.warn(`[midia] download falhou ${externalId} (retry no proximo evento)`);
-        return;
-      }
-      const buffer = Buffer.from(midia.base64, "base64");
-      const ext = extensaoDoMime(midia.mimetype);
-      const idSeguro = externalId.replace(/[^a-zA-Z0-9_-]/g, "_");
-      const chave = `whatsapp/${telefone}/${idSeguro}.${ext}`;
-      const url = await enviarParaR2(
-        chave,
-        buffer,
-        midia.mimetype ?? "application/octet-stream",
-      );
-      if (url) {
-        await prisma.mensagem.update({
-          where: { id: mensagemId },
-          data: { mediaUrl: url },
-        });
-        (io ?? getIO())?.emit("mensagem:midia", { conversaId, mensagemId, mediaUrl: url });
-      }
-    } catch (erro) {
-      console.warn(
-        `[midia] erro ao persistir ${externalId}: ${erro instanceof Error ? erro.message : String(erro)}`,
-      );
-    }
-  })();
+  void persistirMidia({
+    mensagemId,
+    conversaId,
+    externalId,
+    telefone,
+    instancia,
+    data,
+    io,
+  }).catch((erro) => {
+    console.warn(
+      `[midia] erro inesperado ao persistir ${externalId}: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  });
 }
 
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
@@ -767,6 +751,7 @@ async function processarEvento(
       direcao: mensagem.direcao,
       tipo: mensagem.tipo,
       conteudo: mensagem.conteudo,
+      mediaUrl: mensagem.mediaUrl,
       statusEnvio: mensagem.statusEnvio,
       hora: mensagem.hora,
       naoLidas: conversaAtualizada.naoLidas,

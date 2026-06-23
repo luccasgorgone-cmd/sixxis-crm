@@ -133,6 +133,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     direcao: mensagem.direcao,
     tipo: mensagem.tipo,
     conteudo: mensagem.conteudo,
+    mediaUrl: mensagem.mediaUrl,
     statusEnvio: mensagem.statusEnvio,
     hora: mensagem.hora,
     naoLidas: 0,
@@ -144,6 +145,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     direcao: mensagem.direcao,
     tipo: mensagem.tipo,
     conteudo: mensagem.conteudo,
+    mediaUrl: mensagem.mediaUrl,
     statusEnvio: mensagem.statusEnvio,
     hora: mensagem.hora,
   };
