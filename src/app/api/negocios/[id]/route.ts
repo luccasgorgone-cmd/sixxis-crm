@@ -56,6 +56,9 @@ export async function GET(
           anotacoes: true,
           aceitaContato: true,
           origem: true,
+          notaFiscal: true,
+          empresaFaturadaId: true,
+          empresaFaturada: { select: { id: true, nome: true } },
           donoId: true,
           dono: { select: { id: true, nome: true } },
           donoPosVendaId: true,
@@ -132,6 +135,9 @@ export async function GET(
         anotacoes: negocio.lead.anotacoes,
         aceitaContato: negocio.lead.aceitaContato,
         origem: negocio.lead.origem,
+        notaFiscal: negocio.lead.notaFiscal,
+        empresaFaturadaId: negocio.lead.empresaFaturadaId,
+        empresaFaturada: negocio.lead.empresaFaturada,
       },
       // Dono mostrado conforme a finalidade do negocio.
       dono:

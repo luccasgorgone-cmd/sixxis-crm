@@ -135,6 +135,8 @@ enum AtividadeTipo {
   PENDENCIA
   LEMBRETE
   MENSAGEM_APAGADA
+  // Acompanhamento pos-venda: nota fiscal, empresa faturada e garantia.
+  ACOMPANHAMENTO
 }
 
 // Estado de um lembrete/agendamento de contato.
@@ -214,6 +216,10 @@ model Lead {
   aceitaContato Boolean        @default(true)
   ctwaClid      String?
   clienteSiteId  String?
+  // Acompanhamento pos-venda: nota fiscal (texto livre) e empresa que faturou.
+  notaFiscal     String?
+  empresaFaturadaId String?
+  empresaFaturada   EmpresaFaturada? @relation(fields: [empresaFaturadaId], references: [id], onDelete: SetNull)
   donoId         String?
   dono           Agente?        @relation("LeadDono", fields: [donoId], references: [id])
   donoPosVendaId String?
@@ -230,6 +236,17 @@ model Lead {
 
   @@index([donoId])
   @@index([donoPosVendaId])
+  @@index([empresaFaturadaId])
+}
+
+// Empresa que emite a nota fiscal (faturamento). Lista gerenciavel no admin.
+model EmpresaFaturada {
+  id       String   @id @default(cuid())
+  nome     String   @unique
+  ativo    Boolean  @default(true)
+  ordem    Int      @default(0)
+  leads    Lead[]
+  criadoEm DateTime @default(now())
 }
 
 model Conversa {

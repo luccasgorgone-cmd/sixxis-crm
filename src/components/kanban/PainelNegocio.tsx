@@ -30,6 +30,9 @@ import {
   CalendarPlus,
   Check,
   RotateCcw,
+  FileText,
+  Building2,
+  ClipboardList,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -319,6 +322,12 @@ export function PainelNegocio({
                     void carregar();
                     onAtualizado();
                   }}
+                />
+
+                <BlocoAcompanhamento
+                  detalhe={detalhe}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
                 />
 
                 <NegocioAcoes
@@ -924,6 +933,125 @@ function BlocoPendencia({
         </button>
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Acompanhamento (pos-venda): nota fiscal (texto livre) e empresa faturada
+// (select das ativas). Ambos opcionais. Persistem via PATCH /api/leads/[id].
+// ----------------------------------------------------------------------------
+type EmpresaOpcao = { id: string; nome: string };
+
+function BlocoAcompanhamento({
+  detalhe,
+  recarregar,
+  onAtualizado,
+}: {
+  detalhe: DetalheNegocio;
+  recarregar: () => Promise<void>;
+  onAtualizado: () => void;
+}) {
+  const toast = useToast();
+  const cliente = detalhe.cliente;
+  const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
+  const [nf, setNf] = useState(cliente.notaFiscal ?? "");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    setNf(cliente.notaFiscal ?? "");
+  }, [cliente.notaFiscal]);
+
+  useEffect(() => {
+    fetch("/api/empresas-faturadas")
+      .then((r) => (r.ok ? r.json() : { empresas: [] }))
+      .then((d) => setEmpresas(d.empresas ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  // A empresa atual pode estar inativa (fora da lista de ativas): garante a opcao.
+  const opcoes =
+    cliente.empresaFaturada &&
+    !empresas.some((e) => e.id === cliente.empresaFaturada!.id)
+      ? [cliente.empresaFaturada, ...empresas]
+      : empresas;
+
+  async function salvar(body: Record<string, unknown>): Promise<void> {
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/leads/${cliente.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        await recarregar();
+        onAtualizado();
+      } else {
+        const d = await r.json().catch(() => null);
+        if (!(r.status === 400 && d?.erro === "nada a atualizar")) {
+          toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+        }
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
+      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
+        <ClipboardList className="h-3.5 w-3.5" /> Acompanhamento
+      </h4>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Rotulo>Nota fiscal</Rotulo>
+          <div className="relative">
+            <FileText className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-medio/40" />
+            <input
+              value={nf}
+              onChange={(e) => setNf(e.target.value)}
+              onBlur={() => {
+                if ((nf.trim() || null) !== (cliente.notaFiscal ?? null)) {
+                  void salvar({ notaFiscal: nf.trim() });
+                }
+              }}
+              placeholder="Numero da NF (opcional)"
+              className="w-full rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Rotulo>Empresa faturada</Rotulo>
+          <div className="relative">
+            <Building2 className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-medio/40" />
+            <select
+              value={cliente.empresaFaturadaId ?? ""}
+              disabled={salvando}
+              onChange={(e) =>
+                void salvar({ empresaFaturadaId: e.target.value || null })
+              }
+              className="w-full appearance-none rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany disabled:opacity-60"
+            >
+              <option value="">—</option>
+              {opcoes.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          {empresas.length === 0 && (
+            <p className="mt-1 text-[11px] text-medio/50">
+              Nenhuma empresa ativa cadastrada.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

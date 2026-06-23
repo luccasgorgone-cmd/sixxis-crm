@@ -329,6 +329,45 @@ export async function seedModelos(): Promise<void> {
   }
 }
 
+// Empresas faturadas padrao (ordem fixa). Idempotente: cria por nome apenas as
+// que faltarem; nao mexe nas ja existentes (admin gerencia pela tela).
+const EMPRESAS_FATURADAS_PADRAO: string[] = [
+  "Sixxis Comercial Goiânia",
+  "Sixxis Comercial",
+  "Sixxis São Paulo",
+  "Sixxis Importação",
+  "AR Brasil",
+  "Axial",
+];
+
+export async function seedEmpresasFaturadas(): Promise<void> {
+  try {
+    const existentes = new Set(
+      (await prisma.empresaFaturada.findMany({ select: { nome: true } })).map(
+        (e) => e.nome,
+      ),
+    );
+    let criadas = 0;
+    for (let i = 0; i < EMPRESAS_FATURADAS_PADRAO.length; i++) {
+      const nome = EMPRESAS_FATURADAS_PADRAO[i];
+      if (existentes.has(nome)) continue;
+      await prisma.empresaFaturada.create({
+        data: { nome, ordem: i, ativo: true },
+      });
+      criadas++;
+    }
+    console.log(
+      criadas > 0
+        ? `[seed] ${criadas} empresas faturadas criadas`
+        : "[seed] empresas faturadas ok",
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear empresas faturadas: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 export async function seedFunil(): Promise<void> {
   try {
     const totalEtapas = await prisma.etapa.count();

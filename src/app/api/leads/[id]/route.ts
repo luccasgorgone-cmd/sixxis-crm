@@ -1,6 +1,7 @@
 // Edicao dos dados do CLIENTE (Lead): nomeManual, email, empresa, cpf,
-// anotacoes. Dono (venda/pos-venda/atendente da conversa) ou ADMIN. Registra
-// Atividade(EDICAO) com o que mudou.
+// anotacoes (EDICAO); acompanhamento pos-venda — nota fiscal e empresa faturada
+// (ACOMPANHAMENTO). Dono (venda/pos-venda/atendente da conversa) ou ADMIN.
+// Registra Atividade com o que mudou.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
@@ -45,6 +46,8 @@ export async function PATCH(
       cpf: true,
       anotacoes: true,
       aceitaContato: true,
+      notaFiscal: true,
+      empresaFaturadaId: true,
       donoId: true,
       donoPosVendaId: true,
       conversas: { select: { agenteId: true } },
@@ -57,9 +60,8 @@ export async function PATCH(
     lead.donoId === agente.id ||
     lead.donoPosVendaId === agente.id ||
     lead.conversas.some((c) => c.agenteId === agente.id);
-  if (!ehAdmin(agente.papel) && !ehDono) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
-  }
+  // Edicao base (dados/NF/empresa): dono do cliente ou admin (vendedor inclui).
+  const podeEditarBase = ehAdmin(agente.papel) || ehDono;
 
   let body: Record<string, unknown>;
   try {
@@ -69,7 +71,19 @@ export async function PATCH(
   }
 
   const data: Prisma.LeadUncheckedUpdateInput = {};
-  const mudancas: string[] = [];
+  const mudancas: string[] = []; // Atividade(EDICAO)
+  const mudAcomp: string[] = []; // Atividade(ACOMPANHAMENTO)
+
+  // Quais grupos de campos o corpo tenta editar.
+  const tentaBase =
+    CAMPOS.some(({ chave }) => body[chave] !== undefined) ||
+    typeof body.aceitaContato === "boolean";
+  const tentaAcomp =
+    body.notaFiscal !== undefined || body.empresaFaturadaId !== undefined;
+
+  if ((tentaBase || tentaAcomp) && !podeEditarBase) {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
 
   for (const { chave, rotulo } of CAMPOS) {
     if (body[chave] === undefined) continue;
@@ -89,7 +103,49 @@ export async function PATCH(
     mudancas.push(body.aceitaContato ? "aceita contato" : "opt-out de contato");
   }
 
-  if (mudancas.length === 0) {
+  // ---- Acompanhamento: nota fiscal ----
+  if (body.notaFiscal !== undefined) {
+    const novo =
+      body.notaFiscal === null || String(body.notaFiscal).trim() === ""
+        ? null
+        : String(body.notaFiscal).trim();
+    if (novo !== (lead.notaFiscal ?? null)) {
+      data.notaFiscal = novo;
+      mudAcomp.push(novo ? `Nota fiscal definida: ${novo}` : "Nota fiscal removida");
+    }
+  }
+
+  // ---- Acompanhamento: empresa faturada ----
+  if (body.empresaFaturadaId !== undefined) {
+    const novoId =
+      body.empresaFaturadaId === null || String(body.empresaFaturadaId).trim() === ""
+        ? null
+        : String(body.empresaFaturadaId).trim();
+    if (novoId !== (lead.empresaFaturadaId ?? null)) {
+      let nomeEmpresa: string | null = null;
+      if (novoId) {
+        const emp = await prisma.empresaFaturada.findUnique({
+          where: { id: novoId },
+          select: { nome: true },
+        });
+        if (!emp) {
+          return NextResponse.json(
+            { erro: "empresa faturada nao encontrada" },
+            { status: 404 },
+          );
+        }
+        nomeEmpresa = emp.nome;
+      }
+      data.empresaFaturadaId = novoId;
+      mudAcomp.push(
+        nomeEmpresa
+          ? `Empresa faturada definida: ${nomeEmpresa}`
+          : "Empresa faturada removida",
+      );
+    }
+  }
+
+  if (mudancas.length === 0 && mudAcomp.length === 0) {
     return NextResponse.json({ erro: "nada a atualizar" }, { status: 400 });
   }
 
@@ -106,16 +162,28 @@ export async function PATCH(
       empresa: true,
       cpf: true,
       anotacoes: true,
+      notaFiscal: true,
+      empresaFaturadaId: true,
       fotoUrl: true,
     },
   });
 
-  await registrarAtividade({
-    leadId: id,
-    agenteId: agente.id,
-    tipo: AtividadeTipo.EDICAO,
-    descricao: `Dados do cliente atualizados: ${mudancas.join(", ")}`,
-  });
+  if (mudancas.length > 0) {
+    await registrarAtividade({
+      leadId: id,
+      agenteId: agente.id,
+      tipo: AtividadeTipo.EDICAO,
+      descricao: `Dados do cliente atualizados: ${mudancas.join(", ")}`,
+    });
+  }
+  if (mudAcomp.length > 0) {
+    await registrarAtividade({
+      leadId: id,
+      agenteId: agente.id,
+      tipo: AtividadeTipo.ACOMPANHAMENTO,
+      descricao: `${mudAcomp.join("; ")} (por ${agente.nome ?? "colaborador"})`,
+    });
+  }
 
   getIO()?.emit("cliente:atualizado", {
     leadId: id,

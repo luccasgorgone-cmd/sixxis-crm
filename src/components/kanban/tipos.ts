@@ -107,6 +107,11 @@ export type DetalheNegocio = CardNegocio & {
     anotacoes: string | null;
     aceitaContato: boolean;
     origem: string | null;
+    notaFiscal: string | null;
+    empresaFaturadaId: string | null;
+    empresaFaturada: { id: string; nome: string } | null;
+    // Garantia: null = nao definido (Parte E).
+    garantia?: boolean | null;
   };
   dono: { id: string; nome: string } | null;
   produtos: unknown;

@@ -21,6 +21,7 @@ import {
   Megaphone,
   Bot,
   BarChart3,
+  Building2,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const SECOES: Secao[] = [
   { rotulo: "Numeros WhatsApp", href: "/admin/numeros", icone: Smartphone },
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },
+  { rotulo: "Empresas faturadas", href: "/admin/empresas", icone: Building2 },
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },

@@ -11,6 +11,7 @@ import {
   seedAdmin,
   seedFunil,
   seedModelos,
+  seedEmpresasFaturadas,
   seedVendedorTeste,
   seedRoteamentoEPresets,
   seedFinalidadeEInstancias,
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
   await seedAdmin();
   await seedFunil();
   await seedModelos();
+  await seedEmpresasFaturadas();
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();
