@@ -1009,6 +1009,7 @@ function BlocoAcompanhamento({
     <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
       <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
         <ClipboardList className="h-3.5 w-3.5" /> Acompanhamento
+        {salvando && <Loader2 className="h-3 w-3 animate-spin text-tiffany" />}
       </h4>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
