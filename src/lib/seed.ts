@@ -591,12 +591,40 @@ export const HORARIOS_PADRAO = [
   { dia: 6, aberto: true, faixas: [{ inicio: "09:00", fim: "13:00" }] },
 ];
 
+// Atalhos de resposta rapida (categoria "atalho"). Acentuacao correta, tom
+// caloroso e profissional, com {primeiro_nome} no inicio (a normalizacao de
+// aplicarModelo limpa a pontuacao quando o nome vem vazio) e {vendedor} ao
+// assinar quando faz sentido.
 const RESPOSTAS_PADRAO: { titulo: string; atalho: string; texto: string }[] = [
-  { titulo: "Saudacao", atalho: "/saudacao", texto: "Ola! Tudo bem? Como posso ajudar voce hoje?" },
-  { titulo: "Pedir CEP", atalho: "/cep", texto: "Pode me informar seu CEP, por favor? Assim calculo o frete." },
-  { titulo: "Enviar PIX", atalho: "/pix", texto: "Segue nossa chave PIX para pagamento. Assim que enviar, me avise por aqui." },
-  { titulo: "Agradecimento", atalho: "/obrigado", texto: "Obrigado pelo contato! Qualquer coisa, estou a disposicao." },
-  { titulo: "Fechamento", atalho: "/fechamento", texto: "Posso fechar o pedido para voce agora?" },
+  {
+    titulo: "Saudacao",
+    atalho: "/saudacao",
+    texto: "Olá {primeiro_nome}! Tudo bem? Como posso ajudar você hoje?",
+  },
+  {
+    titulo: "Pedir CEP",
+    atalho: "/cep",
+    texto:
+      "Olá {primeiro_nome}! Para calcular o frete certinho, pode me informar o seu CEP, por favor?",
+  },
+  {
+    titulo: "Enviar PIX",
+    atalho: "/pix",
+    texto:
+      "Pronto {primeiro_nome}! Segue a nossa chave PIX para o pagamento. Assim que você enviar, me avise por aqui que eu confirmo na hora.",
+  },
+  {
+    titulo: "Agradecimento",
+    atalho: "/obrigado",
+    texto:
+      "Obrigado {primeiro_nome}! Foi um prazer falar com você. Qualquer coisa, estou à disposição. {vendedor}",
+  },
+  {
+    titulo: "Fechamento",
+    atalho: "/fechamento",
+    texto:
+      "Perfeito {primeiro_nome}! Posso fechar o seu pedido agora? Qualquer dúvida, é só me chamar. {vendedor}",
+  },
 ];
 
 // Singletons de configuracao + respostas rapidas padrao. Idempotente.
@@ -634,6 +662,23 @@ export async function seedConfiguracoes(): Promise<void> {
       );
     } else {
       console.log("[seed] respostas rapidas ok");
+    }
+
+    // Atualiza a copy dos ATALHOS de sistema (por titulo, categoria "atalho")
+    // para a nova redacao acentuada/com {primeiro_nome}, mesmo quando ja
+    // existiam no banco. Nao toca em atalhos criados pelo usuario (outro titulo).
+    let atalhosAtualizados = 0;
+    for (const r of RESPOSTAS_PADRAO) {
+      const upd = await prisma.respostaRapida.updateMany({
+        where: { titulo: r.titulo, categoria: "atalho", texto: { not: r.texto } },
+        data: { texto: r.texto, atalho: r.atalho },
+      });
+      atalhosAtualizados += upd.count;
+    }
+    if (atalhosAtualizados > 0) {
+      console.log(`[seed] ${atalhosAtualizados} atalhos atualizados (copy nova)`);
+    } else {
+      console.log("[seed] atalhos ok");
     }
   } catch (erro) {
     console.error(
