@@ -14,6 +14,9 @@ import {
   MessageSquare,
   FileText,
   Contact,
+  Building2,
+  ShieldCheck,
+  ShieldOff,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -47,7 +50,11 @@ type Cliente = {
   valorAberto: number;
   qtdOrcamentos: number;
   qtdMensagens: number;
+  empresaFaturada: string | null;
+  garantia: boolean | null;
 };
+
+type EmpresaOpcao = { id: string; nome: string };
 
 type Vendedor = { id: string; nome: string };
 
@@ -86,11 +93,14 @@ export function ListaClientes({
   const [etiquetaF, setEtiquetaF] = useState("");
   const [temperaturaF, setTemperaturaF] = useState("");
   const [statusF, setStatusF] = useState("");
+  const [empresaF, setEmpresaF] = useState("");
+  const [garantiaF, setGarantiaF] = useState("");
   const [agenteSel, setAgenteSel] = useState(""); // admin
   const [semDono, setSemDono] = useState(false); // admin
 
   // Auxiliares
   const [todasEtiquetas, setTodasEtiquetas] = useState<EtiquetaChip[]>([]);
+  const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
 
   // Painel
@@ -106,6 +116,10 @@ export function ListaClientes({
     fetch("/api/etapas")
       .then((r) => (r.ok ? r.json() : { etapas: [] }))
       .then((d) => setEtapas(d.etapas ?? []))
+      .catch(() => undefined);
+    fetch("/api/empresas-faturadas")
+      .then((r) => (r.ok ? r.json() : { empresas: [] }))
+      .then((d) => setEmpresas(d.empresas ?? []))
       .catch(() => undefined);
     if (ehAdmin) {
       fetch("/api/vendedores")
@@ -127,6 +141,8 @@ export function ListaClientes({
       if (etiquetaF) p.set("etiqueta", etiquetaF);
       if (temperaturaF) p.set("temperatura", temperaturaF);
       if (statusF) p.set("status", statusF);
+      if (empresaF) p.set("empresa", empresaF);
+      if (garantiaF) p.set("garantia", garantiaF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
       if (periodo.preset === "custom") {
@@ -143,7 +159,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
 
   useEffect(() => {
     void carregar();
@@ -256,6 +272,26 @@ export function ListaClientes({
         ) : (
           <span className="text-xs text-medio/40">—</span>
         ),
+    },
+    {
+      chave: "empresaFaturada",
+      rotulo: "Empresa",
+      sortValue: (c) => (c.empresaFaturada ?? "").toLowerCase(),
+      render: (c) =>
+        c.empresaFaturada ? (
+          <span className="inline-flex items-center gap-1 text-medio/80">
+            <Building2 className="h-3.5 w-3.5 text-medio/40" />
+            {c.empresaFaturada}
+          </span>
+        ) : (
+          <span className="text-xs text-medio/40">—</span>
+        ),
+    },
+    {
+      chave: "garantia",
+      rotulo: "Garantia",
+      sortValue: (c) => (c.garantia === true ? 2 : c.garantia === false ? 1 : 0),
+      render: (c) => <SeloGarantia garantia={c.garantia} />,
     },
     {
       chave: "ultimoContato",
@@ -403,6 +439,20 @@ export function ListaClientes({
           <option value="PERDIDO">Perdido</option>
           <option value="PENDENTE">Pendente</option>
         </select>
+        <select value={empresaF} onChange={(e) => setEmpresaF(e.target.value)} className="campo">
+          <option value="">Empresa: todas</option>
+          {empresas.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.nome}
+            </option>
+          ))}
+        </select>
+        <select value={garantiaF} onChange={(e) => setGarantiaF(e.target.value)} className="campo">
+          <option value="">Garantia: todas</option>
+          <option value="sim">Com garantia</option>
+          <option value="nao">Sem garantia</option>
+          <option value="nao_definido">Nao definido</option>
+        </select>
         <FiltroPeriodo valor={periodo} onChange={setPeriodo} />
       </div>
 
@@ -439,6 +489,25 @@ export function ListaClientes({
       )}
     </div>
   );
+}
+
+// Selo de garantia: Com garantia (verde) / Sem garantia (ambar) / — (neutro).
+function SeloGarantia({ garantia }: { garantia: boolean | null }) {
+  if (garantia === true) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">
+        <ShieldCheck className="h-3 w-3" /> Garantia
+      </span>
+    );
+  }
+  if (garantia === false) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+        <ShieldOff className="h-3 w-3" /> Sem garantia
+      </span>
+    );
+  }
+  return <span className="text-xs text-medio/40">—</span>;
 }
 
 // Celula de etiquetas com aplicar/remover inline (popover).

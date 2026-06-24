@@ -47,6 +47,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const etiqueta = sp.get("etiqueta");
   if (etiqueta) where.etiquetas = { some: { etiquetaId: etiqueta } };
 
+  // Empresa faturada.
+  const empresa = sp.get("empresa");
+  if (empresa) where.empresaFaturadaId = empresa;
+
+  // Garantia: sim / nao / nao_definido.
+  const garantiaF = sp.get("garantia");
+  if (garantiaF === "sim") where.garantia = true;
+  else if (garantiaF === "nao") where.garantia = false;
+  else if (garantiaF === "nao_definido") where.garantia = null;
+
   const temperatura = sp.get("temperatura");
   const status = sp.get("status");
   const negFiltro: Prisma.NegocioWhereInput = {};
@@ -79,6 +89,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donoId: true,
       donoPosVendaId: true,
       criadoEm: true,
+      garantia: true,
+      empresaFaturada: { select: { id: true, nome: true } },
       etiquetas: { include: { etiqueta: true } },
       _count: { select: { orcamentos: true } },
       conversas: {
@@ -124,6 +136,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     valorAberto: number;
     qtdOrcamentos: number;
     qtdMensagens: number;
+    empresaFaturada: string | null;
+    garantia: boolean | null;
   };
 
   const clientes: Item[] = [];
@@ -190,6 +204,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       valorAberto,
       qtdOrcamentos: l._count.orcamentos,
       qtdMensagens,
+      empresaFaturada: l.empresaFaturada?.nome ?? null,
+      garantia: l.garantia,
     });
   }
 
