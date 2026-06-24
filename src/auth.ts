@@ -44,6 +44,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: agente.nome,
           email: agente.email,
           papel: agente.papel,
+          acessoVenda: agente.acessoVenda,
+          acessoPosVenda: agente.acessoPosVenda,
         };
       },
     }),

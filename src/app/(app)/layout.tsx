@@ -24,6 +24,8 @@ export default async function AppLayout({
           id: session.user.id,
           nome: session.user.name ?? null,
           papel: session.user.papel,
+          acessoVenda: session.user.acessoVenda,
+          acessoPosVenda: session.user.acessoPosVenda,
         }}
       >
       <div className="flex h-screen overflow-hidden bg-fundo">

@@ -218,6 +218,8 @@ model Lead {
   clienteSiteId  String?
   // Acompanhamento pos-venda: nota fiscal (texto livre) e empresa que faturou.
   notaFiscal     String?
+  // Garantia pos-venda: null = nao definido, true = com garantia, false = sem.
+  garantia       Boolean?
   empresaFaturadaId String?
   empresaFaturada   EmpresaFaturada? @relation(fields: [empresaFaturadaId], references: [id], onDelete: SetNull)
   donoId         String?

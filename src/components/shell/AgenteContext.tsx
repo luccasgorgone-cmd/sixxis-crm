@@ -9,6 +9,8 @@ export type AgenteAtual = {
   id: string;
   nome: string | null;
   papel: string;
+  acessoVenda: boolean;
+  acessoPosVenda: boolean;
 };
 
 const AgenteCtx = createContext<AgenteAtual | null>(null);

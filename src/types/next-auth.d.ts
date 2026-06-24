@@ -9,12 +9,16 @@ declare module "next-auth" {
     user: {
       id: string;
       papel: Papel;
+      acessoVenda: boolean;
+      acessoPosVenda: boolean;
     } & DefaultSession["user"];
   }
 
   // Objeto retornado pelo authorize() do Credentials provider.
   interface User {
     papel: Papel;
+    acessoVenda?: boolean;
+    acessoPosVenda?: boolean;
   }
 }
 
@@ -23,5 +27,7 @@ declare module "next-auth/jwt" {
     id: string;
     papel: Papel;
     nome?: string | null;
+    acessoVenda?: boolean;
+    acessoPosVenda?: boolean;
   }
 }

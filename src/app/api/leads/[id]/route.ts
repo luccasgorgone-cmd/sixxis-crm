@@ -47,6 +47,7 @@ export async function PATCH(
       anotacoes: true,
       aceitaContato: true,
       notaFiscal: true,
+      garantia: true,
       empresaFaturadaId: true,
       donoId: true,
       donoPosVendaId: true,
@@ -145,6 +146,33 @@ export async function PATCH(
     }
   }
 
+  // ---- Garantia (pos-venda): donoPosVenda, acesso pos-venda ou admin ----
+  if (body.garantia !== undefined) {
+    let podeGarantia =
+      ehAdmin(agente.papel) || lead.donoPosVendaId === agente.id;
+    if (!podeGarantia) {
+      const eu = await prisma.agente.findUnique({
+        where: { id: agente.id },
+        select: { acessoPosVenda: true },
+      });
+      podeGarantia = !!eu?.acessoPosVenda;
+    }
+    if (!podeGarantia) {
+      return NextResponse.json(
+        { erro: "sem permissao para alterar a garantia" },
+        { status: 403 },
+      );
+    }
+    const novo =
+      body.garantia === null ? null : Boolean(body.garantia);
+    if (novo !== (lead.garantia ?? null)) {
+      data.garantia = novo;
+      const rotulo =
+        novo === true ? "Com garantia" : novo === false ? "Sem garantia" : "Nao definido";
+      mudAcomp.push(`Garantia definida como ${rotulo}`);
+    }
+  }
+
   if (mudancas.length === 0 && mudAcomp.length === 0) {
     return NextResponse.json({ erro: "nada a atualizar" }, { status: 400 });
   }
@@ -163,6 +191,7 @@ export async function PATCH(
       cpf: true,
       anotacoes: true,
       notaFiscal: true,
+      garantia: true,
       empresaFaturadaId: true,
       fotoUrl: true,
     },

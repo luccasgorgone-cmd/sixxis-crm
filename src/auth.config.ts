@@ -26,6 +26,8 @@ export const authConfig = {
         token.id = user.id as string;
         token.papel = user.papel;
         token.nome = user.name;
+        token.acessoVenda = user.acessoVenda;
+        token.acessoPosVenda = user.acessoPosVenda;
       }
       return token;
     },
@@ -36,6 +38,8 @@ export const authConfig = {
         session.user.papel = token.papel as typeof session.user.papel;
         session.user.name =
           (token.nome as string | null | undefined) ?? session.user.name;
+        session.user.acessoVenda = Boolean(token.acessoVenda);
+        session.user.acessoPosVenda = Boolean(token.acessoPosVenda);
       }
       return session;
     },
