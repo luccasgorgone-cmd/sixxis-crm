@@ -58,6 +58,48 @@ export function formatarTelefone(tel: string): string {
   return `+${m[1]} ${m[2]} ${m[3]}-${m[4]}`;
 }
 
+// Mascaras leves (so formato, nunca bloqueiam): CPF 000.000.000-00,
+// CNPJ 00.000.000/0000-00, CEP 00000-000. Formatam o que houver de digitos.
+export function mascararCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+}
+
+export function mascararCnpj(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  return d
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3/$4")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, "$1.$2.$3/$4-$5");
+}
+
+export function mascararCep(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  return d.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+// Data de nascimento (ISO em UTC meia-noite) -> "dd/mm/aaaa" sem deslocar fuso.
+export function formatarDataNasc(valor: string | Date | null | undefined): string {
+  if (!valor) return "";
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return "";
+  const dia = String(d.getUTCDate()).padStart(2, "0");
+  const mes = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dia}/${mes}/${d.getUTCFullYear()}`;
+}
+
+// Mesmo valor ISO -> "aaaa-mm-dd" para preencher <input type="date">.
+export function dataNascParaInput(valor: string | Date | null | undefined): string {
+  if (!valor) return "";
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 // Valor em reais. null/undefined -> "—".
 export function formatarBRL(valor: number | null | undefined): string {
   if (valor == null) return "—";

@@ -15,11 +15,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Campos editaveis e seus rotulos para a descricao da atividade.
-const CAMPOS: { chave: "nomeManual" | "email" | "empresa" | "cpf" | "anotacoes"; rotulo: string }[] = [
+const CAMPOS: { chave: "nomeManual" | "email" | "empresa" | "cpf" | "cnpj" | "anotacoes"; rotulo: string }[] = [
   { chave: "nomeManual", rotulo: "nome" },
   { chave: "email", rotulo: "email" },
   { chave: "empresa", rotulo: "empresa" },
   { chave: "cpf", rotulo: "CPF" },
+  { chave: "cnpj", rotulo: "CNPJ" },
   { chave: "anotacoes", rotulo: "anotacoes" },
 ];
 
@@ -44,6 +45,8 @@ export async function PATCH(
       email: true,
       empresa: true,
       cpf: true,
+      cnpj: true,
+      dataNascimento: true,
       anotacoes: true,
       aceitaContato: true,
       notaFiscal: true,
@@ -78,6 +81,7 @@ export async function PATCH(
   // Quais grupos de campos o corpo tenta editar.
   const tentaBase =
     CAMPOS.some(({ chave }) => body[chave] !== undefined) ||
+    body.dataNascimento !== undefined ||
     typeof body.aceitaContato === "boolean";
   const tentaAcomp =
     body.notaFiscal !== undefined || body.empresaFaturadaId !== undefined;
@@ -95,6 +99,37 @@ export async function PATCH(
     if (novo !== atual) {
       (data as Record<string, unknown>)[chave] = novo;
       mudancas.push(rotulo);
+    }
+  }
+
+  // Data de nascimento (apenas a data, em UTC meia-noite). "" / null = limpar.
+  if (body.dataNascimento !== undefined) {
+    const bruto = body.dataNascimento;
+    let nova: Date | null = null;
+    if (bruto !== null && String(bruto).trim() !== "") {
+      // Espera "YYYY-MM-DD" (input date). Fixa meia-noite UTC para evitar
+      // deslocamento de fuso ao exibir.
+      const m = String(bruto).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) {
+        return NextResponse.json(
+          { erro: "data de nascimento invalida" },
+          { status: 400 },
+        );
+      }
+      nova = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
+      if (Number.isNaN(nova.getTime())) {
+        return NextResponse.json(
+          { erro: "data de nascimento invalida" },
+          { status: 400 },
+        );
+      }
+    }
+    const atualMs = lead.dataNascimento
+      ? new Date(lead.dataNascimento).getTime()
+      : null;
+    if ((nova ? nova.getTime() : null) !== atualMs) {
+      data.dataNascimento = nova;
+      mudancas.push("data de nascimento");
     }
   }
 
@@ -189,6 +224,8 @@ export async function PATCH(
       email: true,
       empresa: true,
       cpf: true,
+      cnpj: true,
+      dataNascimento: true,
       anotacoes: true,
       notaFiscal: true,
       garantia: true,

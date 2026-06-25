@@ -104,6 +104,8 @@ export type DetalheNegocio = CardNegocio & {
     email: string | null;
     empresa: string | null;
     cpf: string | null;
+    cnpj: string | null;
+    dataNascimento: string | null;
     anotacoes: string | null;
     aceitaContato: boolean;
     origem: string | null;

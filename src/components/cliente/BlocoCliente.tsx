@@ -17,10 +17,19 @@ import {
   StickyNote,
   BellOff,
   BellRing,
+  Cake,
+  Briefcase,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
-import { formatarTelefone } from "@/lib/format";
+import {
+  formatarTelefone,
+  formatarDataNasc,
+  dataNascParaInput,
+  mascararCpf,
+  mascararCnpj,
+} from "@/lib/format";
+import { Enderecos } from "@/components/cliente/Enderecos";
 
 export type ClientePainel = {
   id: string;
@@ -33,6 +42,8 @@ export type ClientePainel = {
   email: string | null;
   empresa: string | null;
   cpf: string | null;
+  cnpj?: string | null;
+  dataNascimento?: string | null;
   anotacoes: string | null;
   aceitaContato?: boolean;
   origem: string | null;
@@ -79,6 +90,7 @@ export function BlocoCliente({
   }
 
   return (
+    <>
     <section className="rounded-xl border border-black/5 bg-white p-4">
       <div className="flex items-start gap-3">
         <div className="group relative">
@@ -153,7 +165,21 @@ export function BlocoCliente({
             valor={cliente.empresa}
             placeholder="Sem empresa"
           />
-          <Linha icone={IdCard} valor={cliente.cpf} placeholder="Sem CPF" />
+          <Linha
+            icone={IdCard}
+            valor={cliente.cpf ? mascararCpf(cliente.cpf) : null}
+            placeholder="Sem CPF"
+          />
+          {cliente.cnpj && (
+            <Linha icone={Briefcase} valor={mascararCnpj(cliente.cnpj)} placeholder="" />
+          )}
+          {cliente.dataNascimento && (
+            <Linha
+              icone={Cake}
+              valor={formatarDataNasc(cliente.dataNascimento)}
+              placeholder=""
+            />
+          )}
           {cliente.anotacoes && (
             <div className="mt-2 flex gap-2 rounded-lg bg-fundo px-3 py-2">
               <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-medio/50" />
@@ -172,6 +198,9 @@ export function BlocoCliente({
         </div>
       )}
     </section>
+
+    <Enderecos leadId={cliente.id} podeEditar={podeEditar} />
+    </>
   );
 }
 
@@ -267,7 +296,13 @@ function Formulario({
   const [nomeManual, setNomeManual] = useState(cliente.nomeManual ?? "");
   const [email, setEmail] = useState(cliente.email ?? "");
   const [empresa, setEmpresa] = useState(cliente.empresa ?? "");
-  const [cpf, setCpf] = useState(cliente.cpf ?? "");
+  const [cpf, setCpf] = useState(cliente.cpf ? mascararCpf(cliente.cpf) : "");
+  const [cnpj, setCnpj] = useState(
+    cliente.cnpj ? mascararCnpj(cliente.cnpj) : "",
+  );
+  const [dataNascimento, setDataNascimento] = useState(
+    dataNascParaInput(cliente.dataNascimento),
+  );
   const [anotacoes, setAnotacoes] = useState(cliente.anotacoes ?? "");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -279,7 +314,15 @@ function Formulario({
       const r = await fetch(`/api/leads/${cliente.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nomeManual, email, empresa, cpf, anotacoes }),
+        body: JSON.stringify({
+          nomeManual,
+          email,
+          empresa,
+          cpf,
+          cnpj,
+          dataNascimento,
+          anotacoes,
+        }),
       });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
@@ -310,7 +353,26 @@ function Formulario({
       />
       <Campo rotulo="Email" valor={email} onChange={setEmail} tipo="email" />
       <Campo rotulo="Empresa" valor={empresa} onChange={setEmpresa} />
-      <Campo rotulo="CPF" valor={cpf} onChange={setCpf} />
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="CPF"
+          valor={cpf}
+          onChange={(v) => setCpf(mascararCpf(v))}
+          placeholder="000.000.000-00"
+        />
+        <Campo
+          rotulo="CNPJ"
+          valor={cnpj}
+          onChange={(v) => setCnpj(mascararCnpj(v))}
+          placeholder="00.000.000/0000-00"
+        />
+      </div>
+      <Campo
+        rotulo="Data de nascimento"
+        valor={dataNascimento}
+        onChange={setDataNascimento}
+        tipo="date"
+      />
       <div>
         <label className="mb-1 block text-xs font-medium text-medio/70">
           Anotacoes

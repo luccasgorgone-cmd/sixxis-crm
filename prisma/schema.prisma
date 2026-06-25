@@ -210,6 +210,9 @@ model Lead {
   email         String?
   empresa       String?
   cpf           String?
+  cnpj          String?
+  // Data de nascimento (apenas a data; hora ignorada). Base para aniversarios.
+  dataNascimento DateTime?
   anotacoes     String?        @db.Text
   origem        String?
   // Opt-out de comunicacoes em massa: false = nao incluir em campanhas.
@@ -234,11 +237,32 @@ model Lead {
   lembretes      Lembrete[]
   campanhaDestinos CampanhaDestino[]
   orcamentos     Orcamento[]
+  enderecos      Endereco[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
   @@index([donoPosVendaId])
   @@index([empresaFaturadaId])
+}
+
+// Endereco de um cliente. Varios por cliente; um pode ser marcado principal.
+// Preenchimento assistido por CEP (ViaCEP) na UI, com fallback manual.
+model Endereco {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  apelido     String?
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  uf          String?
+  principal   Boolean  @default(false)
+  criadoEm    DateTime @default(now())
+
+  @@index([leadId])
 }
 
 // Empresa que emite a nota fiscal (faturamento). Lista gerenciavel no admin.
