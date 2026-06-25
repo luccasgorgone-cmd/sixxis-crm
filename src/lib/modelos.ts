@@ -8,7 +8,12 @@
 export type LeadModelo = {
   nomeEfetivo: string;
   empresa?: string | null;
+  // Produto do ultimo orcamento do lead (resolvido pelo chamador, se houver).
+  produto?: string | null;
 };
+
+// Fallback gracioso de {produto} quando o lead nao tem orcamento.
+export const PRODUTO_FALLBACK = "produto que você viu";
 
 // Colaborador logado (para resolver {vendedor}/{atendente}).
 export type AgenteModelo = {
@@ -30,6 +35,7 @@ export const VARIAVEIS_AUTOMATICAS = [
   "nome",
   "primeiro_nome",
   "empresa",
+  "produto",
   "vendedor",
   "atendente",
   "loja",
@@ -54,6 +60,11 @@ export const INFO_VARIAVEL: Record<
   nome: { rotulo: "Nome", exemplo: "Maria Silva", tipo: "auto" },
   primeiro_nome: { rotulo: "Primeiro nome", exemplo: "Maria", tipo: "auto" },
   empresa: { rotulo: "Empresa", exemplo: "Acme", tipo: "auto" },
+  produto: {
+    rotulo: "Produto (ultimo orcamento)",
+    exemplo: "Furadeira de Impacto",
+    tipo: "auto",
+  },
   vendedor: { rotulo: "Atendente", exemplo: "Joao", tipo: "auto" },
   atendente: { rotulo: "Atendente", exemplo: "Joao", tipo: "auto" },
   loja: { rotulo: "Loja", exemplo: LOJA_NOME, tipo: "auto" },
@@ -149,6 +160,8 @@ export function aplicarModelo(
     nome: lead?.nomeEfetivo ?? "",
     primeiro_nome: lead ? primeiroNome(lead.nomeEfetivo) : "",
     empresa: lead?.empresa ?? "",
+    // {produto} = ultimo orcamento; vazio -> fallback gracioso ("produto que voce viu").
+    produto: lead?.produto?.trim() || PRODUTO_FALLBACK,
     vendedor,
     atendente: vendedor,
     loja: LOJA_NOME,

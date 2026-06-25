@@ -156,6 +156,12 @@ async function processarCampanha(
           nomeManual: true,
           telefone: true,
           empresa: true,
+          // {produto} = produto do ultimo orcamento do lead (se houver).
+          orcamentos: {
+            orderBy: { criadoEm: "desc" },
+            take: 1,
+            select: { produto: true },
+          },
         },
       },
     },
@@ -170,7 +176,11 @@ async function processarCampanha(
     if (atual?.status === StatusCampanha.CANCELADA) break;
 
     const texto = aplicarModelo(campanha.mensagem, {
-      lead: { nomeEfetivo: nomeEfetivo(d.lead), empresa: d.lead.empresa },
+      lead: {
+        nomeEfetivo: nomeEfetivo(d.lead),
+        empresa: d.lead.empresa,
+        produto: d.lead.orcamentos[0]?.produto ?? null,
+      },
       agente: { nome: campanha.agente?.nome ?? null },
       valoresDigitados: valores,
       variacoes,

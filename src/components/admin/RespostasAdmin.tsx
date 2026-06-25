@@ -315,7 +315,11 @@ function Modal({
   const baseRedacao =
     redacoes.length > 1 ? sortearRedacao(redacoes) : texto;
   const preview = aplicarModelo(baseRedacao, {
-    lead: { nomeEfetivo: "Maria Silva", empresa: "Acme" },
+    lead: {
+      nomeEfetivo: "Maria Silva",
+      empresa: "Acme",
+      produto: INFO_VARIAVEL.produto.exemplo,
+    },
     agente: { nome: INFO_VARIAVEL.vendedor.exemplo },
     valoresDigitados: Object.fromEntries(
       VARIAVEIS_DIGITADAS.map((v) => [v, INFO_VARIAVEL[v].exemplo]),

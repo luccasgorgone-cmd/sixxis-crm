@@ -199,10 +199,10 @@ const MODELOS_PADRAO: {
     categoria: "retomada",
     finalidade: Finalidade.VENDA,
     texto:
-      "Oi {primeiro_nome}, tudo bem? Vi que você teve interesse em um produto da {loja} e passei para saber se posso te ajudar a concluir com calma. Se fizer sentido, consigo uma condição especial com o cupom {cupom}. Fico à disposição! {vendedor}",
+      "Oi {primeiro_nome}, tudo bem? Vi que você teve interesse no {produto} e passei para saber se posso te ajudar a concluir com calma. Se fizer sentido, consigo uma condição especial com o cupom {cupom}. Fico à disposição! {vendedor}",
     variacoes: [
-      "{primeiro_nome}, estou retomando a nossa conversa. Ainda posso te ajudar com o que você viu na {loja}? Deixei o cupom {cupom} reservado caso queira seguir. {vendedor}",
-      "Olá {primeiro_nome}! Lembrei do seu interesse nos produtos da {loja}. Se ainda fizer sentido para você, consigo o cupom {cupom} para facilitar. Como posso ajudar? {vendedor}",
+      "{primeiro_nome}, estou retomando a nossa conversa. Ainda posso te ajudar com o {produto}? Deixei o cupom {cupom} reservado caso queira seguir. {vendedor}",
+      "Olá {primeiro_nome}! Lembrei do seu interesse no {produto}. Se ainda fizer sentido para você, consigo o cupom {cupom} para facilitar. Como posso ajudar? {vendedor}",
     ],
   },
   {
@@ -210,10 +210,10 @@ const MODELOS_PADRAO: {
     categoria: "boas_vindas",
     finalidade: null,
     texto:
-      "Olá {primeiro_nome}, seja muito bem-vindo à {loja}! É um prazer ter você com a gente. Estou por aqui para o que precisar, então fique à vontade para perguntar qualquer coisa. {vendedor}",
+      "Olá {primeiro_nome}, tudo bem? Me chamo {vendedor}, da {loja}. Seja muito bem-vindo! Estou por aqui para ajudar no que você precisar.",
     variacoes: [
-      "{primeiro_nome}, que bom ter você na {loja}! Qualquer dúvida sobre produtos ou pedidos, é só me chamar. Seja muito bem-vindo! {vendedor}",
-      "Seja bem-vindo à {loja}, {primeiro_nome}! Vou te acompanhar por aqui e ajudar no que precisar para escolher ou comprar. Conte comigo. {vendedor}",
+      "Oi {primeiro_nome}! Me chamo {vendedor} e sou da {loja}. Que bom ter você com a gente — qualquer dúvida sobre produtos ou pedidos, é só me chamar.",
+      "{primeiro_nome}, seja bem-vindo à {loja}! Aqui é o {vendedor} e vou te acompanhar por aqui. Conte comigo para escolher ou comprar com tranquilidade.",
     ],
   },
   {
@@ -254,10 +254,10 @@ const MODELOS_PADRAO: {
     categoria: "retomada",
     finalidade: Finalidade.VENDA,
     texto:
-      "{primeiro_nome}, você ainda tem interesse no que conversamos sobre a {loja}? Se quiser, posso te ajudar a finalizar ou tirar qualquer dúvida. Fico no aguardo! {vendedor}",
+      "{primeiro_nome}, você ainda tem interesse no {produto}? Posso te ajudar a seguir com ele e tirar qualquer dúvida. Fico no aguardo! {vendedor}",
     variacoes: [
-      "Oi {primeiro_nome}! Passando para saber se você ainda quer seguir com a compra na {loja}. Estou aqui para ajudar no que precisar. {vendedor}",
-      "{primeiro_nome}, posso te ajudar a concluir o seu pedido na {loja}? Se ainda fizer sentido, é só me dizer que cuido de tudo para você. {vendedor}",
+      "Oi {primeiro_nome}! Passando para saber se você ainda quer seguir com o {produto}. Estou aqui para ajudar no que precisar. {vendedor}",
+      "{primeiro_nome}, posso te ajudar a concluir o {produto}? Se ainda fizer sentido, é só me dizer que cuido de tudo para você. {vendedor}",
     ],
   },
 ];
@@ -599,7 +599,8 @@ const RESPOSTAS_PADRAO: { titulo: string; atalho: string; texto: string }[] = [
   {
     titulo: "Saudacao",
     atalho: "/saudacao",
-    texto: "Olá {primeiro_nome}! Tudo bem? Como posso ajudar você hoje?",
+    texto:
+      "Olá {primeiro_nome}! Tudo bem? Me chamo {vendedor}, da {loja}. Como posso ajudar você hoje?",
   },
   {
     titulo: "Pedir CEP",
