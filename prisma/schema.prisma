@@ -146,6 +146,13 @@ enum StatusLembrete {
   CANCELADO
 }
 
+// Estado de uma tarefa da agenda do agente.
+enum StatusTarefa {
+  PENDENTE
+  CONCLUIDA
+  CANCELADA
+}
+
 // Canal de um envio em massa.
 enum CanalEnvio {
   WHATSAPP
@@ -195,6 +202,7 @@ model Agente {
   lembretes             Lembrete[]
   campanhas             Campanha[]
   notificacoes          Notificacao[]
+  tarefas               Tarefa[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -239,6 +247,7 @@ model Lead {
   campanhaDestinos CampanhaDestino[]
   orcamentos     Orcamento[]
   enderecos      Endereco[]
+  tarefas        Tarefa[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -504,10 +513,35 @@ model Lembrete {
   dataHora    DateTime
   nota        String?        @db.Text
   status      StatusLembrete @default(PENDENTE)
+  // Alerta antecipado: minutos antes de dataHora p/ notificar; notificadoEm
+  // marca que a notificacao ja foi gerada (evita duplicar).
+  lembrarAntesMin Int?
+  notificadoEm    DateTime?
   criadoEm    DateTime       @default(now())
   concluidoEm DateTime?
 
   @@index([agenteId, status, dataHora])
+  @@index([leadId])
+}
+
+// Tarefa/compromisso da agenda do agente. Pode ou nao estar ligada a um cliente.
+// Alerta antecipado igual ao do lembrete (lembrarAntesMin + notificadoEm).
+model Tarefa {
+  id              String       @id @default(cuid())
+  agenteId        String
+  agente          Agente       @relation(fields: [agenteId], references: [id])
+  titulo          String
+  descricao       String?      @db.Text
+  dataHora        DateTime
+  duracaoMin      Int?
+  leadId          String?
+  lead            Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lembrarAntesMin Int?
+  notificadoEm    DateTime?
+  status          StatusTarefa @default(PENDENTE)
+  criadoEm        DateTime     @default(now())
+
+  @@index([agenteId, dataHora])
   @@index([leadId])
 }
 

@@ -120,6 +120,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     finalidade?: string;
     dataHora?: string;
     nota?: string | null;
+    lembrarAntesMin?: number | null;
   };
   try {
     body = await req.json();
@@ -177,6 +178,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const nota = body.nota?.trim() || null;
+  const lembrarAntesMin =
+    typeof body.lembrarAntesMin === "number" && body.lembrarAntesMin > 0
+      ? Math.floor(body.lembrarAntesMin)
+      : null;
   const lembrete = await prisma.lembrete.create({
     data: {
       leadId,
@@ -185,6 +190,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       finalidade,
       dataHora,
       nota,
+      lembrarAntesMin,
     },
   });
 

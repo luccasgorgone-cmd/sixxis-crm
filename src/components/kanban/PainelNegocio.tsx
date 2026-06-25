@@ -1121,6 +1121,7 @@ function BlocoAgendar({
   const toast = useToast();
   const [quando, setQuando] = useState("");
   const [nota, setNota] = useState("");
+  const [alerta, setAlerta] = useState<number | "">("");
   const [salvando, setSalvando] = useState(false);
 
   async function agendar() {
@@ -1139,11 +1140,13 @@ function BlocoAgendar({
           finalidade: detalhe.finalidade,
           dataHora: new Date(quando).toISOString(),
           nota: nota.trim() || null,
+          lembrarAntesMin: alerta === "" ? null : alerta,
         }),
       });
       if (r.ok) {
         setQuando("");
         setNota("");
+        setAlerta("");
         toast.sucesso("Contato agendado.");
         await recarregar();
       } else {
@@ -1195,6 +1198,21 @@ function BlocoAgendar({
           className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
         />
       </div>
+      <select
+        value={alerta}
+        onChange={(e) =>
+          setAlerta(e.target.value === "" ? "" : Number(e.target.value))
+        }
+        title="Alerta antecipado no sino"
+        className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+      >
+        <option value="">Sem alerta antecipado</option>
+        <option value={5}>Alertar 5 min antes</option>
+        <option value={15}>Alertar 15 min antes</option>
+        <option value={30}>Alertar 30 min antes</option>
+        <option value={60}>Alertar 1 hora antes</option>
+        <option value={1440}>Alertar 1 dia antes</option>
+      </select>
       <button
         onClick={() => void agendar()}
         disabled={salvando || !quando}

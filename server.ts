@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
 import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import { iniciarManutencao } from "./src/lib/manutencao";
+import { iniciarAlertas } from "./src/lib/alertas";
 import {
   seedAdmin,
   seedFunil,
@@ -62,8 +63,10 @@ async function main(): Promise<void> {
   // Worker da fila "campaigns" (envio em massa com throttle).
   createCampaignWorker(io);
 
-  // Manutencao: poda do raw antigo (+ arquivamento opcional), agora e diariamente.
+  // Manutencao: poda do raw antigo (+ arquivamento opcional) e aniversarios.
   iniciarManutencao();
+  // Alertas antecipados da agenda (tarefas/lembretes), a cada ~90s.
+  iniciarAlertas();
 
   httpServer.listen(port, () => {
     console.log(`CRM no ar na porta ${port}`);
