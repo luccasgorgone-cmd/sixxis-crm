@@ -19,6 +19,8 @@ import {
   ShieldOff,
   MapPin,
   UserPlus,
+  Send,
+  CheckSquare,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -36,6 +38,7 @@ import {
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
+import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -112,6 +115,11 @@ export function ListaClientes({
 
   // Cadastro manual de cliente
   const [cadastrar, setCadastrar] = useState(false);
+
+  // Envio em massa por selecao
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [envioAberto, setEnvioAberto] = useState(false);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -229,7 +237,46 @@ export function ListaClientes({
     [filtrados],
   );
 
+  function alternarSel(leadId: string) {
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(leadId)) novo.delete(leadId);
+      else novo.add(leadId);
+      return novo;
+    });
+  }
+  const todosDoRecorteSel =
+    filtrados.length > 0 && filtrados.every((c) => selecionados.has(c.leadId));
+  function alternarTodos() {
+    setSelecionados((prev) => {
+      if (todosDoRecorteSel) {
+        const novo = new Set(prev);
+        for (const c of filtrados) novo.delete(c.leadId);
+        return novo;
+      }
+      const novo = new Set(prev);
+      for (const c of filtrados) novo.add(c.leadId);
+      return novo;
+    });
+  }
+
+  const colunaSelecao: Coluna<Cliente> = {
+    chave: "sel",
+    rotulo: "",
+    render: (c) => (
+      <input
+        type="checkbox"
+        checked={selecionados.has(c.leadId)}
+        onClick={(e) => e.stopPropagation()}
+        onChange={() => alternarSel(c.leadId)}
+        className="h-4 w-4 accent-tiffany"
+        aria-label="Selecionar cliente"
+      />
+    ),
+  };
+
   const colunas: Coluna<Cliente>[] = [
+    ...(modoSelecao ? [colunaSelecao] : []),
     {
       chave: "nome",
       rotulo: "Cliente",
@@ -412,6 +459,19 @@ export function ListaClientes({
             </select>
           )}
           <button
+            onClick={() => {
+              setModoSelecao((v) => !v);
+              if (modoSelecao) setSelecionados(new Set());
+            }}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+              modoSelecao
+                ? "border-tiffany bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio hover:bg-black/5"
+            }`}
+          >
+            <CheckSquare className="h-4 w-4" /> Envio em massa
+          </button>
+          <button
             onClick={() => setCadastrar(true)}
             className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro"
           >
@@ -419,6 +479,39 @@ export function ListaClientes({
           </button>
         </div>
       </div>
+
+      {modoSelecao && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-tiffany/30 bg-tiffany/5 px-4 py-2.5">
+          <button
+            onClick={alternarTodos}
+            className="flex items-center gap-1.5 text-sm font-medium text-tiffany hover:underline"
+          >
+            <CheckSquare className="h-4 w-4" />
+            {todosDoRecorteSel
+              ? "Desmarcar todos do recorte"
+              : "Selecionar todos do recorte"}
+          </button>
+          <span className="text-sm text-medio/70">
+            <strong className="text-escuro">{selecionados.size}</strong>{" "}
+            selecionados
+          </span>
+          {selecionados.size > 0 && (
+            <button
+              onClick={() => setSelecionados(new Set())}
+              className="text-sm text-medio/60 hover:text-escuro"
+            >
+              Limpar
+            </button>
+          )}
+          <button
+            onClick={() => setEnvioAberto(true)}
+            disabled={selecionados.size === 0}
+            className="ml-auto flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" /> Escrever mensagem ({selecionados.size})
+          </button>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -524,7 +617,11 @@ export function ListaClientes({
           dados={filtrados}
           chaveLinha={(c) => c.leadId}
           ordemInicial={{ chave: "ultimoContato", dir: -1 }}
-          onLinha={(c) => c.negocioId && setPainelId(c.negocioId)}
+          onLinha={
+            modoSelecao
+              ? (c) => alternarSel(c.leadId)
+              : (c) => c.negocioId && setPainelId(c.negocioId)
+          }
         />
       )}
 
@@ -550,6 +647,14 @@ export function ListaClientes({
             setCadastrar(false);
             void carregar();
           }}
+        />
+      )}
+
+      {envioAberto && (
+        <ModalEnvioSelecao
+          leadIds={[...selecionados]}
+          ehAdmin={ehAdmin}
+          onFechar={() => setEnvioAberto(false)}
         />
       )}
     </div>

@@ -23,12 +23,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     filtro?: unknown;
     escopo?: string;
     agenteId?: string;
+    leadIds?: string[];
   };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
   }
+  const leadIds =
+    Array.isArray(body.leadIds) && body.leadIds.length > 0
+      ? body.leadIds.filter((x): x is string => typeof x === "string")
+      : null;
 
   if (
     body.finalidade !== Finalidade.VENDA &&
@@ -75,6 +80,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       filtro: normalizarFiltro(body.filtro),
       alvoId,
       todos,
+      leadIds,
     });
 
   return NextResponse.json({
