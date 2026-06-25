@@ -4,6 +4,7 @@
 // Opcional (env): arquivar conversas inativas ha muito tempo (sem deletar).
 import { prisma } from "./prisma";
 import { Prisma } from "../generated/prisma/client";
+import { notificarAniversarios } from "./aniversarios";
 
 // Poda o raw de mensagens com mais de RETENCAO_RAW_MESES (default 6).
 export async function podarRawAntigo(): Promise<void> {
@@ -60,6 +61,8 @@ export function iniciarManutencao(): void {
   const rodar = () => {
     void podarRawAntigo();
     void arquivarConversasInativas();
+    // Aniversarios do dia (notificacao para o dono do cliente). Idempotente.
+    void notificarAniversarios();
   };
   rodar();
   // Agendamento simples: a cada 24h.
