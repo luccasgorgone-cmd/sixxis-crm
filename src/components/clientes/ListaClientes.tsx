@@ -17,6 +17,7 @@ import {
   Building2,
   ShieldCheck,
   ShieldOff,
+  MapPin,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -52,6 +53,8 @@ type Cliente = {
   qtdMensagens: number;
   empresaFaturada: string | null;
   garantia: boolean | null;
+  uf: string | null;
+  cidade: string | null;
 };
 
 type EmpresaOpcao = { id: string; nome: string };
@@ -95,6 +98,8 @@ export function ListaClientes({
   const [statusF, setStatusF] = useState("");
   const [empresaF, setEmpresaF] = useState("");
   const [garantiaF, setGarantiaF] = useState("");
+  const [ufF, setUfF] = useState("");
+  const [cidadeF, setCidadeF] = useState("");
   const [agenteSel, setAgenteSel] = useState(""); // admin
   const [semDono, setSemDono] = useState(false); // admin
 
@@ -165,19 +170,28 @@ export function ListaClientes({
     void carregar();
   }, [carregar]);
 
-  // Busca textual no cliente (acentos/digitos).
+  // UFs presentes nos clientes carregados (para o seletor de Estado).
+  const ufsDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of clientes) if (c.uf) set.add(c.uf.toUpperCase());
+    return [...set].sort();
+  }, [clientes]);
+
+  // Busca textual (nome/telefone) + filtros de localizacao (estado/cidade),
+  // aplicados no cliente para manter as opcoes de UF estaveis.
   const filtrados = useMemo(() => {
     const q = normalizar(busca.trim());
     const qd = busca.replace(/\D/g, "");
-    if (!q && !qd) return clientes;
+    const cidadeQ = normalizar(cidadeF.trim());
     return clientes.filter((c) => {
+      if (ufF && (c.uf ?? "").toUpperCase() !== ufF) return false;
+      if (cidadeQ && !normalizar(c.cidade ?? "").includes(cidadeQ)) return false;
+      if (!q && !qd) return true;
       const nome = normalizar(c.nome);
       const tel = c.telefone.replace(/\D/g, "");
-      return (
-        (q && nome.includes(q)) || (qd.length > 0 && tel.includes(qd))
-      );
+      return (q && nome.includes(q)) || (qd.length > 0 && tel.includes(qd));
     });
-  }, [clientes, busca]);
+  }, [clientes, busca, ufF, cidadeF]);
 
   // Etiqueta inline (aplica/remove via negocio).
   const aplicarEtiqueta = useCallback(
@@ -269,6 +283,20 @@ export function ListaClientes({
           <BadgePendente />
         ) : c.status ? (
           <BadgeStatusNegocio status={c.status} />
+        ) : (
+          <span className="text-xs text-medio/40">—</span>
+        ),
+    },
+    {
+      chave: "local",
+      rotulo: "Local",
+      sortValue: (c) => `${c.uf ?? ""}${c.cidade ?? ""}`.toLowerCase(),
+      render: (c) =>
+        c.cidade || c.uf ? (
+          <span className="inline-flex items-center gap-1 text-medio/80">
+            <MapPin className="h-3.5 w-3.5 text-medio/40" />
+            {c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ""}` : c.uf}
+          </span>
         ) : (
           <span className="text-xs text-medio/40">—</span>
         ),
@@ -453,6 +481,20 @@ export function ListaClientes({
           <option value="nao">Sem garantia</option>
           <option value="nao_definido">Nao definido</option>
         </select>
+        <select value={ufF} onChange={(e) => setUfF(e.target.value)} className="campo">
+          <option value="">Estado: todos</option>
+          {ufsDisponiveis.map((uf) => (
+            <option key={uf} value={uf}>
+              {uf}
+            </option>
+          ))}
+        </select>
+        <input
+          value={cidadeF}
+          onChange={(e) => setCidadeF(e.target.value)}
+          placeholder="Cidade"
+          className="campo w-36"
+        />
         <FiltroPeriodo valor={periodo} onChange={setPeriodo} />
       </div>
 

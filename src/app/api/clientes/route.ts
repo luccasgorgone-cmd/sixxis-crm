@@ -9,6 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { nomeEfetivo } from "@/lib/cliente";
+import { normalizarTexto } from "@/lib/format";
 import { resolverPeriodo } from "@/lib/metricas";
 import {
   Finalidade,
@@ -91,6 +92,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       criadoEm: true,
       garantia: true,
       empresaFaturada: { select: { id: true, nome: true } },
+      enderecos: {
+        select: { uf: true, cidade: true, principal: true },
+        orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
+      },
       etiquetas: { include: { etiqueta: true } },
       _count: { select: { orcamentos: true } },
       conversas: {
@@ -138,7 +143,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     qtdMensagens: number;
     empresaFaturada: string | null;
     garantia: boolean | null;
+    uf: string | null;
+    cidade: string | null;
   };
+
+  // Filtros de localizacao (endereco principal ou primeiro). cidade = contains.
+  const ufFiltro = (sp.get("uf") ?? "").trim().toUpperCase();
+  const cidadeFiltro = normalizarTexto(sp.get("cidade") ?? "");
 
   const clientes: Item[] = [];
   for (const l of leads) {
@@ -155,6 +166,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Filtro de periodo: ativo no periodo (ultimo contato) ou criado no periodo.
     const refData = ultimoContato ?? l.criadoEm;
     if (refData < inicio || refData > fim) continue;
+
+    // Localizacao = endereco principal (ou o primeiro). Aplica filtros uf/cidade.
+    const endPrincipal = l.enderecos[0] ?? null;
+    const uf = endPrincipal?.uf ?? null;
+    const cidade = endPrincipal?.cidade ?? null;
+    if (ufFiltro && (uf ?? "").toUpperCase() !== ufFiltro) continue;
+    if (cidadeFiltro && !normalizarTexto(cidade ?? "").includes(cidadeFiltro)) {
+      continue;
+    }
 
     // Negocio "principal" (aberto > pendente > ganho > perdido), por relevancia.
     const abertoPend = l.negocios.find((n) => n.status === "ABERTO" && n.pendente);
@@ -206,6 +226,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       qtdMensagens,
       empresaFaturada: l.empresaFaturada?.nome ?? null,
       garantia: l.garantia,
+      uf,
+      cidade,
     });
   }
 
