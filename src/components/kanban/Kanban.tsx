@@ -430,13 +430,16 @@ export function Kanban({
           onDragEnd={aoFinalizar}
         >
           {multiSecao ? (
-            <div className="scroll-fino flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
               {secoes.map((s) => {
                 const cor = corFinalidade(s.finalidade);
                 return (
-                  <section key={s.finalidade} className="min-h-0">
+                  <section
+                    key={s.finalidade}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
                     <div
-                      className="mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      className="mb-2 flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ backgroundColor: `${cor.hex}14` }}
                     >
                       <span
@@ -451,7 +454,7 @@ export function Kanban({
                       </h2>
                     </div>
                     <div
-                      className="scroll-fino flex gap-3 overflow-x-auto rounded-xl border-l-2 pl-2"
+                      className="scroll-fino flex min-h-0 flex-1 gap-3 overflow-x-auto rounded-xl border-l-2 pl-2"
                       style={{ borderColor: cor.hex }}
                     >
                       {s.etapas.map((etapa, j) => (
