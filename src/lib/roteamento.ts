@@ -20,7 +20,7 @@ export async function rotearLeadNovo(
   const resultado = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.findUnique({
       where: { id: leadId },
-      select: { id: true, donoId: true, donoPosVendaId: true },
+      select: { id: true, donoId: true, donoPosVendaId: true, origem: true },
     });
     if (!lead) return null;
 
@@ -39,11 +39,16 @@ export async function rotearLeadNovo(
     let descricao = "";
     let avancarPonteiro = false;
 
-    if (config?.respeitarDono && donoAtual) {
-      // 1) Sticky por dono da finalidade.
+    // Cadastro manual: o dono pre-definido e SEMPRE respeitado (mesmo com
+    // respeitarDono desligado) e NAO consome o ponteiro do round-robin.
+    const stickyManual = lead.origem === "manual" && donoAtual;
+    if ((config?.respeitarDono || stickyManual) && donoAtual) {
+      // 1) Sticky por dono da finalidade (recorrente) ou cadastro manual.
       alvoId = donoAtual;
       tipo = AtividadeTipo.CONTATO;
-      descricao = "Contato recorrente atribuido ao dono";
+      descricao = stickyManual
+        ? "Cliente de cadastro manual atribuido ao dono definido"
+        : "Contato recorrente atribuido ao dono";
     } else if (config?.ativo) {
       // 2) Round-robin na fila (acesso) da finalidade.
       const equipe = await tx.agente.findMany({

@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ShieldOff,
   MapPin,
+  UserPlus,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -34,6 +35,7 @@ import {
 } from "@/components/badges";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
+import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -107,6 +109,9 @@ export function ListaClientes({
   const [todasEtiquetas, setTodasEtiquetas] = useState<EtiquetaChip[]>([]);
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+
+  // Cadastro manual de cliente
+  const [cadastrar, setCadastrar] = useState(false);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -382,8 +387,8 @@ export function ListaClientes({
             </p>
           </div>
         </div>
-        {ehAdmin && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {ehAdmin && (
             <select
               value={semDono ? "__sem__" : agenteSel}
               onChange={(e) => {
@@ -405,8 +410,14 @@ export function ListaClientes({
                 </option>
               ))}
             </select>
-          </div>
-        )}
+          )}
+          <button
+            onClick={() => setCadastrar(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+          >
+            <UserPlus className="h-4 w-4" /> Cadastrar cliente
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -527,6 +538,18 @@ export function ListaClientes({
           etapas={etapas}
           onFechar={() => setPainelId(null)}
           onAtualizado={() => void carregar()}
+        />
+      )}
+
+      {cadastrar && (
+        <ModalCadastrarCliente
+          ehAdmin={ehAdmin}
+          vendedores={vendedores}
+          onFechar={() => setCadastrar(false)}
+          onCriado={() => {
+            setCadastrar(false);
+            void carregar();
+          }}
         />
       )}
     </div>

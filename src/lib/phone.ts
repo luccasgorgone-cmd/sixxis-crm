@@ -8,3 +8,14 @@ export function normalizarJid(jid: string): string {
   // Remove qualquer caractere nao numerico (ex.: ":device" em alguns JIDs).
   return semSufixo.replace(/\D/g, "");
 }
+
+// Normaliza um telefone digitado para o MESMO formato do JID do WhatsApp
+// (so digitos, com codigo do pais 55). Assim o cadastro manual casa com o lead
+// que chega depois pela 1a mensagem. Numeros ja com DDI (12-13 digitos) ficam
+// como estao; DDD+numero (10-11 digitos) recebem o prefixo "55".
+export function normalizarTelefoneBR(entrada: string): string {
+  let d = (entrada ?? "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.length <= 11) d = `55${d}`;
+  return d;
+}
