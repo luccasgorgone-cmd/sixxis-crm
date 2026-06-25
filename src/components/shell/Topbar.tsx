@@ -4,6 +4,7 @@
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "./LogoutButton";
 import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
+import { SinoNotificacoes } from "./SinoNotificacoes";
 
 const ROTULO_PAPEL: Record<string, string> = {
   ADMIN: "Administrador",
@@ -40,6 +41,7 @@ export function Topbar({
       <h1 className="text-sm font-semibold text-escuro">{titulo}</h1>
 
       <div className="flex items-center gap-3">
+        <SinoNotificacoes />
         <SinoLembretes papel={papel} agenteId={agenteId} />
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-tiffany/15 text-sm font-semibold text-tiffany">

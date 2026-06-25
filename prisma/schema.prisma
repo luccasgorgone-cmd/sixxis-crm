@@ -194,6 +194,7 @@ model Agente {
   metasCriadas          Meta[]             @relation("MetaCriador")
   lembretes             Lembrete[]
   campanhas             Campanha[]
+  notificacoes          Notificacao[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -508,6 +509,23 @@ model Lembrete {
 
   @@index([agenteId, status, dataHora])
   @@index([leadId])
+}
+
+// Notificacao do agente (centro de notificacoes do sino). tipo livre:
+// ANIVERSARIO | LEMBRETE | TAREFA | GERAL... link aponta para cliente/agenda.
+model Notificacao {
+  id        String   @id @default(cuid())
+  agenteId  String
+  agente    Agente   @relation(fields: [agenteId], references: [id])
+  tipo      String
+  titulo    String
+  descricao String?  @db.Text
+  link      String?
+  lida      Boolean  @default(false)
+  leadId    String?
+  criadoEm  DateTime @default(now())
+
+  @@index([agenteId, lida, criadoEm])
 }
 
 // Orcamento de um cliente. Multiplos por cliente ficam todos armazenados
