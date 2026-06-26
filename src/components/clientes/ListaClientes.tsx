@@ -20,6 +20,7 @@ import {
   MapPin,
   UserPlus,
   Send,
+  Repeat,
   CheckSquare,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -39,6 +40,7 @@ import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
 import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
+import { ModalTransferencia } from "./ModalTransferencia";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -128,6 +130,7 @@ export function ListaClientes({
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [envioAberto, setEnvioAberto] = useState(false);
+  const [transferAberto, setTransferAberto] = useState(false);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -580,13 +583,24 @@ export function ListaClientes({
               Limpar
             </button>
           )}
-          <button
-            onClick={() => setEnvioAberto(true)}
-            disabled={selecionados.size === 0}
-            className="ml-auto flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" /> Escrever mensagem ({selecionados.size})
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {ehAdmin && (
+              <button
+                onClick={() => setTransferAberto(true)}
+                disabled={selecionados.size === 0}
+                className="flex items-center gap-1.5 rounded-lg border border-tiffany/40 px-3 py-1.5 text-sm font-semibold text-tiffany hover:bg-tiffany/10 disabled:opacity-50"
+              >
+                <Repeat className="h-4 w-4" /> Transferir ({selecionados.size})
+              </button>
+            )}
+            <button
+              onClick={() => setEnvioAberto(true)}
+              disabled={selecionados.size === 0}
+              className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" /> Escrever mensagem ({selecionados.size})
+            </button>
+          </div>
         </div>
       )}
 
@@ -751,6 +765,19 @@ export function ListaClientes({
           leadIds={[...selecionados]}
           ehAdmin={ehAdmin}
           onFechar={() => setEnvioAberto(false)}
+        />
+      )}
+
+      {transferAberto && (
+        <ModalTransferencia
+          leadIds={[...selecionados]}
+          onFechar={() => setTransferAberto(false)}
+          onConcluido={() => {
+            setTransferAberto(false);
+            setSelecionados(new Set());
+            setModoSelecao(false);
+            void carregar();
+          }}
         />
       )}
     </div>
