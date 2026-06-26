@@ -1,12 +1,13 @@
-// Exclusao FISICA de UMA conversa (e suas mensagens). SOMENTE ADMIN — gate no
-// servidor (obterAdmin -> 403). Diferente do "apagar mensagem" (revoke que
-// preserva): aqui o registro e removido em definitivo. Em transacao: apaga as
-// Mensagens da conversa e depois a Conversa. NAO toca no Lead nem em Negocios.
-// (Unica FK para Conversa e Mensagem.conversaId; nada referencia Mensagem.)
+// Exclusao FISICA do atendimento de um cliente a partir de uma conversa. SOMENTE
+// ADMIN — gate no servidor (obterAdmin -> 403). Decisao de produto: "excluir
+// conversa" remove o atendimento por completo (Inbox, Kanban, Carteira, Clientes):
+// apaga a Conversa e suas Mensagens, os Negocios do lead e dependentes, e o
+// proprio Lead. NAO mexe na configuracao. Diferente do "apagar mensagem" (revoke).
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
+import { excluirLeadsCompleto } from "@/lib/exclusao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,17 +30,20 @@ export async function DELETE(
     return NextResponse.json({ erro: "conversa nao encontrada" }, { status: 404 });
   }
 
-  await prisma.$transaction([
-    prisma.mensagem.deleteMany({ where: { conversaId: id } }),
-    prisma.conversa.delete({ where: { id } }),
-  ]);
+  // Remove o atendimento completo do cliente (lead + negocios + conversas).
+  const resumo = await excluirLeadsCompleto([conversa.leadId]);
 
-  // Remove a conversa das telas abertas (inbox/painel) em tempo real.
+  // Some de todas as telas: Inbox (conversa) e Kanban/Carteira (negocio).
   getIO()?.emit("conversa:excluida", {
     conversaId: id,
     leadId: conversa.leadId,
     agenteId: conversa.agenteId,
   });
+  getIO()?.emit("negocio:atualizado", {
+    negocioId: null,
+    etapaId: null,
+    motivo: "excluido",
+  });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...resumo });
 }

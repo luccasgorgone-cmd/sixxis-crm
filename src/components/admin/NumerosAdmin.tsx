@@ -282,9 +282,12 @@ function ModalExcluirConversas({
   onConcluido: () => void;
 }) {
   const toast = useToast();
-  const [preview, setPreview] = useState<{ conversas: number; mensagens: number } | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<{
+    clientes: number;
+    conversas: number;
+    mensagens: number;
+    negocios: number;
+  } | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [excluindo, setExcluindo] = useState(false);
 
@@ -292,7 +295,13 @@ function ModalExcluirConversas({
     fetch(`/api/admin/instancias/${numero.id}/excluir-conversas`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d) setPreview({ conversas: d.conversas ?? 0, mensagens: d.mensagens ?? 0 });
+        if (d)
+          setPreview({
+            clientes: d.clientes ?? 0,
+            conversas: d.conversas ?? 0,
+            mensagens: d.mensagens ?? 0,
+            negocios: d.negocios ?? 0,
+          });
       })
       .catch(() => undefined)
       .finally(() => setCarregando(false));
@@ -307,7 +316,7 @@ function ModalExcluirConversas({
       const d = await r.json().catch(() => null);
       if (r.ok) {
         toast.sucesso(
-          `${d?.conversasApagadas ?? 0} conversa(s) e ${d?.mensagensApagadas ?? 0} mensagem(ns) apagadas.`,
+          `${d?.clientesApagados ?? 0} cliente(s), ${d?.conversasApagadas ?? 0} conversa(s) e ${d?.mensagensApagadas ?? 0} mensagem(ns) apagadas.`,
         );
         onConcluido();
       } else {
@@ -335,13 +344,18 @@ function ModalExcluirConversas({
           </div>
         ) : (
           <p className="text-sm text-medio/80">
-            Isto vai apagar <strong className="text-escuro">permanentemente</strong>{" "}
+            Isto vai remover <strong className="text-escuro">permanentemente</strong> o
+            atendimento de{" "}
+            <strong className="text-escuro">{preview?.clientes ?? 0}</strong>{" "}
+            cliente(s) vinculados ao numero{" "}
+            <strong className="text-escuro">{numero.nome}</strong>:{" "}
             <strong className="text-escuro">{preview?.conversas ?? 0}</strong>{" "}
-            conversa(s) e{" "}
+            conversa(s),{" "}
             <strong className="text-escuro">{preview?.mensagens ?? 0}</strong>{" "}
-            mensagem(ns) vinculadas ao numero{" "}
-            <strong className="text-escuro">{numero.nome}</strong>. Nao pode ser
-            desfeito. Os clientes e negocios sao mantidos.
+            mensagem(ns) e{" "}
+            <strong className="text-escuro">{preview?.negocios ?? 0}</strong>{" "}
+            negocio(s). Some do Inbox, Kanban, Carteira e Clientes. Nao pode ser
+            desfeito.
           </p>
         )}
         <div className="mt-5 flex justify-end gap-2">

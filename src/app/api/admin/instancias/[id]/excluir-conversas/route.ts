@@ -1,16 +1,27 @@
-// Exclusao FISICA das conversas de um NUMERO (instancia). SOMENTE ADMIN (gate no
-// servidor). Escopo: Conversas cujo instanciaId = id (thread inteira + mensagens).
-// GET = preview (contagem do que sera apagado). POST = executa em transacao.
-// NAO toca no Lead nem em Negocios.
+// Exclusao FISICA do atendimento dos clientes de um NUMERO (instancia). SOMENTE
+// ADMIN (gate no servidor). Escopo: leads que tem Conversa cujo instanciaId = id.
+// Remove o atendimento por completo desses clientes (Conversa/Mensagem, Negocios
+// e dependentes, e o Lead). GET = preview (contagem). POST = executa.
+// NAO toca na configuracao.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
 import { getIO } from "@/lib/socket";
+import { excluirLeadsCompleto } from "@/lib/exclusao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Preview: contagem de conversas e mensagens no escopo do numero.
+// Leads no escopo do numero (que tem ao menos uma conversa nessa instancia).
+async function leadsDoNumero(instanciaId: string): Promise<string[]> {
+  const convs = await prisma.conversa.findMany({
+    where: { instanciaId },
+    select: { leadId: true },
+  });
+  return Array.from(new Set(convs.map((c) => c.leadId)));
+}
+
+// Preview: contagem de clientes, conversas e mensagens que seriam afetados.
 export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -27,11 +38,19 @@ export async function GET(
   if (!instancia) {
     return NextResponse.json({ erro: "numero nao encontrado" }, { status: 404 });
   }
-  const [conversas, mensagens] = await Promise.all([
-    prisma.conversa.count({ where: { instanciaId: id } }),
-    prisma.mensagem.count({ where: { conversa: { instanciaId: id } } }),
+  const leadIds = await leadsDoNumero(id);
+  const [conversas, mensagens, negocios] = await Promise.all([
+    prisma.conversa.count({ where: { leadId: { in: leadIds } } }),
+    prisma.mensagem.count({ where: { conversa: { leadId: { in: leadIds } } } }),
+    prisma.negocio.count({ where: { leadId: { in: leadIds } } }),
   ]);
-  return NextResponse.json({ instancia, conversas, mensagens });
+  return NextResponse.json({
+    instancia,
+    clientes: leadIds.length,
+    conversas,
+    mensagens,
+    negocios,
+  });
 }
 
 export async function POST(
@@ -51,17 +70,21 @@ export async function POST(
     return NextResponse.json({ erro: "numero nao encontrado" }, { status: 404 });
   }
 
-  // Em transacao: apaga as Mensagens das conversas do numero e depois as Conversas.
-  const [msg, conv] = await prisma.$transaction([
-    prisma.mensagem.deleteMany({ where: { conversa: { instanciaId: id } } }),
-    prisma.conversa.deleteMany({ where: { instanciaId: id } }),
-  ]);
+  const leadIds = await leadsDoNumero(id);
+  const resumo = await excluirLeadsCompleto(leadIds);
 
   getIO()?.emit("conversa:excluida", { instanciaId: id });
+  getIO()?.emit("negocio:atualizado", {
+    negocioId: null,
+    etapaId: null,
+    motivo: "excluido",
+  });
 
   return NextResponse.json({
     ok: true,
-    mensagensApagadas: msg.count,
-    conversasApagadas: conv.count,
+    clientesApagados: resumo.leads,
+    conversasApagadas: resumo.conversas,
+    mensagensApagadas: resumo.mensagens,
+    negociosApagados: resumo.negocios,
   });
 }

@@ -143,11 +143,12 @@ export function Thread({
               <h3 className="text-sm font-semibold text-escuro">Excluir conversa</h3>
             </div>
             <p className="text-sm text-medio/80">
-              Tem certeza? Esta acao apaga{" "}
-              <strong className="text-escuro">PERMANENTEMENTE</strong> esta conversa
-              e suas <strong className="text-escuro">{mensagens.length}</strong>{" "}
-              mensagem(ns). Nao pode ser desfeita. O cliente e os negocios sao
-              mantidos.
+              Tem certeza? Esta acao remove{" "}
+              <strong className="text-escuro">PERMANENTEMENTE</strong> este
+              atendimento: a conversa e suas{" "}
+              <strong className="text-escuro">{mensagens.length}</strong>{" "}
+              mensagem(ns), alem do cliente e seus negocios (some do Inbox,
+              Kanban, Carteira e Clientes). Nao pode ser desfeita.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
