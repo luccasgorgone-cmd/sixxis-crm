@@ -22,6 +22,7 @@ import {
   Bot,
   BarChart3,
   Building2,
+  Boxes,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const SECOES: Secao[] = [
   { rotulo: "Etapas", href: "/admin/etapas", icone: Columns3 },
   { rotulo: "Etiquetas", href: "/admin/etiquetas", icone: Tags },
   { rotulo: "Empresas faturadas", href: "/admin/empresas", icone: Building2 },
+  { rotulo: "Produtos de interesse", href: "/admin/produtos-interesse", icone: Boxes },
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },

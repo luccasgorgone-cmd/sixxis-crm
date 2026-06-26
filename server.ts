@@ -13,6 +13,7 @@ import {
   seedFunil,
   seedModelos,
   seedEmpresasFaturadas,
+  seedProdutosInteresse,
   seedVendedorTeste,
   seedRoteamentoEPresets,
   seedFinalidadeEInstancias,
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
   await seedFunil();
   await seedModelos();
   await seedEmpresasFaturadas();
+  await seedProdutosInteresse();
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();

@@ -248,6 +248,7 @@ model Lead {
   orcamentos     Orcamento[]
   enderecos      Endereco[]
   tarefas        Tarefa[]
+  produtosInteresse LeadProdutoInteresse[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -273,6 +274,30 @@ model Endereco {
   criadoEm    DateTime @default(now())
 
   @@index([leadId])
+}
+
+// Produto pelo qual o cliente tem INTERESSE (distinto do produto comprado/
+// orcamento). Lista gerenciavel no admin. Varios por cliente via LeadProdutoInteresse.
+model ProdutoInteresse {
+  id       String   @id @default(cuid())
+  nome     String   @unique
+  ativo    Boolean  @default(true)
+  ordem    Int      @default(0)
+  leads    LeadProdutoInteresse[]
+  criadoEm DateTime @default(now())
+}
+
+// Vinculo N:N cliente <-> produto de interesse (varios por cliente).
+model LeadProdutoInteresse {
+  id                 String           @id @default(cuid())
+  leadId             String
+  lead               Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  produtoInteresseId String
+  produtoInteresse   ProdutoInteresse @relation(fields: [produtoInteresseId], references: [id])
+  criadoEm           DateTime         @default(now())
+
+  @@unique([leadId, produtoInteresseId])
+  @@index([produtoInteresseId])
 }
 
 // Empresa que emite a nota fiscal (faturamento). Lista gerenciavel no admin.

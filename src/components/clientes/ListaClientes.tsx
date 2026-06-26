@@ -60,9 +60,11 @@ type Cliente = {
   garantia: boolean | null;
   uf: string | null;
   cidade: string | null;
+  produtosInteresse: { id: string; nome: string }[];
 };
 
 type EmpresaOpcao = { id: string; nome: string };
+type ProdutoOpcao = { id: string; nome: string };
 
 type Vendedor = { id: string; nome: string };
 
@@ -102,6 +104,7 @@ export function ListaClientes({
   const [temperaturaF, setTemperaturaF] = useState("");
   const [statusF, setStatusF] = useState("");
   const [empresaF, setEmpresaF] = useState("");
+  const [produtoInteresseF, setProdutoInteresseF] = useState("");
   const [garantiaF, setGarantiaF] = useState("");
   const [ufF, setUfF] = useState("");
   const [cidadeF, setCidadeF] = useState("");
@@ -111,6 +114,7 @@ export function ListaClientes({
   // Auxiliares
   const [todasEtiquetas, setTodasEtiquetas] = useState<EtiquetaChip[]>([]);
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
+  const [produtosInteresse, setProdutosInteresse] = useState<ProdutoOpcao[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
 
   // Cadastro manual de cliente
@@ -139,6 +143,10 @@ export function ListaClientes({
       .then((r) => (r.ok ? r.json() : { empresas: [] }))
       .then((d) => setEmpresas(d.empresas ?? []))
       .catch(() => undefined);
+    fetch("/api/produtos-interesse")
+      .then((r) => (r.ok ? r.json() : { produtos: [] }))
+      .then((d) => setProdutosInteresse(d.produtos ?? []))
+      .catch(() => undefined);
     if (ehAdmin) {
       fetch("/api/vendedores")
         .then((r) => (r.ok ? r.json() : { vendedores: [] }))
@@ -160,6 +168,7 @@ export function ListaClientes({
       if (temperaturaF) p.set("temperatura", temperaturaF);
       if (statusF) p.set("status", statusF);
       if (empresaF) p.set("empresa", empresaF);
+      if (produtoInteresseF) p.set("produtoInteresse", produtoInteresseF);
       if (garantiaF) p.set("garantia", garantiaF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
@@ -177,7 +186,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
 
   useEffect(() => {
     void carregar();
@@ -363,6 +372,31 @@ export function ListaClientes({
             <Building2 className="h-3.5 w-3.5 text-medio/40" />
             {c.empresaFaturada}
           </span>
+        ) : (
+          <span className="text-xs text-medio/40">—</span>
+        ),
+    },
+    {
+      chave: "interesse",
+      rotulo: "Interesse",
+      sortValue: (c) => c.produtosInteresse.length,
+      render: (c) =>
+        c.produtosInteresse.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {c.produtosInteresse.slice(0, 2).map((p) => (
+              <span
+                key={p.id}
+                className="rounded-full bg-tiffany/10 px-1.5 py-0.5 text-[10px] font-medium text-tiffany"
+              >
+                {p.nome}
+              </span>
+            ))}
+            {c.produtosInteresse.length > 2 && (
+              <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/60">
+                +{c.produtosInteresse.length - 2}
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-medio/40">—</span>
         ),
@@ -576,6 +610,18 @@ export function ListaClientes({
           {empresas.map((e) => (
             <option key={e.id} value={e.id}>
               {e.nome}
+            </option>
+          ))}
+        </select>
+        <select
+          value={produtoInteresseF}
+          onChange={(e) => setProdutoInteresseF(e.target.value)}
+          className="campo"
+        >
+          <option value="">Interesse: todos</option>
+          {produtosInteresse.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
             </option>
           ))}
         </select>

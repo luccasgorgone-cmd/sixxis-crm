@@ -41,6 +41,7 @@ import { LojaCliente } from "@/components/loja/LojaCliente";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
+import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
@@ -324,6 +325,11 @@ export function PainelNegocio({
                     void carregar();
                     onAtualizado();
                   }}
+                />
+
+                <BlocoProdutosInteresse
+                  leadId={detalhe.cliente.id}
+                  onAtualizado={() => void carregar()}
                 />
 
                 <BlocoAcompanhamento

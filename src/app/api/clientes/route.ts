@@ -52,6 +52,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const empresa = sp.get("empresa");
   if (empresa) where.empresaFaturadaId = empresa;
 
+  // Produto de interesse (distinto do produto comprado).
+  const produtoInteresse = sp.get("produtoInteresse");
+  if (produtoInteresse) {
+    where.produtosInteresse = { some: { produtoInteresseId: produtoInteresse } };
+  }
+
   // Garantia: sim / nao / nao_definido.
   const garantiaF = sp.get("garantia");
   if (garantiaF === "sim") where.garantia = true;
@@ -97,6 +103,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
       },
       etiquetas: { include: { etiqueta: true } },
+      produtosInteresse: {
+        select: { produtoInteresse: { select: { id: true, nome: true } } },
+      },
       _count: { select: { orcamentos: true } },
       conversas: {
         select: {
@@ -145,6 +154,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     garantia: boolean | null;
     uf: string | null;
     cidade: string | null;
+    produtosInteresse: { id: string; nome: string }[];
   };
 
   // Filtros de localizacao (endereco principal ou primeiro). cidade = contains.
@@ -228,6 +238,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       garantia: l.garantia,
       uf,
       cidade,
+      produtosInteresse: l.produtosInteresse.map((pi) => ({
+        id: pi.produtoInteresse.id,
+        nome: pi.produtoInteresse.nome,
+      })),
     });
   }
 

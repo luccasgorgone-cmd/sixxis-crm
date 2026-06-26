@@ -340,6 +340,56 @@ const EMPRESAS_FATURADAS_PADRAO: string[] = [
   "Axial",
 ];
 
+// Lista pre-definida de produtos de interesse (ordem 0..16). Formato exato do
+// nome: espaco-hifen-espaco entre nome e voltagem.
+const PRODUTOS_INTERESSE_PADRAO: string[] = [
+  "Aspirador Bravo",
+  "Sixxis Cardio",
+  "Sixxis Life",
+  "M45 Trend - 110V",
+  "M45 Trend - 220V",
+  "SX040 Trend - 110V",
+  "SX040 Trend - 220V",
+  "SX060 Prime - 110V",
+  "SX060 Prime - 220V",
+  "SX070 Trend - 110V",
+  "SX070 Trend - 220V",
+  "SX100 Trend - 110V",
+  "SX100 Trend - 220V",
+  "SX120 Prime - 220V",
+  "SX180 Trend - 220V",
+  "SX200 Trend - 220V",
+  "SX200 Prime - 220V",
+];
+
+export async function seedProdutosInteresse(): Promise<void> {
+  try {
+    const existentes = new Set(
+      (await prisma.produtoInteresse.findMany({ select: { nome: true } })).map(
+        (p) => p.nome,
+      ),
+    );
+    let criados = 0;
+    for (let i = 0; i < PRODUTOS_INTERESSE_PADRAO.length; i++) {
+      const nome = PRODUTOS_INTERESSE_PADRAO[i];
+      if (existentes.has(nome)) continue;
+      await prisma.produtoInteresse.create({
+        data: { nome, ordem: i, ativo: true },
+      });
+      criados++;
+    }
+    console.log(
+      criados > 0
+        ? `[seed] ${criados} produtos de interesse criados`
+        : "[seed] produtos de interesse ok",
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear produtos de interesse: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 export async function seedEmpresasFaturadas(): Promise<void> {
   try {
     const existentes = new Set(
