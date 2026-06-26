@@ -19,6 +19,7 @@ import {
   Loader2,
   RefreshCw,
   Download,
+  AlertTriangle,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -37,6 +38,7 @@ export function Thread({
   mensagens,
   carregando,
   onEnviada,
+  onExcluida,
   somenteLeitura = false,
   ehAdmin = false,
 }: {
@@ -44,10 +46,33 @@ export function Thread({
   mensagens: MensagemItem[];
   carregando: boolean;
   onEnviada?: (msg: MensagemItem) => void;
+  onExcluida?: () => void;
   somenteLeitura?: boolean;
   ehAdmin?: boolean;
 }) {
   const fimRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function excluirConversa() {
+    setExcluindo(true);
+    try {
+      const r = await fetch(`/api/conversas/${conversa.id}`, { method: "DELETE" });
+      if (r.ok) {
+        toast.sucesso("Conversa excluida.");
+        setConfirmarExcluir(false);
+        onExcluida?.();
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel excluir.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   // Auto-scroll para o fim quando chegam/abrem mensagens.
   useEffect(() => {
@@ -95,7 +120,59 @@ export function Thread({
           )}
           {conversa.atendidoPor === "IA" ? "IA" : "Humano"}
         </span>
+
+        {/* Exclusao da conversa: SOMENTE admin (o endpoint tambem barra). */}
+        {ehAdmin && (
+          <button
+            onClick={() => setConfirmarExcluir(true)}
+            title="Excluir conversa (permanente)"
+            aria-label="Excluir conversa"
+            className="rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-erro/10 hover:text-erro"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </header>
+
+      {/* Modal de confirmacao de exclusao (irreversivel). */}
+      {confirmarExcluir && (
+        <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="modal-in w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-erro" />
+              <h3 className="text-sm font-semibold text-escuro">Excluir conversa</h3>
+            </div>
+            <p className="text-sm text-medio/80">
+              Tem certeza? Esta acao apaga{" "}
+              <strong className="text-escuro">PERMANENTEMENTE</strong> esta conversa
+              e suas <strong className="text-escuro">{mensagens.length}</strong>{" "}
+              mensagem(ns). Nao pode ser desfeita. O cliente e os negocios sao
+              mantidos.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmarExcluir(false)}
+                disabled={excluindo}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void excluirConversa()}
+                disabled={excluindo}
+                className="flex items-center gap-1.5 rounded-lg bg-erro px-4 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60"
+              >
+                {excluindo ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Excluir permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mensagens */}
       <div className="scroll-fino min-h-0 flex-1 overflow-y-auto px-4 py-4">

@@ -3,7 +3,16 @@
 // Admin > Numeros WhatsApp: CRUD de instancias Evolution, status de conexao e
 // botao para apontar o webhook da instancia para este CRM.
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, X, Pencil, RefreshCw, Webhook } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  X,
+  Pencil,
+  RefreshCw,
+  Webhook,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import {
   Cabecalho,
   SkeletonTabela,
@@ -36,6 +45,7 @@ export function NumerosAdmin() {
   const [editando, setEditando] = useState<Numero | null>(null);
   const [criando, setCriando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [excluirAlvo, setExcluirAlvo] = useState<Numero | null>(null);
   const toast = useToast();
 
   const carregar = useCallback(async () => {
@@ -191,6 +201,13 @@ export function NumerosAdmin() {
                 <Webhook className="h-4 w-4" />
               </button>
               <button
+                onClick={() => setExcluirAlvo(n)}
+                title="Excluir conversas deste numero (permanente)"
+                className="rounded-lg p-1.5 text-medio/60 hover:bg-erro/10 hover:text-erro"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+              <button
                 onClick={() => void patch(n.id, { ativo: !n.ativo })}
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   n.ativo
@@ -238,6 +255,117 @@ export function NumerosAdmin() {
           }
         />
       )}
+
+      {excluirAlvo && (
+        <ModalExcluirConversas
+          numero={excluirAlvo}
+          onFechar={() => setExcluirAlvo(null)}
+          onConcluido={() => {
+            setExcluirAlvo(null);
+            void carregar();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Modal de exclusao FISICA das conversas de um numero. Carrega a previa
+// (contagem) e so executa apos confirmacao. O endpoint tambem barra nao-admin.
+function ModalExcluirConversas({
+  numero,
+  onFechar,
+  onConcluido,
+}: {
+  numero: Numero;
+  onFechar: () => void;
+  onConcluido: () => void;
+}) {
+  const toast = useToast();
+  const [preview, setPreview] = useState<{ conversas: number; mensagens: number } | null>(
+    null,
+  );
+  const [carregando, setCarregando] = useState(true);
+  const [excluindo, setExcluindo] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/admin/instancias/${numero.id}/excluir-conversas`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setPreview({ conversas: d.conversas ?? 0, mensagens: d.mensagens ?? 0 });
+      })
+      .catch(() => undefined)
+      .finally(() => setCarregando(false));
+  }, [numero.id]);
+
+  async function excluir() {
+    setExcluindo(true);
+    try {
+      const r = await fetch(`/api/admin/instancias/${numero.id}/excluir-conversas`, {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok) {
+        toast.sucesso(
+          `${d?.conversasApagadas ?? 0} conversa(s) e ${d?.mensagensApagadas ?? 0} mensagem(ns) apagadas.`,
+        );
+        onConcluido();
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel excluir.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+        <div className="mb-2 flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-erro" />
+          <h3 className="text-sm font-semibold text-escuro">
+            Excluir conversas do numero
+          </h3>
+        </div>
+        {carregando ? (
+          <div className="flex items-center gap-2 py-3 text-sm text-medio/60">
+            <Loader2 className="h-4 w-4 animate-spin" /> Calculando o que sera apagado...
+          </div>
+        ) : (
+          <p className="text-sm text-medio/80">
+            Isto vai apagar <strong className="text-escuro">permanentemente</strong>{" "}
+            <strong className="text-escuro">{preview?.conversas ?? 0}</strong>{" "}
+            conversa(s) e{" "}
+            <strong className="text-escuro">{preview?.mensagens ?? 0}</strong>{" "}
+            mensagem(ns) vinculadas ao numero{" "}
+            <strong className="text-escuro">{numero.nome}</strong>. Nao pode ser
+            desfeito. Os clientes e negocios sao mantidos.
+          </p>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onFechar}
+            disabled={excluindo}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => void excluir()}
+            disabled={excluindo || carregando}
+            className="flex items-center gap-1.5 rounded-lg bg-erro px-4 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60"
+          >
+            {excluindo ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Excluir permanentemente
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -70,12 +70,29 @@ export function Inbox({
   }, [carregarConversas]);
 
   // Dono mudou (roteamento/assumir/transferir) -> recarrega a lista.
+  // Conversa excluida (admin) -> remove da lista e fecha se estava aberta.
   useEffect(() => {
     const socket = getSocket();
     const recarregar = () => void carregarConversas();
+    const onExcluida = (p: { conversaId?: string }) => {
+      if (p?.conversaId) {
+        setConversas((prev) => prev.filter((c) => c.id !== p.conversaId));
+        if (selecionadaRef.current === p.conversaId) {
+          setSelecionada(null);
+          setMensagens([]);
+        }
+      } else {
+        // Exclusao em massa (por numero): recarrega tudo.
+        void carregarConversas();
+        setSelecionada(null);
+        setMensagens([]);
+      }
+    };
     socket.on("conversa:atualizada", recarregar);
+    socket.on("conversa:excluida", onExcluida);
     return () => {
       socket.off("conversa:atualizada", recarregar);
+      socket.off("conversa:excluida", onExcluida);
     };
   }, [carregarConversas]);
 
@@ -237,6 +254,12 @@ export function Inbox({
           carregando={carregandoThread}
           onEnviada={aoEnviada}
           ehAdmin={ehAdmin}
+          onExcluida={() => {
+            const id = selecionadaRef.current;
+            if (id) setConversas((prev) => prev.filter((c) => c.id !== id));
+            setSelecionada(null);
+            setMensagens([]);
+          }}
         />
       ) : (
         <div className="hidden flex-1 flex-col items-center justify-center gap-3 bg-fundo text-center sm:flex">
