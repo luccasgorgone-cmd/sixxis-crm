@@ -11,6 +11,7 @@ import {
   FinalidadeEtapa,
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
+import { excluirLeadsCompleto } from "./exclusao";
 
 // Backfill (idempotente): metas sem autor (criadas antes da 2.18) recebem
 // criadoPorId = primeiro ADMIN, para a trava de edicao funcionar. Metas de
@@ -818,30 +819,10 @@ export async function purgarDadosTeste(): Promise<void> {
     const leadIds = leads.map((l) => l.id);
 
     if (leadIds.length > 0) {
-      const conversas = await prisma.conversa.findMany({
-        where: { leadId: { in: leadIds } },
-        select: { id: true },
-      });
-      const convIds = conversas.map((c) => c.id);
-      const negocios = await prisma.negocio.findMany({
-        where: { leadId: { in: leadIds } },
-        select: { id: true },
-      });
-      const negIds = negocios.map((n) => n.id);
-
-      // Remove filhos antes dos pais (FKs RESTRICT).
-      await prisma.$transaction([
-        prisma.mensagem.deleteMany({ where: { conversaId: { in: convIds } } }),
-        prisma.atividade.deleteMany({ where: { leadId: { in: leadIds } } }),
-        prisma.historicoNegocio.deleteMany({
-          where: { negocioId: { in: negIds } },
-        }),
-        prisma.nota.deleteMany({ where: { leadId: { in: leadIds } } }),
-        prisma.leadEtiqueta.deleteMany({ where: { leadId: { in: leadIds } } }),
-        prisma.conversa.deleteMany({ where: { leadId: { in: leadIds } } }),
-        prisma.negocio.deleteMany({ where: { leadId: { in: leadIds } } }),
-        prisma.lead.deleteMany({ where: { id: { in: leadIds } } }),
-      ]);
+      // Remove o lead sintetico e TODAS as dependencias na ordem correta de FKs
+      // (incl. Lembrete/Tarefa/Orcamento/AlertaNegocio/etc., que antes faltavam e
+      // causavam o erro "Lembrete_leadId_fkey"). Reusa o helper de exclusao.
+      await excluirLeadsCompleto(leadIds);
       console.log(`[seed] purga: ${leadIds.length} leads de teste removidos`);
     }
 
