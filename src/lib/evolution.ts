@@ -49,6 +49,47 @@ export async function enviarTexto(
   }
 }
 
+// Envia uma mensagem de VOZ (PTT) por uma instancia especifica (ou a do env).
+// Endpoint: POST {BASE}/message/sendWhatsAppAudio/{INSTANCE}  header apikey.
+// `audio` aceita base64 (sem data: prefix) OU uma URL publica do arquivo.
+export async function enviarAudio(
+  numero: string,
+  audio: string,
+  instancia?: string | null,
+  delayMs?: number,
+): Promise<ResultadoEnvio> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+
+  const url = `${cfg.base}/message/sendWhatsAppAudio/${instance}`;
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({
+        number: numero,
+        audio,
+        ...(delayMs ? { delay: delayMs } : {}),
+      }),
+    });
+    const raw: unknown = await resp.json().catch(() => null);
+    if (!resp.ok) return { ok: false, status: resp.status, raw };
+    const externalId =
+      typeof raw === "object" && raw !== null
+        ? (raw as { key?: { id?: string } }).key?.id
+        : undefined;
+    return { ok: true, externalId, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // Baixa a midia de uma mensagem (base64) via Evolution.
 // Evolution v2: POST {BASE}/chat/getBase64FromMediaMessage/{instance} espera o
 // OBJETO DE MENSAGEM COMPLETO no campo `message` — { key, message, ... } —, ou

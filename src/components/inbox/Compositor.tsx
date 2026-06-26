@@ -4,7 +4,17 @@
 // Enter envia, Shift+Enter quebra linha. Digitar "/" abre a lista filtravel; ao
 // escolher, o texto e inserido no compositor (editavel antes de enviar).
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { Send, Loader2, Zap, X, Package } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  Zap,
+  X,
+  Package,
+  Mic,
+  Square,
+  Trash2,
+  Paperclip,
+} from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
 import type { ProdutoLoja } from "@/components/loja/tipos";
@@ -86,6 +96,127 @@ export function Compositor({
     digitadas: string[];
     valores: Record<string, string>;
   } | null>(null);
+
+  // ---- Audio (gravacao/anexo) ----
+  const [gravando, setGravando] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [enviandoAudio, setEnviandoAudio] = useState(false);
+  const [segundos, setSegundos] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const arquivoAudioRef = useRef<HTMLInputElement>(null);
+
+  function pararTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  function definirAudio(blob: Blob) {
+    setAudioBlob(blob);
+    setAudioUrl((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return URL.createObjectURL(blob);
+    });
+  }
+
+  function descartarAudio() {
+    setAudioBlob(null);
+    setAudioUrl((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return null;
+    });
+    setSegundos(0);
+  }
+
+  async function iniciarGravacao() {
+    setErro(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErro("Gravacao de audio nao suportada neste navegador.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        pararTimer();
+        const blob = new Blob(chunksRef.current, {
+          type: rec.mimeType || "audio/webm",
+        });
+        if (blob.size > 0) definirAudio(blob);
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setGravando(true);
+      setSegundos(0);
+      timerRef.current = setInterval(() => setSegundos((s) => s + 1), 1000);
+    } catch {
+      setErro("Permissao de microfone negada.");
+    }
+  }
+
+  function pararGravacao() {
+    recorderRef.current?.stop();
+    setGravando(false);
+  }
+
+  function anexarAudio(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) definirAudio(f);
+    e.target.value = "";
+  }
+
+  async function enviarAudioMsg() {
+    if (!audioBlob || enviandoAudio) return;
+    setEnviandoAudio(true);
+    setErro(null);
+    try {
+      const fd = new FormData();
+      fd.append("conversaId", conversaId);
+      if (instanciaSel) fd.append("instanciaId", instanciaSel);
+      const ext = (audioBlob.type.split("/")[1] || "webm").split(";")[0];
+      fd.append("audio", audioBlob, `audio.${ext}`);
+      const r = await fetch("/api/mensagens/enviar-audio", {
+        method: "POST",
+        body: fd,
+      });
+      const d = await r.json().catch(() => null);
+      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      if (!r.ok) {
+        setErro("Falha ao enviar o audio. Verifique a conexao com o WhatsApp.");
+      }
+      descartarAudio();
+    } catch {
+      setErro("Nao foi possivel enviar o audio agora.");
+    } finally {
+      setEnviandoAudio(false);
+    }
+  }
+
+  // Limpeza da URL de preview e do timer ao desmontar.
+  useEffect(() => {
+    return () => {
+      pararTimer();
+      setAudioUrl((u) => {
+        if (u) URL.revokeObjectURL(u);
+        return null;
+      });
+    };
+  }, []);
+
+  function mmss(s: number): string {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r.toString().padStart(2, "0")}`;
+  }
 
   function inserirTexto(novoTrecho: string) {
     const base = texto.trim();
@@ -374,7 +505,60 @@ export function Compositor({
         </div>
       )}
 
+      {/* Preview do audio gravado/anexado: tocar, descartar ou enviar. */}
+      {audioBlob && audioUrl && !gravando && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo p-2">
+          <audio src={audioUrl} controls className="h-9 min-w-0 flex-1" />
+          <button
+            onClick={descartarAudio}
+            disabled={enviandoAudio}
+            title="Descartar audio"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio hover:bg-black/5 hover:text-erro"
+          >
+            <Trash2 className="h-4.5 w-4.5" />
+          </button>
+          <button
+            onClick={() => void enviarAudioMsg()}
+            disabled={enviandoAudio}
+            title="Enviar audio"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-tiffany px-3 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+          >
+            {enviandoAudio ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Enviar
+          </button>
+        </div>
+      )}
+
+      <input
+        ref={arquivoAudioRef}
+        type="file"
+        accept="audio/*"
+        onChange={anexarAudio}
+        className="hidden"
+      />
+
       <div className="flex items-end gap-2">
+        {gravando ? (
+          // Gravando: indicador + parar (substitui as acoes auxiliares).
+          <div className="flex h-11 flex-1 items-center gap-3 rounded-lg border border-erro/30 bg-erro/5 px-3">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-erro" />
+            <span className="text-sm font-medium text-erro">
+              Gravando... {mmss(segundos)}
+            </span>
+            <button
+              onClick={pararGravacao}
+              title="Parar gravacao"
+              className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-erro text-white hover:opacity-90"
+            >
+              <Square className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <>
         <button
           onClick={() => {
             setMostrar((v) => !v);
@@ -395,6 +579,20 @@ export function Compositor({
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
         >
           <Package className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => void iniciarGravacao()}
+          title="Gravar audio"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+        >
+          <Mic className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => arquivoAudioRef.current?.click()}
+          title="Anexar audio"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+        >
+          <Paperclip className="h-5 w-5" />
         </button>
         <textarea
           ref={ref}
@@ -417,6 +615,8 @@ export function Compositor({
             <Send className="h-5 w-5" />
           )}
         </button>
+          </>
+        )}
       </div>
     </div>
   );
