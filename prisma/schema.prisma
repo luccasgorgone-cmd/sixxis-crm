@@ -499,6 +499,9 @@ model RespostaRapida {
   // atalho | aniversario | cupom | data_comemorativa | desconto_relampago |
   // retomada | geral | boas_vindas | agradecimento | avaliacao | follow_up
   categoria    String      @default("atalho")
+  // Autor da resposta rapida: null = de SISTEMA (global, gerida pelo admin);
+  // preenchido = pessoal do atendente (so ele edita/exclui/reordena as dele).
+  criadoPorId  String?
   finalidade   Finalidade?
   // Redacoes alternativas da MESMA intencao (texto e a principal). aplicarModelo
   // sorteia uma entre [texto, ...variacoes] por destinatario.
@@ -509,6 +512,7 @@ model RespostaRapida {
   atualizadoEm DateTime    @updatedAt
 
   @@index([categoria])
+  @@index([criadoPorId])
 }
 
 // Lembrete/agendamento de contato com um cliente.

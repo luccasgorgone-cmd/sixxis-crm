@@ -1,22 +1,34 @@
-// Admin: edita ou remove uma resposta rapida.
+// Edita ou exclui uma resposta rapida PESSOAL. O atendente so mexe nas suas
+// (criadoPorId = ele); nunca nas de sistema.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAdmin } from "@/lib/autorizacao";
+import { obterAgente } from "@/lib/autorizacao";
 import { Prisma } from "@/generated/prisma/client";
 import { Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function donoDaPropria(id: string, agenteId: string): Promise<boolean> {
+  const r = await prisma.respostaRapida.findUnique({
+    where: { id },
+    select: { criadoPorId: true },
+  });
+  return !!r && r.criadoPorId === agenteId;
+}
+
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const admin = await obterAdmin();
-  if (!admin) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   const { id } = await ctx.params;
+  if (!(await donoDaPropria(id, agente.id))) {
+    return NextResponse.json({ erro: "nao encontrada" }, { status: 404 });
+  }
   let body: {
     titulo?: string;
     atalho?: string | null;
@@ -24,7 +36,6 @@ export async function PATCH(
     ativo?: boolean;
     categoria?: string;
     finalidade?: unknown;
-    variacoes?: unknown;
   };
   try {
     body = await req.json();
@@ -36,30 +47,14 @@ export async function PATCH(
   if (body.atalho !== undefined) data.atalho = body.atalho?.trim() || null;
   if (body.texto !== undefined) data.texto = body.texto.trim();
   if (body.ativo !== undefined) data.ativo = body.ativo;
-  if (body.categoria !== undefined) data.categoria = body.categoria.trim() || "geral";
+  if (body.categoria !== undefined)
+    data.categoria = body.categoria.trim() || "geral";
   if (body.finalidade !== undefined) {
     data.finalidade =
       body.finalidade === Finalidade.VENDA ||
       body.finalidade === Finalidade.POS_VENDA
         ? body.finalidade
         : null;
-  }
-  if (body.variacoes !== undefined) {
-    data.variacoes = Array.isArray(body.variacoes)
-      ? body.variacoes
-          .filter((x): x is string => typeof x === "string")
-          .map((x) => x.trim())
-          .filter((x) => x.length > 0)
-      : [];
-  }
-
-  // Admin so mexe nas de sistema (criadoPorId null), nunca nas pessoais.
-  const alvo = await prisma.respostaRapida.findUnique({
-    where: { id },
-    select: { criadoPorId: true },
-  });
-  if (!alvo || alvo.criadoPorId !== null) {
-    return NextResponse.json({ erro: "nao encontrada" }, { status: 404 });
   }
   const resposta = await prisma.respostaRapida.update({ where: { id }, data });
   return NextResponse.json({ resposta });
@@ -69,16 +64,12 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const admin = await obterAdmin();
-  if (!admin) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   const { id } = await ctx.params;
-  const alvo = await prisma.respostaRapida.findUnique({
-    where: { id },
-    select: { criadoPorId: true },
-  });
-  if (!alvo || alvo.criadoPorId !== null) {
+  if (!(await donoDaPropria(id, agente.id))) {
     return NextResponse.json({ erro: "nao encontrada" }, { status: 404 });
   }
   await prisma.respostaRapida.delete({ where: { id } });

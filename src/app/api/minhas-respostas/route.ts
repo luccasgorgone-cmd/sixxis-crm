@@ -1,44 +1,33 @@
-// Admin: lista, cria e reordena respostas rapidas. Somente ADMIN.
+// Respostas rapidas PESSOAIS do atendente (criadoPorId = ele). Lista todas as
+// dele (ativas e inativas), cria novas e reordena. Cada um so mexe nas suas.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAdmin } from "@/lib/autorizacao";
+import { obterAgente } from "@/lib/autorizacao";
 import { Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// "VENDA" | "POS_VENDA" | outro -> null (ambas).
 function normalizarFinalidade(v: unknown): Finalidade | null {
   return v === Finalidade.VENDA || v === Finalidade.POS_VENDA ? v : null;
 }
 
-// Array de variacoes: so strings nao-vazias (trim), sem limite rigido.
-function normalizarVariacoes(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .filter((x): x is string => typeof x === "string")
-    .map((x) => x.trim())
-    .filter((x) => x.length > 0);
-}
-
 export async function GET(): Promise<NextResponse> {
-  const admin = await obterAdmin();
-  if (!admin) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  // Admin gere apenas as respostas de SISTEMA (criadoPorId null). As pessoais
-  // dos atendentes sao geridas por cada um em /minhas-respostas.
   const respostas = await prisma.respostaRapida.findMany({
-    where: { criadoPorId: null },
+    where: { criadoPorId: agente.id },
     orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
   });
   return NextResponse.json({ respostas });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const admin = await obterAdmin();
-  if (!admin) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   let body: {
     titulo?: string;
@@ -46,7 +35,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     texto?: string;
     categoria?: string;
     finalidade?: unknown;
-    variacoes?: unknown;
   };
   try {
     body = await req.json();
@@ -61,7 +49,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
+  // Ordem dentro das proprias do agente.
   const ultima = await prisma.respostaRapida.findFirst({
+    where: { criadoPorId: agente.id },
     orderBy: { ordem: "desc" },
     select: { ordem: true },
   });
@@ -72,18 +62,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       texto,
       categoria: body.categoria?.trim() || "geral",
       finalidade: normalizarFinalidade(body.finalidade),
-      variacoes: normalizarVariacoes(body.variacoes),
+      criadoPorId: agente.id,
       ordem: (ultima?.ordem ?? 0) + 1,
     },
   });
   return NextResponse.json({ resposta });
 }
 
-// Reordena: body { ordem: [id1, id2, ...] }.
+// Reordena as proprias: body { ordem: [id1, id2, ...] }. So afeta as do agente.
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
-  const admin = await obterAdmin();
-  if (!admin) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   let body: { ordem?: string[] };
   try {
@@ -96,7 +86,10 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   }
   await prisma.$transaction(
     body.ordem.map((id, i) =>
-      prisma.respostaRapida.update({ where: { id }, data: { ordem: i + 1 } }),
+      prisma.respostaRapida.updateMany({
+        where: { id, criadoPorId: agente.id },
+        data: { ordem: i + 1 },
+      }),
     ),
   );
   return NextResponse.json({ ok: true });

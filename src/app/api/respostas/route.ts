@@ -11,8 +11,13 @@ export async function GET(): Promise<NextResponse> {
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
+  // Atendente ve as de SISTEMA (criadoPorId null) + as PROPRIAS. As proprias
+  // aparecem primeiro, na ordem que ele definiu.
   const respostas = await prisma.respostaRapida.findMany({
-    where: { ativo: true },
+    where: {
+      ativo: true,
+      OR: [{ criadoPorId: null }, { criadoPorId: agente.id }],
+    },
     orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
     select: {
       id: true,
@@ -22,7 +27,10 @@ export async function GET(): Promise<NextResponse> {
       categoria: true,
       finalidade: true,
       variacoes: true,
+      criadoPorId: true,
     },
   });
-  return NextResponse.json({ respostas });
+  const proprias = respostas.filter((r) => r.criadoPorId === agente.id);
+  const sistema = respostas.filter((r) => r.criadoPorId === null);
+  return NextResponse.json({ respostas: [...proprias, ...sistema] });
 }

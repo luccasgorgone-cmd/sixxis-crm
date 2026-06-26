@@ -368,12 +368,20 @@ export function Compositor({
             <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
               Respostas rapidas
             </p>
-            <button
-              onClick={() => setMostrar(false)}
-              className="rounded p-0.5 text-medio/50 hover:bg-black/5"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <a
+                href="/minhas-respostas"
+                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-tiffany hover:bg-tiffany/10"
+              >
+                Gerenciar minhas
+              </a>
+              <button
+                onClick={() => setMostrar(false)}
+                className="rounded p-0.5 text-medio/50 hover:bg-black/5"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <div className="scroll-fino max-h-60 overflow-y-auto">
             {filtradas.length === 0 ? (
