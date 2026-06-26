@@ -558,7 +558,7 @@ export function Compositor({
         className="hidden"
       />
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-center gap-2">
         {gravando ? (
           // Gravando: indicador + parar (substitui as acoes auxiliares).
           <div className="flex h-11 flex-1 items-center gap-3 rounded-lg border border-erro/30 bg-erro/5 px-3">
@@ -576,49 +576,56 @@ export function Compositor({
           </div>
         ) : (
           <>
-        <button
-          onClick={() => {
-            setMostrar((v) => !v);
-            setBusca("");
-          }}
-          title="Respostas rapidas"
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-            mostrar
-              ? "border-tiffany bg-tiffany/10 text-tiffany"
-              : "border-black/10 text-medio hover:bg-black/5"
-          }`}
-        >
-          <Zap className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => setSeletorProduto(true)}
-          title="Enviar produto"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
-        >
-          <Package className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => void iniciarGravacao()}
-          title="Gravar audio"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
-        >
-          <Mic className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => arquivoAudioRef.current?.click()}
-          title="Anexar audio"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
-        >
-          <Paperclip className="h-5 w-5" />
-        </button>
+        {/* Acoes auxiliares em grade 2x2 a esquerda (chat mais alto). */}
+        <div className="grid shrink-0 grid-cols-2 grid-rows-2 gap-1">
+          <button
+            onClick={() => {
+              setMostrar((v) => !v);
+              setBusca("");
+            }}
+            title="Respostas rapidas"
+            aria-label="Respostas rapidas"
+            className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${
+              mostrar
+                ? "border-tiffany bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio hover:bg-black/5"
+            }`}
+          >
+            <Zap className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setSeletorProduto(true)}
+            title="Enviar produto"
+            aria-label="Enviar produto"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+          >
+            <Package className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => void iniciarGravacao()}
+            title="Gravar audio"
+            aria-label="Gravar audio"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+          >
+            <Mic className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => arquivoAudioRef.current?.click()}
+            title="Anexar audio"
+            aria-label="Anexar audio"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+        </div>
         <textarea
           ref={ref}
           value={texto}
           onChange={(e) => aoMudar(e.target.value)}
           onKeyDown={aoTeclar}
-          rows={3}
+          rows={4}
           placeholder='Escreva uma mensagem... ("/" para respostas rapidas)'
-          className="scroll-fino max-h-60 min-h-[88px] flex-1 resize-none rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none transition-colors focus:border-tiffany"
+          className="scroll-fino max-h-60 min-h-[92px] flex-1 resize-none self-stretch rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none transition-colors focus:border-tiffany"
         />
         <button
           onClick={() => void enviar()}
