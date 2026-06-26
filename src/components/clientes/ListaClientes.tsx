@@ -61,6 +61,9 @@ type Cliente = {
   uf: string | null;
   cidade: string | null;
   produtosInteresse: { id: string; nome: string }[];
+  origem: string | null;
+  anuncioTitulo: string | null;
+  anuncioUrl: string | null;
 };
 
 type EmpresaOpcao = { id: string; nome: string };
@@ -105,6 +108,7 @@ export function ListaClientes({
   const [statusF, setStatusF] = useState("");
   const [empresaF, setEmpresaF] = useState("");
   const [produtoInteresseF, setProdutoInteresseF] = useState("");
+  const [origemF, setOrigemF] = useState("");
   const [garantiaF, setGarantiaF] = useState("");
   const [ufF, setUfF] = useState("");
   const [cidadeF, setCidadeF] = useState("");
@@ -169,6 +173,7 @@ export function ListaClientes({
       if (statusF) p.set("status", statusF);
       if (empresaF) p.set("empresa", empresaF);
       if (produtoInteresseF) p.set("produtoInteresse", produtoInteresseF);
+      if (origemF) p.set("origem", origemF);
       if (garantiaF) p.set("garantia", garantiaF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
@@ -186,7 +191,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
 
   useEffect(() => {
     void carregar();
@@ -396,6 +401,44 @@ export function ListaClientes({
                 +{c.produtosInteresse.length - 2}
               </span>
             )}
+          </div>
+        ) : (
+          <span className="text-xs text-medio/40">—</span>
+        ),
+    },
+    {
+      chave: "origem",
+      rotulo: "Origem",
+      sortValue: (c) => (c.origem ?? "").toLowerCase(),
+      render: (c) =>
+        c.origem || c.anuncioTitulo ? (
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-medio/80">
+              {c.origem === "anuncio"
+                ? "Anuncio"
+                : c.origem === "whatsapp"
+                  ? "WhatsApp"
+                  : c.origem === "manual"
+                    ? "Manual"
+                    : (c.origem ?? "—")}
+            </span>
+            {c.anuncioTitulo &&
+              (c.anuncioUrl ? (
+                <a
+                  href={c.anuncioUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="max-w-40 truncate text-[11px] text-tiffany hover:underline"
+                  title={c.anuncioTitulo}
+                >
+                  {c.anuncioTitulo}
+                </a>
+              ) : (
+                <span className="max-w-40 truncate text-[11px] text-medio/50" title={c.anuncioTitulo}>
+                  {c.anuncioTitulo}
+                </span>
+              ))}
           </div>
         ) : (
           <span className="text-xs text-medio/40">—</span>
@@ -624,6 +667,13 @@ export function ListaClientes({
               {p.nome}
             </option>
           ))}
+        </select>
+        <select value={origemF} onChange={(e) => setOrigemF(e.target.value)} className="campo">
+          <option value="">Origem: todas</option>
+          <option value="anuncio">Anuncio</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="manual">Cadastro manual</option>
+          <option value="site">Site</option>
         </select>
         <select value={garantiaF} onChange={(e) => setGarantiaF(e.target.value)} className="campo">
           <option value="">Garantia: todas</option>

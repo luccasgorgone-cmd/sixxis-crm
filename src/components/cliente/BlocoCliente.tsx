@@ -19,6 +19,7 @@ import {
   BellRing,
   Cake,
   Briefcase,
+  Megaphone,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -47,6 +48,8 @@ export type ClientePainel = {
   anotacoes: string | null;
   aceitaContato?: boolean;
   origem: string | null;
+  anuncioTitulo?: string | null;
+  anuncioUrl?: string | null;
 };
 
 export function BlocoCliente({
@@ -188,6 +191,41 @@ export function BlocoCliente({
               </p>
             </div>
           )}
+          {/* Origem (incl. anuncio Click-to-WhatsApp). Visivel a vendedor e admin. */}
+          {(cliente.origem || cliente.anuncioTitulo) && (
+            <div className="mt-2 flex gap-2 rounded-lg bg-fundo px-3 py-2">
+              <Megaphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-medio/50" />
+              <div className="min-w-0 text-xs">
+                <p className="font-medium text-medio/80">
+                  Origem:{" "}
+                  {cliente.origem === "anuncio"
+                    ? "Anuncio"
+                    : cliente.origem === "whatsapp"
+                      ? "WhatsApp"
+                      : cliente.origem === "manual"
+                        ? "Cadastro manual"
+                        : (cliente.origem ?? "—")}
+                </p>
+                {cliente.anuncioTitulo &&
+                  (cliente.anuncioUrl ? (
+                    <a
+                      href={cliente.anuncioUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate text-tiffany hover:underline"
+                      title={cliente.anuncioTitulo}
+                    >
+                      {cliente.anuncioTitulo}
+                    </a>
+                  ) : (
+                    <p className="truncate text-medio/60" title={cliente.anuncioTitulo}>
+                      {cliente.anuncioTitulo}
+                    </p>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {podeEditar && cliente.aceitaContato !== undefined && (
             <OptOut
               leadId={cliente.id}

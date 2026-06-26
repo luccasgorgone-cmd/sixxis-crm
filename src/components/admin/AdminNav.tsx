@@ -24,6 +24,7 @@ import {
   Building2,
   Boxes,
   BellRing,
+  Target,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -48,6 +49,7 @@ const SECOES: Secao[] = [
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },
   { rotulo: "Alertas de SLA", href: "/admin/alertas", icone: BellRing },
   { rotulo: "Comunicacoes", href: "/admin/comunicacoes", icone: Megaphone },
+  { rotulo: "Meta / Pixel", href: "/admin/meta", icone: Target },
   { rotulo: "Geral e horario", href: "/admin/geral", icone: Clock },
   { rotulo: "Evolution", href: "/admin/evolution", icone: MessageSquareDot },
   { rotulo: "Agente IA", href: "/admin/ia", icone: Bot },

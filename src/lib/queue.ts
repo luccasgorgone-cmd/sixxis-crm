@@ -454,6 +454,48 @@ function extrairConteudo(
   return null;
 }
 
+// Extrai dados de ANUNCIO (Click-to-WhatsApp) do contextInfo.externalAdReply
+// de qualquer subtipo de mensagem. Retorna ctwaClid + dados do anuncio quando
+// presentes (mensagem originada de clique num anuncio do Meta).
+function extrairAnuncio(message?: Record<string, unknown> | null): {
+  ctwaClid: string | null;
+  anuncioId: string | null;
+  anuncioTitulo: string | null;
+  anuncioUrl: string | null;
+  origemDetalhe: string | null;
+} | null {
+  if (!message) return null;
+  for (const sub of Object.values(message)) {
+    if (!sub || typeof sub !== "object") continue;
+    const ctx = (sub as { contextInfo?: Record<string, unknown> }).contextInfo;
+    if (!ctx) continue;
+    const ad = ctx["externalAdReply"] as
+      | {
+          title?: string;
+          body?: string;
+          sourceId?: string;
+          sourceUrl?: string;
+          sourceType?: string;
+          ctwaClid?: string;
+        }
+      | undefined;
+    const ctwaClid =
+      (ad?.ctwaClid as string | undefined) ??
+      (ctx["ctwaClid"] as string | undefined) ??
+      null;
+    if (ad || ctwaClid) {
+      return {
+        ctwaClid: ctwaClid || null,
+        anuncioId: ad?.sourceId || null,
+        anuncioTitulo: ad?.title || null,
+        anuncioUrl: ad?.sourceUrl || null,
+        origemDetalhe: ad?.body || ad?.sourceType || null,
+      };
+    }
+  }
+  return null;
+}
+
 // Transcricao de audio (speech-to-text), quando a Evolution enviar. Busca em
 // alguns locais conhecidos; ausente = null.
 function extrairTranscricao(data?: EventoEvolution["data"]): string | null {
@@ -821,6 +863,32 @@ async function processarEvento(
       where: { id: lead.id },
       data: { nome: pushName },
     });
+  }
+
+  // Origem por ANUNCIO (Click-to-WhatsApp): grava na 1a mensagem, sem
+  // sobrescrever dados ja existentes com vazio. Registra Atividade de origem.
+  if (direcao === DirecaoMsg.IN && !lead.ctwaClid && !lead.anuncioId) {
+    const anuncio = extrairAnuncio(data?.message);
+    if (anuncio && (anuncio.ctwaClid || anuncio.anuncioId)) {
+      lead = await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          ...(anuncio.ctwaClid ? { ctwaClid: anuncio.ctwaClid } : {}),
+          ...(anuncio.anuncioId ? { anuncioId: anuncio.anuncioId } : {}),
+          ...(anuncio.anuncioTitulo ? { anuncioTitulo: anuncio.anuncioTitulo } : {}),
+          ...(anuncio.anuncioUrl ? { anuncioUrl: anuncio.anuncioUrl } : {}),
+          ...(anuncio.origemDetalhe ? { origemDetalhe: anuncio.origemDetalhe } : {}),
+          ...(lead.origem ? {} : { origem: "anuncio" }),
+        },
+      });
+      await prisma.atividade.create({
+        data: {
+          leadId: lead.id,
+          tipo: AtividadeTipo.CRIACAO,
+          descricao: `Origem: anuncio${anuncio.anuncioTitulo ? ` "${anuncio.anuncioTitulo}"` : ""}`,
+        },
+      });
+    }
   }
 
   // Resolve a instancia (numero) pelo campo `instance` do payload. Define a

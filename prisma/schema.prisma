@@ -227,6 +227,12 @@ model Lead {
   // Opt-out de comunicacoes em massa: false = nao incluir em campanhas.
   aceitaContato Boolean        @default(true)
   ctwaClid      String?
+  // Origem por ANUNCIO (Click-to-WhatsApp): dados do referral do contextInfo da
+  // Evolution, gravados na 1a mensagem (nunca sobrescritos com vazio depois).
+  anuncioId      String?
+  anuncioTitulo  String?
+  anuncioUrl     String?
+  origemDetalhe  String?
   clienteSiteId  String?
   // Acompanhamento pos-venda: nota fiscal (texto livre) e empresa que faturou.
   notaFiscal     String?
@@ -714,6 +720,11 @@ model ConfiguracaoCRM {
   logoData           String?   @db.Text
   logoMime           String?
   logoEm             DateTime?
+  // Meta Conversions API (server-side). Token guardado aqui (nunca exposto ao
+  // browser). testEventCode usa o modo de teste do Gerenciador de Eventos.
+  metaPixelId        String?
+  metaCapiToken      String?
+  metaTestEventCode  String?
   atualizadoEm       DateTime @updatedAt
 }
 

@@ -18,6 +18,7 @@ import {
 import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
+import { dispararPurchase } from "@/lib/metaCapi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,8 @@ export async function GET(
           anotacoes: true,
           aceitaContato: true,
           origem: true,
+          anuncioTitulo: true,
+          anuncioUrl: true,
           notaFiscal: true,
           garantia: true,
           empresaFaturadaId: true,
@@ -141,6 +144,8 @@ export async function GET(
         anotacoes: negocio.lead.anotacoes,
         aceitaContato: negocio.lead.aceitaContato,
         origem: negocio.lead.origem,
+        anuncioTitulo: negocio.lead.anuncioTitulo,
+        anuncioUrl: negocio.lead.anuncioUrl,
         notaFiscal: negocio.lead.notaFiscal,
         garantia: negocio.lead.garantia,
         empresaFaturadaId: negocio.lead.empresaFaturadaId,
@@ -476,6 +481,41 @@ export async function PATCH(
   // de SLA abertos deste negocio. O job recria para a nova etapa, se exceder.
   if (data.etapaId !== undefined || data.status !== undefined) {
     await resolverAlertasNegocio(id);
+  }
+
+  // Meta Conversions API: ao marcar GANHO com valor, dispara "Purchase" com a
+  // atribuicao do anuncio (ctwaClid), deduplicado por negocio. Best-effort.
+  if (data.status === StatusNeg.GANHO) {
+    try {
+      const leadCapi = await prisma.lead.findUnique({
+        where: { id: negocio.leadId },
+        select: {
+          ctwaClid: true,
+          telefone: true,
+          email: true,
+          nome: true,
+          pushName: true,
+          nomeManual: true,
+        },
+      });
+      const valorVenda =
+        atualizado.valor != null ? Number(atualizado.valor) : null;
+      if (leadCapi && valorVenda && valorVenda > 0) {
+        await dispararPurchase({
+          ctwaClid: leadCapi.ctwaClid,
+          valor: valorVenda,
+          moeda: "BRL",
+          eventId: `purchase-${id}`,
+          telefone: leadCapi.telefone,
+          email: leadCapi.email,
+          nome: leadCapi.nomeManual || leadCapi.pushName || leadCapi.nome,
+        });
+      }
+    } catch (e) {
+      console.warn(
+        `[capi] falha ao enviar Purchase do negocio ${id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   // Pendencia: registra a Atividade(PENDENCIA) na linha do tempo do cliente.

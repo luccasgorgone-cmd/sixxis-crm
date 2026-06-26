@@ -58,6 +58,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where.produtosInteresse = { some: { produtoInteresseId: produtoInteresse } };
   }
 
+  // Origem do lead (anuncio / whatsapp / manual / site...).
+  const origemF = sp.get("origem");
+  if (origemF) where.origem = origemF;
+
   // Garantia: sim / nao / nao_definido.
   const garantiaF = sp.get("garantia");
   if (garantiaF === "sim") where.garantia = true;
@@ -97,6 +101,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donoPosVendaId: true,
       criadoEm: true,
       garantia: true,
+      origem: true,
+      anuncioTitulo: true,
+      anuncioUrl: true,
       empresaFaturada: { select: { id: true, nome: true } },
       enderecos: {
         select: { uf: true, cidade: true, principal: true },
@@ -155,6 +162,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     uf: string | null;
     cidade: string | null;
     produtosInteresse: { id: string; nome: string }[];
+    origem: string | null;
+    anuncioTitulo: string | null;
+    anuncioUrl: string | null;
   };
 
   // Filtros de localizacao (endereco principal ou primeiro). cidade = contains.
@@ -242,6 +252,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         id: pi.produtoInteresse.id,
         nome: pi.produtoInteresse.nome,
       })),
+      origem: l.origem,
+      anuncioTitulo: l.anuncioTitulo,
+      anuncioUrl: l.anuncioUrl,
     });
   }
 
