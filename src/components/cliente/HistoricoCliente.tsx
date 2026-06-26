@@ -25,6 +25,7 @@ import {
   ClipboardList,
   History,
   WifiOff,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { formatarBRL } from "@/lib/format";
@@ -92,10 +93,22 @@ function dataHora(valor: string): string {
   });
 }
 
-export function HistoricoCliente({ leadId }: { leadId: string }) {
+export function HistoricoCliente({
+  leadId,
+  // No painel o historico abre RECOLHIDO (resumo). limiteInicial controla
+  // quantos itens aparecem antes do "Ver historico completo". completo=true
+  // (aba dedicada de historico) ja abre tudo.
+  limiteInicial = 4,
+  completo = false,
+}: {
+  leadId: string;
+  limiteInicial?: number;
+  completo?: boolean;
+}) {
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [lojaOffline, setLojaOffline] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [expandido, setExpandido] = useState(completo);
 
   useEffect(() => {
     let vivo = true;
@@ -144,14 +157,17 @@ export function HistoricoCliente({ leadId }: { leadId: string }) {
     );
   }
 
+  const mostrar = expandido ? eventos : eventos.slice(0, limiteInicial);
+  const ocultos = eventos.length - mostrar.length;
+
   return (
     <div>
       {/* Timeline em duas colunas: calha (icone + linha conectora) e conteudo.
           Garante que o icone nunca invada o titulo, em qualquer comprimento. */}
       <ol className="space-y-1">
-        {eventos.map((e, i) => {
+        {mostrar.map((e, i) => {
           const { Icone, classe } = visual(e);
-          const ultimo = i === eventos.length - 1;
+          const ultimo = i === mostrar.length - 1;
           return (
             <li key={e.id} className="flex gap-3">
               <div className="flex flex-col items-center">
@@ -193,6 +209,16 @@ export function HistoricoCliente({ leadId }: { leadId: string }) {
           );
         })}
       </ol>
+
+      {!expandido && ocultos > 0 && (
+        <button
+          onClick={() => setExpandido(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/5 bg-fundo py-2 text-xs font-medium text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro"
+        >
+          <ChevronDown className="h-3.5 w-3.5" /> Ver historico completo
+          {` (+${ocultos})`}
+        </button>
+      )}
 
       {lojaOffline && (
         <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-medio/40">
