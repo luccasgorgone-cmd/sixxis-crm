@@ -218,6 +218,15 @@ export function Compositor({
     return `${m}:${r.toString().padStart(2, "0")}`;
   }
 
+  // Auto-grow do campo: cresce com o conteudo ate o teto (max-h-60), depois
+  // rola internamente. A altura minima (min-h) mantem o campo confortavel.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [texto]);
+
   function inserirTexto(novoTrecho: string) {
     const base = texto.trim();
     const novo =
@@ -607,9 +616,9 @@ export function Compositor({
           value={texto}
           onChange={(e) => aoMudar(e.target.value)}
           onKeyDown={aoTeclar}
-          rows={1}
+          rows={3}
           placeholder='Escreva uma mensagem... ("/" para respostas rapidas)'
-          className="scroll-fino max-h-32 min-h-[44px] flex-1 resize-none rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none transition-colors focus:border-tiffany"
+          className="scroll-fino max-h-60 min-h-[88px] flex-1 resize-none rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none transition-colors focus:border-tiffany"
         />
         <button
           onClick={() => void enviar()}
