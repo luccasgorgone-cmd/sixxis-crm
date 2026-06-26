@@ -1,7 +1,13 @@
 @import "tailwindcss";
 
+/* Tema escuro: a variante `dark:` vale quando html/body tem a classe .dark. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Tokens da marca Sixxis (Tailwind v4 @theme => vira classes utilitarias:
-   bg-tiffany, text-escuro, border-medio, etc.). */
+   bg-tiffany, text-escuro, border-medio, etc.).
+   --color-escuro/medio/fundo e a "superficie" sao SEMANTICOS: mudam no tema
+   escuro (ver bloco .dark abaixo). As cores de marca (tiffany/roxo/erro/
+   sucesso) sao fixas nos dois temas. */
 @theme {
   --color-tiffany: #3cbfb3;
   --color-tiffany-escuro: #2aa79b;
@@ -11,7 +17,72 @@
   --color-erro: #dc2626;
   --color-sucesso: #16a34a;
   --color-fundo: #f6f8f8;
+  /* Superficie = cor das "folhas" (cards, headers, dropdowns, modais). No tema
+     claro e branca; os componentes usam bg-white, remapeado no .dark. */
+  --color-superficie: #ffffff;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ----------------------------- TEMA ESCURO --------------------------------
+   Estrategia: redefinir os tokens SEMANTICOS (fundo/texto/silenciado/borda/
+   superficie). Assim text-escuro/text-medio/bg-fundo e as bordas/hover
+   (border-black/* e bg-black/5,10) viram claros automaticamente, sem tocar em
+   cada componente. As cores de marca e os badges de paleta (verde/ambar/
+   vermelho-100, *-500 com text-white) permanecem corretos pois nao dependem
+   destes tokens. Overlays de fundo (modais) sao re-escurecidos explicitamente. */
+.dark {
+  color-scheme: dark;
+  --color-fundo: #0b1413;
+  --color-superficie: #14211f;
+  --color-escuro: #e7efed; /* texto principal */
+  --color-medio: #aebfbb; /* texto silenciado (suporta /60, /70 legivel) */
+  /* "black" vira claro => border-black/* e bg-black/5,10 ficam visiveis como
+     linhas/realces claros sobre o escuro. */
+  --color-black: #d4e0dd;
+}
+
+/* Superficies: bg-white (solido) passa a usar a superficie do tema. As variantes
+   com opacidade (bg-white/15 etc.) ficam como estao (realces sobre botoes). */
+.dark .bg-white {
+  background-color: var(--color-superficie);
+}
+
+/* bg-escuro e usado como FUNDO escuro (sidebar, preview da logo). Como o token
+   --color-escuro vira claro no tema escuro (e cor de TEXTO), fixamos esses
+   fundos num tom escuro proprio para a sidebar continuar legivel. */
+.dark .bg-escuro {
+  background-color: #102d2a;
+}
+
+/* Overlays/backdrops de modais e menus: continuam ESCUROS no tema escuro
+   (o flip do "black" os deixaria claros). */
+.dark .bg-black\/40 {
+  background-color: rgb(0 0 0 / 0.6);
+}
+.dark .bg-black\/30 {
+  background-color: rgb(0 0 0 / 0.55);
+}
+.dark .bg-black\/20 {
+  background-color: rgb(0 0 0 / 0.45);
+}
+.dark .bg-black\/15 {
+  background-color: rgb(0 0 0 / 0.4);
+}
+
+/* Graficos (recharts): eixos, grade e tooltip legiveis no escuro. */
+.dark .recharts-text,
+.dark .recharts-cartesian-axis-tick text,
+.dark .recharts-legend-item-text {
+  fill: var(--color-medio);
+  color: var(--color-medio);
+}
+.dark .recharts-cartesian-grid line {
+  stroke: rgb(255 255 255 / 0.08);
+}
+.dark .recharts-default-tooltip {
+  background-color: var(--color-superficie) !important;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  color: var(--color-escuro) !important;
 }
 
 html,
@@ -35,6 +106,9 @@ body {
   background-color: #cbd5d3;
   border-radius: 9999px;
 }
+.dark .scroll-fino::-webkit-scrollbar-thumb {
+  background-color: #33403d;
+}
 .scroll-fino::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -54,6 +128,9 @@ body {
   border-radius: 0.5rem;
   animation: pulsar 1.5s ease-in-out infinite;
 }
+.dark .skeleton {
+  background-color: #233330;
+}
 
 /* Campo de formulario padrao (input/select/textarea). */
 .campo {
@@ -66,6 +143,11 @@ body {
 }
 .campo:focus {
   border-color: var(--color-tiffany);
+}
+.dark .campo {
+  background-color: var(--color-superficie);
+  border-color: rgb(255 255 255 / 0.12);
+  color: var(--color-escuro);
 }
 
 /* Entrada do drawer (painel lateral) e do overlay. */

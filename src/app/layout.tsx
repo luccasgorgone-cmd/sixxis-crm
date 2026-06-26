@@ -32,6 +32,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className={inter.variable}>
+      <head>
+        {/* Aplica o tema (claro/escuro/sistema) ANTES da pintura, sem flash.
+            A preferencia fica em localStorage 'tema' (gerida no Topbar). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('tema')||'sistema';var d=t==='dark'||(t==='sistema'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
