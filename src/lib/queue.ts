@@ -11,6 +11,8 @@ import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
+import { criarNotificacao } from "./notificacao";
+import { campoDono } from "./dono";
 import { fetchFotoPerfil, enviarTexto } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia } from "./midia";
@@ -627,6 +629,94 @@ function agendarMidia(
   });
 }
 
+// Dedup em memoria de chamadas ja tratadas (a Evolution envia varios eventos
+// por chamada: offer/accept/terminate). TTL curto; reset no restart (aceitavel).
+const chamadasVistas = new Map<string, number>();
+const TTL_CHAMADA_MS = 10 * 60 * 1000;
+
+// Chamada RECEBIDA (evento CALL): nao atende/streama. Resolve o setor pelo
+// numero que recebeu; se o cliente ja tem dono nesse setor, notifica o dono;
+// senao aciona a distribuicao (rotearLeadNovo) e notifica o escolhido. Registra
+// Atividade "Chamada recebida" no historico do cliente.
+async function processarChamada(
+  payload: EventoEvolution,
+  io: Server | null,
+): Promise<void> {
+  // O payload de CALL pode vir como objeto unico ou array de chamadas.
+  const bruto = (payload as { data?: unknown }).data;
+  const chamada = (Array.isArray(bruto) ? bruto[0] : bruto) as
+    | { id?: string; from?: string; isVideo?: boolean; status?: string }
+    | undefined;
+  const jid = chamada?.from;
+  if (!jid || jid.endsWith("@g.us")) return;
+
+  // Dedup por id da chamada (ou pelo jid quando nao houver id).
+  const agoraMs = Date.now();
+  for (const [k, t] of chamadasVistas) {
+    if (agoraMs - t > TTL_CHAMADA_MS) chamadasVistas.delete(k);
+  }
+  const chaveDedup = chamada?.id ?? `from:${jid}`;
+  if (chamadasVistas.has(chaveDedup)) return;
+  chamadasVistas.set(chaveDedup, agoraMs);
+
+  const telefone = normalizarJid(jid);
+  if (!telefone) return;
+
+  // Setor pelo numero que RECEBEU (a instancia do payload).
+  const nomeInstancia = payload?.instance ?? "sixxis-wa1";
+  const instancia = await prisma.instanciaWhatsApp.findUnique({
+    where: { instanciaEvolution: nomeInstancia },
+    select: { finalidade: true },
+  });
+  const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
+
+  // Lead (cria se for um numero novo ligando pela 1a vez).
+  const lead = await prisma.lead.upsert({
+    where: { telefone },
+    update: {},
+    create: { telefone, origem: "whatsapp" },
+  });
+
+  // Garante negocio + roteia (idempotente) para resolver/definir o dono do setor.
+  await garantirNegocioParaLead(lead.id, finalidade);
+  await rotearLeadNovo(lead.id, finalidade);
+
+  // Dono atual do setor apos o roteamento.
+  const leadAtual = await prisma.lead.findUnique({
+    where: { id: lead.id },
+    select: { donoId: true, donoPosVendaId: true },
+  });
+  const donoId = leadAtual ? leadAtual[campoDono(finalidade)] : null;
+
+  const tipoChamada = chamada?.isVideo ? "Chamada de video" : "Chamada";
+  const descricao = `${tipoChamada} recebida${
+    finalidade === Finalidade.POS_VENDA ? " (pos-venda)" : ""
+  }`;
+
+  // Historico do cliente.
+  await prisma.atividade.create({
+    data: {
+      leadId: lead.id,
+      agenteId: donoId ?? null,
+      tipo: AtividadeTipo.CONTATO,
+      descricao,
+    },
+  });
+
+  // Notifica o atendente correto (se houver dono).
+  if (donoId) {
+    await criarNotificacao({
+      agenteId: donoId,
+      tipo: "CHAMADA",
+      titulo: `${tipoChamada} recebida`,
+      descricao: `${nomeEfetivo(lead)} esta ligando`,
+      link: "/inbox",
+      leadId: lead.id,
+    });
+  }
+  console.log(`[chamada] ${telefone} (${finalidade}) -> dono ${donoId ?? "sem dono"}`);
+}
+
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
 async function processarEvento(
   payload: EventoEvolution,
@@ -637,6 +727,12 @@ async function processarEvento(
   // (minusculo, ponto). Normaliza antes de comparar para aceitar ambos.
   const evtRaw = String(payload?.event ?? "");
   const evt = evtRaw.toUpperCase().replace(/\./g, "_");
+
+  // Chamada recebida (CALL): notifica o atendente; nao tenta atender.
+  if (evt === "CALL") {
+    await processarChamada(payload, io);
+    return;
+  }
 
   // Revogacao dedicada (cliente apagou): preserva, nao deleta.
   if (evt === "MESSAGES_DELETE") {

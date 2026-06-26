@@ -248,8 +248,9 @@ export async function configurarWebhook(
           headers: { "x-webhook-secret": secret },
           byEvents: false,
           base64: false,
-          // UPSERT = mensagens; UPDATE/DELETE = status e revogacoes (apagar).
-          events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE"],
+          // UPSERT = mensagens; UPDATE/DELETE = status e revogacoes (apagar);
+          // CALL = chamada recebida (notifica o atendente, nao atende).
+          events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CALL"],
         },
       }),
     });
