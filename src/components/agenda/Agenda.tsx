@@ -13,7 +13,6 @@ import {
   Check,
   AlarmClock,
   CheckSquare,
-  Bell,
 } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
 import { useToast } from "@/components/ui/Toast";
@@ -570,7 +569,7 @@ function VisaoDia({
     <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-black/5 bg-white">
       {eventos.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-10 text-center">
-          <Bell className="h-7 w-7 text-medio/30" />
+          <CalendarDays className="h-7 w-7 text-medio/30" />
           <p className="text-sm font-medium text-escuro">Nada agendado</p>
           <p className="text-xs text-medio/60">
             Clique em um horario para criar uma tarefa.

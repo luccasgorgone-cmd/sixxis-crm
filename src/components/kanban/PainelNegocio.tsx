@@ -26,7 +26,7 @@ import {
   History,
   PauseCircle,
   PlayCircle,
-  CalendarClock,
+  AlarmClock,
   CalendarPlus,
   Check,
   RotateCcw,
@@ -1178,7 +1178,7 @@ function BlocoAgendar({
   return (
     <section className="space-y-3 rounded-xl border border-black/5 bg-white p-4">
       <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
-        <CalendarClock className="h-3.5 w-3.5" /> Agendar contato
+        <AlarmClock className="h-3.5 w-3.5" /> Agendar contato
       </h4>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1233,7 +1233,7 @@ function BlocoAgendar({
               key={l.id}
               className="flex items-center gap-2 rounded-lg bg-fundo px-3 py-2 text-sm"
             >
-              <CalendarClock className="h-3.5 w-3.5 shrink-0 text-tiffany" />
+              <AlarmClock className="h-3.5 w-3.5 shrink-0 text-tiffany" />
               <div className="min-w-0 flex-1">
                 <p className="text-escuro">
                   {new Date(l.dataHora).toLocaleString("pt-BR", {

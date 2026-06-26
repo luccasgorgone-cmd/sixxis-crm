@@ -6,7 +6,6 @@
 // feito, remarcar (snooze: +1h, amanha, escolher), abrir cliente.
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Bell,
   X,
   Check,
   Clock4,
@@ -189,7 +188,7 @@ export function SinoLembretes({
             : "border-black/10 text-medio hover:bg-black/5"
         }`}
       >
-        <Bell className="h-5 w-5" />
+        <AlarmClock className="h-5 w-5" />
         {total > 0 && (
           <span
             className={`absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white ${
@@ -236,7 +235,7 @@ export function SinoLembretes({
                   grupos.hoje.length === 0 &&
                   grupos.proximos.length === 0) ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-                  <Bell className="h-8 w-8 text-medio/30" />
+                  <AlarmClock className="h-8 w-8 text-medio/30" />
                   <p className="text-sm font-medium text-escuro">Nenhum lembrete</p>
                   <p className="max-w-xs text-xs text-medio/60">
                     Agende um contato no painel do cliente para ser lembrado aqui.
