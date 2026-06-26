@@ -331,6 +331,9 @@ model Conversa {
   naoLidas         Int               @default(0)
   ultimaMensagemEm DateTime?
   arquivada        Boolean           @default(false)
+  // Ultima vez que enviamos a mensagem automatica de "fora do horario" nesta
+  // conversa (evita repetir a cada mensagem; reenvia apos ~8h).
+  foraHorarioAvisadoEm DateTime?
   mensagens        Mensagem[]
   criadoEm         DateTime          @default(now())
 

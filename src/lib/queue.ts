@@ -13,6 +13,7 @@ import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono } from "./dono";
+import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { fetchFotoPerfil, enviarTexto } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia } from "./midia";
@@ -759,6 +760,118 @@ async function processarChamada(
   console.log(`[chamada] ${telefone} (${finalidade}) -> dono ${donoId ?? "sem dono"}`);
 }
 
+// Mensagem padrao (editavel em Admin -> Geral) quando o admin nao definiu uma.
+const MSG_FORA_HORARIO_PADRAO =
+  "Olá! Agradecemos o seu contato com a Sixxis. No momento estamos fora do horário de atendimento. Assim que um de nossos atendentes estiver disponível, retornaremos por aqui. Obrigado pela preferência!";
+// Reenvio so apos ~8h (nao repete a cada mensagem do cliente).
+const REENVIO_FORA_HORARIO_MS = 8 * 60 * 60 * 1000;
+
+// Envia, UMA vez por janela, a mensagem automatica de "fora do horario" quando o
+// CRM esta fechado. NAO interfere no roteamento (o lead ja foi atribuido antes).
+async function responderForaHorarioSePreciso(
+  conversa: {
+    id: string;
+    instancia: string;
+    instanciaId: string | null;
+    foraHorarioAvisadoEm: Date | null;
+  },
+  telefone: string,
+  lead: {
+    id: string;
+    nome: string | null;
+    pushName: string | null;
+    nomeManual: string | null;
+    telefone: string;
+    fotoUrl: string | null;
+  },
+  io: Server | null,
+): Promise<void> {
+  try {
+    const config = await prisma.configuracaoCRM.findFirst({
+      select: { horarios: true, fuso: true, mensagemForaHorario: true },
+    });
+    if (!config) return;
+    // Dentro do expediente: nunca envia.
+    const aberto = estaAbertoAgora(
+      normalizarHorarios(config.horarios),
+      config.fuso ?? "America/Sao_Paulo",
+    );
+    if (aberto) return;
+    // Ja avisou nesta janela? Nao repete.
+    const ultimo = conversa.foraHorarioAvisadoEm?.getTime() ?? 0;
+    if (Date.now() - ultimo < REENVIO_FORA_HORARIO_MS) return;
+
+    const texto = (config.mensagemForaHorario ?? "").trim() || MSG_FORA_HORARIO_PADRAO;
+    const agora = new Date();
+    const r = await enviarTexto(telefone, texto, conversa.instancia);
+    const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
+
+    let msg;
+    try {
+      msg = await prisma.mensagem.create({
+        data: {
+          externalId: r.externalId ?? `out-auto-${randomUUID()}`,
+          conversaId: conversa.id,
+          direcao: DirecaoMsg.OUT,
+          tipo: TipoMsg.TEXTO,
+          conteudo: texto,
+          instancia: conversa.instancia,
+          instanciaId: conversa.instanciaId,
+          statusEnvio: status,
+          lida: true,
+          hora: agora,
+        },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        msg = await prisma.mensagem.create({
+          data: {
+            externalId: `out-auto-${randomUUID()}`,
+            conversaId: conversa.id,
+            direcao: DirecaoMsg.OUT,
+            tipo: TipoMsg.TEXTO,
+            conteudo: texto,
+            instancia: conversa.instancia,
+            instanciaId: conversa.instanciaId,
+            statusEnvio: status,
+            lida: true,
+            hora: agora,
+          },
+        });
+      } else {
+        throw e;
+      }
+    }
+
+    // Marca a janela (mesmo em falha de envio, para nao reinsistir a cada msg).
+    await prisma.conversa.update({
+      where: { id: conversa.id },
+      data: { foraHorarioAvisadoEm: agora, ultimaMensagemEm: agora },
+    });
+
+    (io ?? getIO())?.emit("mensagem:nova", {
+      leadId: lead.id,
+      leadNome: nomeEfetivo(lead),
+      leadFoto: lead.fotoUrl,
+      leadTelefone: telefone,
+      conversaId: conversa.id,
+      mensagemId: msg.id,
+      direcao: msg.direcao,
+      tipo: msg.tipo,
+      conteudo: msg.conteudo,
+      mediaUrl: msg.mediaUrl,
+      statusEnvio: msg.statusEnvio,
+      hora: msg.hora,
+      naoLidas: 0,
+      ultimaMensagemEm: agora,
+    });
+  } catch (e) {
+    console.warn(
+      `[fora-horario] falha ao responder ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
 async function processarEvento(
   payload: EventoEvolution,
@@ -1002,8 +1115,20 @@ async function processarEvento(
     // Registra HistoricoNegocio(CRIACAO) e emite evento.
     await garantirNegocioParaLead(lead.id, finalidade);
     // Roteia o negocio da finalidade para a equipe correta (sticky/round-robin).
-    // Idempotente: nao mexe em negocio ja atribuido.
+    // Idempotente: nao mexe em negocio ja atribuido. (Roda independentemente do
+    // horario — o lead e atribuido mesmo fora do expediente.)
     await rotearLeadNovo(lead.id, finalidade);
+
+    // Auto-resposta de FORA DO HORARIO: apenas em mensagens de ENTRADA, uma vez
+    // (nao repete a cada mensagem; reenvia apos ~8h). Nao bloqueia o roteamento.
+    if (direcao === DirecaoMsg.IN) {
+      await responderForaHorarioSePreciso(
+        { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId, foraHorarioAvisadoEm: conversa.foraHorarioAvisadoEm },
+        telefone,
+        lead,
+        io,
+      );
+    }
   } catch (erro) {
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
     // P2002 = violacao de unique (externalId). Tratamos como idempotente.
