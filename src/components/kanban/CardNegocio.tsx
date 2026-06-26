@@ -5,7 +5,7 @@
 // pela finalidade; badge de finalidade para o admin.
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, UserPlus } from "lucide-react";
+import { Clock, UserPlus, BellRing } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -80,6 +80,18 @@ export function CardNegocio({
       {card.pendente && (
         <div className="mb-2">
           <BadgePendente motivo={card.motivoPendencia} />
+        </div>
+      )}
+
+      {(card.alertasSla ?? 0) > 0 && (
+        <div className="mb-2">
+          <span
+            title="Negocio parado alem do tempo (SLA)"
+            className="inline-flex animate-pulse items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700"
+          >
+            <BellRing className="h-3 w-3" /> Alerta de tempo
+            {(card.alertasSla ?? 0) > 1 ? ` (${card.alertasSla})` : ""}
+          </span>
         </div>
       )}
 

@@ -17,6 +17,7 @@ import {
 } from "@/generated/prisma/enums";
 import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
+import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -469,6 +470,12 @@ export async function PATCH(
         descricao: h.descricao,
       })),
     });
+  }
+
+  // SLA: mover de etapa ou fechar (ganho/perdido)/reabrir resolve os alertas
+  // de SLA abertos deste negocio. O job recria para a nova etapa, se exceder.
+  if (data.etapaId !== undefined || data.status !== undefined) {
+    await resolverAlertasNegocio(id);
   }
 
   // Pendencia: registra a Atividade(PENDENCIA) na linha do tempo do cliente.

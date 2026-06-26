@@ -46,6 +46,8 @@ export type CardNegocio = {
   entrouEtapaEm: string;
   agente: AgenteResumo | null;
   etiquetas: EtiquetaChip[];
+  // Quantidade de alertas de SLA abertos (selo no card).
+  alertasSla?: number;
 };
 
 // Evento de tempo real emitido pelo servidor.

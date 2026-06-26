@@ -19,6 +19,8 @@ export const includeCard = {
   },
   agente: { select: { id: true, nome: true, avatarUrl: true } },
   etapa: { select: { id: true, tipo: true } },
+  // Alertas de SLA abertos (selo/contador no card do kanban).
+  alertasSla: { where: { resolvidoEm: null }, select: { id: true } },
 } satisfies Prisma.NegocioInclude;
 
 type NegocioCard = Prisma.NegocioGetPayload<{ include: typeof includeCard }>;
@@ -41,6 +43,7 @@ export function cardNegocio(n: NegocioCard) {
     motivoPerdaObs: n.motivoPerdaObs,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
+    alertasSla: n.alertasSla.length,
     agente: n.agente
       ? { id: n.agente.id, nome: n.agente.nome, avatarUrl: n.agente.avatarUrl }
       : null,

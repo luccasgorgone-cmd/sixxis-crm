@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogoutButton } from "./LogoutButton";
 import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
 import { SinoNotificacoes } from "./SinoNotificacoes";
+import { SinoAlertasSla } from "./SinoAlertasSla";
 import { TemaToggle } from "./TemaToggle";
 
 const ROTULO_PAPEL: Record<string, string> = {
@@ -44,6 +45,7 @@ export function Topbar({
 
       <div className="flex items-center gap-3">
         <TemaToggle />
+        <SinoAlertasSla agenteId={agenteId} papel={papel} />
         <SinoNotificacoes />
         <SinoLembretes papel={papel} agenteId={agenteId} />
         <div className="flex items-center gap-2">

@@ -382,6 +382,38 @@ model Etapa {
   finalidade FinalidadeEtapa @default(VENDA)
   ativo      Boolean         @default(true)
   negocios   Negocio[]
+  configsAlertaSla ConfigAlertaSla[]
+}
+
+// Configuracao de alerta de SLA por (finalidade, etapa): tempo maximo na etapa
+// antes de alertar o dono. Separada por Venda e Pos-venda. SEPARADA do sistema
+// de alertas ANTECIPADOS da agenda (lib/alertas.ts), que nao e tocado.
+model ConfigAlertaSla {
+  id               String         @id @default(cuid())
+  finalidade       Finalidade
+  etapaId          String
+  etapa            Etapa          @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  minutosParaAlerta Int
+  ativo            Boolean        @default(true)
+  som              String?
+  alertas          AlertaNegocio[]
+  criadoEm         DateTime       @default(now())
+
+  @@unique([finalidade, etapaId])
+}
+
+// Alerta de SLA ATIVO de um negocio (resolvidoEm null = aberto). Fechado ao
+// mover de etapa / ganho / perdido / resolver.
+model AlertaNegocio {
+  id          String          @id @default(cuid())
+  negocioId   String
+  negocio     Negocio         @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  configId    String
+  config      ConfigAlertaSla @relation(fields: [configId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime        @default(now())
+  resolvidoEm DateTime?
+
+  @@index([negocioId, resolvidoEm])
 }
 
 model Etiqueta {
@@ -430,6 +462,7 @@ model Negocio {
   atividades    Atividade[]
   lembretes     Lembrete[]
   orcamentos    Orcamento[]
+  alertasSla    AlertaNegocio[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 

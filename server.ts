@@ -8,6 +8,7 @@ import { setIO } from "./src/lib/socket";
 import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import { iniciarManutencao } from "./src/lib/manutencao";
 import { iniciarAlertas } from "./src/lib/alertas";
+import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import {
   seedAdmin,
   seedFunil,
@@ -69,6 +70,8 @@ async function main(): Promise<void> {
   iniciarManutencao();
   // Alertas antecipados da agenda (tarefas/lembretes), a cada ~90s.
   iniciarAlertas();
+  // Alertas de SLA por etapa/setor (negocios parados), a cada ~60s.
+  iniciarSlaAlertas();
 
   httpServer.listen(port, () => {
     console.log(`CRM no ar na porta ${port}`);

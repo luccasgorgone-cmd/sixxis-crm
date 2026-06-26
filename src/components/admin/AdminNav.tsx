@@ -23,6 +23,7 @@ import {
   BarChart3,
   Building2,
   Boxes,
+  BellRing,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -45,6 +46,7 @@ const SECOES: Secao[] = [
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },
+  { rotulo: "Alertas de SLA", href: "/admin/alertas", icone: BellRing },
   { rotulo: "Comunicacoes", href: "/admin/comunicacoes", icone: Megaphone },
   { rotulo: "Geral e horario", href: "/admin/geral", icone: Clock },
   { rotulo: "Evolution", href: "/admin/evolution", icone: MessageSquareDot },
