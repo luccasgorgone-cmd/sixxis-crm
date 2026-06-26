@@ -3,6 +3,7 @@
 // processa depois, com retry automatico. Assim, um deploy/reinicio no meio
 // do recebimento nao perde a mensagem do cliente.
 import { Queue, Worker, type Job, type ConnectionOptions } from "bullmq";
+import { randomUUID } from "node:crypto";
 import IORedis from "ioredis";
 import type { Server } from "socket.io";
 import { prisma } from "./prisma";
@@ -11,6 +12,7 @@ import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
 import { fetchFotoPerfil, enviarTexto } from "./evolution";
+import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia } from "./midia";
 import { nomeEfetivo } from "./cliente";
 import { aplicarModelo } from "./modelos";
@@ -132,14 +134,17 @@ async function processarCampanha(
       )
     : [];
 
-  // Instancia de WhatsApp da finalidade (para o canal WhatsApp).
+  // Instancia de WhatsApp da finalidade (para o canal WhatsApp). O envio pode
+  // sair por este numero; a resposta do cliente cai sempre na conversa unificada.
   let instancia: string | null = null;
+  let instanciaId: string | null = null;
   if (campanha.canal === CanalEnvio.WHATSAPP) {
     const inst = await prisma.instanciaWhatsApp.findFirst({
       where: { finalidade: campanha.finalidade, ativo: true },
-      select: { instanciaEvolution: true },
+      select: { id: true, instanciaEvolution: true },
     });
     instancia = inst?.instanciaEvolution ?? process.env.EVOLUTION_INSTANCE ?? null;
+    instanciaId = inst?.id ?? null;
   }
 
   const valores = (campanha.valoresJson ?? {}) as Record<string, string>;
@@ -149,8 +154,10 @@ async function processarCampanha(
     select: {
       id: true,
       destino: true,
+      leadId: true,
       lead: {
         select: {
+          id: true,
           nome: true,
           pushName: true,
           nomeManual: true,
@@ -188,9 +195,11 @@ async function processarCampanha(
 
     let ok = false;
     let erro: string | null = null;
+    let externalIdWa: string | undefined;
     if (campanha.canal === CanalEnvio.WHATSAPP) {
       const r = await enviarTexto(d.destino, texto, instancia);
       ok = r.ok;
+      externalIdWa = r.externalId;
       erro = r.ok ? null : "falha no envio (WhatsApp)";
     } else if (campanha.canal === CanalEnvio.SMS) {
       const r = await enviarSMS(d.destino, texto);
@@ -217,6 +226,57 @@ async function processarCampanha(
       data: ok ? { enviados: { increment: 1 } } : { falhas: { increment: 1 } },
       select: { enviados: true, falhas: true, total: true, pulados: true },
     });
+
+    // Envio em massa por WhatsApp: registra a mensagem OUT na CONVERSA UNIFICADA
+    // (leadId, finalidade) do destinatario, reabrindo/usando a existente. Nunca
+    // cria conversa por instancia. A futura resposta do cliente cai no mesmo chat.
+    if (ok && campanha.canal === CanalEnvio.WHATSAPP) {
+      try {
+        const conversa = await garantirConversaUnificada(
+          d.leadId,
+          campanha.finalidade,
+          { instancia, instanciaId },
+        );
+        const msg = await prisma.mensagem.create({
+          data: {
+            externalId: externalIdWa ?? `out-${randomUUID()}`,
+            conversaId: conversa.id,
+            direcao: DirecaoMsg.OUT,
+            tipo: TipoMsg.TEXTO,
+            conteudo: texto,
+            instancia,
+            instanciaId,
+            statusEnvio: StatusEnvio.ENVIADA,
+            lida: true,
+            hora: new Date(),
+          },
+        });
+        await prisma.conversa.update({
+          where: { id: conversa.id },
+          data: { ultimaMensagemEm: msg.hora },
+        });
+        (io ?? getIO())?.emit("mensagem:nova", {
+          leadId: d.leadId,
+          leadNome: nomeEfetivo(d.lead),
+          leadTelefone: d.destino,
+          conversaId: conversa.id,
+          mensagemId: msg.id,
+          direcao: msg.direcao,
+          tipo: msg.tipo,
+          conteudo: msg.conteudo,
+          mediaUrl: msg.mediaUrl,
+          statusEnvio: msg.statusEnvio,
+          hora: msg.hora,
+          naoLidas: 0,
+          ultimaMensagemEm: msg.hora,
+        });
+      } catch (e) {
+        // Falha de registro nao deve abortar a campanha (idempotencia/corrida).
+        console.warn(
+          `[campanha] falha ao registrar mensagem na conversa unificada do lead ${d.leadId}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
 
     (io ?? getIO())?.emit("campanha:progresso", {
       campanhaId,
@@ -690,21 +750,13 @@ async function processarEvento(
     io,
   );
 
-  // Conversa: garante UMA conversa "aberta" para o Lead NAQUELA finalidade.
-  let conversa = await prisma.conversa.findFirst({
-    where: { leadId: lead.id, status: "aberta", finalidade },
-    orderBy: { criadoEm: "desc" },
+  // Conversa UNIFICADA por (leadId, finalidade): considera QUALQUER conversa do
+  // setor (inclusive arquivada) e a REABRE em vez de criar uma segunda. Assim
+  // todos os numeros do mesmo setor caem na mesma conversa.
+  const conversa = await garantirConversaUnificada(lead.id, finalidade, {
+    instancia: nomeInstancia,
+    instanciaId: instancia?.id ?? null,
   });
-  if (!conversa) {
-    conversa = await prisma.conversa.create({
-      data: {
-        leadId: lead.id,
-        instancia: nomeInstancia,
-        instanciaId: instancia?.id ?? null,
-        finalidade,
-      },
-    });
-  }
 
   // Hora real da mensagem quando disponivel (timestamp unix em segundos).
   const ts = data?.messageTimestamp;
@@ -718,6 +770,10 @@ async function processarEvento(
         direcao,
         tipo,
         conteudo,
+        // Numero que originou/enviou esta mensagem (mantido mesmo na conversa
+        // unificada, em que varios numeros do setor coexistem).
+        instancia: nomeInstancia,
+        instanciaId: instancia?.id ?? null,
         ...(transcricao ? { transcricao } : {}),
         ...(mediaUrlOriginal ? { mediaUrl: mediaUrlOriginal } : {}),
         raw: payload as unknown as Prisma.InputJsonValue,
@@ -746,7 +802,15 @@ async function processarEvento(
       where: { id: conversa.id },
       data: {
         ultimaMensagemEm: mensagem.hora,
-        ...(direcao === DirecaoMsg.IN ? { naoLidas: { increment: 1 } } : {}),
+        // Mensagem de ENTRADA define o numero padrao de resposta da conversa
+        // (responde-se por padrao pelo numero que o cliente usou por ultimo).
+        ...(direcao === DirecaoMsg.IN
+          ? {
+              naoLidas: { increment: 1 },
+              instancia: nomeInstancia,
+              instanciaId: instancia?.id ?? null,
+            }
+          : {}),
       },
       select: { naoLidas: true },
     });

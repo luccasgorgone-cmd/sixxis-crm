@@ -25,6 +25,7 @@ export type ConversaItem = {
   atendidoPor: AtendidoPor;
   agenteId: string | null;
   finalidade?: Finalidade;
+  instanciaId?: string | null;
   instanciaNome?: string | null;
   instanciaNumero?: string | null;
 };
@@ -41,6 +42,8 @@ export type MensagemItem = {
   apagada?: boolean;
   apagadaPor?: string | null; // "COLABORADOR" | "CLIENTE"
   apagadaEm?: string | null;
+  // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
+  instanciaRotulo?: string | null;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

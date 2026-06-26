@@ -27,15 +27,26 @@ type Resposta = {
   variacoes?: string[];
 };
 
+type Instancia = {
+  id: string;
+  nome: string;
+  numero: string | null;
+  finalidade: "VENDA" | "POS_VENDA";
+};
+
 export function Compositor({
   conversaId,
   onEnviada,
   ehAdmin = false,
+  finalidade,
+  instanciaIdAtual,
   lead,
 }: {
   conversaId: string;
   onEnviada: (msg: MensagemItem) => void;
   ehAdmin?: boolean;
+  finalidade?: "VENDA" | "POS_VENDA";
+  instanciaIdAtual?: string | null;
   lead?: LeadModelo | null;
 }) {
   const agente = useAgente();
@@ -44,6 +55,24 @@ export function Compositor({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Numero de envio: as instancias ativas da finalidade da conversa. O padrao e
+  // o numero que o cliente usou por ultimo (instanciaIdAtual); o atendente pode
+  // escolher outro. A resposta do cliente sempre cai na conversa unificada.
+  const [instancias, setInstancias] = useState<Instancia[]>([]);
+  const [instanciaSel, setInstanciaSel] = useState<string | null>(
+    instanciaIdAtual ?? null,
+  );
+  useEffect(() => {
+    setInstanciaSel(instanciaIdAtual ?? null);
+  }, [instanciaIdAtual, conversaId]);
+  useEffect(() => {
+    const qs = finalidade ? `?finalidade=${finalidade}` : "";
+    fetch(`/api/instancias${qs}`)
+      .then((r) => (r.ok ? r.json() : { instancias: [] }))
+      .then((d) => setInstancias(d.instancias ?? []))
+      .catch(() => undefined);
+  }, [finalidade]);
 
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [mostrar, setMostrar] = useState(false);
@@ -161,7 +190,11 @@ export function Compositor({
       const r = await fetch("/api/mensagens/enviar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversaId, texto: valor }),
+        body: JSON.stringify({
+          conversaId,
+          texto: valor,
+          ...(instanciaSel ? { instanciaId: instanciaSel } : {}),
+        }),
       });
       const d = await r.json().catch(() => null);
       if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
@@ -318,6 +351,27 @@ export function Compositor({
           onEscolher={inserirProduto}
           onFechar={() => setSeletorProduto(false)}
         />
+      )}
+
+      {instancias.length > 1 && (
+        <div className="mb-2 flex items-center gap-2 px-1">
+          <span className="text-[11px] font-medium text-medio/60">
+            Responder por:
+          </span>
+          <select
+            value={instanciaSel ?? ""}
+            onChange={(e) => setInstanciaSel(e.target.value || null)}
+            className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs text-escuro outline-none focus:border-tiffany"
+          >
+            {!instanciaSel && <option value="">Numero padrao</option>}
+            {instancias.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nome}
+                {i.numero ? ` (${i.numero})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       <div className="flex items-end gap-2">

@@ -303,6 +303,12 @@ model Conversa {
   mensagens        Mensagem[]
   criadoEm         DateTime          @default(now())
 
+  // No MAXIMO uma conversa ATIVA por (cliente, setor): todos os numeros do
+  // mesmo setor caem nela; venda e pos-venda seguem como threads separadas.
+  // No banco a unicidade e PARCIAL (WHERE arquivada = false) para preservar
+  // o historico de conversas antigas arquivadas (nunca deletadas) — ver a
+  // migracao fatia231a. O @@unique aqui documenta a regra e gera o tipo.
+  @@unique([leadId, finalidade])
   @@index([leadId])
   @@index([agenteId])
   @@index([instanciaId])
@@ -320,6 +326,11 @@ model Mensagem {
   conteudo    String?      @db.Text
   transcricao String?      @db.Text
   mediaUrl    String?
+  // Numero (instancia Evolution) que originou/enviou esta mensagem. Permite
+  // mostrar na thread por qual numero cada mensagem entrou/saiu mesmo na
+  // conversa unificada (varios numeros do mesmo setor caem na mesma conversa).
+  instancia   String?
+  instanciaId String?
   lida        Boolean      @default(false)
   statusEnvio StatusEnvio?
   // Apagamento (revoke). O conteudo NUNCA e removido — so marcado. apagadaPor:

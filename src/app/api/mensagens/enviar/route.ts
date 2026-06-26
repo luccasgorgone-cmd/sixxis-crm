@@ -25,7 +25,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const agenteId = session.user.id;
 
-  let body: { conversaId?: string; texto?: string };
+  let body: { conversaId?: string; texto?: string; instanciaId?: string };
   try {
     body = await req.json();
   } catch {
@@ -34,6 +34,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const conversaId = String(body?.conversaId ?? "");
   const texto = String(body?.texto ?? "").trim();
+  const instanciaIdEscolhida = body?.instanciaId
+    ? String(body.instanciaId)
+    : null;
   if (!conversaId || !texto) {
     return NextResponse.json(
       { erro: "conversaId e texto sao obrigatorios" },
@@ -63,9 +66,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Envia pela instancia (numero) da conversa; fallback para a do env.
-  const instanciaEvolution =
+  // Numero de envio: por padrao o da conversa (ultimo que o cliente usou no
+  // setor); ou o escolhido no compositor, desde que ativo e da MESMA finalidade.
+  let instanciaEvolution =
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
+  let instanciaIdUsada: string | null = conversa.instanciaId;
+  if (instanciaIdEscolhida) {
+    const escolhida = await prisma.instanciaWhatsApp.findFirst({
+      where: {
+        id: instanciaIdEscolhida,
+        ativo: true,
+        finalidade: conversa.finalidade,
+      },
+      select: { id: true, instanciaEvolution: true },
+    });
+    if (escolhida) {
+      instanciaEvolution = escolhida.instanciaEvolution;
+      instanciaIdUsada = escolhida.id;
+    }
+  }
 
   // Chama a Evolution. Se falhar, ainda gravamos a mensagem com status ERRO.
   const resultado = await enviarTexto(numero, texto, instanciaEvolution);
@@ -84,6 +103,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         direcao: DirecaoMsg.OUT,
         tipo: TipoMsg.TEXTO,
         conteudo: texto,
+        instancia: instanciaEvolution,
+        instanciaId: instanciaIdUsada,
         statusEnvio: status,
         lida: true,
         raw: (resultado.raw ?? {}) as Prisma.InputJsonValue,
@@ -103,6 +124,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           direcao: DirecaoMsg.OUT,
           tipo: TipoMsg.TEXTO,
           conteudo: texto,
+          instancia: instanciaEvolution,
+          instanciaId: instanciaIdUsada,
           statusEnvio: status,
           lida: true,
           raw: (resultado.raw ?? {}) as Prisma.InputJsonValue,

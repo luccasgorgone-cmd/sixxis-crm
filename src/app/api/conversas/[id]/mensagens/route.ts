@@ -45,8 +45,31 @@ export async function GET(
       apagada: true,
       apagadaPor: true,
       apagadaEm: true,
+      // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
+      instancia: true,
+      instanciaId: true,
     },
   });
+
+  // Rotulo curto do numero de origem de cada mensagem (nome cadastrado da
+  // instancia, com fallback para o identificador da Evolution).
+  const ids = Array.from(
+    new Set(mensagens.map((m) => m.instanciaId).filter((v): v is string => !!v)),
+  );
+  const instancias = ids.length
+    ? await prisma.instanciaWhatsApp.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, nome: true },
+      })
+    : [];
+  const mapaInstancia = new Map(instancias.map((i) => [i.id, i.nome]));
+  const mensagensComRotulo = mensagens.map((m) => ({
+    ...m,
+    instanciaRotulo:
+      (m.instanciaId ? mapaInstancia.get(m.instanciaId) : null) ??
+      m.instancia ??
+      null,
+  }));
 
   // Marca como lidas / zera o badge APENAS para o dono da conversa (quem
   // realmente esta atendendo). A inspecao do admin nao zera o contador alheio.
@@ -76,6 +99,6 @@ export async function GET(
       atendidoPor: conversa.atendidoPor,
       finalidade: conversa.finalidade,
     },
-    mensagens,
+    mensagens: mensagensComRotulo,
   });
 }

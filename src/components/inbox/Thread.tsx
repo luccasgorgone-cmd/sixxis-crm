@@ -126,6 +126,8 @@ export function Thread({
           conversaId={conversa.id}
           onEnviada={onEnviada ?? (() => undefined)}
           ehAdmin={ehAdmin}
+          finalidade={conversa.finalidade}
+          instanciaIdAtual={conversa.instanciaId}
           lead={{
             nomeEfetivo: conversa.leadNome?.trim() || conversa.leadTelefone,
           }}
@@ -340,6 +342,12 @@ function Bolha({
             apagada ? "text-medio/40" : ehOut ? "text-white/70" : "text-medio/50"
           }`}
         >
+          {/* Numero (instancia) por onde a mensagem entrou/saiu. */}
+          {mensagem.instanciaRotulo && (
+            <span className="truncate opacity-80" title={`Numero: ${mensagem.instanciaRotulo}`}>
+              {mensagem.instanciaRotulo} ·
+            </span>
+          )}
           {horaCurta(mensagem.hora)}
           {ehOut && !apagada && <StatusEnvio status={mensagem.statusEnvio} />}
         </span>

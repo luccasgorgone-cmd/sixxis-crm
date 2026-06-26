@@ -65,6 +65,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Finalidade visivel a todos (indicador colorido). Nome/numero da instancia
     // segue apenas para ADMIN.
     finalidade: c.finalidade,
+    // Numero padrao de resposta (ultima entrada do cliente naquele setor).
+    instanciaId: c.instanciaId,
     ...(admin
       ? {
           instanciaNome: c.instanciaRef?.nome ?? c.instancia,
