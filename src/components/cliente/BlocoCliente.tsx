@@ -30,6 +30,7 @@ import {
   mascararCpf,
   mascararCnpj,
 } from "@/lib/format";
+import { temNomeReal } from "@/lib/cliente";
 import { Enderecos } from "@/components/cliente/Enderecos";
 
 export type ClientePainel = {
@@ -66,8 +67,9 @@ export function BlocoCliente({
   const [foto, setFoto] = useState(cliente.fotoUrl);
   const [atualizandoFoto, setAtualizandoFoto] = useState(false);
 
-  // Sem nome real (so o numero): nome efetivo == telefone.
-  const semNome = cliente.nomeEfetivo.trim() === cliente.telefone;
+  // Sem nome real (so o numero/telefone). Checa os campos crus — nomeEfetivo
+  // agora vem formatado, entao NAO comparar com o telefone.
+  const semNome = !temNomeReal(cliente);
 
   async function atualizarFoto() {
     setAtualizandoFoto(true);

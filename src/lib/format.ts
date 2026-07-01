@@ -1,4 +1,20 @@
 // Helpers de formatacao para a UI (executados no browser).
+import { ehTelefoneValidoBR } from "./ddd";
+
+// Rotulo curto para "telefones" que na verdade sao @lid (numero mascarado do
+// WhatsApp) ou lixo: nunca exibimos o numero interno gigante de 14-15 digitos.
+const ROTULO_SEM_TELEFONE = "Contato WhatsApp";
+
+// Quebra a parte nacional (DDD + numero) em "(DD) 9NNNN-NNNN" ou "(DD) NNNN-NNNN".
+function formatarNacional(nac: string): string {
+  const ddd = nac.slice(0, 2);
+  const num = nac.slice(2);
+  const meio =
+    num.length === 9
+      ? `${num.slice(0, 5)}-${num.slice(5)}`
+      : `${num.slice(0, 4)}-${num.slice(4)}`;
+  return `(${ddd}) ${meio}`;
+}
 
 // "14:32" a partir de uma data/ISO string.
 export function horaCurta(valor: string | Date | null | undefined): string {
@@ -50,12 +66,29 @@ export function horarioLista(valor: string | Date | null | undefined): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
-// Telefone "5518999999999" -> "+55 18 99999-9999" (best-effort, BR).
+// Telefone "5518999999999" -> "+55 (18) 99999-9999". Numeros sem DDI 55 (10-11
+// digitos) sao assumidos como BR. Se NAO for telefone BR valido (ex.: @lid),
+// retorna um rotulo curto amigavel — NUNCA o numero interno gigante.
 export function formatarTelefone(tel: string): string {
-  const d = tel.replace(/\D/g, "");
-  const m = d.match(/^(\d{2})(\d{2})(\d{4,5})(\d{4})$/);
-  if (!m) return tel;
-  return `+${m[1]} ${m[2]} ${m[3]}-${m[4]}`;
+  const d = (tel ?? "").replace(/\D/g, "");
+  if (!ehTelefoneValidoBR(d)) return ROTULO_SEM_TELEFONE;
+  const nac =
+    d.startsWith("55") && (d.length === 12 || d.length === 13)
+      ? d.slice(2)
+      : d;
+  return `+55 ${formatarNacional(nac)}`;
+}
+
+// Versao curta para cards/listas apertadas: "(18) 99999-9999" (sem o +55) ou o
+// mesmo rotulo amigavel para @lid/lixo.
+export function formatarTelefoneCurto(tel: string): string {
+  const d = (tel ?? "").replace(/\D/g, "");
+  if (!ehTelefoneValidoBR(d)) return ROTULO_SEM_TELEFONE;
+  const nac =
+    d.startsWith("55") && (d.length === 12 || d.length === 13)
+      ? d.slice(2)
+      : d;
+  return formatarNacional(nac);
 }
 
 // Mascaras leves (so formato, nunca bloqueiam): CPF 000.000.000-00,
@@ -149,11 +182,12 @@ export function tempoDesde(valor: string | Date | null | undefined): string {
   return `ha ${dias} d`;
 }
 
-// Iniciais para o avatar (nome ou telefone).
+// Iniciais para o avatar (nome ou telefone). Ignora "nomes" sem letras (ex.: um
+// telefone formatado como fallback), caindo nos ultimos 2 digitos do numero.
 export function iniciais(nome: string | null, telefone: string): string {
   const base = (nome ?? "").trim();
-  if (base) {
-    const partes = base.split(/\s+/);
+  if (base && /\p{L}/u.test(base)) {
+    const partes = base.split(/\s+/).filter((p) => /\p{L}/u.test(p));
     const a = partes[0]?.[0] ?? "";
     const b = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? "") : "";
     return (a + b).toUpperCase();
