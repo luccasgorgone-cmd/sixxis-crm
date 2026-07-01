@@ -924,25 +924,14 @@ async function processarEvento(
     return;
   }
 
-  // DIAGNOSTICO (temporario, Fatia 2.37 Parte A — REMOVER na Parte C): quando o
-  // remetente e um @lid (numero mascarado por privacidade), loga a key crua e o
-  // pushName para descobrirmos como mapear @lid -> telefone real via Evolution.
-  if (jid.endsWith("@lid")) {
-    console.log(
-      "[LID-DIAG]",
-      JSON.stringify(data?.key ?? {}),
-      "pushName=",
-      data?.pushName,
-    );
-  }
+  const fromMe = data?.key?.fromMe === true;
 
   // Ignora "leads fantasma": remetentes que nao sao clientes de fato.
   //   @g.us      -> grupos
   //   @broadcast -> listas de transmissao (e status@broadcast: status/stories)
   //   @newsletter-> canais/newsletters
-  // Clientes normais (@s.whatsapp.net) e numeros mascarados (@lid) seguem o
-  // fluxo normal. Anuncios (Click-to-WhatsApp) chegam por @s.whatsapp.net e
-  // continuam entrando.
+  // Clientes normais (@s.whatsapp.net) seguem o fluxo. Anuncios (Click-to-
+  // WhatsApp) chegam por @s.whatsapp.net e continuam entrando.
   if (
     jid.endsWith("@g.us") ||
     jid.endsWith("@broadcast") ||
@@ -951,7 +940,11 @@ async function processarEvento(
     return;
   }
 
-  const fromMe = data?.key?.fromMe === true;
+  // @lid + saida = eco de mensagem enviada a um contato nao-salvo (numero
+  // mascarado); o numero real NAO vem no payload e criaria um lead fantasma.
+  // Descarta. Entrada @lid (rara) segue o fluxo normal e vira "Contato WhatsApp".
+  if (jid.endsWith("@lid") && fromMe) return;
+
   const pushName = data?.pushName;
   // pushName so nomeia o lead em mensagens de ENTRADA. Em mensagens de SAIDA
   // (fromMe), o WhatsApp envia "Voce"/nome da propria conta, que NAO e o nome
