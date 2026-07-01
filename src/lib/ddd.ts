@@ -68,8 +68,12 @@ const DEFINICAO: {
 ];
 
 const MAPA: Record<string, InfoDDD> = {};
+// Mapa UF -> { estado, regiao }, derivado da mesma DEFINICAO (sem duplicar dados).
+// Usado quando so temos a UF (ex.: Endereco.uf) e nao um DDD/telefone.
+const MAPA_UF: Record<string, { estado: string; regiao: string }> = {};
 for (const { regiao, ufs } of DEFINICAO) {
   for (const { uf, estado, ddds } of ufs) {
+    MAPA_UF[uf] = { estado, regiao };
     for (const ddd of ddds) {
       MAPA[String(ddd)] = { uf, estado, regiao };
     }
@@ -118,4 +122,12 @@ export function regiaoPorTelefone(telefone: string): string | null {
 // Info completa por DDD (ex.: "18" -> { uf:"SP", estado:"São Paulo", ... }).
 export function infoPorDDD(ddd: string): InfoDDD | null {
   return MAPA[ddd] ?? null;
+}
+
+// Estado/regiao a partir da UF (ex.: "SP" -> { estado:"São Paulo", regiao:"Sudeste" }).
+// Para leads com Endereco.uf mas telefone sem DDD valido. Reusa o mesmo mapa.
+export function infoPorUF(
+  uf: string,
+): { estado: string; regiao: string } | null {
+  return MAPA_UF[uf.toUpperCase()] ?? null;
 }
