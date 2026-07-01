@@ -41,6 +41,7 @@ export function Thread({
   onExcluida,
   somenteLeitura = false,
   ehAdmin = false,
+  embutida = false,
 }: {
   conversa: ConversaItem;
   mensagens: MensagemItem[];
@@ -49,6 +50,10 @@ export function Thread({
   onExcluida?: () => void;
   somenteLeitura?: boolean;
   ehAdmin?: boolean;
+  // Quando embutida no painel do Kanban, o nome/avatar e a finalidade ja
+  // aparecem na barra do painel; o cabecalho fica slim (so telefone/instancia,
+  // selo IA/Humano e excluir) para nao repetir o nome do cliente.
+  embutida?: boolean;
 }) {
   const fimRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -81,58 +86,77 @@ export function Thread({
 
   const nome = conversa.leadNome?.trim() || conversa.leadTelefone;
 
+  // Selo IA/Humano e botao excluir: unicos deste cabecalho (nao existem na barra
+  // do painel), reusados tanto no cabecalho completo quanto no slim (embutido).
+  const seloAtendimento = (
+    <span
+      className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+        conversa.atendidoPor === "IA"
+          ? "bg-tiffany/10 text-tiffany"
+          : "bg-medio/10 text-medio"
+      }`}
+    >
+      {conversa.atendidoPor === "IA" ? (
+        <Bot className="h-3.5 w-3.5" />
+      ) : (
+        <UserIcon className="h-3.5 w-3.5" />
+      )}
+      {conversa.atendidoPor === "IA" ? "IA" : "Humano"}
+    </span>
+  );
+
+  // Exclusao da conversa: SOMENTE admin (o endpoint tambem barra).
+  const botaoExcluir = ehAdmin ? (
+    <button
+      onClick={() => setConfirmarExcluir(true)}
+      title="Excluir conversa (permanente)"
+      aria-label="Excluir conversa"
+      className="shrink-0 rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-erro/10 hover:text-erro"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  ) : null;
+
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-fundo">
-      {/* Cabecalho */}
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-black/5 bg-white px-4">
-        <AvatarCliente
-          nome={conversa.leadNome}
-          telefone={conversa.leadTelefone}
-          fotoUrl={conversa.leadFoto}
-          tamanho={36}
-        />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
-          <p className="truncate text-xs text-medio/60">
+      {/* Cabecalho: slim quando embutido no painel (nome/avatar/finalidade ja
+          aparecem na barra do painel); completo no uso standalone (Inbox). */}
+      {embutida ? (
+        <header className="flex h-11 shrink-0 items-center gap-2 border-b border-black/5 bg-white px-4">
+          <p className="min-w-0 flex-1 truncate text-xs text-medio/60">
             {formatarTelefone(conversa.leadTelefone)}
             {conversa.instanciaNome ? ` · ${conversa.instanciaNome}` : ""}
           </p>
-        </div>
-        {conversa.finalidade && (
-          <span className="ml-auto">
-            <BadgeFinalidade
-              finalidade={conversa.finalidade}
-              className="px-2.5 py-1 text-xs"
-            />
-          </span>
-        )}
-        <span
-          className={`${conversa.finalidade ? "" : "ml-auto "}flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-            conversa.atendidoPor === "IA"
-              ? "bg-tiffany/10 text-tiffany"
-              : "bg-medio/10 text-medio"
-          }`}
-        >
-          {conversa.atendidoPor === "IA" ? (
-            <Bot className="h-3.5 w-3.5" />
-          ) : (
-            <UserIcon className="h-3.5 w-3.5" />
-          )}
-          {conversa.atendidoPor === "IA" ? "IA" : "Humano"}
-        </span>
-
-        {/* Exclusao da conversa: SOMENTE admin (o endpoint tambem barra). */}
-        {ehAdmin && (
-          <button
-            onClick={() => setConfirmarExcluir(true)}
-            title="Excluir conversa (permanente)"
-            aria-label="Excluir conversa"
-            className="rounded-lg p-1.5 text-medio/60 transition-colors hover:bg-erro/10 hover:text-erro"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
-      </header>
+          {seloAtendimento}
+          {botaoExcluir}
+        </header>
+      ) : (
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-black/5 bg-white px-4">
+          <AvatarCliente
+            nome={conversa.leadNome}
+            telefone={conversa.leadTelefone}
+            fotoUrl={conversa.leadFoto}
+            tamanho={36}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
+            <p className="truncate text-xs text-medio/60">
+              {formatarTelefone(conversa.leadTelefone)}
+              {conversa.instanciaNome ? ` · ${conversa.instanciaNome}` : ""}
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {conversa.finalidade && (
+              <BadgeFinalidade
+                finalidade={conversa.finalidade}
+                className="px-2.5 py-1 text-xs"
+              />
+            )}
+            {seloAtendimento}
+            {botaoExcluir}
+          </div>
+        </header>
+      )}
 
       {/* Modal de confirmacao de exclusao (irreversivel). */}
       {confirmarExcluir && (

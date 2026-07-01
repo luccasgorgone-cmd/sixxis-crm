@@ -107,6 +107,7 @@ export function ConversaEmbed({
         carregando={carregando}
         onEnviada={aoEnviada}
         ehAdmin={ehAdmin}
+        embutida
       />
     </div>
   );
