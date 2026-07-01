@@ -779,3 +779,22 @@ model ConfigAgenteIA {
   handoffSeLeadQuente      Boolean @default(false)
   atualizadoEm        DateTime @updatedAt
 }
+
+// Assistente de escrita ("varinha magica"): reescreve o texto do atendente no
+// compositor aplicando um TOM. Config singleton (liga/desliga + modelo).
+model AssistenteTom {
+  id           String   @id @default(cuid())
+  nome         String
+  instrucao    String   @db.Text
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model AssistenteConfig {
+  id           String   @id @default(cuid())
+  modelo       String   @default("claude-haiku-4-5")
+  ativo        Boolean  @default(true)
+  atualizadoEm DateTime @updatedAt
+}

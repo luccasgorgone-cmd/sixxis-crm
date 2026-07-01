@@ -19,6 +19,7 @@ import {
   seedRoteamentoEPresets,
   seedFinalidadeEInstancias,
   seedConfiguracoes,
+  seedAssistenteEscrita,
   backfillAcesso,
   purgarDadosTeste,
   backfillNegocios,
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();
   await seedConfiguracoes();
+  await seedAssistenteEscrita();
   await backfillAcesso();
   await purgarDadosTeste();
   await backfillNegocios();

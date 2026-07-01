@@ -739,6 +739,71 @@ export async function seedConfiguracoes(): Promise<void> {
   }
 }
 
+// Tons padrao do assistente de escrita ("varinha magica"). Semeados SE a tabela
+// estiver vazia (nao duplica em re-seed). A config singleton e criada sempre que
+// faltar.
+const ASSISTENTE_TONS_PADRAO: { nome: string; instrucao: string }[] = [
+  {
+    nome: "Corrigir",
+    instrucao:
+      "Corrija apenas ortografia, gramatica e pontuacao. NAO mude o tom nem reescreva o conteudo; mantenha o texto o mais fiel possivel ao original.",
+  },
+  {
+    nome: "Suavizar",
+    instrucao:
+      "Reescreva deixando o texto mais gentil, caloroso e acolhedor, sem perder objetividade nem informacoes.",
+  },
+  {
+    nome: "Profissional",
+    instrucao:
+      "Reescreva deixando o texto mais formal e profissional, claro, educado e organizado.",
+  },
+  {
+    nome: "Vendedor",
+    instrucao:
+      "Reescreva deixando o texto mais persuasivo e comercial: destaque beneficios e inclua uma chamada para acao natural, sem exagero e sem inventar informacao.",
+  },
+  {
+    nome: "Encurtar",
+    instrucao:
+      "Reescreva deixando o texto mais curto e direto, mantendo todas as informacoes essenciais.",
+  },
+];
+
+// Config singleton do assistente + tons padrao. Idempotente.
+export async function seedAssistenteEscrita(): Promise<void> {
+  try {
+    const config = await prisma.assistenteConfig.findFirst();
+    if (!config) {
+      await prisma.assistenteConfig.create({ data: {} });
+      console.log("[seed] config do assistente de escrita criada");
+    } else {
+      console.log("[seed] config do assistente de escrita ok");
+    }
+
+    const totalTons = await prisma.assistenteTom.count();
+    if (totalTons === 0) {
+      await prisma.assistenteTom.createMany({
+        data: ASSISTENTE_TONS_PADRAO.map((t, i) => ({
+          nome: t.nome,
+          instrucao: t.instrucao,
+          ordem: i + 1,
+          ativo: true,
+        })),
+      });
+      console.log(
+        `[seed] ${ASSISTENTE_TONS_PADRAO.length} tons do assistente criados`,
+      );
+    } else {
+      console.log("[seed] tons do assistente ok");
+    }
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear assistente de escrita: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill de acesso por papel (legado). Idempotente. Agentes editados pela
 // tela de Equipe passam a ter papel COLABORADOR/ADMIN e nao sao mais tocados.
 export async function backfillAcesso(): Promise<void> {
