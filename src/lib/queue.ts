@@ -929,6 +929,10 @@ async function processarEvento(
 
   const fromMe = data?.key?.fromMe === true;
   const pushName = data?.pushName;
+  // pushName so nomeia o lead em mensagens de ENTRADA. Em mensagens de SAIDA
+  // (fromMe), o WhatsApp envia "Voce"/nome da propria conta, que NAO e o nome
+  // do cliente — usa-lo renomearia o cliente para "Voce".
+  const pushNameCliente = fromMe ? undefined : (pushName ?? undefined);
   const telefone = normalizarJid(jid);
   if (!telefone) {
     console.warn(`[ingest] jid sem digitos ignorado: ${jid}`);
@@ -958,23 +962,26 @@ async function processarEvento(
     update: {},
     create: {
       telefone,
-      nome: pushName ?? undefined,
-      pushName: pushName ?? undefined,
+      // So nomeia a partir do pushName em mensagens de entrada (ver acima).
+      // Em saida, cria sem nome e cai no telefone via nomeEfetivo.
+      nome: pushNameCliente,
+      pushName: pushNameCliente,
       origem: "whatsapp",
     },
   });
-  // Mantem o pushName do WhatsApp sempre atualizado quando vier no payload.
-  if (pushName && lead.pushName !== pushName) {
+  // Mantem o pushName do WhatsApp atualizado — apenas em mensagens de ENTRADA.
+  if (pushNameCliente && lead.pushName !== pushNameCliente) {
     lead = await prisma.lead.update({
       where: { id: lead.id },
-      data: { pushName },
+      data: { pushName: pushNameCliente },
     });
   }
-  // Compat: se o nome legado ainda estava vazio, preenche com o pushName.
-  if (!lead.nome && pushName) {
+  // Compat: se o nome legado ainda estava vazio, preenche com o pushName de
+  // entrada. Nunca sobrescreve o nomeManual (override do atendente).
+  if (!lead.nome && pushNameCliente) {
     lead = await prisma.lead.update({
       where: { id: lead.id },
-      data: { nome: pushName },
+      data: { nome: pushNameCliente },
     });
   }
 
