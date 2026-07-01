@@ -194,6 +194,32 @@ body {
   animation: surgir-zoom 0.18s ease-out;
 }
 
+/* Animacao de entrada por rolagem (revelada via IntersectionObserver no
+   componente Reveal). Comeca deslocada/transparente; ao ganhar .revelar,
+   sobe e aparece. Respeita prefers-reduced-motion. */
+.revelavel {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.revelavel.revelar {
+  animation: revelar-entrada 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes revelar-entrada {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .revelavel {
+    opacity: 1;
+    transform: none;
+  }
+  .revelavel.revelar {
+    animation: none;
+  }
+}
+
 /* Foco visivel consistente para acessibilidade (teclado). */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-tiffany);
