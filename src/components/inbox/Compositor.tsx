@@ -14,6 +14,8 @@ import {
   Square,
   Trash2,
   Paperclip,
+  Wand2,
+  Undo2,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
@@ -88,6 +90,15 @@ export function Compositor({
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
+
+  // Varinha magica: reescreve o texto aplicando um tom (via IA). So aparece se
+  // houver tons ativos (assistente ligado no admin).
+  const [tons, setTons] = useState<{ id: string; nome: string; ordem: number }[]>(
+    [],
+  );
+  const [mostrarTons, setMostrarTons] = useState(false);
+  const [reescrevendo, setReescrevendo] = useState(false);
+  const [textoAnterior, setTextoAnterior] = useState<string | null>(null);
   // Modelo escolhido que pede variaveis digitadas (cupom etc.). redacao = a
   // redacao sorteada (texto principal ou uma variacao).
   const [modeloPendente, setModeloPendente] = useState<{
@@ -252,6 +263,56 @@ export function Compositor({
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/assistente/tons")
+      .then((r) => (r.ok ? r.json() : { tons: [] }))
+      .then((d) => setTons(d.tons ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  // Reescreve o texto atual com o tom escolhido. Guarda o texto antes (desfazer),
+  // mostra loading e degrada com mensagem amigavel se a API falhar.
+  async function reescrever(tomId: string) {
+    const valor = texto.trim();
+    if (!valor || reescrevendo) return;
+    setMostrarTons(false);
+    setReescrevendo(true);
+    setErro(null);
+    const anterior = texto;
+    try {
+      const r = await fetch("/api/assistente/reescrever", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: valor, tomId }),
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok && typeof d?.textoNovo === "string" && d.textoNovo.trim()) {
+        setTextoAnterior(anterior);
+        setTexto(d.textoNovo);
+        setTimeout(() => {
+          const el = ref.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(el.value.length, el.value.length);
+          }
+        }, 0);
+      } else {
+        setErro("Nao foi possivel reescrever agora.");
+      }
+    } catch {
+      setErro("Nao foi possivel reescrever agora.");
+    } finally {
+      setReescrevendo(false);
+    }
+  }
+
+  function desfazerReescrita() {
+    if (textoAnterior === null) return;
+    setTexto(textoAnterior);
+    setTextoAnterior(null);
+    setTimeout(() => ref.current?.focus(), 0);
+  }
+
   const q = busca.toLowerCase().trim();
   const filtradas = q
     ? respostas.filter(
@@ -264,6 +325,8 @@ export function Compositor({
 
   function aoMudar(v: string) {
     setTexto(v);
+    // Edicao manual descarta o "desfazer" da reescrita.
+    if (textoAnterior !== null) setTextoAnterior(null);
     if (v.startsWith("/")) {
       setMostrar(true);
       setBusca(v.slice(1));
@@ -342,6 +405,7 @@ export function Compositor({
         setErro("Falha ao enviar. Verifique a conexao com o WhatsApp.");
       }
       setTexto("");
+      setTextoAnterior(null);
       ref.current?.focus();
     } catch {
       setErro("Nao foi possivel enviar agora.");
@@ -370,6 +434,43 @@ export function Compositor({
   return (
     <div className="relative border-t border-black/5 bg-white p-3">
       {erro && <p className="mb-2 px-1 text-xs text-erro">{erro}</p>}
+
+      {textoAnterior !== null && !reescrevendo && (
+        <button
+          onClick={desfazerReescrita}
+          className="mb-2 flex items-center gap-1 px-1 text-xs font-medium text-tiffany transition-colors hover:underline"
+        >
+          <Undo2 className="h-3.5 w-3.5" /> Desfazer reescrita
+        </button>
+      )}
+
+      {mostrarTons && tons.length > 0 && (
+        <div className="absolute bottom-full right-3 z-10 mb-1 w-60 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
+              Reescrever com IA
+            </p>
+            <button
+              onClick={() => setMostrarTons(false)}
+              className="rounded p-0.5 text-medio/50 hover:bg-black/5"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="scroll-fino max-h-60 overflow-y-auto py-1">
+            {tons.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => void reescrever(t.id)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-escuro transition-colors hover:bg-fundo"
+              >
+                <Wand2 className="h-3.5 w-3.5 shrink-0 text-tiffany" />
+                {t.nome}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {mostrar && (
         <div className="absolute bottom-full left-3 right-3 mb-1 max-h-72 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg">
@@ -627,18 +728,41 @@ export function Compositor({
           placeholder='Escreva uma mensagem... ("/" para respostas rapidas)'
           className="scroll-fino max-h-60 min-h-[92px] flex-1 resize-none self-stretch rounded-lg border border-black/10 bg-fundo px-3 py-2.5 text-sm outline-none transition-colors focus:border-tiffany"
         />
-        <button
-          onClick={() => void enviar()}
-          disabled={enviando || !texto.trim()}
-          title="Enviar (Enter)"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-tiffany text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
-        >
-          {enviando ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Send className="h-5 w-5" />
+        {/* Coluna direita: varinha (reescrever) sobre o enviar. A varinha so
+            aparece quando ha tons ativos (assistente ligado no admin). */}
+        <div className="flex shrink-0 flex-col gap-1">
+          {tons.length > 0 && (
+            <button
+              onClick={() => setMostrarTons((v) => !v)}
+              disabled={!texto.trim() || reescrevendo}
+              title="Reescrever com IA"
+              aria-label="Reescrever com IA"
+              className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-colors disabled:opacity-40 ${
+                mostrarTons
+                  ? "border-tiffany bg-tiffany/10 text-tiffany"
+                  : "border-black/10 text-medio hover:bg-black/5"
+              }`}
+            >
+              {reescrevendo ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Wand2 className="h-5 w-5" />
+              )}
+            </button>
           )}
-        </button>
+          <button
+            onClick={() => void enviar()}
+            disabled={enviando || !texto.trim()}
+            title="Enviar (Enter)"
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-tiffany text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
+          >
+            {enviando ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </button>
+        </div>
           </>
         )}
       </div>
