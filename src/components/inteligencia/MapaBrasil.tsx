@@ -18,11 +18,13 @@ export function MapaBrasil({
   tooltip,
   ufAtivo,
   onHoverUF,
+  onClickUF,
 }: {
   cor: (uf: string) => string;
   tooltip: (uf: string) => React.ReactNode;
   ufAtivo: string | null;
   onHoverUF: (uf: string | null) => void;
+  onClickUF?: (uf: string) => void;
 }) {
   const [geos, setGeos] = useState<Geo[] | null>(null);
   const [erro, setErro] = useState(false);
@@ -119,6 +121,7 @@ export function MapaBrasil({
                 className="cursor-pointer transition-[opacity,stroke-width] duration-150"
                 style={{ opacity: ufAtivo && !ativo ? 0.72 : 1 }}
                 onMouseEnter={() => onHoverUF(g.sigla)}
+                onClick={() => onClickUF?.(g.sigla)}
               />
             );
           })}

@@ -19,9 +19,17 @@ import {
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
+import { useAgente } from "@/components/shell/AgenteContext";
+import { PainelNegocio } from "@/components/kanban/PainelNegocio";
+import type {
+  Etapa,
+  EtiquetaChip,
+  AgenteResumo,
+} from "@/components/kanban/tipos";
 import { MapaBrasil } from "./MapaBrasil";
 import { RankingEstados, type ItemRanking } from "./RankingEstados";
 import { DistribuicaoRegiao } from "./DistribuicaoRegiao";
+import { PainelClientesEstado } from "./PainelClientesEstado";
 import { Reveal } from "./Reveal";
 import {
   CATEGORIAS,
@@ -56,7 +64,36 @@ export function InteligenciaRegional() {
   const [agora, setAgora] = useState(() => Date.now());
   const [cooldownAte, setCooldownAte] = useState(0);
 
+  // Clique no estado -> drawer de clientes; item do drawer -> painel do negocio.
+  const [ufClientes, setUfClientes] = useState<string | null>(null);
+  const [negocioId, setNegocioId] = useState<string | null>(null);
+
+  const agente = useAgente();
+  const papel = agente?.papel ?? "COLABORADOR";
+  const agenteId = agente?.id ?? "";
+  const [etapas, setEtapas] = useState<Etapa[]>([]);
+  const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
+  const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
+
   const ehClima = categoria === "CLIMATIZADOR";
+
+  // Datasets para o PainelNegocio (reuso do Kanban), carregados uma vez.
+  useEffect(() => {
+    fetch("/api/etapas")
+      .then((r) => (r.ok ? r.json() : { etapas: [] }))
+      .then((d) => setEtapas(d.etapas ?? []))
+      .catch(() => undefined);
+    fetch("/api/etiquetas")
+      .then((r) => (r.ok ? r.json() : { etiquetas: [] }))
+      .then((d) => setEtiquetas(d.etiquetas ?? []))
+      .catch(() => undefined);
+    if (papel === "ADMIN") {
+      fetch("/api/agentes")
+        .then((r) => (r.ok ? r.json() : { agentes: [] }))
+        .then((d) => setAgentes(d.agentes ?? []))
+        .catch(() => undefined);
+    }
+  }, [papel]);
 
   // Relogio leve p/ "atualizado ha X min".
   useEffect(() => {
@@ -492,6 +529,7 @@ export function InteligenciaRegional() {
                   tooltip={tooltip}
                   ufAtivo={ufAtivo}
                   onHoverUF={setUfAtivo}
+                  onClickUF={setUfClientes}
                 />
               )}
               <Legenda
@@ -499,6 +537,9 @@ export function InteligenciaRegional() {
                 maxDensidade={maxDensidade}
                 metricaBase={metricaBase}
               />
+              <p className="mt-2 text-center text-[11px] text-medio/50">
+                Clique num estado para ver os clientes de la.
+              </p>
             </div>
           </Reveal>
 
@@ -585,6 +626,29 @@ export function InteligenciaRegional() {
           Camada de densidade de clientes/vendas (dado interno real). Sem
           previsao de vendas: ela chega quando houver historico suficiente.
         </p>
+      )}
+
+      {/* Drawer de clientes do estado (clique no mapa) */}
+      {ufClientes && (
+        <PainelClientesEstado
+          uf={ufClientes}
+          onFechar={() => setUfClientes(null)}
+          onAbrirNegocio={(id) => setNegocioId(id)}
+        />
+      )}
+
+      {/* Painel do negocio (reuso do Kanban) — abre por cima do drawer */}
+      {negocioId && (
+        <PainelNegocio
+          negocioId={negocioId}
+          papel={papel}
+          agenteIdAtual={agenteId}
+          agentes={agentes}
+          etiquetas={etiquetas}
+          etapas={etapas}
+          onFechar={() => setNegocioId(null)}
+          onAtualizado={() => undefined}
+        />
       )}
     </div>
   );
