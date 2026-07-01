@@ -924,8 +924,20 @@ async function processarEvento(
     return;
   }
 
-  // Ignora mensagens de grupo.
-  if (jid.endsWith("@g.us")) return;
+  // Ignora "leads fantasma": remetentes que nao sao clientes de fato.
+  //   @g.us      -> grupos
+  //   @broadcast -> listas de transmissao (e status@broadcast: status/stories)
+  //   @newsletter-> canais/newsletters
+  // Clientes normais (@s.whatsapp.net) e numeros mascarados (@lid) seguem o
+  // fluxo normal. Anuncios (Click-to-WhatsApp) chegam por @s.whatsapp.net e
+  // continuam entrando.
+  if (
+    jid.endsWith("@g.us") ||
+    jid.endsWith("@broadcast") ||
+    jid.endsWith("@newsletter")
+  ) {
+    return;
+  }
 
   const fromMe = data?.key?.fromMe === true;
   const pushName = data?.pushName;
