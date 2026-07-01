@@ -798,3 +798,17 @@ model AssistenteConfig {
   ativo        Boolean  @default(true)
   atualizadoEm DateTime @updatedAt
 }
+
+// Cache persistente do clima por UF/periodo (Inteligencia Regional). Cada linha
+// guarda a ULTIMA leitura BOA da Open-Meteo para (uf, dias). Falha de fetch nunca
+// sobrescreve: preservamos o ultimo bom (o refresh so troca em caso de sucesso).
+// Ver GET /api/inteligencia/clima.
+model ClimaCacheUF {
+  id           String   @id @default(cuid())
+  uf           String
+  dias         Int
+  dados        Json
+  atualizadoEm DateTime @default(now())
+
+  @@unique([uf, dias])
+}

@@ -29,12 +29,34 @@ export type ClimaUF = {
   umidadeMax: number | null;
   indiceOportunidade: number | null;
   erro: boolean;
+  // Cache persistente por UF: quando foi atualizado e se passou de 3h (stale).
+  atualizadoEm: string | null;
+  stale: boolean;
 };
 export type ClimaResp = {
   dias: number;
-  atualizadoEm: string;
+  atualizadoEm: string | null;
   fonte: string;
   porUF: ClimaUF[];
+};
+
+// Cliente na lista por estado (GET /api/inteligencia/clientes?uf=XX).
+export type ClienteEstado = {
+  leadId: string;
+  nome: string;
+  telefone: string;
+  temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
+  status: "ABERTO" | "GANHO" | "PERDIDO" | "PENDENTE" | null;
+  valorAberto: number;
+  ultimoContato: string | null;
+  negocioId: string | null;
+  conversaId: string | null;
+};
+export type ClientesEstadoResp = {
+  uf: string;
+  estado: string;
+  total: number;
+  clientes: ClienteEstado[];
 };
 
 export type Categoria = "CLIMATIZADOR" | "SPINNING" | "ASPIRADOR";
