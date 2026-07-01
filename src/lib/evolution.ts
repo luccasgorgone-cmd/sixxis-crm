@@ -7,7 +7,7 @@ type ResultadoEnvio = {
   raw: unknown;
 };
 
-function baseEKey(): { base: string; apikey: string } | null {
+export function baseEKey(): { base: string; apikey: string } | null {
   const base = process.env.EVOLUTION_BASE_URL;
   const apikey = process.env.EVOLUTION_API_KEY;
   if (!base || !apikey) return null;

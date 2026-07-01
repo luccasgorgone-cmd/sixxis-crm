@@ -924,6 +924,18 @@ async function processarEvento(
     return;
   }
 
+  // DIAGNOSTICO (temporario, Fatia 2.37 Parte A — REMOVER na Parte C): quando o
+  // remetente e um @lid (numero mascarado por privacidade), loga a key crua e o
+  // pushName para descobrirmos como mapear @lid -> telefone real via Evolution.
+  if (jid.endsWith("@lid")) {
+    console.log(
+      "[LID-DIAG]",
+      JSON.stringify(data?.key ?? {}),
+      "pushName=",
+      data?.pushName,
+    );
+  }
+
   // Ignora "leads fantasma": remetentes que nao sao clientes de fato.
   //   @g.us      -> grupos
   //   @broadcast -> listas de transmissao (e status@broadcast: status/stories)
