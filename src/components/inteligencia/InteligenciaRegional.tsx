@@ -12,6 +12,9 @@ import {
   Users,
   Info,
   Sparkles,
+  Clock,
+  Trophy,
+  CloudOff,
 } from "lucide-react";
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
@@ -51,6 +54,7 @@ export function InteligenciaRegional() {
   const [erroClima, setErroClima] = useState(false);
   const [ufAtivo, setUfAtivo] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
+  const [cooldownAte, setCooldownAte] = useState(0);
 
   const ehClima = categoria === "CLIMATIZADOR";
 
@@ -59,6 +63,13 @@ export function InteligenciaRegional() {
     const t = setInterval(() => setAgora(Date.now()), 60_000);
     return () => clearInterval(t);
   }, []);
+
+  // Re-habilita o botao exatamente quando o cooldown termina (sem ticker de 1s).
+  useEffect(() => {
+    if (cooldownAte <= Date.now()) return;
+    const t = setTimeout(() => setAgora(Date.now()), cooldownAte - Date.now() + 50);
+    return () => clearTimeout(t);
+  }, [cooldownAte]);
 
   const carregarRegioes = useCallback(async () => {
     setCarregandoReg(true);
@@ -181,6 +192,17 @@ export function InteligenciaRegional() {
                     {c.indiceOportunidade ?? "—"}
                   </span>
                 </div>
+                {c.atualizadoEm && (
+                  <p className="flex items-center gap-1 pt-0.5 text-[11px] text-medio/50">
+                    <Clock className="h-3 w-3" />
+                    atualizado {fmtDesde(c.atualizadoEm, agora)}
+                    {c.stale && (
+                      <span className="font-medium text-amber-600 dark:text-amber-400">
+                        · desatualizado
+                      </span>
+                    )}
+                  </p>
+                )}
               </>
             )}
             <Linha rotulo="Seus clientes" valor={String(clientes)} />
@@ -198,7 +220,7 @@ export function InteligenciaRegional() {
         </div>
       );
     },
-    [ehClima, climaUtil, climaPorUF, regPorUF, dias],
+    [ehClima, climaUtil, climaPorUF, regPorUF, dias, agora],
   );
 
   // Ranking (top 10) pela metrica ativa.
@@ -235,6 +257,18 @@ export function InteligenciaRegional() {
     [regioes, metricaBase],
   );
 
+  // Vendas ainda escassas: em Vendas, com 0-1 estado com venda, o mapa fica so
+  // cinza. Nesse caso mostramos um aviso limpo (e destacamos a unica venda).
+  const estadosComVenda = useMemo(
+    () => (regioes?.porUF ?? []).filter((r) => r.vendas > 0),
+    [regioes],
+  );
+  const vendasQuaseVazio =
+    !ehClima &&
+    metricaBase === "vendas" &&
+    !!regioes &&
+    estadosComVenda.length <= 1;
+
   // Melhores oportunidades (climatizador): top indice x presenca de clientes.
   const oportunidades = useMemo(() => {
     if (!(ehClima && climaUtil)) return [];
@@ -256,11 +290,15 @@ export function InteligenciaRegional() {
       ? Math.max(0, Math.round((agora - new Date(clima.atualizadoEm).getTime()) / 60000))
       : null;
 
-  const atualizar = () => {
-    if (ehClima) void carregarClima(dias, true);
-    else void carregarRegioes();
-  };
   const atualizando = ehClima ? carregandoClima : carregandoReg;
+  const emCooldown = agora < cooldownAte;
+  const atualizar = async () => {
+    if (atualizando || emCooldown) return;
+    if (ehClima) await carregarClima(dias, true);
+    else await carregarRegioes();
+    // Debounce: bloqueia novos refresh por ~60s (evita rajada na Open-Meteo).
+    setCooldownAte(Date.now() + 60_000);
+  };
 
   const rotuloMetrica = ehClima
     ? "Indice de oportunidade (clima)"
@@ -336,16 +374,23 @@ export function InteligenciaRegional() {
           )}
 
           <button
-            onClick={atualizar}
-            disabled={atualizando}
-            className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-60"
+            onClick={() => void atualizar()}
+            disabled={atualizando || emCooldown}
+            title={
+              atualizando
+                ? "Atualizando..."
+                : emCooldown
+                  ? "Atualizado agora — aguarde para atualizar de novo"
+                  : "Buscar dados mais recentes"
+            }
+            className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-black/10 disabled:hover:text-medio"
           >
             {atualizando ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
-            Atualizar
+            {emCooldown && !atualizando ? "Atualizado" : "Atualizar"}
           </button>
         </div>
       </div>
@@ -369,9 +414,10 @@ export function InteligenciaRegional() {
 
       {/* Aviso de degradacao do clima */}
       {ehClima && !climaUtil && !carregandoClima && (
-        <div className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-          Nao foi possivel carregar o clima agora. Mostrando a presenca de
-          clientes por estado; tente novamente em instantes.
+        <div className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+          <CloudOff className="h-4 w-4 shrink-0" />
+          Clima indisponivel no momento — mostrando densidade de clientes por
+          estado. Tente novamente em instantes.
         </div>
       )}
 
@@ -380,6 +426,49 @@ export function InteligenciaRegional() {
           mensagem="Nao foi possivel carregar os dados regionais."
           onRetry={() => void carregarRegioes()}
         />
+      ) : vendasQuaseVazio ? (
+        <Reveal>
+          <div className="rounded-xl border border-black/5 bg-white p-6">
+            <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tiffany/10">
+                <Trophy className="h-6 w-6 text-tiffany" />
+              </div>
+              <p className="text-sm font-medium text-escuro">
+                Ainda ha poucas vendas registradas
+              </p>
+              <p className="max-w-sm text-xs text-medio/60">
+                Conforme os negocios forem marcados como Ganho, o mapa de calor
+                de vendas ganha densidade. Enquanto isso, veja a densidade de
+                clientes na aba correspondente.
+              </p>
+              {estadosComVenda.length === 1 && (
+                <div className="mt-1 w-full max-w-xs rounded-lg border border-black/5 bg-fundo p-3 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-escuro">
+                      {estadoDe(estadosComVenda[0].uf, estadosComVenda[0])}{" "}
+                      <span className="text-medio/60">
+                        ({estadosComVenda[0].uf})
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-sucesso/10 px-2 py-0.5 text-xs font-semibold text-sucesso">
+                      {estadosComVenda[0].vendas}{" "}
+                      {estadosComVenda[0].vendas === 1 ? "venda" : "vendas"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-medio/60">
+                    Faturamento: {formatarBRL(estadosComVenda[0].faturamento)}
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={() => setMetricaBase("clientes")}
+                className="mt-1 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro"
+              >
+                Ver densidade de clientes
+              </button>
+            </div>
+          </div>
+        </Reveal>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Mapa + legenda */}
@@ -510,6 +599,16 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
       <span className="font-medium text-escuro">{valor}</span>
     </div>
   );
+}
+
+// "há X min" / "há X h" / "há X d" a partir de um ISO e do relogio atual.
+function fmtDesde(iso: string, agora: number): string {
+  const min = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 60000));
+  if (min < 1) return "agora";
+  if (min < 60) return `ha ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `ha ${h} h`;
+  return `ha ${Math.round(h / 24)} d`;
 }
 
 function fmtTemp(v: number | null): string {
