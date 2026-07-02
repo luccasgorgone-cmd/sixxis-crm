@@ -384,11 +384,9 @@ export function InteligenciaRegional() {
       {/* Cabecalho + filtros */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-escuro">
-            Inteligencia Regional
-          </h2>
+          <h2 className="text-lg font-semibold text-escuro">Clima</h2>
           <p className="text-sm text-medio/60">
-            Onde estao seus clientes e onde ha mais oportunidade agora
+            Onde o clima favorece a venda de climatizador agora
           </p>
         </div>
 

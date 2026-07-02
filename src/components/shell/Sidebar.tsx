@@ -14,7 +14,7 @@ import {
   Briefcase,
   Contact,
   CalendarDays,
-  Map as MapIcon,
+  CloudSun,
   MapPin,
   Shield,
   type LucideIcon,
@@ -73,7 +73,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Clientes", href: "/clientes", icone: Contact },
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
-    { rotulo: "Inteligencia", href: "/inteligencia", icone: MapIcon },
+    { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
