@@ -25,6 +25,7 @@ import {
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
+import { LegendaGradiente } from "@/components/ui/LegendaGradiente";
 import { useAgente } from "@/components/shell/AgenteContext";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import type {
@@ -43,6 +44,7 @@ import {
   COR_SEM_DADO,
   FILTROS_VAZIO,
   corEscala,
+  gradienteCss,
   algumFiltroAtivo,
   combinaFiltros,
   type ClimaResp,
@@ -79,8 +81,11 @@ const TRENDS = [
   },
 ] as const;
 
+// Janelas de previsao suportadas (16 = teto de forecast diario da Open-Meteo).
+type Dias = 3 | 7 | 14 | 16;
+
 export function InteligenciaRegional() {
-  const [dias, setDias] = useState<7 | 14>(7);
+  const [dias, setDias] = useState<Dias>(7);
 
   const [regioes, setRegioes] = useState<RegioesResp | null>(null);
   const [clima, setClima] = useState<ClimaResp | null>(null);
@@ -150,7 +155,7 @@ export function InteligenciaRegional() {
   }, []);
 
   const carregarClima = useCallback(
-    async (d: 7 | 14, refresh = false) => {
+    async (d: Dias, refresh = false) => {
       setCarregandoClima(true);
       try {
         const r = await fetch(
@@ -347,6 +352,15 @@ export function InteligenciaRegional() {
       }));
   }, [climaUtil, clima, regPorUF]);
 
+  // Min/max do indice (para os rotulos das pontas da legenda).
+  const faixaIndice = useMemo(() => {
+    const vals = (clima?.porUF ?? [])
+      .filter((c) => !c.erro && c.indiceOportunidade != null)
+      .map((c) => c.indiceOportunidade as number);
+    if (!vals.length) return { min: 0, max: 100 };
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  }, [clima]);
+
   const minAtualizado =
     clima?.atualizadoEm != null
       ? Math.max(0, Math.round((agora - new Date(clima.atualizadoEm).getTime()) / 60000))
@@ -377,7 +391,7 @@ export function InteligenciaRegional() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Periodo do clima */}
           <div className="flex overflow-hidden rounded-lg border border-black/10">
-            {([7, 14] as const).map((d) => (
+            {([3, 7, 14, 16] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setDias(d)}
@@ -475,7 +489,23 @@ export function InteligenciaRegional() {
                   dimUF={filtrosLigados ? dimUF : undefined}
                 />
               )}
-              <Legenda clima={climaUtil} maxDensidade={maxDensidade} />
+              {climaUtil ? (
+                <LegendaGradiente
+                  rotulo="Indice de oportunidade Sixxis (calor + seco + sem chuva) — nao meteorologico"
+                  gradiente={gradienteCss(ESCALA_INDICE)}
+                  min={String(faixaIndice.min)}
+                  max={String(faixaIndice.max)}
+                  icone={<ThermometerSun className="h-3.5 w-3.5" />}
+                />
+              ) : (
+                <LegendaGradiente
+                  rotulo="Densidade de clientes (dado interno)"
+                  gradiente={gradienteCss(ESCALA_DENSIDADE)}
+                  min="0"
+                  max={`${maxDensidade} clientes`}
+                  icone={<Users className="h-3.5 w-3.5" />}
+                />
+              )}
               <p className="mt-2 text-center text-[11px] text-medio/50">
                 Clique num estado para ver os clientes de la.
               </p>
@@ -687,6 +717,29 @@ function BarraFiltros({
         ativos={filtros.chuva}
         onToggle={(v) => alternar("chuva", v as FiltrosClima["chuva"][number])}
       />
+      <GrupoFiltro
+        titulo="Sensacao"
+        opcoes={[
+          { v: "alta", r: "Alta >32" },
+          { v: "media", r: "Média 24-32" },
+          { v: "baixa", r: "Baixa <24" },
+        ]}
+        ativos={filtros.sensacao}
+        onToggle={(v) =>
+          alternar("sensacao", v as FiltrosClima["sensacao"][number])
+        }
+      />
+      <GrupoFiltro
+        titulo="Indice Sixxis"
+        dica="Indice proprietario da Sixxis (calor + seco + sem chuva), nao meteorologico oficial."
+        opcoes={[
+          { v: "alto", r: "Alto ≥70" },
+          { v: "medio", r: "Médio 40-69" },
+          { v: "baixo", r: "Baixo <40" },
+        ]}
+        ativos={filtros.indice}
+        onToggle={(v) => alternar("indice", v as FiltrosClima["indice"][number])}
+      />
 
       {algum && (
         <button
@@ -706,15 +759,22 @@ function GrupoFiltro({
   opcoes,
   ativos,
   onToggle,
+  dica,
 }: {
   titulo: string;
   opcoes: { v: string; r: string }[];
   ativos: string[];
   onToggle: (v: string) => void;
+  dica?: string;
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-medio/50">
+      <span
+        title={dica}
+        className={`text-[11px] uppercase tracking-wide text-medio/50 ${
+          dica ? "cursor-help underline decoration-dotted underline-offset-2" : ""
+        }`}
+      >
         {titulo}
       </span>
       <div className="flex flex-wrap gap-1">
@@ -766,30 +826,3 @@ function fmtPct(v: number | null): string {
   return v == null ? "—" : `${Math.round(v)}%`;
 }
 
-function Legenda({
-  clima,
-  maxDensidade,
-}: {
-  clima: boolean;
-  maxDensidade: number;
-}) {
-  const grad = clima
-    ? "linear-gradient(90deg,#5b7a76 0%,#3cbfb3 35%,#f59e0b 65%,#dc2626 100%)"
-    : "linear-gradient(90deg,#e2f4f1 0%,#3cbfb3 50%,#12433d 100%)";
-  return (
-    <div className="mt-3 flex items-center gap-3">
-      <div className="flex items-center gap-1.5 text-xs text-medio/60">
-        {clima ? <ThermometerSun className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
-        {clima ? "Menor" : "0"}
-      </div>
-      <div
-        className="h-2.5 flex-1 rounded-full"
-        style={{ background: grad }}
-        aria-hidden
-      />
-      <div className="text-xs text-medio/60">
-        {clima ? "Maior oportunidade" : `${maxDensidade} clientes`}
-      </div>
-    </div>
-  );
-}

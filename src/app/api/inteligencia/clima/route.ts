@@ -31,7 +31,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const sp = req.nextUrl.searchParams;
   const diasParam = Number(sp.get("dias"));
-  const dias = diasParam === 14 ? 14 : 7; // apenas {7,14}, default 7
+  // Janelas suportadas: {3,7,14,16}. 16 e o teto de forecast diario da Open-Meteo;
+  // valor invalido degrada para 7 (default).
+  const dias = [3, 7, 14, 16].includes(diasParam) ? diasParam : 7;
   const refresh = sp.get("refresh") === "1";
   const agora = Date.now();
 

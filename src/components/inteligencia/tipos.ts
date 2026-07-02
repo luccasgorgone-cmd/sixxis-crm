@@ -128,6 +128,13 @@ export const ESCALA_DENSIDADE: [number, string][] = [
 // Cinza neutro para UF sem dado (usa currentColor-independent; funciona nos 2 temas).
 export const COR_SEM_DADO = "#c2ccca";
 
+// CSS linear-gradient (horizontal) a partir dos stops de uma escala. Usado pela
+// LegendaGradiente para bater exatamente com as cores do mapa.
+export function gradienteCss(stops: [number, string][]): string {
+  const partes = stops.map(([t, c]) => `${c} ${Math.round(t * 100)}%`);
+  return `linear-gradient(90deg,${partes.join(",")})`;
+}
+
 export const NOME_REGIAO_ORDEM = [
   "Norte",
   "Nordeste",
@@ -141,12 +148,22 @@ export const NOME_REGIAO_ORDEM = [
 export type FaixaTemp = "alta" | "media" | "baixa";
 export type FaixaUmid = "alta" | "media" | "baixa";
 export type FaixaChuva = "com" | "sem";
+export type FaixaSensacao = "alta" | "media" | "baixa";
+export type FaixaIndice = "alto" | "medio" | "baixo";
 export type FiltrosClima = {
   temp: FaixaTemp[];
   umidade: FaixaUmid[];
   chuva: FaixaChuva[];
+  sensacao: FaixaSensacao[];
+  indice: FaixaIndice[];
 };
-export const FILTROS_VAZIO: FiltrosClima = { temp: [], umidade: [], chuva: [] };
+export const FILTROS_VAZIO: FiltrosClima = {
+  temp: [],
+  umidade: [],
+  chuva: [],
+  sensacao: [],
+  indice: [],
+};
 
 // Faixa de cada dimensao (null = sem dado). Temp sobre tempMax; umidade sobre a
 // umidade atual; chuva sobre a chuva prevista do periodo.
@@ -166,9 +183,34 @@ export function faixaDeChuva(chuvaPrevista: number | null): FaixaChuva | null {
   if (chuvaPrevista == null) return null;
   return chuvaPrevista > 0 ? "com" : "sem";
 }
+// Sensacao termica: usa `sensacao`; se null, cai para tempMax (aproximacao).
+export function faixaDeSensacao(
+  sensacao: number | null,
+  tempMax: number | null,
+): FaixaSensacao | null {
+  const v = sensacao ?? tempMax;
+  if (v == null) return null;
+  if (v > 32) return "alta";
+  if (v >= 24) return "media";
+  return "baixa";
+}
+// Indice de oportunidade PROPRIETARIO da Sixxis (calor + seco + sem chuva).
+export function faixaDeIndice(indice: number | null): FaixaIndice | null {
+  if (indice == null) return null;
+  if (indice >= 70) return "alto";
+  if (indice >= 40) return "medio";
+  return "baixo";
+}
 
 export function algumFiltroAtivo(f: FiltrosClima): boolean {
-  return f.temp.length + f.umidade.length + f.chuva.length > 0;
+  return (
+    f.temp.length +
+      f.umidade.length +
+      f.chuva.length +
+      f.sensacao.length +
+      f.indice.length >
+    0
+  );
 }
 
 // AND entre grupos ativos, OR dentro do grupo. UF sem dado na dimensao ativa
@@ -185,6 +227,14 @@ export function combinaFiltros(c: ClimaUF, f: FiltrosClima): boolean {
   if (f.chuva.length) {
     const ch = faixaDeChuva(c.chuvaPrevista);
     if (!ch || !f.chuva.includes(ch)) return false;
+  }
+  if (f.sensacao.length) {
+    const s = faixaDeSensacao(c.sensacao, c.tempMax);
+    if (!s || !f.sensacao.includes(s)) return false;
+  }
+  if (f.indice.length) {
+    const i = faixaDeIndice(c.indiceOportunidade);
+    if (!i || !f.indice.includes(i)) return false;
   }
   return true;
 }
