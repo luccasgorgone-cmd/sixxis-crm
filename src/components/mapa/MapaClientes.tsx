@@ -302,6 +302,14 @@ export function MapaClientes() {
         )}
       </div>
 
+      {/* Estado vazio honesto: escopo/filtros sem nenhum cliente. */}
+      {dados && t && t.clientes === 0 && !carregando && (
+        <p className="flex items-center gap-1.5 text-xs text-medio/50">
+          <Info className="h-3 w-3" />
+          Nenhum cliente no escopo/filtros atuais.
+        </p>
+      )}
+
       {erro && !dados ? (
         <EstadoErro
           mensagem="Nao foi possivel carregar o mapa."

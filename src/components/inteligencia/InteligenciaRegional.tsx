@@ -479,6 +479,14 @@ export function InteligenciaRegional() {
         />
       )}
 
+      {/* Estado vazio honesto: escopo sem nenhum cliente (mesmo padrao do Mapa). */}
+      {regioes && regioes.total.clientes === 0 && !carregandoReg && (
+        <p className="flex items-center gap-1.5 text-xs text-medio/50">
+          <Info className="h-3 w-3" />
+          Nenhum cliente no seu escopo atual — o mapa mostra so o clima.
+        </p>
+      )}
+
       {erroReg && !regioes ? (
         <EstadoErro
           mensagem="Nao foi possivel carregar os dados regionais."
