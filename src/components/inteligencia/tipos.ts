@@ -124,3 +124,56 @@ export const NOME_REGIAO_ORDEM = [
   "Sudeste",
   "Sul",
 ];
+
+// ---- Filtros de faixa (modo Climatizador) ----
+// Multi-select por dimensao; recolorem/atenuam o mapa (dim nos que nao batem).
+export type FaixaTemp = "alta" | "media" | "baixa";
+export type FaixaUmid = "alta" | "media" | "baixa";
+export type FaixaChuva = "com" | "sem";
+export type FiltrosClima = {
+  temp: FaixaTemp[];
+  umidade: FaixaUmid[];
+  chuva: FaixaChuva[];
+};
+export const FILTROS_VAZIO: FiltrosClima = { temp: [], umidade: [], chuva: [] };
+
+// Faixa de cada dimensao (null = sem dado). Temp sobre tempMax; umidade sobre a
+// umidade atual; chuva sobre a chuva prevista do periodo.
+export function faixaDeTemp(tempMax: number | null): FaixaTemp | null {
+  if (tempMax == null) return null;
+  if (tempMax > 30) return "alta";
+  if (tempMax >= 22) return "media";
+  return "baixa";
+}
+export function faixaDeUmid(umidade: number | null): FaixaUmid | null {
+  if (umidade == null) return null;
+  if (umidade > 70) return "alta";
+  if (umidade >= 40) return "media";
+  return "baixa";
+}
+export function faixaDeChuva(chuvaPrevista: number | null): FaixaChuva | null {
+  if (chuvaPrevista == null) return null;
+  return chuvaPrevista > 0 ? "com" : "sem";
+}
+
+export function algumFiltroAtivo(f: FiltrosClima): boolean {
+  return f.temp.length + f.umidade.length + f.chuva.length > 0;
+}
+
+// AND entre grupos ativos, OR dentro do grupo. UF sem dado na dimensao ativa
+// nao bate. Retorna true quando nao ha filtro ativo naquele grupo.
+export function combinaFiltros(c: ClimaUF, f: FiltrosClima): boolean {
+  if (f.temp.length) {
+    const t = faixaDeTemp(c.tempMax);
+    if (!t || !f.temp.includes(t)) return false;
+  }
+  if (f.umidade.length) {
+    const u = faixaDeUmid(c.umidade);
+    if (!u || !f.umidade.includes(u)) return false;
+  }
+  if (f.chuva.length) {
+    const ch = faixaDeChuva(c.chuvaPrevista);
+    if (!ch || !f.chuva.includes(ch)) return false;
+  }
+  return true;
+}

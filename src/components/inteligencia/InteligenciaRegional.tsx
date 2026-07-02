@@ -15,6 +15,8 @@ import {
   Clock,
   Trophy,
   CloudOff,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
@@ -36,10 +38,14 @@ import {
   ESCALA_DENSIDADE,
   ESCALA_INDICE,
   COR_SEM_DADO,
+  FILTROS_VAZIO,
   corEscala,
+  algumFiltroAtivo,
+  combinaFiltros,
   type Categoria,
   type ClimaResp,
   type ClimaUF,
+  type FiltrosClima,
   type MetricaBase,
   type RegioesResp,
   type RegiaoUF,
@@ -63,6 +69,7 @@ export function InteligenciaRegional() {
   const [ufAtivo, setUfAtivo] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
   const [cooldownAte, setCooldownAte] = useState(0);
+  const [filtros, setFiltros] = useState<FiltrosClima>(FILTROS_VAZIO);
 
   // Clique no estado -> drawer de clientes; item do drawer -> painel do negocio.
   const [ufClientes, setUfClientes] = useState<string | null>(null);
@@ -185,6 +192,18 @@ export function InteligenciaRegional() {
   // Em Climatizador sem clima -> degrada para densidade de clientes + aviso.
   const modoDensidade = !ehClima || !climaUtil;
 
+  // Filtros de faixa: so no modo clima util. UF sem dado nao bate filtro ativo.
+  const filtrosLigados = ehClima && climaUtil && algumFiltroAtivo(filtros);
+  const dimUF = useCallback(
+    (uf: string): boolean => {
+      if (!filtrosLigados) return false;
+      const c = climaPorUF.get(uf);
+      if (!c || c.erro) return true;
+      return !combinaFiltros(c, filtros);
+    },
+    [filtrosLigados, climaPorUF, filtros],
+  );
+
   const corPorUF = useCallback(
     (uf: string): string => {
       if (!modoDensidade) {
@@ -217,7 +236,10 @@ export function InteligenciaRegional() {
             ) : (
               <>
                 <Linha rotulo="Temp. atual" valor={fmtTemp(c.tempAtual)} />
-                <Linha rotulo="Maxima prevista" valor={fmtTemp(c.tempMax)} />
+                <Linha
+                  rotulo="Máx / mín"
+                  valor={`${fmtTemp(c.tempMax)} / ${fmtTemp(c.tempMin)}`}
+                />
                 <Linha rotulo="Umidade" valor={fmtPct(c.umidade)} />
                 <Linha
                   rotulo={`Chuva (${dias}d)`}
@@ -458,6 +480,11 @@ export function InteligenciaRegional() {
         </div>
       )}
 
+      {/* Filtros de faixa (climatizador): recolorem/atenuam o mapa */}
+      {ehClima && climaUtil && (
+        <BarraFiltros filtros={filtros} onChange={setFiltros} />
+      )}
+
       {erroReg && !regioes ? (
         <EstadoErro
           mensagem="Nao foi possivel carregar os dados regionais."
@@ -530,6 +557,7 @@ export function InteligenciaRegional() {
                   ufAtivo={ufAtivo}
                   onHoverUF={setUfAtivo}
                   onClickUF={setUfClientes}
+                  dimUF={filtrosLigados ? dimUF : undefined}
                 />
               )}
               <Legenda
@@ -655,6 +683,117 @@ export function InteligenciaRegional() {
 }
 
 // ---- auxiliares de UI ----
+
+// Barra de filtros de faixa (multi-select) para o modo Climatizador. Cada chip
+// alterna uma faixa; grupos ativos combinam em AND (dentro do grupo, OR).
+function BarraFiltros({
+  filtros,
+  onChange,
+}: {
+  filtros: FiltrosClima;
+  onChange: (f: FiltrosClima) => void;
+}) {
+  const algum = algumFiltroAtivo(filtros);
+
+  function alternar<K extends keyof FiltrosClima>(
+    grupo: K,
+    valor: FiltrosClima[K][number],
+  ) {
+    const atual = filtros[grupo] as string[];
+    const proximo = atual.includes(valor as string)
+      ? atual.filter((v) => v !== valor)
+      : [...atual, valor as string];
+    onChange({ ...filtros, [grupo]: proximo });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-black/5 bg-white px-3 py-2">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-medio/70">
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        Filtrar mapa
+      </span>
+
+      <GrupoFiltro
+        titulo="Temperatura"
+        opcoes={[
+          { v: "alta", r: "Alta >30" },
+          { v: "media", r: "Média 22-30" },
+          { v: "baixa", r: "Baixa <22" },
+        ]}
+        ativos={filtros.temp}
+        onToggle={(v) => alternar("temp", v as FiltrosClima["temp"][number])}
+      />
+      <GrupoFiltro
+        titulo="Umidade"
+        opcoes={[
+          { v: "alta", r: "Alta >70" },
+          { v: "media", r: "Média 40-70" },
+          { v: "baixa", r: "Baixa <40" },
+        ]}
+        ativos={filtros.umidade}
+        onToggle={(v) => alternar("umidade", v as FiltrosClima["umidade"][number])}
+      />
+      <GrupoFiltro
+        titulo="Chuva"
+        opcoes={[
+          { v: "com", r: "Com chuva" },
+          { v: "sem", r: "Sem chuva" },
+        ]}
+        ativos={filtros.chuva}
+        onToggle={(v) => alternar("chuva", v as FiltrosClima["chuva"][number])}
+      />
+
+      {algum && (
+        <button
+          onClick={() => onChange(FILTROS_VAZIO)}
+          className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro"
+        >
+          <X className="h-3.5 w-3.5" />
+          Limpar filtros
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GrupoFiltro({
+  titulo,
+  opcoes,
+  ativos,
+  onToggle,
+}: {
+  titulo: string;
+  opcoes: { v: string; r: string }[];
+  ativos: string[];
+  onToggle: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-medio/50">
+        {titulo}
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {opcoes.map((o) => {
+          const on = ativos.includes(o.v);
+          return (
+            <button
+              key={o.v}
+              onClick={() => onToggle(o.v)}
+              aria-pressed={on}
+              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
+                on
+                  ? "border-tiffany bg-tiffany text-white"
+                  : "border-black/10 bg-white text-medio hover:border-tiffany hover:text-tiffany"
+              }`}
+            >
+              {o.r}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (

@@ -19,12 +19,15 @@ export function MapaBrasil({
   ufAtivo,
   onHoverUF,
   onClickUF,
+  dimUF,
 }: {
   cor: (uf: string) => string;
   tooltip: (uf: string) => React.ReactNode;
   ufAtivo: string | null;
   onHoverUF: (uf: string | null) => void;
   onClickUF?: (uf: string) => void;
+  // Filtros de faixa: UF que nao bate fica atenuada (dim), sem perder a cor.
+  dimUF?: (uf: string) => boolean;
 }) {
   const [geos, setGeos] = useState<Geo[] | null>(null);
   const [erro, setErro] = useState(false);
@@ -111,6 +114,7 @@ export function MapaBrasil({
         <g>
           {geos.map((g) => {
             const ativo = g.sigla === ufAtivo;
+            const atenuado = !ativo && (dimUF?.(g.sigla) ?? false);
             return (
               <path
                 key={g.sigla}
@@ -119,7 +123,9 @@ export function MapaBrasil({
                 stroke={ativo ? "#0f2e2b" : "#ffffff"}
                 strokeWidth={ativo ? 1.4 : 0.6}
                 className="cursor-pointer transition-[opacity,stroke-width] duration-150"
-                style={{ opacity: ufAtivo && !ativo ? 0.72 : 1 }}
+                style={{
+                  opacity: atenuado ? 0.16 : ufAtivo && !ativo ? 0.72 : 1,
+                }}
                 onMouseEnter={() => onHoverUF(g.sigla)}
                 onClick={() => onClickUF?.(g.sigla)}
               />
