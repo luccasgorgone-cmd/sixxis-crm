@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
-import { nomeEfetivo } from "@/lib/cliente";
+import { serializarClientePainel } from "@/lib/cliente";
 import { getIO } from "@/lib/socket";
 import { Prisma } from "@/generated/prisma/client";
 import {
@@ -128,24 +128,10 @@ export async function GET(
   return NextResponse.json({
     negocio: {
       ...card,
+      // Base do ClientePainel via serializador compartilhado (mesmo shape do
+      // Inbox e da supervisao) + extras de acompanhamento (NF/garantia/empresa).
       cliente: {
-        id: negocio.lead.id,
-        nome: negocio.lead.nome,
-        pushName: negocio.lead.pushName,
-        nomeManual: negocio.lead.nomeManual,
-        nomeEfetivo: nomeEfetivo(negocio.lead),
-        fotoUrl: negocio.lead.fotoUrl,
-        telefone: negocio.lead.telefone,
-        email: negocio.lead.email,
-        empresa: negocio.lead.empresa,
-        cpf: negocio.lead.cpf,
-        cnpj: negocio.lead.cnpj,
-        dataNascimento: negocio.lead.dataNascimento,
-        anotacoes: negocio.lead.anotacoes,
-        aceitaContato: negocio.lead.aceitaContato,
-        origem: negocio.lead.origem,
-        anuncioTitulo: negocio.lead.anuncioTitulo,
-        anuncioUrl: negocio.lead.anuncioUrl,
+        ...serializarClientePainel(negocio.lead),
         notaFiscal: negocio.lead.notaFiscal,
         garantia: negocio.lead.garantia,
         empresaFaturadaId: negocio.lead.empresaFaturadaId,
