@@ -1,42 +1,71 @@
 "use client";
 
-// Aba Google Trends: hub de demanda. Tres secoes, nesta ordem: (1) links ao
-// Google Trends por categoria (o Trends nao tem API oficial e bloqueia
-// datacenter -> so links, que abrem no site do Google); (2) Tendencias do
-// Mercado Livre (OAuth oficial, atras de "Conectar"; zero numero inventado
-// enquanto desconectado); (3) demanda interna do CRM (ancora que nunca falha).
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+// Aba Trends: hub de ATALHOS para pesquisa externa de interesse/preco/demanda.
+// Somente links (o CRM nao raspa nem inventa numero): cada termo abre em varias
+// ferramentas (Google Trends, Google Shopping, Mercado Livre, Amazon) em nova aba.
+//
+// NOTA DE PRODUTO: a integracao Mercado Livre por API (OAuth + /api/trends/
+// mercadolivre + model IntegracaoMercadoLivre + lib/mercadolivre.ts) foi
+// DESATIVADA da UI por decisao do dono (2.45-C). O backend segue dormante para
+// uso futuro; aqui usamos apenas o link de NAVEGACAO do ML (lista.mercadolivre),
+// que mostra anuncios/precos reais sem depender da API.
 import {
   TrendingUp,
   ExternalLink,
   Fan,
   Bike,
   Wind,
+  ShoppingCart,
   ShoppingBag,
-  Loader2,
-  RefreshCw,
-  Unplug,
-  Info,
-  CheckCircle2,
-  AlertTriangle,
-  BarChart3,
+  Package,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 import { Reveal } from "@/components/inteligencia/Reveal";
-import { useAgente } from "@/components/shell/AgenteContext";
-import type { EstadosResp } from "@/components/mapa/tipos";
 
-const BASE_TRENDS = "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=";
-function urlTrends(termo: string): string {
-  return BASE_TRENDS + encodeURIComponent(termo);
+// ---- Destinos externos: cada um monta uma URL de busca por termo ----
+// Slug do Mercado Livre: caminho de navegacao (espacos viram hifens).
+function slugML(termo: string): string {
+  return encodeURIComponent(termo.trim()).replace(/%20/g, "-");
 }
 
-const CATEGORIAS_TRENDS: {
+type Destino = {
   rotulo: string;
   icon: LucideIcon;
-  termos: string[];
-}[] = [
+  url: (termo: string) => string;
+  descricao: string;
+};
+
+const DESTINOS: Destino[] = [
+  {
+    rotulo: "Trends",
+    icon: TrendingUp,
+    descricao: "Interesse de busca no tempo (Google Trends)",
+    url: (t) =>
+      "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=" +
+      encodeURIComponent(t),
+  },
+  {
+    rotulo: "Shopping",
+    icon: ShoppingCart,
+    descricao: "Precos e ofertas (Google Shopping)",
+    url: (t) => "https://www.google.com/search?tbm=shop&q=" + encodeURIComponent(t),
+  },
+  {
+    rotulo: "Mercado Livre",
+    icon: ShoppingBag,
+    descricao: "Anuncios e precos no Mercado Livre",
+    url: (t) => "https://lista.mercadolivre.com.br/" + slugML(t),
+  },
+  {
+    rotulo: "Amazon",
+    icon: Package,
+    descricao: "Anuncios e precos na Amazon Brasil",
+    url: (t) => "https://www.amazon.com.br/s?k=" + encodeURIComponent(t),
+  },
+];
+
+const CATEGORIAS: { rotulo: string; icon: LucideIcon; termos: string[] }[] = [
   {
     rotulo: "Climatizadores",
     icon: Fan,
@@ -65,59 +94,59 @@ const CATEGORIAS_TRENDS: {
   },
 ];
 
-function desde(iso: string | null): string {
-  if (!iso) return "sem registro";
-  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (min < 1) return "agora";
-  if (min < 60) return `ha ${min} min`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `ha ${h} h`;
-  return `ha ${Math.round(h / 24)} d`;
-}
+// Atalhos gerais (nao por termo): panorama de demanda no Brasil.
+const ATALHOS_GERAIS: { rotulo: string; url: string; descricao: string }[] = [
+  {
+    rotulo: "Google Trends — Em alta no Brasil",
+    url: "https://trends.google.com/trending?geo=BR&hl=pt-BR",
+    descricao: "Assuntos em alta agora, Brasil inteiro.",
+  },
+  {
+    rotulo: "Comparar climatizador x ventilador x ar condicionado",
+    url:
+      "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=" +
+      [
+        encodeURIComponent("climatizador"),
+        encodeURIComponent("ventilador"),
+        encodeURIComponent("ar condicionado"),
+      ].join(","),
+    descricao: "Interesse relativo entre os tres termos no Google Trends.",
+  },
+];
 
 export function TrendsHub() {
-  const agente = useAgente();
-  const ehAdmin = (agente?.papel ?? "COLABORADOR") === "ADMIN";
-
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h2 className="text-lg font-semibold text-escuro">Google Trends</h2>
+        <h2 className="text-lg font-semibold text-escuro">Trends</h2>
         <p className="text-sm text-medio/60">
-          Sinais de demanda por categoria: interesse de busca, tendencias do
-          Mercado Livre e o dado interno do seu CRM.
+          Atalhos para pesquisar interesse, preco e demanda em ferramentas
+          externas. Cada link abre fora do CRM, em nova aba.
         </p>
       </div>
 
-      <SecaoGoogleTrends />
-      <SecaoMercadoLivre ehAdmin={ehAdmin} />
-      <SecaoDemandaInterna />
-    </div>
-  );
-}
-
-// ---- 1. Google Trends (links externos) ----
-function SecaoGoogleTrends() {
-  return (
-    <Reveal>
-      <div className="rounded-xl border border-black/5 bg-white p-4">
-        <div className="mb-1 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-tiffany" />
-          <p className="text-sm font-semibold text-escuro">
-            Interesse de busca (Google Trends)
-          </p>
-        </div>
-        <p className="mb-3 text-xs text-medio/60">
-          Tendencia de buscas no Brasil por termo. Cada botao abre no site do
-          Google Trends, fora do CRM.
-        </p>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {CATEGORIAS_TRENDS.map((cat) => (
-            <div
-              key={cat.rotulo}
-              className="flex flex-col gap-2 rounded-lg border border-black/5 bg-fundo p-3"
+      {/* Legenda dos destinos */}
+      <Reveal>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-black/5 bg-white px-4 py-3">
+          <span className="text-xs font-medium text-medio/70">Destinos:</span>
+          {DESTINOS.map((d) => (
+            <span
+              key={d.rotulo}
+              title={d.descricao}
+              className="flex cursor-help items-center gap-1.5 text-xs text-medio/70"
             >
+              <d.icon className="h-3.5 w-3.5 text-tiffany" />
+              {d.rotulo}
+            </span>
+          ))}
+        </div>
+      </Reveal>
+
+      {/* Categorias x termos x destinos */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {CATEGORIAS.map((cat, i) => (
+          <Reveal key={cat.rotulo} delay={i * 60}>
+            <div className="flex h-full flex-col gap-3 rounded-xl border border-black/5 bg-white p-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-tiffany/10">
                   <cat.icon className="h-4 w-4 text-tiffany" />
@@ -126,328 +155,77 @@ function SecaoGoogleTrends() {
                   {cat.rotulo}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+
+              <div className="space-y-2.5">
                 {cat.termos.map((termo) => (
-                  <a
+                  <div
                     key={termo}
-                    href={urlTrends(termo)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`Ver "${termo}" no Google Trends`}
-                    className="flex items-center gap-1 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+                    className="rounded-lg border border-black/5 bg-fundo p-2.5"
                   >
-                    {termo}
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </a>
+                    <p className="mb-1.5 text-xs font-medium text-escuro">
+                      {termo}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DESTINOS.map((d) => (
+                        <a
+                          key={d.rotulo}
+                          href={d.url(termo)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${d.descricao} — abre fora do CRM`}
+                          className="flex items-center gap-1 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+                        >
+                          <d.icon className="h-3 w-3" />
+                          {d.rotulo}
+                          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-          ))}
-        </div>
+          </Reveal>
+        ))}
       </div>
-    </Reveal>
-  );
-}
 
-// ---- 2. Mercado Livre (OAuth, atras de Conectar) ----
-type TrendsML = {
-  conectado: boolean;
-  atualizadoEm?: string | null;
-  stale?: boolean;
-  itens: { keyword: string; url: string }[];
-};
-
-function SecaoMercadoLivre({ ehAdmin }: { ehAdmin: boolean }) {
-  const params = useSearchParams();
-  const feedback = params.get("ml");
-  const [dados, setDados] = useState<TrendsML | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [atualizando, setAtualizando] = useState(false);
-
-  const carregar = useCallback(async (refresh = false) => {
-    if (refresh) setAtualizando(true);
-    else setCarregando(true);
-    try {
-      const r = await fetch(
-        `/api/trends/mercadolivre${refresh ? "?refresh=1" : ""}`,
-      );
-      if (!r.ok) throw new Error();
-      setDados(await r.json());
-    } catch {
-      setDados({ conectado: false, itens: [] });
-    } finally {
-      setCarregando(false);
-      setAtualizando(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void carregar();
-  }, [carregar]);
-
-  const desconectar = async () => {
-    if (!confirm("Desconectar a integracao do Mercado Livre?")) return;
-    try {
-      await fetch("/api/admin/integracoes/mercadolivre/desconectar", {
-        method: "POST",
-      });
-    } catch {
-      // segue e recarrega o estado de qualquer forma
-    }
-    void carregar();
-  };
-
-  return (
-    <Reveal delay={60}>
-      <div className="rounded-xl border border-black/5 bg-white p-4">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="h-4 w-4 text-tiffany" />
+      {/* Atalhos gerais */}
+      <Reveal delay={180}>
+        <div className="rounded-xl border border-black/5 bg-white p-4">
+          <div className="mb-1 flex items-center gap-2">
+            <Flame className="h-4 w-4 text-tiffany" />
             <p className="text-sm font-semibold text-escuro">
-              Mercado Livre — Tendencias de busca
+              Panorama de demanda
             </p>
           </div>
-          {dados?.conectado && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => void carregar(true)}
-                disabled={atualizando}
-                className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-60"
-              >
-                {atualizando ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Atualizar
-              </button>
-              {ehAdmin && (
-                <button
-                  onClick={() => void desconectar()}
-                  className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-erro hover:text-erro"
-                >
-                  <Unplug className="h-3.5 w-3.5" />
-                  Desconectar
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {feedback && <BannerFeedback tipo={feedback} />}
-
-        {carregando ? (
-          <div className="skeleton mt-2 h-28 w-full rounded-lg" />
-        ) : dados?.conectado ? (
-          <ConectadoML dados={dados} />
-        ) : (
-          <DesconectadoML ehAdmin={ehAdmin} />
-        )}
-      </div>
-    </Reveal>
-  );
-}
-
-function BannerFeedback({ tipo }: { tipo: string }) {
-  const ok = tipo === "conectado";
-  const msg =
-    tipo === "conectado"
-      ? "Mercado Livre conectado com sucesso."
-      : tipo === "erro_config"
-        ? "Integracao nao configurada no servidor (credenciais ausentes)."
-        : tipo === "erro_state"
-          ? "Falha de seguranca na conexao (state invalido). Tente de novo."
-          : tipo === "erro_token"
-            ? "Nao foi possivel concluir a conexao com o Mercado Livre."
-            : null;
-  if (!msg) return null;
-  return (
-    <div
-      className={`mb-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
-        ok
-          ? "bg-sucesso/10 text-sucesso"
-          : "border border-amber-300/60 bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200"
-      }`}
-    >
-      {ok ? (
-        <CheckCircle2 className="h-4 w-4 shrink-0" />
-      ) : (
-        <AlertTriangle className="h-4 w-4 shrink-0" />
-      )}
-      {msg}
-    </div>
-  );
-}
-
-function ConectadoML({ dados }: { dados: TrendsML }) {
-  return (
-    <div>
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-medio/60">
-        <span className="rounded-full bg-tiffany/10 px-2 py-0.5 font-medium text-tiffany">
-          Fonte: Mercado Livre — atualizado semanalmente
-        </span>
-        <span>Cache {desde(dados.atualizadoEm ?? null)}</span>
-        {dados.stale && (
-          <span className="font-medium text-amber-600 dark:text-amber-400">
-            · desatualizado
-          </span>
-        )}
-      </div>
-      {dados.itens.length === 0 ? (
-        <p className="py-6 text-center text-sm text-medio/50">
-          Sem tendencias no momento. Tente atualizar em instantes.
-        </p>
-      ) : (
-        <ol className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-          {dados.itens.map((it, i) => (
-            <li key={`${it.keyword}-${i}`}>
+          <p className="mb-3 text-xs text-medio/60">
+            Visao ampla de tendencias no Brasil. Abre no Google Trends, fora do
+            CRM.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {ATALHOS_GERAIS.map((a) => (
               <a
-                href={it.url || "#"}
+                key={a.rotulo}
+                href={a.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-black/5"
+                className="flex items-start gap-2 rounded-lg border border-black/5 bg-fundo p-3 transition-colors hover:border-tiffany"
               >
-                <span className="w-6 shrink-0 text-right text-xs font-semibold text-medio/50">
-                  {i + 1}
+                <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-tiffany" />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1 text-sm font-medium text-escuro">
+                    {a.rotulo}
+                    <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+                  </span>
+                  <span className="mt-0.5 block text-xs text-medio/60">
+                    {a.descricao}
+                  </span>
                 </span>
-                <span className="min-w-0 flex-1 truncate text-escuro">
-                  {it.keyword}
-                </span>
-                {it.url && (
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-medio/40" />
-                )}
               </a>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  );
-}
-
-function DesconectadoML({ ehAdmin }: { ehAdmin: boolean }) {
-  if (ehAdmin) {
-    return (
-      <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed border-black/10 bg-fundo p-4">
-        <p className="text-sm text-medio/70">
-          Conecte para ver as buscas mais populares do Mercado Livre,
-          atualizadas semanalmente.
-        </p>
-        <a
-          href="/api/admin/integracoes/mercadolivre/conectar"
-          className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro"
-        >
-          <ShoppingBag className="h-4 w-4" />
-          Conectar Mercado Livre
-        </a>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/10 bg-fundo p-4 text-sm text-medio/60">
-      <Info className="h-4 w-4 shrink-0" />
-      Integracao do Mercado Livre ainda nao conectada. Peca ao administrador para
-      conectar e ver as buscas mais populares.
-    </div>
-  );
-}
-
-// ---- 3. Demanda interna do CRM (ancora) ----
-function SecaoDemandaInterna() {
-  const [dados, setDados] = useState<EstadosResp | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(false);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const r = await fetch("/api/mapa/estados");
-        if (!r.ok) throw new Error();
-        const j = (await r.json()) as EstadosResp;
-        if (vivo) {
-          setDados(j);
-          setErro(false);
-        }
-      } catch {
-        if (vivo) setErro(true);
-      } finally {
-        if (vivo) setCarregando(false);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
-
-  // Soma produtosTop de todas as UFs por categoria (dado interno real).
-  const categorias = useMemo(() => {
-    const m = new Map<string, number>();
-    dados?.porUF.forEach((uf) =>
-      uf.produtosTop.forEach((p) =>
-        m.set(p.rotulo, (m.get(p.rotulo) ?? 0) + p.qtd),
-      ),
-    );
-    return [...m.entries()]
-      .map(([rotulo, qtd]) => ({ rotulo, qtd }))
-      .sort((a, b) => b.qtd - a.qtd);
-  }, [dados]);
-
-  const total = categorias.reduce((s, c) => s + c.qtd, 0);
-  const max = categorias[0]?.qtd ?? 0;
-
-  return (
-    <Reveal delay={120}>
-      <div className="rounded-xl border border-black/5 bg-white p-4">
-        <div className="mb-1 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-tiffany" />
-          <p className="text-sm font-semibold text-escuro">
-            Demanda interna Sixxis
-          </p>
-        </div>
-        <p className="mb-3 flex items-center gap-1 text-xs text-medio/60">
-          <Info className="h-3 w-3 shrink-0" />
-          Dado interno do CRM (clientes por categoria de produto). A classificacao
-          depende do anuncio de origem — muitos ainda ficam em &quot;Nao
-          classificado&quot;.
-        </p>
-
-        {carregando ? (
-          <div className="skeleton h-24 w-full rounded-lg" />
-        ) : erro ? (
-          <p className="py-4 text-center text-sm text-medio/50">
-            Nao foi possivel carregar o dado interno.
-          </p>
-        ) : total === 0 ? (
-          <p className="py-4 text-center text-sm text-medio/50">
-            Ainda sem clientes classificados por categoria.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {categorias.map((c) => (
-              <li key={c.rotulo} className="flex items-center gap-2">
-                <span className="w-32 shrink-0 truncate text-sm text-medio/80">
-                  {c.rotulo}
-                </span>
-                <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-black/5">
-                  <span
-                    className="absolute inset-y-0 left-0 rounded-full bg-tiffany"
-                    style={{ width: `${max ? (c.qtd / max) * 100 : 0}%` }}
-                  />
-                </span>
-                <span className="w-10 shrink-0 text-right text-sm font-semibold text-escuro">
-                  {c.qtd}
-                </span>
-              </li>
             ))}
-          </ul>
-        )}
-        {total > 0 && (
-          <p className="mt-2 text-[11px] text-medio/50">
-            {total} clientes classificados no total.
-          </p>
-        )}
-      </div>
-    </Reveal>
+          </div>
+        </div>
+      </Reveal>
+    </div>
   );
 }
