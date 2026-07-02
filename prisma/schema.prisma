@@ -812,3 +812,17 @@ model ClimaCacheUF {
 
   @@unique([uf, dias])
 }
+
+// Integracao OAuth com o Mercado Livre (singleton: id fixo "ml"). Guarda os
+// TOKENS no banco (nunca em env); as credenciais do APP (clientId/clientSecret/
+// redirectUri) vem de env (ML_CLIENT_ID/ML_CLIENT_SECRET/ML_REDIRECT_URI).
+// Usada pelo hub de Tendencias (Google Trends aba) para ler /trends/MLB.
+model IntegracaoMercadoLivre {
+  id           String    @id
+  accessToken  String?
+  refreshToken String?
+  expiraEm     DateTime?
+  mlUserId     String?
+  conectadoEm  DateTime?
+  atualizadoEm DateTime  @updatedAt
+}
