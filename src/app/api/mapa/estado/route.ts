@@ -5,7 +5,7 @@
 // GET /api/mapa/estado?uf=XX  (agente logado -> 401)
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { CAPITAIS } from "@/lib/capitais";
 import { mapaPopulacao } from "@/lib/ibge";
 import { nomeEfetivo } from "@/lib/cliente";
@@ -61,8 +61,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ erro: "uf invalida" }, { status: 400 });
   }
 
+  // Escopo por dono: o vendedor abrindo uma UF so ve os SEUS clientes de la;
+  // admin ve todos (ou ?agenteId/?semDono). A UF continua filtrada em memoria.
+  const where = escopoLeadWhere(agente, req.nextUrl.searchParams);
+
   const [leadsTodos, populacaoPorUF] = await Promise.all([
-    prisma.lead.findMany({ select: selectLeadMapa }),
+    prisma.lead.findMany({ where, select: selectLeadMapa }),
     mapaPopulacao(),
   ]);
 

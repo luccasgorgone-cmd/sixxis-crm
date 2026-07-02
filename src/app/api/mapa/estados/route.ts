@@ -7,7 +7,7 @@
 // GET /api/mapa/estados  (agente logado -> 401)
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { mapaPopulacao } from "@/lib/ibge";
 import {
   selectLeadMapa,
@@ -77,8 +77,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const filtros = lerFiltros(req.nextUrl.searchParams);
 
+  // Escopo por dono: colaborador ve so os seus; admin ve tudo (ou ?agenteId/
+  // ?semDono). Os filtros em memoria (leadPassa) combinam por cima (AND).
+  const where = escopoLeadWhere(agente, req.nextUrl.searchParams);
+
   const [leadsTodos, populacaoPorUF] = await Promise.all([
-    prisma.lead.findMany({ select: selectLeadMapa }),
+    prisma.lead.findMany({ where, select: selectLeadMapa }),
     mapaPopulacao(),
   ]);
   const leads = leadsTodos.filter((l) => leadPassa(l, filtros));

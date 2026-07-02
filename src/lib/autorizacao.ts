@@ -2,6 +2,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Papel } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 
 export type SessaoAgente = {
   id: string;
@@ -22,6 +23,29 @@ export async function obterAgente(): Promise<SessaoAgente | null> {
 
 export function ehAdmin(papel: Papel): boolean {
   return papel === Papel.ADMIN;
+}
+
+// Escopo canonico de leads por dono (mesmo padrao do /api/clientes):
+// - colaborador (VENDEDOR/POS_VENDA): so os seus (donoId OU donoPosVendaId = ele);
+//   os params agenteId/semDono sao IGNORADOS (nao pode escalar vendo os de outro).
+// - admin: ve tudo; ?semDono=1 -> orfaos (sem dono de venda nem pos-venda);
+//   ?agenteId=X -> so os daquele vendedor; sem param -> todos.
+// Retorna o WhereInput de escopo (sozinho, ou combinavel via AND com filtros).
+export function escopoLeadWhere(
+  agente: SessaoAgente,
+  sp: URLSearchParams,
+): Prisma.LeadWhereInput {
+  if (!ehAdmin(agente.papel)) {
+    return { OR: [{ donoId: agente.id }, { donoPosVendaId: agente.id }] };
+  }
+  if (sp.get("semDono") === "1") {
+    return { donoId: null, donoPosVendaId: null };
+  }
+  const agenteId = sp.get("agenteId");
+  if (agenteId) {
+    return { OR: [{ donoId: agenteId }, { donoPosVendaId: agenteId }] };
+  }
+  return {};
 }
 
 // Retorna o agente da sessao apenas se for ADMIN; senao null. Atalho para as
