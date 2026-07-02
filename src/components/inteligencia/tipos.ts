@@ -59,6 +59,28 @@ export type ClientesEstadoResp = {
   clientes: ClienteEstado[];
 };
 
+// Resposta de GET /api/inteligencia/clima/estado?uf=XX (drill-down).
+export type PontoHora = { hora: string; temp: number | null; umidade: number | null };
+export type PontoDia = {
+  dia: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  chuva: number | null;
+};
+export type Tendencia = "esquentando" | "esfriando" | "estavel";
+export type DetalheClimaResp = {
+  uf: string;
+  capital: string;
+  fonte: string;
+  horarioHoje: PontoHora[];
+  horarioAtualizadoEm: string | null;
+  horarioErro: boolean;
+  historico: PontoDia[];
+  historicoAtualizadoEm: string | null;
+  historicoErro: boolean;
+  tendencia: Tendencia | null;
+};
+
 export type Categoria = "CLIMATIZADOR" | "SPINNING" | "ASPIRADOR";
 
 export const CATEGORIAS: { chave: Categoria; rotulo: string }[] = [

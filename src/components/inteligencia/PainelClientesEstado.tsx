@@ -9,7 +9,8 @@ import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { BadgeStatusNegocio, BadgePendente } from "@/components/badges";
 import { EstadoErro } from "@/components/ui/Estado";
 import { formatarBRL, normalizarTexto } from "@/lib/format";
-import type { ClienteEstado, ClientesEstadoResp } from "./tipos";
+import { ClimaEstadoDetalhe } from "./ClimaEstadoDetalhe";
+import type { ClienteEstado, ClientesEstadoResp, ClimaUF } from "./tipos";
 
 function desde(iso: string | null): string {
   if (!iso) return "sem contato";
@@ -25,10 +26,15 @@ export function PainelClientesEstado({
   uf,
   onFechar,
   onAbrirNegocio,
+  climatizador = false,
+  resumoClima,
 }: {
   uf: string;
   onFechar: () => void;
   onAbrirNegocio: (negocioId: string) => void;
+  // No modo Climatizador o drawer ganha o detalhe de clima (curva + historico).
+  climatizador?: boolean;
+  resumoClima?: ClimaUF | null;
 }) {
   const [dados, setDados] = useState<ClientesEstadoResp | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -110,8 +116,9 @@ export function PainelClientesEstado({
           </div>
         </header>
 
-        {/* Lista */}
+        {/* Detalhe de clima (modo Climatizador) + lista de clientes */}
         <div className="scroll-fino min-h-0 flex-1 overflow-y-auto">
+          {climatizador && <ClimaEstadoDetalhe uf={uf} resumo={resumoClima} />}
           {carregando ? (
             <div className="flex h-40 items-center justify-center text-medio/50">
               <Loader2 className="h-5 w-5 animate-spin" />

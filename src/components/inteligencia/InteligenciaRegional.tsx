@@ -662,6 +662,8 @@ export function InteligenciaRegional() {
           uf={ufClientes}
           onFechar={() => setUfClientes(null)}
           onAbrirNegocio={(id) => setNegocioId(id)}
+          climatizador={ehClima && climaUtil}
+          resumoClima={climaPorUF.get(ufClientes)}
         />
       )}
 
