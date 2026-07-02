@@ -11,6 +11,7 @@ import {
   selectClientePainel,
   serializarClientePainel,
 } from "@/lib/cliente";
+import { parseDataNascimento } from "@/lib/format";
 import { getIO } from "@/lib/socket";
 import { AtividadeTipo } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
@@ -139,26 +140,14 @@ export async function PATCH(
 
   // Data de nascimento (apenas a data, em UTC meia-noite). "" / null = limpar.
   if (body.dataNascimento !== undefined) {
-    const bruto = body.dataNascimento;
-    let nova: Date | null = null;
-    if (bruto !== null && String(bruto).trim() !== "") {
-      // Espera "YYYY-MM-DD" (input date). Fixa meia-noite UTC para evitar
-      // deslocamento de fuso ao exibir.
-      const m = String(bruto).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (!m) {
-        return NextResponse.json(
-          { erro: "data de nascimento invalida" },
-          { status: 400 },
-        );
-      }
-      nova = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
-      if (Number.isNaN(nova.getTime())) {
-        return NextResponse.json(
-          { erro: "data de nascimento invalida" },
-          { status: 400 },
-        );
-      }
+    const parsed = parseDataNascimento(body.dataNascimento);
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { erro: "data de nascimento invalida" },
+        { status: 400 },
+      );
     }
+    const nova = parsed.valor;
     const atualMs = lead.dataNascimento
       ? new Date(lead.dataNascimento).getTime()
       : null;

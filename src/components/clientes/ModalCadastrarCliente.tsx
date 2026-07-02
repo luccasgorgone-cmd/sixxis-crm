@@ -3,9 +3,18 @@
 // Modal de cadastro MANUAL de cliente. Vincula ao dono (eu por padrao; admin
 // escolhe o colaborador). Telefone duplicado -> oferece assumir/vincular.
 import { useState } from "react";
-import { X, Check, Loader2, UserPlus, Link2 } from "lucide-react";
+import {
+  X,
+  Check,
+  Loader2,
+  UserPlus,
+  Link2,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { mascararCpf, mascararCnpj } from "@/lib/format";
+import { mascararCpf, mascararCnpj, mascararCep } from "@/lib/format";
+import { buscarViaCep } from "@/lib/viacep";
 
 type Vendedor = { id: string; nome: string };
 
@@ -28,8 +37,37 @@ export function ModalCadastrarCliente({
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
+  // Dados adicionais (opcionais), recolhidos por padrao para o cadastro rapido.
+  const [mostrarAdicionais, setMostrarAdicionais] = useState(false);
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [cep, setCep] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // ViaCEP: ao completar 8 digitos, auto-preenche logradouro/bairro/cidade/uf.
+  async function preencherPorCep(valor: string) {
+    if (valor.replace(/\D/g, "").length !== 8) return;
+    setBuscandoCep(true);
+    try {
+      const via = await buscarViaCep(valor);
+      if (!via) {
+        toast.erro("CEP nao encontrado. Preencha manualmente.");
+        return;
+      }
+      if (via.logradouro) setLogradouro((p) => p || via.logradouro);
+      if (via.bairro) setBairro((p) => p || via.bairro);
+      if (via.cidade) setCidade(via.cidade);
+      if (via.uf) setUf(via.uf);
+    } finally {
+      setBuscandoCep(false);
+    }
+  }
   // Duplicado: guarda o lead existente para oferecer assumir.
   const [duplicado, setDuplicado] = useState<{
     leadId: string;
@@ -55,6 +93,15 @@ export function ModalCadastrarCliente({
           email: email.trim() || null,
           cpf: cpf.trim() || null,
           cnpj: cnpj.trim() || null,
+          dataNascimento: dataNascimento || null,
+          endereco: {
+            cep: cep.trim() || null,
+            logradouro: logradouro.trim() || null,
+            numero: numero.trim() || null,
+            bairro: bairro.trim() || null,
+            cidade: cidade.trim() || null,
+            uf: uf.trim() || null,
+          },
           assumir,
         }),
       });
@@ -197,6 +244,102 @@ export function ModalCadastrarCliente({
                   className="campo w-full"
                 />
               </Campo>
+            </div>
+
+            {/* Dados adicionais (opcional): nascimento + endereco com ViaCEP. */}
+            <div className="rounded-xl border border-black/5">
+              <button
+                type="button"
+                onClick={() => setMostrarAdicionais((v) => !v)}
+                className="flex w-full items-center gap-1.5 px-3 py-2 text-xs font-medium text-medio/70 hover:text-escuro"
+              >
+                {mostrarAdicionais ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+                Dados adicionais (opcional)
+              </button>
+              {mostrarAdicionais && (
+                <div className="space-y-3 border-t border-black/5 p-3">
+                  <Campo rotulo="Data de nascimento">
+                    <input
+                      type="date"
+                      value={dataNascimento}
+                      onChange={(e) => setDataNascimento(e.target.value)}
+                      className="campo w-full"
+                    />
+                  </Campo>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Campo rotulo="CEP">
+                      <div className="relative">
+                        <input
+                          value={cep}
+                          onChange={(e) => setCep(mascararCep(e.target.value))}
+                          onBlur={() => void preencherPorCep(cep)}
+                          placeholder="00000-000"
+                          className="campo w-full"
+                        />
+                        {buscandoCep && (
+                          <Loader2 className="absolute right-2 top-2.5 h-3.5 w-3.5 animate-spin text-tiffany" />
+                        )}
+                      </div>
+                    </Campo>
+                    <div className="col-span-2">
+                      <Campo rotulo="Cidade">
+                        <input
+                          value={cidade}
+                          onChange={(e) => setCidade(e.target.value)}
+                          placeholder="Opcional"
+                          className="campo w-full"
+                        />
+                      </Campo>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <Campo rotulo="Logradouro">
+                        <input
+                          value={logradouro}
+                          onChange={(e) => setLogradouro(e.target.value)}
+                          placeholder="Opcional"
+                          className="campo w-full"
+                        />
+                      </Campo>
+                    </div>
+                    <Campo rotulo="Numero">
+                      <input
+                        value={numero}
+                        onChange={(e) => setNumero(e.target.value)}
+                        placeholder="Opcional"
+                        className="campo w-full"
+                      />
+                    </Campo>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <Campo rotulo="Bairro">
+                        <input
+                          value={bairro}
+                          onChange={(e) => setBairro(e.target.value)}
+                          placeholder="Opcional"
+                          className="campo w-full"
+                        />
+                      </Campo>
+                    </div>
+                    <Campo rotulo="UF">
+                      <input
+                        value={uf}
+                        onChange={(e) =>
+                          setUf(e.target.value.toUpperCase().slice(0, 2))
+                        }
+                        placeholder="UF"
+                        className="campo w-full"
+                      />
+                    </Campo>
+                  </div>
+                </div>
+              )}
             </div>
 
             {erro && <p className="text-xs text-erro">{erro}</p>}

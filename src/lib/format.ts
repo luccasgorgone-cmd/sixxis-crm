@@ -133,6 +133,23 @@ export function dataNascParaInput(valor: string | Date | null | undefined): stri
   return d.toISOString().slice(0, 10);
 }
 
+// Converte "YYYY-MM-DD" (input date) em Date UTC meia-noite (evita deslocamento
+// de fuso ao exibir). "" / null / undefined -> null (limpar). Retorna
+// { ok:false } quando o texto e nao-vazio e invalido. Usado no POST e no PATCH
+// de /api/leads (mesma validacao, sem drift).
+export function parseDataNascimento(
+  bruto: unknown,
+): { ok: true; valor: Date | null } | { ok: false } {
+  if (bruto === null || bruto === undefined || String(bruto).trim() === "") {
+    return { ok: true, valor: null };
+  }
+  const m = String(bruto).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return { ok: false };
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return { ok: false };
+  return { ok: true, valor: d };
+}
+
 // Valor em reais. null/undefined -> "—".
 export function formatarBRL(valor: number | null | undefined): string {
   if (valor == null) return "—";

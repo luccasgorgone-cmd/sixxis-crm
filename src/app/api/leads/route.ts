@@ -12,7 +12,42 @@ import { normalizarTelefoneBR } from "@/lib/phone";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { espelharDonoNasConversas } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
+import { parseDataNascimento } from "@/lib/format";
 import { Finalidade, AtividadeTipo } from "@/generated/prisma/enums";
+
+// Campos opcionais de endereco aceitos no cadastro (mesmo shape do endpoint de
+// enderecos). Cria um Endereco (principal) quando ao menos um vier preenchido.
+type EnderecoEntrada = {
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+};
+
+function limparEndereco(
+  e: EnderecoEntrada | undefined,
+): Record<string, string> | null {
+  if (!e || typeof e !== "object") return null;
+  const campos = [
+    "cep",
+    "logradouro",
+    "numero",
+    "complemento",
+    "bairro",
+    "cidade",
+    "uf",
+  ] as const;
+  const dados: Record<string, string> = {};
+  for (const c of campos) {
+    const v = e[c];
+    const s = v == null ? "" : String(v).trim();
+    if (s) dados[c] = c === "uf" ? s.toUpperCase().slice(0, 2) : s;
+  }
+  return Object.keys(dados).length > 0 ? dados : null;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +67,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     email?: string | null;
     cpf?: string | null;
     cnpj?: string | null;
+    dataNascimento?: string | null;
+    endereco?: EnderecoEntrada;
     assumir?: boolean;
   };
   try {
@@ -39,6 +76,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch {
     return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
   }
+
+  // Campos opcionais: data de nascimento (mesma validacao do PATCH) e endereco.
+  const nascParsed = parseDataNascimento(body.dataNascimento);
+  if (!nascParsed.ok) {
+    return NextResponse.json(
+      { erro: "data de nascimento invalida" },
+      { status: 400 },
+    );
+  }
+  const dataNascimento = nascParsed.valor;
+  const enderecoDados = limparEndereco(body.endereco);
 
   const telefone = normalizarTelefoneBR(body.telefone ?? "");
   if (telefone.length < 12) {
@@ -111,6 +159,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Cria o lead manual ja com dono. Sem conversa/negocio (nascem no 1o contato).
+  // Endereco (principal) so quando algum campo veio preenchido — tudo opcional.
   const lead = await prisma.lead.create({
     data: {
       telefone,
@@ -118,9 +167,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       email: body.email?.trim() || null,
       cpf: body.cpf?.trim() || null,
       cnpj: body.cnpj?.trim() || null,
+      dataNascimento,
       origem: "manual",
       aceitaContato: true,
       [campo]: donoId,
+      ...(enderecoDados
+        ? { enderecos: { create: { ...enderecoDados, principal: true } } }
+        : {}),
     },
   });
 

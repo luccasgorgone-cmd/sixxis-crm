@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { mascararCep } from "@/lib/format";
+import { buscarViaCep } from "@/lib/viacep";
 
 export type EnderecoItem = {
   id: string;
@@ -274,28 +275,24 @@ function FormEndereco({
     setD((prev) => ({ ...prev, [chave]: valor }));
   }
 
-  // Busca no ViaCEP quando ha 8 digitos. Fallback silencioso (deixa preencher
-  // manualmente) quando o CEP nao existe ou a rede falha.
+  // Busca no ViaCEP quando ha 8 digitos (helper compartilhado). Fallback
+  // silencioso (deixa preencher manualmente) quando o CEP nao existe/rede falha.
   async function buscarCep(cepBruto: string) {
-    const digitos = cepBruto.replace(/\D/g, "");
-    if (digitos.length !== 8) return;
+    if (cepBruto.replace(/\D/g, "").length !== 8) return;
     setBuscandoCep(true);
     try {
-      const r = await fetch(`https://viacep.com.br/ws/${digitos}/json/`);
-      const j = await r.json();
-      if (j.erro) {
+      const via = await buscarViaCep(cepBruto);
+      if (!via) {
         toast.erro("CEP nao encontrado. Preencha manualmente.");
         return;
       }
       setD((prev) => ({
         ...prev,
-        logradouro: j.logradouro || prev.logradouro,
-        bairro: j.bairro || prev.bairro,
-        cidade: j.localidade || prev.cidade,
-        uf: j.uf || prev.uf,
+        logradouro: via.logradouro || prev.logradouro,
+        bairro: via.bairro || prev.bairro,
+        cidade: via.cidade || prev.cidade,
+        uf: via.uf || prev.uf,
       }));
-    } catch {
-      // Rede indisponivel: segue com preenchimento manual.
     } finally {
       setBuscandoCep(false);
     }
