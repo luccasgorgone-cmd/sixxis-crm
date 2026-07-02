@@ -1,11 +1,11 @@
 // Inteligencia Regional: lista os clientes (leads) de um estado. Mesma regra de
 // UF do mapa/regioes: Endereco.uf valido (2 letras) -> fallback ufPorTelefone.
-// Retorna TODOS os leads daquele estado (nao escopado por dono), batendo com a
-// contagem do mapa. Ordena por ultimo contato desc, limita a ~200.
-// GET /api/inteligencia/clientes?uf=XX  (agente logado)
+// Escopo por dono (canonico): colaborador ve so os seus; admin ve todos e pode
+// passar ?agenteId=X ou ?semDono=1. Ordena por ultimo contato desc, limita a ~200.
+// GET /api/inteligencia/clientes?uf=XX&agenteId?(admin)&semDono?(admin)
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { nomeEfetivo } from "@/lib/cliente";
 import { formatarTelefone } from "@/lib/format";
 import { ufPorTelefone, infoPorUF } from "@/lib/ddd";
@@ -27,7 +27,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ erro: "uf invalida" }, { status: 400 });
   }
 
+  // Escopo por dono: colaborador ve so os seus; admin ve todos (ou ?agenteId/
+  // ?semDono). A UF continua filtrada em memoria (endereco -> DDD).
+  const where = escopoLeadWhere(agente, req.nextUrl.searchParams);
+
   const leads = await prisma.lead.findMany({
+    where,
     select: {
       id: true,
       nome: true,

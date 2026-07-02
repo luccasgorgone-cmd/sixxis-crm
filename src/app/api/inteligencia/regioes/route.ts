@@ -1,10 +1,12 @@
 // Inteligencia Regional: agrega clientes, vendas (GANHO) e faturamento por UF e
-// por regiao, sobre TODOS os leads. A UF de cada lead vem do Endereco (primeiro
-// UF valido de 2 letras) ou, na falta, do DDD do telefone; sem nenhum -> SEM_UF.
-// GET /api/inteligencia/regioes  (agente logado; nao e admin-only)
-import { NextResponse } from "next/server";
+// por regiao. Escopo por dono (canonico): colaborador ve so os seus; admin ve
+// todos e pode passar ?agenteId=X ou ?semDono=1. A UF de cada lead vem do
+// Endereco (primeiro UF valido de 2 letras) ou, na falta, do DDD; sem nenhum ->
+// SEM_UF.
+// GET /api/inteligencia/regioes?agenteId?(admin)&semDono?(admin)
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { ufPorTelefone, infoPorUF } from "@/lib/ddd";
 import { CAPITAIS } from "@/lib/capitais";
 import { StatusNeg } from "@/generated/prisma/enums";
@@ -26,15 +28,18 @@ function arred2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
 
-  // Traz tudo num unico findMany (base pequena): endereco -> uf, negocios ->
-  // status/valor. Agregacao em JS (sem N+1).
+  // Escopo por dono: colaborador ve so os seus; admin ve todos (ou ?agenteId/
+  // ?semDono). Traz tudo num unico findMany (base pequena): endereco -> uf,
+  // negocios -> status/valor. Agregacao em JS (sem N+1).
+  const where = escopoLeadWhere(agente, req.nextUrl.searchParams);
   const leads = await prisma.lead.findMany({
+    where,
     select: {
       telefone: true,
       enderecos: { select: { uf: true } },
