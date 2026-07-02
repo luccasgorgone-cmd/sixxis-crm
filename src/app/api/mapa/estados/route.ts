@@ -24,11 +24,16 @@ import { CATEGORIAS_PRODUTO } from "@/lib/classificar-produto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Janelas de periodo aceitas (dias). null = "todos" (default, sem corte). O
+// periodo filtra por ULTIMO CONTATO (ultimaMensagemEm) do lead — ver leadPassa.
+const PERIODOS_VALIDOS = [7, 30, 90, 180] as const;
+type Periodo = (typeof PERIODOS_VALIDOS)[number];
+
 type Filtros = {
   categoria: string | null;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
   situacao: "abertos" | "ganhos" | "perdidos" | null;
-  periodo: 30 | 90 | null;
+  periodo: Periodo | null;
 };
 
 function lerFiltros(sp: URLSearchParams): Filtros {
@@ -42,7 +47,7 @@ function lerFiltros(sp: URLSearchParams): Filtros {
       temp === "QUENTE" || temp === "MORNO" || temp === "FRIO" ? temp : null,
     situacao:
       sit === "abertos" || sit === "ganhos" || sit === "perdidos" ? sit : null,
-    periodo: per === 30 || per === 90 ? (per as 30 | 90) : null,
+    periodo: PERIODOS_VALIDOS.includes(per as Periodo) ? (per as Periodo) : null,
   };
 }
 

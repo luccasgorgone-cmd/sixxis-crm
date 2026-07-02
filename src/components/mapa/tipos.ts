@@ -18,6 +18,7 @@ export type ResumoUF = {
   populacao: number | null;
   clientesPor100k: number | null;
   produtosTop: ProdutoTop[];
+  novosPorMes: { ultimos30: number; ultimos90: number };
   ultimoContato: string | null;
 };
 
@@ -113,7 +114,8 @@ export type FiltrosMapa = {
   categoria: string | null;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
   situacao: "abertos" | "ganhos" | "perdidos" | null;
-  periodo: 30 | 90 | null;
+  // Janela por ultimo contato (dias). null = todos. Backend aceita 7/30/90/180.
+  periodo: 7 | 30 | 90 | 180 | null;
 };
 export const FILTROS_MAPA_VAZIO: FiltrosMapa = {
   categoria: null,

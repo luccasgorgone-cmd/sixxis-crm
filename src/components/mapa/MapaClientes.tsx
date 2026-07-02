@@ -271,14 +271,16 @@ export function MapaClientes() {
           rotulo="Periodo"
           valor={filtros.periodo ? String(filtros.periodo) : ""}
           opcoes={[
-            { v: "", r: "Todo" },
+            { v: "", r: "Todos" },
+            { v: "7", r: "7 dias" },
             { v: "30", r: "30 dias" },
             { v: "90", r: "90 dias" },
+            { v: "180", r: "180 dias" },
           ]}
           onChange={(v) =>
             setFiltros((f) => ({
               ...f,
-              periodo: v ? (Number(v) as 30 | 90) : null,
+              periodo: v ? (Number(v) as 7 | 30 | 90 | 180) : null,
             }))
           }
         />

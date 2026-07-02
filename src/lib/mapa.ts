@@ -149,6 +149,9 @@ export type ResumoUF = {
   populacao: number | null;
   clientesPor100k: number | null;
   produtosTop: { rotulo: CategoriaProduto; qtd: number }[];
+  // Leads criados nas ultimas janelas (dimensao de tempo). Derivado de criadoEm,
+  // sem migracao: agregacao em memoria sobre o que ja vem no select.
+  novosPorMes: { ultimos30: number; ultimos90: number };
   ultimoContato: string | null;
 };
 
@@ -165,6 +168,9 @@ export function montarResumo(
   let faturamento = 0;
   const catCount = new Map<CategoriaProduto, number>();
   let ultimo: Date | null = null;
+  const novosPorMes = { ultimos30: 0, ultimos90: 0 };
+  const agora = Date.now();
+  const dia = 24 * 60 * 60 * 1000;
 
   for (const lead of leads) {
     // Temperatura do lead = a do negocio principal (se houver).
@@ -189,6 +195,11 @@ export function montarResumo(
 
     const cat = classificarLead(lead);
     catCount.set(cat, (catCount.get(cat) ?? 0) + 1);
+
+    // Dimensao de tempo: leads criados nas ultimas janelas (30/90 dias).
+    const idade = agora - lead.criadoEm.getTime();
+    if (idade <= 30 * dia) novosPorMes.ultimos30++;
+    if (idade <= 90 * dia) novosPorMes.ultimos90++;
 
     const uc = ultimoContatoDoLead(lead);
     if (uc && (!ultimo || uc > ultimo)) ultimo = uc;
@@ -217,6 +228,7 @@ export function montarResumo(
     populacao: populacao ?? null,
     clientesPor100k,
     produtosTop,
+    novosPorMes,
     ultimoContato: ultimo ? ultimo.toISOString() : null,
   };
 }
