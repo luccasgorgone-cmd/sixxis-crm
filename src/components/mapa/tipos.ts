@@ -84,6 +84,7 @@ export const METRICAS: {
   rotulo: string;
   valor: (r: ResumoUF) => number | null;
   formato: FormatoMetrica;
+  dica?: string;
 }[] = [
   { chave: "clientes", rotulo: "Clientes", valor: (r) => r.clientes, formato: "num" },
   { chave: "vendas", rotulo: "Vendas", valor: (r) => r.negocios.ganhos, formato: "num" },
@@ -99,8 +100,18 @@ export const METRICAS: {
     rotulo: "Clientes / 100k hab.",
     valor: (r) => r.clientesPor100k,
     formato: "dec",
+    dica: "Clientes a cada 100 mil habitantes — cruza seus clientes com a populacao do estado (IBGE) para revelar potencial de mercado, nao so volume absoluto.",
   },
 ];
+
+// Cores Sixxis por categoria de produto (tonalidades tiffany + cinza honesto
+// para os nao classificados). Usadas no breakdown de produtos por estado.
+export const CORES_PRODUTO: Record<string, string> = {
+  Climatizador: "#3cbfb3",
+  "Bike Spinning": "#2aa79b",
+  Aspirador: "#1a4f4a",
+  "Nao classificado": "#94a3b8",
+};
 
 export function fmtMetrica(v: number | null, formato: FormatoMetrica): string {
   if (v == null) return "—";

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw, Loader2, Info, Users, Filter } from "lucide-react";
 import { formatarBRL } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
+import { LegendaGradiente } from "@/components/ui/LegendaGradiente";
 import { useAgente } from "@/components/shell/AgenteContext";
 import { MapaBrasil } from "@/components/inteligencia/MapaBrasil";
 import { Reveal } from "@/components/inteligencia/Reveal";
@@ -15,6 +16,7 @@ import {
   ESCALA_DENSIDADE,
   COR_SEM_DADO,
   corEscala,
+  gradienteCss,
 } from "@/components/inteligencia/tipos";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { SeletorVendedor } from "@/components/shared/SeletorVendedor";
@@ -166,6 +168,12 @@ export function MapaClientes() {
                   valor={r.clientesPor100k.toFixed(2)}
                 />
               )}
+              {r.produtosTop[0] && r.produtosTop[0].qtd > 0 && (
+                <Linha
+                  rotulo="Produto top"
+                  valor={`${r.produtosTop[0].rotulo} (${r.produtosTop[0].qtd})`}
+                />
+              )}
             </>
           )}
         </div>
@@ -310,11 +318,12 @@ export function MapaClientes() {
                   <button
                     key={m.chave}
                     onClick={() => setMetrica(m.chave)}
+                    title={m.dica}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                       metrica === m.chave
                         ? "bg-tiffany text-white"
                         : "bg-black/5 text-medio hover:bg-black/10"
-                    }`}
+                    } ${m.dica ? "cursor-help" : ""}`}
                   >
                     {m.rotulo}
                   </button>
@@ -333,9 +342,12 @@ export function MapaClientes() {
                 />
               )}
 
-              <Legenda
+              <LegendaGradiente
                 rotulo={metricaCfg.rotulo}
+                gradiente={gradienteCss(ESCALA_DENSIDADE)}
+                min="0"
                 max={fmtMetrica(maxMetrica || null, metricaCfg.formato)}
+                icone={<Users className="h-3.5 w-3.5" />}
               />
               <p className="mt-2 text-center text-[11px] text-medio/50">
                 Clique num estado para ver clientes, compradores e negocios.
@@ -443,26 +455,6 @@ function SelectFiltro({
         ))}
       </select>
     </label>
-  );
-}
-
-function Legenda({ rotulo, max }: { rotulo: string; max: string }) {
-  return (
-    <div className="mt-3 flex items-center gap-3">
-      <div className="flex items-center gap-1.5 text-xs text-medio/60">
-        <Users className="h-3.5 w-3.5" />
-        {rotulo}
-      </div>
-      <div
-        className="h-2.5 flex-1 rounded-full"
-        style={{
-          background:
-            "linear-gradient(90deg,#e2f4f1 0%,#3cbfb3 50%,#12433d 100%)",
-        }}
-        aria-hidden
-      />
-      <div className="text-xs text-medio/60">{max}</div>
-    </div>
   );
 }
 

@@ -16,6 +16,7 @@ import {
   Trophy,
   Repeat2,
   ThermometerSun,
+  ArrowUpDown,
 } from "lucide-react";
 import Link from "next/link";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -24,7 +25,10 @@ import { EstadoErro } from "@/components/ui/Estado";
 import { Reveal } from "@/components/inteligencia/Reveal";
 import { formatarBRL, normalizarTexto } from "@/lib/format";
 import { paramsEscopo } from "@/lib/escopo";
+import { BreakdownProdutos } from "./BreakdownProdutos";
 import type { ClienteMapa, EstadoDetalheResp } from "./tipos";
+
+type Ordenacao = "recentes" | "valor";
 
 type EtapaOpcao = { id: string; nome: string; tipo?: string };
 
@@ -67,6 +71,8 @@ export function PainelEstadoMapa({
   const [erro, setErro] = useState(false);
   const [aba, setAba] = useState<Aba>("geral");
   const [busca, setBusca] = useState("");
+  const [catFiltro, setCatFiltro] = useState(""); // "" = todas
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>("recentes");
   const [editando, setEditando] = useState<string | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
 
@@ -151,16 +157,40 @@ export function PainelEstadoMapa({
     }
   }
 
+  // Categorias de produto presentes nos clientes deste estado (para os chips).
+  const categoriasPresentes = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of dados?.clientes ?? []) {
+      if (c.produtoClassificado) s.add(c.produtoClassificado);
+    }
+    return [...s];
+  }, [dados]);
+
   const clientesFiltrados = useMemo(() => {
     const q = normalizarTexto(busca.trim());
-    const lista = dados?.clientes ?? [];
-    if (!q) return lista;
-    return lista.filter(
-      (c) =>
-        normalizarTexto(c.nome).includes(q) ||
-        c.telefone.replace(/\D/g, "").includes(q.replace(/\D/g, "")),
-    );
-  }, [dados, busca]);
+    let lista = dados?.clientes ?? [];
+    if (catFiltro) {
+      lista = lista.filter((c) => c.produtoClassificado === catFiltro);
+    }
+    if (q) {
+      lista = lista.filter(
+        (c) =>
+          normalizarTexto(c.nome).includes(q) ||
+          c.telefone.replace(/\D/g, "").includes(q.replace(/\D/g, "")),
+      );
+    }
+    const ord = [...lista];
+    if (ordenacao === "valor") {
+      ord.sort((a, b) => b.valorAberto - a.valorAberto);
+    } else {
+      ord.sort((a, b) => {
+        const ta = a.ultimoContato ? new Date(a.ultimoContato).getTime() : 0;
+        const tb = b.ultimoContato ? new Date(b.ultimoContato).getTime() : 0;
+        return tb - ta;
+      });
+    }
+    return ord;
+  }, [dados, busca, catFiltro, ordenacao]);
 
   const titulo = dados ? `${dados.resumo.estado} (${uf})` : `Estado ${uf}`;
 
@@ -239,11 +269,55 @@ export function PainelEstadoMapa({
                   className="w-full rounded-lg border border-black/10 bg-white py-1.5 pl-8 pr-3 text-sm outline-none focus:border-tiffany"
                 />
               </div>
+
+              {/* Filtro rapido por categoria de produto + ordenacao */}
+              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                {categoriasPresentes.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <ChipCategoria
+                      rotulo="Todas"
+                      ativo={catFiltro === ""}
+                      onClick={() => setCatFiltro("")}
+                    />
+                    {categoriasPresentes.map((cat) => (
+                      <ChipCategoria
+                        key={cat}
+                        rotulo={cat}
+                        ativo={catFiltro === cat}
+                        onClick={() => setCatFiltro(cat)}
+                      />
+                    ))}
+                  </div>
+                )}
+                <div className="ml-auto flex items-center gap-1 text-[11px] text-medio/60">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  <button
+                    onClick={() => setOrdenacao("recentes")}
+                    className={`rounded-md px-1.5 py-0.5 font-medium transition-colors ${
+                      ordenacao === "recentes"
+                        ? "bg-tiffany text-white"
+                        : "hover:bg-black/5"
+                    }`}
+                  >
+                    Recentes
+                  </button>
+                  <button
+                    onClick={() => setOrdenacao("valor")}
+                    className={`rounded-md px-1.5 py-0.5 font-medium transition-colors ${
+                      ordenacao === "valor"
+                        ? "bg-tiffany text-white"
+                        : "hover:bg-black/5"
+                    }`}
+                  >
+                    Maior valor
+                  </button>
+                </div>
+              </div>
               <ListaClientes
                 clientes={clientesFiltrados}
                 vazio={
-                  busca
-                    ? "Nenhum cliente encontrado. Ajuste a busca."
+                  busca || catFiltro
+                    ? "Nenhum cliente encontrado. Ajuste a busca ou os filtros."
                     : "Sem clientes neste estado ainda."
                 }
                 etapas={etapas}
@@ -350,6 +424,12 @@ export function PainelEstadoMapa({
 // ---- Visao geral ----
 function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
   const r = dados.resumo;
+  const produtosComQtd = r.produtosTop.reduce((s, p) => s + p.qtd, 0);
+  const naoClass =
+    r.produtosTop.find((p) => p.rotulo === "Nao classificado")?.qtd ?? 0;
+  // "Domina" = mais da metade dos clientes classificados caiu em Nao classificado.
+  const naoClassificadoDomina =
+    produtosComQtd > 0 && naoClass / produtosComQtd > 0.5;
   return (
     <div className="space-y-4 p-4">
       <Reveal>
@@ -372,6 +452,14 @@ function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
             rotulo="Clientes / 100k hab."
             valor={r.clientesPor100k != null ? r.clientesPor100k.toFixed(2) : "—"}
           />
+          <MiniCard
+            rotulo="Novos (30 dias)"
+            valor={String(r.novosPorMes.ultimos30)}
+          />
+          <MiniCard
+            rotulo="Novos (90 dias)"
+            valor={String(r.novosPorMes.ultimos90)}
+          />
         </div>
       </Reveal>
 
@@ -379,25 +467,23 @@ function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
         <div className="rounded-lg border border-black/5 bg-white p-3">
           <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-escuro">
             <ThermometerSun className="h-4 w-4 text-tiffany" />
-            Produtos (classificacao)
+            Produtos por estado
           </p>
-          {r.produtosTop.length === 0 ? (
+          {produtosComQtd === 0 ? (
             <p className="text-xs text-medio/60">
-              Sem dados de produto — a classificacao depende do anuncio de origem
-              ou do interesse cadastrado.
+              Sem produto classificado neste estado — a classificacao depende do
+              interesse cadastrado, do anuncio de origem, das etapas ou da origem.
             </p>
           ) : (
-            <ul className="space-y-1.5">
-              {r.produtosTop.map((p) => (
-                <li
-                  key={p.rotulo}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-medio/80">{p.rotulo}</span>
-                  <span className="font-semibold text-escuro">{p.qtd}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <BreakdownProdutos dados={r.produtosTop} />
+              {naoClassificadoDomina && (
+                <p className="mt-1 text-[11px] text-medio/50">
+                  Boa parte ficou em &quot;Nao classificado&quot; — a classificacao
+                  depende da origem/anuncio; nao inventamos categoria.
+                </p>
+              )}
+            </>
           )}
         </div>
       </Reveal>
@@ -407,6 +493,30 @@ function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
         {r.porTemperatura.morno} mornos · {r.porTemperatura.frio} frios.
       </p>
     </div>
+  );
+}
+
+function ChipCategoria({
+  rotulo,
+  ativo,
+  onClick,
+}: {
+  rotulo: string;
+  ativo: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+        ativo
+          ? "border-tiffany bg-tiffany text-white"
+          : "border-black/10 bg-white text-medio hover:border-tiffany hover:text-tiffany"
+      }`}
+    >
+      {rotulo}
+    </button>
   );
 }
 
