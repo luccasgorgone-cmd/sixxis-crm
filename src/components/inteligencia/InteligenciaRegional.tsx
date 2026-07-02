@@ -13,10 +13,14 @@ import {
   Info,
   Sparkles,
   Clock,
-  Trophy,
   CloudOff,
   SlidersHorizontal,
   X,
+  TrendingUp,
+  ExternalLink,
+  Fan,
+  Bike,
+  Wind,
 } from "lucide-react";
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
@@ -34,7 +38,6 @@ import { DistribuicaoRegiao } from "./DistribuicaoRegiao";
 import { PainelClientesEstado } from "./PainelClientesEstado";
 import { Reveal } from "./Reveal";
 import {
-  CATEGORIAS,
   ESCALA_DENSIDADE,
   ESCALA_INDICE,
   COR_SEM_DADO,
@@ -55,10 +58,35 @@ function estadoDe(uf: string, reg?: RegiaoUF): string {
   return reg?.estado ?? infoPorUF(uf)?.estado ?? uf;
 }
 
+// Links externos ao Google Trends (Brasil). O Trends nao tem API oficial e
+// bloqueia datacenter; entao apontamos direto para o site, em nova aba.
+const TRENDS = [
+  {
+    rotulo: "Climatizadores",
+    descricao: "Tendencia de busca por climatizadores.",
+    icon: Fan,
+    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=climatizador",
+  },
+  {
+    rotulo: "Bikes de Spinning",
+    descricao: "Interesse por bikes de spinning.",
+    icon: Bike,
+    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=bike%20spinning",
+  },
+  {
+    rotulo: "Aspiradores",
+    descricao: "Tendencia de busca por aspiradores de po.",
+    icon: Wind,
+    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=aspirador%20de%20p%C3%B3",
+  },
+] as const;
+
 export function InteligenciaRegional() {
-  const [categoria, setCategoria] = useState<Categoria>("CLIMATIZADOR");
+  // So Climatizador: Spinning/Aspirador viraram links externos ao Google Trends.
+  const categoria: Categoria = "CLIMATIZADOR";
   const [dias, setDias] = useState<7 | 14>(7);
-  const [metricaBase, setMetricaBase] = useState<MetricaBase>("clientes");
+  // Metrica base ainda usada na degradacao (clima indisponivel -> densidade).
+  const [metricaBase] = useState<MetricaBase>("clientes");
 
   const [regioes, setRegioes] = useState<RegioesResp | null>(null);
   const [clima, setClima] = useState<ClimaResp | null>(null);
@@ -316,18 +344,6 @@ export function InteligenciaRegional() {
     [regioes, metricaBase],
   );
 
-  // Vendas ainda escassas: em Vendas, com 0-1 estado com venda, o mapa fica so
-  // cinza. Nesse caso mostramos um aviso limpo (e destacamos a unica venda).
-  const estadosComVenda = useMemo(
-    () => (regioes?.porUF ?? []).filter((r) => r.vendas > 0),
-    [regioes],
-  );
-  const vendasQuaseVazio =
-    !ehClima &&
-    metricaBase === "vendas" &&
-    !!regioes &&
-    estadosComVenda.length <= 1;
-
   // Melhores oportunidades (climatizador): top indice x presenca de clientes.
   const oportunidades = useMemo(() => {
     if (!(ehClima && climaUtil)) return [];
@@ -377,60 +393,22 @@ export function InteligenciaRegional() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Categoria */}
+          {/* Periodo do clima */}
           <div className="flex overflow-hidden rounded-lg border border-black/10">
-            {CATEGORIAS.map((c) => (
+            {([7, 14] as const).map((d) => (
               <button
-                key={c.chave}
-                onClick={() => setCategoria(c.chave)}
+                key={d}
+                onClick={() => setDias(d)}
                 className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  categoria === c.chave
+                  dias === d
                     ? "bg-tiffany text-white"
                     : "bg-white text-medio hover:bg-black/5"
                 }`}
               >
-                {c.rotulo}
+                {d} dias
               </button>
             ))}
           </div>
-
-          {/* Periodo (climatizador) */}
-          {ehClima && (
-            <div className="flex overflow-hidden rounded-lg border border-black/10">
-              {([7, 14] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDias(d)}
-                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                    dias === d
-                      ? "bg-tiffany text-white"
-                      : "bg-white text-medio hover:bg-black/5"
-                  }`}
-                >
-                  {d} dias
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Metrica base (spinning/aspirador) */}
-          {!ehClima && (
-            <div className="flex overflow-hidden rounded-lg border border-black/10">
-              {(["clientes", "vendas"] as const).map((mb) => (
-                <button
-                  key={mb}
-                  onClick={() => setMetricaBase(mb)}
-                  className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                    metricaBase === mb
-                      ? "bg-tiffany text-white"
-                      : "bg-white text-medio hover:bg-black/5"
-                  }`}
-                >
-                  {mb}
-                </button>
-              ))}
-            </div>
-          )}
 
           <button
             onClick={() => void atualizar()}
@@ -490,49 +468,6 @@ export function InteligenciaRegional() {
           mensagem="Nao foi possivel carregar os dados regionais."
           onRetry={() => void carregarRegioes()}
         />
-      ) : vendasQuaseVazio ? (
-        <Reveal>
-          <div className="rounded-xl border border-black/5 bg-white p-6">
-            <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tiffany/10">
-                <Trophy className="h-6 w-6 text-tiffany" />
-              </div>
-              <p className="text-sm font-medium text-escuro">
-                Ainda ha poucas vendas registradas
-              </p>
-              <p className="max-w-sm text-xs text-medio/60">
-                Conforme os negocios forem marcados como Ganho, o mapa de calor
-                de vendas ganha densidade. Enquanto isso, veja a densidade de
-                clientes na aba correspondente.
-              </p>
-              {estadosComVenda.length === 1 && (
-                <div className="mt-1 w-full max-w-xs rounded-lg border border-black/5 bg-fundo p-3 text-left">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-escuro">
-                      {estadoDe(estadosComVenda[0].uf, estadosComVenda[0])}{" "}
-                      <span className="text-medio/60">
-                        ({estadosComVenda[0].uf})
-                      </span>
-                    </span>
-                    <span className="rounded-full bg-sucesso/10 px-2 py-0.5 text-xs font-semibold text-sucesso">
-                      {estadosComVenda[0].vendas}{" "}
-                      {estadosComVenda[0].vendas === 1 ? "venda" : "vendas"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-medio/60">
-                    Faturamento: {formatarBRL(estadosComVenda[0].faturamento)}
-                  </p>
-                </div>
-              )}
-              <button
-                onClick={() => setMetricaBase("clientes")}
-                className="mt-1 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro"
-              >
-                Ver densidade de clientes
-              </button>
-            </div>
-          </div>
-        </Reveal>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Mapa + legenda */}
@@ -647,14 +582,48 @@ export function InteligenciaRegional() {
         </Reveal>
       )}
 
-      {/* Rodape honesto para spinning/aspirador */}
-      {!ehClima && (
-        <p className="flex items-center gap-1.5 text-xs text-medio/60">
-          <Info className="h-3 w-3" />
-          Camada de densidade de clientes/vendas (dado interno real). Sem
-          previsao de vendas: ela chega quando houver historico suficiente.
-        </p>
-      )}
+      {/* Interesse de busca (Google Trends) — links externos ao site do Google */}
+      <Reveal delay={80}>
+        <div className="rounded-xl border border-black/5 bg-white p-4">
+          <div className="mb-1 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-tiffany" />
+            <p className="text-sm font-semibold text-escuro">
+              Interesse de busca (Google Trends)
+            </p>
+          </div>
+          <p className="mb-3 text-xs text-medio/60">
+            Tendencia de buscas no Brasil por categoria. Abre no site do Google
+            Trends, fora do CRM.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {TRENDS.map((t) => (
+              <div
+                key={t.rotulo}
+                className="flex flex-col gap-2 rounded-lg border border-black/5 bg-fundo p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-tiffany/10">
+                    <t.icon className="h-4 w-4 text-tiffany" />
+                  </div>
+                  <span className="text-sm font-semibold text-escuro">
+                    {t.rotulo}
+                  </span>
+                </div>
+                <p className="text-xs text-medio/60">{t.descricao}</p>
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-auto flex items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Ver no Google Trends
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Reveal>
 
       {/* Drawer de clientes do estado (clique no mapa) */}
       {ufClientes && (
