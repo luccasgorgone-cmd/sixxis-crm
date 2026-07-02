@@ -15,6 +15,7 @@ import {
   Contact,
   CalendarDays,
   Map as MapIcon,
+  MapPin,
   Shield,
   type LucideIcon,
 } from "lucide-react";
@@ -73,6 +74,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
     { rotulo: "Inteligencia", href: "/inteligencia", icone: MapIcon },
+    { rotulo: "Mapa", href: "/mapa", icone: MapPin },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
       ? [{ rotulo: "Admin", href: "/admin", icone: Shield }]

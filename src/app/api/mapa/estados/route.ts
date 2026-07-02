@@ -1,8 +1,11 @@
 // Mapa: agregado por UF (centro de clientes georreferenciado). Cruza dados
 // internos (clientes/negocios/valor/produto) com a populacao IBGE (potencial de
 // mercado). UF via Endereco.uf -> fallback DDD do telefone. Sempre 200.
+// Filtros opcionais (query) refinam os leads ANTES de agregar, entao recolorem o
+// mapa e os KPIs: categoria, temperatura, situacao (abertos/ganhos/perdidos),
+// periodo (30/90 dias por ultimo contato).
 // GET /api/mapa/estados  (agente logado -> 401)
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente } from "@/lib/autorizacao";
 import { mapaPopulacao } from "@/lib/ibge";
@@ -10,23 +13,75 @@ import {
   selectLeadMapa,
   resolverUF,
   montarResumo,
+  negocioPrincipal,
+  classificarLead,
+  ultimoContatoDoLead,
   type LeadMapa,
   type ResumoUF,
 } from "@/lib/mapa";
+import { CATEGORIAS_PRODUTO } from "@/lib/classificar-produto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<NextResponse> {
+type Filtros = {
+  categoria: string | null;
+  temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
+  situacao: "abertos" | "ganhos" | "perdidos" | null;
+  periodo: 30 | 90 | null;
+};
+
+function lerFiltros(sp: URLSearchParams): Filtros {
+  const cat = sp.get("categoria");
+  const temp = sp.get("temperatura");
+  const sit = sp.get("situacao");
+  const per = Number(sp.get("periodo"));
+  return {
+    categoria: cat && CATEGORIAS_PRODUTO.includes(cat as never) ? cat : null,
+    temperatura:
+      temp === "QUENTE" || temp === "MORNO" || temp === "FRIO" ? temp : null,
+    situacao:
+      sit === "abertos" || sit === "ganhos" || sit === "perdidos" ? sit : null,
+    periodo: per === 30 || per === 90 ? (per as 30 | 90) : null,
+  };
+}
+
+function leadPassa(lead: LeadMapa, f: Filtros): boolean {
+  if (f.categoria && classificarLead(lead) !== f.categoria) return false;
+  if (f.temperatura) {
+    const p = negocioPrincipal(lead);
+    if (!p || p.temperatura !== f.temperatura) return false;
+  }
+  if (f.situacao) {
+    const alvo =
+      f.situacao === "abertos"
+        ? "ABERTO"
+        : f.situacao === "ganhos"
+          ? "GANHO"
+          : "PERDIDO";
+    if (!lead.negocios.some((n) => n.status === alvo)) return false;
+  }
+  if (f.periodo) {
+    const uc = ultimoContatoDoLead(lead);
+    if (!uc) return false;
+    if (uc.getTime() < Date.now() - f.periodo * 24 * 60 * 60 * 1000) return false;
+  }
+  return true;
+}
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
 
-  const [leads, populacaoPorUF] = await Promise.all([
+  const filtros = lerFiltros(req.nextUrl.searchParams);
+
+  const [leadsTodos, populacaoPorUF] = await Promise.all([
     prisma.lead.findMany({ select: selectLeadMapa }),
     mapaPopulacao(),
   ]);
+  const leads = leadsTodos.filter((l) => leadPassa(l, filtros));
 
   // Agrupa os leads por UF (ou conta como semUF quando nao da para inferir).
   const porUFLeads = new Map<string, LeadMapa[]>();
