@@ -4,15 +4,50 @@
 // Registra Atividade com o que mudou.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente, ehAdmin } from "@/lib/autorizacao";
+import { obterAgente, ehAdmin, podeGerenciarLead } from "@/lib/autorizacao";
 import { registrarAtividade } from "@/lib/atividade";
-import { nomeEfetivo } from "@/lib/cliente";
+import {
+  nomeEfetivo,
+  selectClientePainel,
+  serializarClientePainel,
+} from "@/lib/cliente";
 import { getIO } from "@/lib/socket";
 import { AtividadeTipo } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// GET: dados completos do cliente para o BlocoCliente (usado pelo Inbox, que nao
+// passa por /api/negocios/[id]). Mesmo shape do negocio.cliente, via serializador
+// compartilhado. Escopo: dono (venda/pos/atendente) ou admin — reusa
+// podeGerenciarLead (mesma regra do PATCH abaixo). Enderecos ficam com o proprio
+// BlocoCliente (componente Enderecos), como no Kanban/supervisao.
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
+  }
+  const { id } = await ctx.params;
+
+  if (!(await podeGerenciarLead(agente, id))) {
+    // Nao revela existencia a quem nao tem escopo: 404 (o lead pode nem existir).
+    return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id },
+    select: selectClientePainel,
+  });
+  if (!lead) {
+    return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
+  }
+
+  return NextResponse.json({ cliente: serializarClientePainel(lead) });
+}
 
 // Campos editaveis e seus rotulos para a descricao da atividade.
 const CAMPOS: { chave: "nomeManual" | "email" | "empresa" | "cpf" | "cnpj" | "anotacoes"; rotulo: string }[] = [

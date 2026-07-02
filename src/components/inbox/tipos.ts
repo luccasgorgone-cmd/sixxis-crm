@@ -16,6 +16,9 @@ export type Finalidade = "VENDA" | "POS_VENDA";
 
 export type ConversaItem = {
   id: string;
+  // Presente na lista real do Inbox (/api/conversas); ausente nos usos embutidos
+  // do Thread (Kanban/supervisao), que nao precisam do painel de cliente.
+  leadId?: string;
   leadNome: string | null;
   leadFoto?: string | null;
   leadTelefone: string;

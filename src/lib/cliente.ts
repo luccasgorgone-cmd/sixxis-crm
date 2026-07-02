@@ -39,3 +39,66 @@ export const selectClienteBasico = {
   telefone: true,
   fotoUrl: true,
 } as const;
+
+// Select RICO para o BlocoCliente (painel de dados do cliente). Reune tudo que o
+// bloco exibe: identificacao, contato, documentos, nascimento, anotacoes, opt-out
+// e a origem (incl. anuncio Click-to-WhatsApp). O endereco NAO entra aqui — o
+// BlocoCliente carrega os enderecos por conta propria (componente Enderecos).
+export const selectClientePainel = {
+  id: true,
+  nome: true,
+  pushName: true,
+  nomeManual: true,
+  telefone: true,
+  fotoUrl: true,
+  email: true,
+  empresa: true,
+  cpf: true,
+  cnpj: true,
+  dataNascimento: true,
+  anotacoes: true,
+  aceitaContato: true,
+  origem: true,
+  anuncioTitulo: true,
+  anuncioUrl: true,
+} as const;
+
+// Linha do banco (subset de Lead) que o serializador do painel espera.
+export type LeadPainelRow = LeadNomeavel & {
+  id: string;
+  fotoUrl: string | null;
+  email: string | null;
+  empresa: string | null;
+  cpf: string | null;
+  cnpj: string | null;
+  dataNascimento: Date | null;
+  anotacoes: string | null;
+  aceitaContato: boolean;
+  origem: string | null;
+  anuncioTitulo: string | null;
+  anuncioUrl: string | null;
+};
+
+// Serializa um Lead (selectClientePainel) no shape do ClientePainel do BlocoCliente.
+// Usado por endpoints que alimentam o painel do cliente (ex.: GET /api/leads/[id]).
+export function serializarClientePainel(l: LeadPainelRow) {
+  return {
+    id: l.id,
+    nome: l.nome ?? null,
+    pushName: l.pushName ?? null,
+    nomeManual: l.nomeManual ?? null,
+    nomeEfetivo: nomeEfetivo(l),
+    fotoUrl: l.fotoUrl,
+    telefone: l.telefone,
+    email: l.email,
+    empresa: l.empresa,
+    cpf: l.cpf,
+    cnpj: l.cnpj,
+    dataNascimento: l.dataNascimento ? l.dataNascimento.toISOString() : null,
+    anotacoes: l.anotacoes,
+    aceitaContato: l.aceitaContato,
+    origem: l.origem,
+    anuncioTitulo: l.anuncioTitulo,
+    anuncioUrl: l.anuncioUrl,
+  };
+}

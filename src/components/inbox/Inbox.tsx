@@ -9,6 +9,7 @@ import { previewMensagem } from "@/lib/preview";
 import { normalizarTexto } from "@/lib/format";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
+import { PainelClienteInbox } from "./PainelClienteInbox";
 import type {
   ConversaItem,
   MensagemItem,
@@ -248,19 +249,28 @@ export function Inbox({
       />
 
       {conversaAberta ? (
-        <Thread
-          conversa={conversaAberta}
-          mensagens={mensagens}
-          carregando={carregandoThread}
-          onEnviada={aoEnviada}
-          ehAdmin={ehAdmin}
-          onExcluida={() => {
-            const id = selecionadaRef.current;
-            if (id) setConversas((prev) => prev.filter((c) => c.id !== id));
-            setSelecionada(null);
-            setMensagens([]);
-          }}
-        />
+        <>
+          <Thread
+            conversa={conversaAberta}
+            mensagens={mensagens}
+            carregando={carregandoThread}
+            onEnviada={aoEnviada}
+            ehAdmin={ehAdmin}
+            onExcluida={() => {
+              const id = selecionadaRef.current;
+              if (id) setConversas((prev) => prev.filter((c) => c.id !== id));
+              setSelecionada(null);
+              setMensagens([]);
+            }}
+          />
+          {/* Coluna de dados do cliente (email/CPF/nascimento/endereco/anuncio).
+              Aparece em telas largas; no mobile a thread ocupa tudo. */}
+          {conversaAberta.leadId && (
+            <aside className="hidden w-[340px] shrink-0 border-l border-black/5 xl:block">
+              <PainelClienteInbox leadId={conversaAberta.leadId} />
+            </aside>
+          )}
+        </>
       ) : (
         <div className="hidden flex-1 flex-col items-center justify-center gap-3 bg-fundo text-center sm:flex">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-tiffany/10">

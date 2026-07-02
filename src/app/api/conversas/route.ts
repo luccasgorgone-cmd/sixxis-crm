@@ -48,6 +48,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const admin = ehAdmin(agente.papel);
   const lista = conversas.map((c) => ({
     id: c.id,
+    leadId: c.leadId,
     leadNome: nomeEfetivo(c.lead),
     leadFoto: c.lead.fotoUrl,
     leadTelefone: c.lead.telefone,
