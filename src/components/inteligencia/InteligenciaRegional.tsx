@@ -44,6 +44,11 @@ import {
   gradienteCss,
   algumFiltroAtivo,
   combinaFiltros,
+  faixaDeTemp,
+  faixaDeUmid,
+  faixaDeChuva,
+  faixaDeSensacao,
+  faixaDeIndice,
   type ClimaResp,
   type ClimaUF,
   type FiltrosClima,
@@ -206,6 +211,32 @@ export function InteligenciaRegional() {
     [filtrosLigados, climaPorUF, filtros],
   );
 
+  // Contagem de estados por faixa (feedback nos chips: "Alta >30 (7)"). So conta
+  // UF com clima valido; UF sem dado na dimensao nao entra em nenhuma faixa.
+  const contagens = useMemo(() => {
+    const base = {
+      temp: { alta: 0, media: 0, baixa: 0 },
+      umidade: { alta: 0, media: 0, baixa: 0 },
+      chuva: { com: 0, sem: 0 },
+      sensacao: { alta: 0, media: 0, baixa: 0 },
+      indice: { alto: 0, medio: 0, baixo: 0 },
+    };
+    (clima?.porUF ?? []).forEach((c) => {
+      if (c.erro) return;
+      const t = faixaDeTemp(c.tempMax);
+      if (t) base.temp[t]++;
+      const u = faixaDeUmid(c.umidade);
+      if (u) base.umidade[u]++;
+      const ch = faixaDeChuva(c.chuvaPrevista);
+      if (ch) base.chuva[ch]++;
+      const s = faixaDeSensacao(c.sensacao, c.tempMax);
+      if (s) base.sensacao[s]++;
+      const i = faixaDeIndice(c.indiceOportunidade);
+      if (i) base.indice[i]++;
+    });
+    return base;
+  }, [clima]);
+
   const corPorUF = useCallback(
     (uf: string): string => {
       if (!modoDensidade) {
@@ -238,6 +269,7 @@ export function InteligenciaRegional() {
             ) : (
               <>
                 <Linha rotulo="Temp. atual" valor={fmtTemp(c.tempAtual)} />
+                <Linha rotulo="Sensacao" valor={fmtTemp(c.sensacao)} />
                 <Linha
                   rotulo="Máx / mín"
                   valor={`${fmtTemp(c.tempMax)} / ${fmtTemp(c.tempMin)}`}
@@ -440,7 +472,11 @@ export function InteligenciaRegional() {
 
       {/* Filtros de faixa: recolorem/atenuam o mapa */}
       {climaUtil && (
-        <BarraFiltros filtros={filtros} onChange={setFiltros} />
+        <BarraFiltros
+          filtros={filtros}
+          onChange={setFiltros}
+          contagens={contagens}
+        />
       )}
 
       {erroReg && !regioes ? (
@@ -605,12 +641,16 @@ export function InteligenciaRegional() {
 
 // Barra de filtros de faixa (multi-select). Cada chip alterna uma faixa; grupos
 // ativos combinam em AND (dentro do grupo, OR).
+type Contagens = Record<keyof FiltrosClima, Record<string, number>>;
+
 function BarraFiltros({
   filtros,
   onChange,
+  contagens,
 }: {
   filtros: FiltrosClima;
   onChange: (f: FiltrosClima) => void;
+  contagens: Contagens;
 }) {
   const algum = algumFiltroAtivo(filtros);
 
@@ -640,6 +680,7 @@ function BarraFiltros({
           { v: "baixa", r: "Baixa <22" },
         ]}
         ativos={filtros.temp}
+        contagens={contagens.temp}
         onToggle={(v) => alternar("temp", v as FiltrosClima["temp"][number])}
       />
       <GrupoFiltro
@@ -650,6 +691,7 @@ function BarraFiltros({
           { v: "baixa", r: "Baixa <40" },
         ]}
         ativos={filtros.umidade}
+        contagens={contagens.umidade}
         onToggle={(v) => alternar("umidade", v as FiltrosClima["umidade"][number])}
       />
       <GrupoFiltro
@@ -659,6 +701,7 @@ function BarraFiltros({
           { v: "sem", r: "Sem chuva" },
         ]}
         ativos={filtros.chuva}
+        contagens={contagens.chuva}
         onToggle={(v) => alternar("chuva", v as FiltrosClima["chuva"][number])}
       />
       <GrupoFiltro
@@ -669,6 +712,7 @@ function BarraFiltros({
           { v: "baixa", r: "Baixa <24" },
         ]}
         ativos={filtros.sensacao}
+        contagens={contagens.sensacao}
         onToggle={(v) =>
           alternar("sensacao", v as FiltrosClima["sensacao"][number])
         }
@@ -682,6 +726,7 @@ function BarraFiltros({
           { v: "baixo", r: "Baixo <40" },
         ]}
         ativos={filtros.indice}
+        contagens={contagens.indice}
         onToggle={(v) => alternar("indice", v as FiltrosClima["indice"][number])}
       />
 
@@ -704,12 +749,15 @@ function GrupoFiltro({
   ativos,
   onToggle,
   dica,
+  contagens,
 }: {
   titulo: string;
   opcoes: { v: string; r: string }[];
   ativos: string[];
   onToggle: (v: string) => void;
   dica?: string;
+  // Quantos estados casam cada faixa (feedback nos chips). Opcional.
+  contagens?: Record<string, number>;
 }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -724,6 +772,7 @@ function GrupoFiltro({
       <div className="flex flex-wrap gap-1">
         {opcoes.map((o) => {
           const on = ativos.includes(o.v);
+          const qtd = contagens?.[o.v];
           return (
             <button
               key={o.v}
@@ -736,6 +785,12 @@ function GrupoFiltro({
               }`}
             >
               {o.r}
+              {qtd != null && (
+                <span className={on ? "opacity-80" : "text-medio/50"}>
+                  {" "}
+                  ({qtd})
+                </span>
+              )}
             </button>
           );
         })}
