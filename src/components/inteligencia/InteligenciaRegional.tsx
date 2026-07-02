@@ -16,11 +16,6 @@ import {
   CloudOff,
   SlidersHorizontal,
   X,
-  TrendingUp,
-  ExternalLink,
-  Fan,
-  Bike,
-  Wind,
 } from "lucide-react";
 import { infoPorUF } from "@/lib/ddd";
 import { formatarBRL } from "@/lib/format";
@@ -57,29 +52,6 @@ import {
 function estadoDe(uf: string, reg?: RegiaoUF): string {
   return reg?.estado ?? infoPorUF(uf)?.estado ?? uf;
 }
-
-// Links externos ao Google Trends (Brasil). O Trends nao tem API oficial e
-// bloqueia datacenter; entao apontamos direto para o site, em nova aba.
-const TRENDS = [
-  {
-    rotulo: "Climatizadores",
-    descricao: "Tendencia de busca por climatizadores.",
-    icon: Fan,
-    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=climatizador",
-  },
-  {
-    rotulo: "Bikes de Spinning",
-    descricao: "Interesse por bikes de spinning.",
-    icon: Bike,
-    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=bike%20spinning",
-  },
-  {
-    rotulo: "Aspiradores",
-    descricao: "Tendencia de busca por aspiradores de po.",
-    icon: Wind,
-    url: "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=aspirador%20de%20p%C3%B3",
-  },
-] as const;
 
 // Janelas de previsao suportadas (16 = teto de forecast diario da Open-Meteo).
 type Dias = 3 | 7 | 14 | 16;
@@ -585,49 +557,6 @@ export function InteligenciaRegional() {
           </div>
         </Reveal>
       )}
-
-      {/* Interesse de busca (Google Trends) — links externos ao site do Google */}
-      <Reveal delay={80}>
-        <div className="rounded-xl border border-black/5 bg-white p-4">
-          <div className="mb-1 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-tiffany" />
-            <p className="text-sm font-semibold text-escuro">
-              Interesse de busca (Google Trends)
-            </p>
-          </div>
-          <p className="mb-3 text-xs text-medio/60">
-            Tendencia de buscas no Brasil por categoria. Abre no site do Google
-            Trends, fora do CRM.
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {TRENDS.map((t) => (
-              <div
-                key={t.rotulo}
-                className="flex flex-col gap-2 rounded-lg border border-black/5 bg-fundo p-3"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-tiffany/10">
-                    <t.icon className="h-4 w-4 text-tiffany" />
-                  </div>
-                  <span className="text-sm font-semibold text-escuro">
-                    {t.rotulo}
-                  </span>
-                </div>
-                <p className="text-xs text-medio/60">{t.descricao}</p>
-                <a
-                  href={t.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-auto flex items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Ver no Google Trends
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Reveal>
 
       {/* Drawer de clientes do estado (clique no mapa) */}
       {ufClientes && (

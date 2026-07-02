@@ -21,6 +21,7 @@ const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
   { prefixo: "/admin", titulo: "Administracao" },
   { prefixo: "/agenda", titulo: "Agenda" },
   { prefixo: "/dashboard", titulo: "Painel" },
+  { prefixo: "/google-trends", titulo: "Google Trends" },
   { prefixo: "/inteligencia", titulo: "Clima" },
   { prefixo: "/inbox", titulo: "Inbox" },
   { prefixo: "/kanban", titulo: "Kanban" },

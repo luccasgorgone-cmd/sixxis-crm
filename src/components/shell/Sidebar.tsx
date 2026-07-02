@@ -16,6 +16,7 @@ import {
   CalendarDays,
   CloudSun,
   MapPin,
+  TrendingUp,
   Shield,
   type LucideIcon,
 } from "lucide-react";
@@ -74,6 +75,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
     { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
+    { rotulo: "Google Trends", href: "/google-trends", icone: TrendingUp },
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
