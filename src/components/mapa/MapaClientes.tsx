@@ -17,6 +17,7 @@ import {
   corEscala,
 } from "@/components/inteligencia/tipos";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
+import { SeletorVendedor } from "@/components/shared/SeletorVendedor";
 import type {
   Etapa,
   EtiquetaChip,
@@ -54,7 +55,9 @@ export function MapaClientes() {
 
   const agente = useAgente();
   const papel = agente?.papel ?? "COLABORADOR";
+  const ehAdmin = papel === "ADMIN";
   const agenteId = agente?.id ?? "";
+  const [escopo, setEscopo] = useState(""); // admin: "" (Todos) | agenteId | SEM_DONO
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
   const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
@@ -69,18 +72,18 @@ export function MapaClientes() {
       .then((r) => (r.ok ? r.json() : { etiquetas: [] }))
       .then((d) => setEtiquetas(d.etiquetas ?? []))
       .catch(() => undefined);
-    if (papel === "ADMIN") {
+    if (ehAdmin) {
       fetch("/api/agentes")
         .then((r) => (r.ok ? r.json() : { agentes: [] }))
         .then((d) => setAgentes(d.agentes ?? []))
         .catch(() => undefined);
     }
-  }, [papel]);
+  }, [ehAdmin]);
 
-  const carregar = useCallback(async (f: FiltrosMapa) => {
+  const carregar = useCallback(async (f: FiltrosMapa, esc: string) => {
     setCarregando(true);
     try {
-      const r = await fetch(`/api/mapa/estados${queryFiltros(f)}`);
+      const r = await fetch(`/api/mapa/estados${queryFiltros(f, esc)}`);
       if (!r.ok) throw new Error();
       setDados(await r.json());
       setErro(false);
@@ -92,8 +95,8 @@ export function MapaClientes() {
   }, []);
 
   useEffect(() => {
-    void carregar(filtros);
-  }, [carregar, filtros]);
+    void carregar(filtros, escopo);
+  }, [carregar, filtros, escopo]);
 
   // Etapas de VENDA/AMBAS para o dropdown do drawer (pos-venda fica de fora).
   const etapasEdicao = useMemo(
@@ -184,18 +187,27 @@ export function MapaClientes() {
             de mercado (populacao).
           </p>
         </div>
-        <button
-          onClick={() => void carregar(filtros)}
-          disabled={carregando}
-          className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-60"
-        >
-          {carregando ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-3">
+          {ehAdmin && (
+            <SeletorVendedor
+              valor={escopo}
+              vendedores={agentes}
+              onChange={setEscopo}
+            />
           )}
-          Atualizar
-        </button>
+          <button
+            onClick={() => void carregar(filtros, escopo)}
+            disabled={carregando}
+            className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-60"
+          >
+            {carregando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -283,7 +295,7 @@ export function MapaClientes() {
       {erro && !dados ? (
         <EstadoErro
           mensagem="Nao foi possivel carregar o mapa."
-          onRetry={() => void carregar(filtros)}
+          onRetry={() => void carregar(filtros, escopo)}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -360,6 +372,7 @@ export function MapaClientes() {
       {ufDrawer && (
         <PainelEstadoMapa
           uf={ufDrawer}
+          escopo={escopo}
           etapas={etapasEdicao}
           onFechar={() => setUfDrawer(null)}
           onAbrirNegocio={(id) => setNegocioId(id)}
@@ -376,7 +389,7 @@ export function MapaClientes() {
           etiquetas={etiquetas}
           etapas={etapas}
           onFechar={() => setNegocioId(null)}
-          onAtualizado={() => void carregar(filtros)}
+          onAtualizado={() => void carregar(filtros, escopo)}
         />
       )}
     </div>

@@ -22,6 +22,8 @@ import { formatarBRL } from "@/lib/format";
 import { EstadoErro } from "@/components/ui/Estado";
 import { LegendaGradiente } from "@/components/ui/LegendaGradiente";
 import { useAgente } from "@/components/shell/AgenteContext";
+import { SeletorVendedor } from "@/components/shared/SeletorVendedor";
+import { paramsEscopo } from "@/lib/escopo";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import type {
   Etapa,
@@ -76,7 +78,9 @@ export function InteligenciaRegional() {
 
   const agente = useAgente();
   const papel = agente?.papel ?? "COLABORADOR";
+  const ehAdmin = papel === "ADMIN";
   const agenteId = agente?.id ?? "";
+  const [escopo, setEscopo] = useState(""); // admin: "" (Todos) | agenteId | SEM_DONO
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
   const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
@@ -91,13 +95,13 @@ export function InteligenciaRegional() {
       .then((r) => (r.ok ? r.json() : { etiquetas: [] }))
       .then((d) => setEtiquetas(d.etiquetas ?? []))
       .catch(() => undefined);
-    if (papel === "ADMIN") {
+    if (ehAdmin) {
       fetch("/api/agentes")
         .then((r) => (r.ok ? r.json() : { agentes: [] }))
         .then((d) => setAgentes(d.agentes ?? []))
         .catch(() => undefined);
     }
-  }, [papel]);
+  }, [ehAdmin]);
 
   // Relogio leve p/ "atualizado ha X min".
   useEffect(() => {
@@ -115,7 +119,10 @@ export function InteligenciaRegional() {
   const carregarRegioes = useCallback(async () => {
     setCarregandoReg(true);
     try {
-      const r = await fetch("/api/inteligencia/regioes");
+      const p = new URLSearchParams();
+      for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
+      const qs = p.toString();
+      const r = await fetch(`/api/inteligencia/regioes${qs ? `?${qs}` : ""}`);
       if (!r.ok) throw new Error();
       setRegioes(await r.json());
       setErroReg(false);
@@ -124,7 +131,7 @@ export function InteligenciaRegional() {
     } finally {
       setCarregandoReg(false);
     }
-  }, []);
+  }, [escopo]);
 
   const carregarClima = useCallback(
     async (d: Dias, refresh = false) => {
@@ -361,6 +368,13 @@ export function InteligenciaRegional() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {ehAdmin && (
+            <SeletorVendedor
+              valor={escopo}
+              vendedores={agentes}
+              onChange={setEscopo}
+            />
+          )}
           {/* Periodo do clima */}
           <div className="flex overflow-hidden rounded-lg border border-black/10">
             {([3, 7, 14, 16] as const).map((d) => (
@@ -562,6 +576,7 @@ export function InteligenciaRegional() {
       {ufClientes && (
         <PainelClientesEstado
           uf={ufClientes}
+          escopo={escopo}
           onFechar={() => setUfClientes(null)}
           onAbrirNegocio={(id) => setNegocioId(id)}
           climatizador={climaUtil}

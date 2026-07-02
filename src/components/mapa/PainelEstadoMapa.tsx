@@ -23,6 +23,7 @@ import { BadgeStatusNegocio, BadgePendente } from "@/components/badges";
 import { EstadoErro } from "@/components/ui/Estado";
 import { Reveal } from "@/components/inteligencia/Reveal";
 import { formatarBRL, normalizarTexto } from "@/lib/format";
+import { paramsEscopo } from "@/lib/escopo";
 import type { ClienteMapa, EstadoDetalheResp } from "./tipos";
 
 type EtapaOpcao = { id: string; nome: string; tipo?: string };
@@ -49,11 +50,14 @@ function desde(iso: string | null): string {
 
 export function PainelEstadoMapa({
   uf,
+  escopo = "",
   etapas,
   onFechar,
   onAbrirNegocio,
 }: {
   uf: string;
+  // Escopo de vendedor herdado do Mapa (admin). Vazio = colaborador / Todos.
+  escopo?: string;
   etapas: EtapaOpcao[];
   onFechar: () => void;
   onAbrirNegocio: (negocioId: string) => void;
@@ -70,7 +74,9 @@ export function PainelEstadoMapa({
     async (silencioso = false) => {
       if (!silencioso) setCarregando(true);
       try {
-        const r = await fetch(`/api/mapa/estado?uf=${uf}`);
+        const p = new URLSearchParams({ uf });
+        for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
+        const r = await fetch(`/api/mapa/estado?${p.toString()}`);
         if (!r.ok) throw new Error();
         setDados(await r.json());
         setErro(false);
@@ -80,7 +86,7 @@ export function PainelEstadoMapa({
         if (!silencioso) setCarregando(false);
       }
     },
-    [uf],
+    [uf, escopo],
   );
 
   useEffect(() => {

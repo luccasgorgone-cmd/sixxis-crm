@@ -9,6 +9,7 @@ import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { BadgeStatusNegocio, BadgePendente } from "@/components/badges";
 import { EstadoErro } from "@/components/ui/Estado";
 import { formatarBRL, normalizarTexto } from "@/lib/format";
+import { paramsEscopo } from "@/lib/escopo";
 import { ClimaEstadoDetalhe } from "./ClimaEstadoDetalhe";
 import type { ClienteEstado, ClientesEstadoResp, ClimaUF } from "./tipos";
 
@@ -24,12 +25,15 @@ function desde(iso: string | null): string {
 
 export function PainelClientesEstado({
   uf,
+  escopo = "",
   onFechar,
   onAbrirNegocio,
   climatizador = false,
   resumoClima,
 }: {
   uf: string;
+  // Escopo de vendedor herdado do Clima (admin). Vazio = colaborador / Todos.
+  escopo?: string;
   onFechar: () => void;
   onAbrirNegocio: (negocioId: string) => void;
   // No modo Climatizador o drawer ganha o detalhe de clima (curva + historico).
@@ -44,7 +48,9 @@ export function PainelClientesEstado({
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const r = await fetch(`/api/inteligencia/clientes?uf=${uf}`);
+      const p = new URLSearchParams({ uf });
+      for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
+      const r = await fetch(`/api/inteligencia/clientes?${p.toString()}`);
       if (!r.ok) throw new Error();
       setDados(await r.json());
       setErro(false);
@@ -53,7 +59,7 @@ export function PainelClientesEstado({
     } finally {
       setCarregando(false);
     }
-  }, [uf]);
+  }, [uf, escopo]);
 
   useEffect(() => {
     void carregar();

@@ -1,6 +1,7 @@
 // Tipos e config do Mapa (client). Espelham as respostas de /api/mapa/*.
 // A escala de cor e a de densidade da Inteligencia (tiffany claro -> escuro).
 import { formatarBRL } from "@/lib/format";
+import { paramsEscopo } from "@/lib/escopo";
 
 export type ProdutoTop = { rotulo: string; qtd: number };
 
@@ -121,12 +122,13 @@ export const FILTROS_MAPA_VAZIO: FiltrosMapa = {
   periodo: null,
 };
 
-export function queryFiltros(f: FiltrosMapa): string {
+export function queryFiltros(f: FiltrosMapa, escopo = ""): string {
   const p = new URLSearchParams();
   if (f.categoria) p.set("categoria", f.categoria);
   if (f.temperatura) p.set("temperatura", f.temperatura);
   if (f.situacao) p.set("situacao", f.situacao);
   if (f.periodo) p.set("periodo", String(f.periodo));
+  for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
   const s = p.toString();
   return s ? `?${s}` : "";
 }
