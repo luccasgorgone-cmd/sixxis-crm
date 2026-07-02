@@ -120,6 +120,9 @@ export function classificarLead(lead: LeadMapa): CategoriaProduto {
   return classificarProduto({
     interesses: lead.produtosInteresse.map((p) => p.produtoInteresse.nome),
     anuncioTitulo: lead.anuncioTitulo,
+    // Nomes das etapas dos negocios do lead (ex.: funil "Climatizador - ...").
+    etapasNomes: lead.negocios.map((n) => n.etapa?.nome ?? null),
+    origem: lead.origem,
   });
 }
 

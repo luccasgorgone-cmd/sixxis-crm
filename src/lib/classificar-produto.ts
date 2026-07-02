@@ -1,7 +1,9 @@
-// Classificacao de produto do cliente para o Mapa. Prioriza os produtos de
-// interesse cadastrados (LeadProdutoInteresse); se nao houver sinal, cai para o
-// titulo do anuncio de origem (Click-to-WhatsApp). E heuristica honesta por
-// palavra-chave; sem sinal, retorna "Nao classificado" (nunca inventa).
+// Classificacao de produto do cliente para o Mapa. Ordem de prioridade (do sinal
+// mais forte ao mais fraco, so texto real que ja existe): produtos de interesse
+// cadastrados (LeadProdutoInteresse) -> titulo do anuncio de origem
+// (Click-to-WhatsApp) -> nomes das etapas dos negocios do lead -> origem. E
+// heuristica honesta por palavra-chave; sem sinal, retorna "Nao classificado"
+// (nunca inventa).
 import { normalizarTexto } from "./format";
 
 export type CategoriaProduto =
@@ -29,18 +31,28 @@ function categoriaDeTexto(texto: string): CategoriaProduto | null {
   return null;
 }
 
-// Classifica um lead: primeiro pelos produtos de interesse, depois pelo anuncio.
+// Classifica um lead percorrendo as fontes na ordem de prioridade: produtos de
+// interesse -> anuncio -> nomes das etapas dos negocios -> origem. Retorna a
+// primeira categoria que baterem; sem sinal em nenhuma, "Nao classificado".
 export function classificarProduto(entrada: {
   interesses?: (string | null | undefined)[];
   anuncioTitulo?: string | null;
+  etapasNomes?: (string | null | undefined)[];
+  origem?: string | null;
 }): CategoriaProduto {
-  for (const nome of entrada.interesses ?? []) {
-    if (!nome) continue;
-    const c = categoriaDeTexto(nome);
-    if (c) return c;
+  // Fontes em ordem: cada uma e uma lista de textos livres a testar.
+  const fontes: (string | null | undefined)[][] = [
+    entrada.interesses ?? [],
+    [entrada.anuncioTitulo],
+    entrada.etapasNomes ?? [],
+    [entrada.origem],
+  ];
+  for (const fonte of fontes) {
+    for (const texto of fonte) {
+      if (!texto) continue;
+      const c = categoriaDeTexto(texto);
+      if (c) return c;
+    }
   }
-  const porAnuncio = entrada.anuncioTitulo
-    ? categoriaDeTexto(entrada.anuncioTitulo)
-    : null;
-  return porAnuncio ?? "Nao classificado";
+  return "Nao classificado";
 }
