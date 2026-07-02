@@ -81,17 +81,6 @@ export type DetalheClimaResp = {
   tendencia: Tendencia | null;
 };
 
-export type Categoria = "CLIMATIZADOR" | "SPINNING" | "ASPIRADOR";
-
-export const CATEGORIAS: { chave: Categoria; rotulo: string }[] = [
-  { chave: "CLIMATIZADOR", rotulo: "Climatizador" },
-  { chave: "SPINNING", rotulo: "Spinning" },
-  { chave: "ASPIRADOR", rotulo: "Aspirador" },
-];
-
-// Metrica ativa no mapa para categorias sem clima (Spinning/Aspirador).
-export type MetricaBase = "clientes" | "vendas";
-
 // Interpolacao linear entre stops [t(0..1), "#rrggbb"] -> "#rrggbb".
 function hexParaRgb(h: string): [number, number, number] {
   const n = parseInt(h.slice(1), 16);

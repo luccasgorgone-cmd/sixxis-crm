@@ -1,9 +1,9 @@
 "use client";
 
-// Inteligencia Regional: mapa coropletico do Brasil + rankings por estado e
-// regiao. Cruza dados internos (clientes/vendas/faturamento por UF) com a
-// previsao do tempo (Open-Meteo) para sugerir onde ha mais oportunidade de
-// venda de climatizador. Spinning/Aspirador usam so a densidade interna.
+// Aba Clima: mapa coropletico do Brasil + rankings por estado e regiao. Cruza a
+// previsao do tempo (Open-Meteo) com os dados internos (clientes por UF) para
+// sugerir onde ha mais oportunidade de venda de climatizador. Se o clima estiver
+// indisponivel, degrada para a densidade de clientes (dado interno).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   RefreshCw,
@@ -45,11 +45,9 @@ import {
   corEscala,
   algumFiltroAtivo,
   combinaFiltros,
-  type Categoria,
   type ClimaResp,
   type ClimaUF,
   type FiltrosClima,
-  type MetricaBase,
   type RegioesResp,
   type RegiaoUF,
 } from "./tipos";
@@ -82,11 +80,7 @@ const TRENDS = [
 ] as const;
 
 export function InteligenciaRegional() {
-  // So Climatizador: Spinning/Aspirador viraram links externos ao Google Trends.
-  const categoria: Categoria = "CLIMATIZADOR";
   const [dias, setDias] = useState<7 | 14>(7);
-  // Metrica base ainda usada na degradacao (clima indisponivel -> densidade).
-  const [metricaBase] = useState<MetricaBase>("clientes");
 
   const [regioes, setRegioes] = useState<RegioesResp | null>(null);
   const [clima, setClima] = useState<ClimaResp | null>(null);
@@ -109,8 +103,6 @@ export function InteligenciaRegional() {
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
   const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
-
-  const ehClima = categoria === "CLIMATIZADOR";
 
   // Datasets para o PainelNegocio (reuso do Kanban), carregados uma vez.
   useEffect(() => {
@@ -180,16 +172,15 @@ export function InteligenciaRegional() {
     void carregarRegioes();
   }, [carregarRegioes]);
 
-  // Carrega o clima ao entrar em Climatizador ou trocar de periodo (uma vez por
-  // combinacao; o cache do servidor evita refetch pesado).
+  // Carrega o clima ao montar ou trocar de periodo (uma vez por combinacao; o
+  // cache do servidor evita refetch pesado).
   const climaCarregadoRef = useRef<string>("");
   useEffect(() => {
-    if (!ehClima) return;
     const chave = `${dias}`;
     if (climaCarregadoRef.current === chave && clima) return;
     climaCarregadoRef.current = chave;
     void carregarClima(dias);
-  }, [ehClima, dias, carregarClima, clima]);
+  }, [dias, carregarClima, clima]);
 
   const regPorUF = useMemo(() => {
     const m = new Map<string, RegiaoUF>();
@@ -206,22 +197,21 @@ export function InteligenciaRegional() {
   const maxDensidade = useMemo(() => {
     let mx = 0;
     regioes?.porUF.forEach((r) => {
-      const v = metricaBase === "vendas" ? r.vendas : r.clientes;
-      if (v > mx) mx = v;
+      if (r.clientes > mx) mx = r.clientes;
     });
     return mx;
-  }, [regioes, metricaBase]);
+  }, [regioes]);
 
   // Clima realmente utilizavel? (existe e ao menos uma UF sem erro)
   const climaUtil = useMemo(
     () => !!clima && clima.porUF.some((c) => !c.erro && c.indiceOportunidade != null),
     [clima],
   );
-  // Em Climatizador sem clima -> degrada para densidade de clientes + aviso.
-  const modoDensidade = !ehClima || !climaUtil;
+  // Sem clima utilizavel -> degrada para densidade de clientes (dado interno) + aviso.
+  const modoDensidade = !climaUtil;
 
   // Filtros de faixa: so no modo clima util. UF sem dado nao bate filtro ativo.
-  const filtrosLigados = ehClima && climaUtil && algumFiltroAtivo(filtros);
+  const filtrosLigados = climaUtil && algumFiltroAtivo(filtros);
   const dimUF = useCallback(
     (uf: string): boolean => {
       if (!filtrosLigados) return false;
@@ -240,11 +230,11 @@ export function InteligenciaRegional() {
         return corEscala(c.indiceOportunidade / 100, ESCALA_INDICE);
       }
       const r = regPorUF.get(uf);
-      const v = r ? (metricaBase === "vendas" ? r.vendas : r.clientes) : 0;
+      const v = r ? r.clientes : 0;
       if (!v || maxDensidade === 0) return COR_SEM_DADO;
       return corEscala(v / maxDensidade, ESCALA_DENSIDADE);
     },
-    [modoDensidade, climaPorUF, regPorUF, metricaBase, maxDensidade],
+    [modoDensidade, climaPorUF, regPorUF, maxDensidade],
   );
 
   const tooltip = useCallback(
@@ -252,7 +242,7 @@ export function InteligenciaRegional() {
       const reg = regPorUF.get(uf);
       const nome = estadoDe(uf, reg);
       const clientes = reg?.clientes ?? 0;
-      if (ehClima && climaUtil) {
+      if (climaUtil) {
         const c = climaPorUF.get(uf);
         return (
           <div className="space-y-1">
@@ -307,12 +297,12 @@ export function InteligenciaRegional() {
         </div>
       );
     },
-    [ehClima, climaUtil, climaPorUF, regPorUF, dias, agora],
+    [climaUtil, climaPorUF, regPorUF, dias, agora],
   );
 
   // Ranking (top 10) pela metrica ativa.
   const ranking: ItemRanking[] = useMemo(() => {
-    if (ehClima && climaUtil) {
+    if (climaUtil) {
       return (clima?.porUF ?? [])
         .filter((c) => !c.erro && c.indiceOportunidade != null)
         .map((c) => ({
@@ -323,30 +313,27 @@ export function InteligenciaRegional() {
         .sort((a, b) => b.valor - a.valor);
     }
     return (regioes?.porUF ?? [])
-      .map((r) => {
-        const v = metricaBase === "vendas" ? r.vendas : r.clientes;
-        return {
-          uf: r.uf,
-          valor: v,
-          cor: corEscala(maxDensidade ? v / maxDensidade : 0, ESCALA_DENSIDADE),
-        };
-      })
+      .map((r) => ({
+        uf: r.uf,
+        valor: r.clientes,
+        cor: corEscala(maxDensidade ? r.clientes / maxDensidade : 0, ESCALA_DENSIDADE),
+      }))
       .filter((i) => i.valor > 0)
       .sort((a, b) => b.valor - a.valor);
-  }, [ehClima, climaUtil, clima, regioes, metricaBase, maxDensidade]);
+  }, [climaUtil, clima, regioes, maxDensidade]);
 
   const distRegiao = useMemo(
     () =>
       (regioes?.porRegiao ?? []).map((r) => ({
         regiao: r.regiao,
-        valor: metricaBase === "vendas" ? r.vendas : r.clientes,
+        valor: r.clientes,
       })),
-    [regioes, metricaBase],
+    [regioes],
   );
 
   // Melhores oportunidades (climatizador): top indice x presenca de clientes.
   const oportunidades = useMemo(() => {
-    if (!(ehClima && climaUtil)) return [];
+    if (!climaUtil) return [];
     return (clima?.porUF ?? [])
       .filter((c) => !c.erro && c.indiceOportunidade != null)
       .sort((a, b) => (b.indiceOportunidade ?? 0) - (a.indiceOportunidade ?? 0))
@@ -358,26 +345,23 @@ export function InteligenciaRegional() {
         tempMax: c.tempMax,
         clientes: regPorUF.get(c.uf)?.clientes ?? 0,
       }));
-  }, [ehClima, climaUtil, clima, regPorUF]);
+  }, [climaUtil, clima, regPorUF]);
 
   const minAtualizado =
     clima?.atualizadoEm != null
       ? Math.max(0, Math.round((agora - new Date(clima.atualizadoEm).getTime()) / 60000))
       : null;
 
-  const atualizando = ehClima ? carregandoClima : carregandoReg;
+  const atualizando = carregandoClima;
   const emCooldown = agora < cooldownAte;
   const atualizar = async () => {
     if (atualizando || emCooldown) return;
-    if (ehClima) await carregarClima(dias, true);
-    else await carregarRegioes();
+    await carregarClima(dias, true);
     // Debounce: bloqueia novos refresh por ~60s (evita rajada na Open-Meteo).
     setCooldownAte(Date.now() + 60_000);
   };
 
-  const rotuloMetrica = ehClima
-    ? "Indice de oportunidade (clima)"
-    : `Densidade de ${metricaBase === "vendas" ? "vendas" : "clientes"} (dado interno)`;
+  const rotuloMetrica = "Indice de oportunidade (clima)";
 
   return (
     <div className="space-y-4 p-6">
@@ -431,24 +415,22 @@ export function InteligenciaRegional() {
       </div>
 
       {/* Status do clima */}
-      {ehClima && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-medio/60">
-          {minAtualizado != null && !erroClima && (
-            <span>
-              Clima atualizado{" "}
-              {minAtualizado === 0 ? "agora" : `ha ${minAtualizado} min`} ·
-              fonte {clima?.fonte}
-            </span>
-          )}
-          <span className="flex items-center gap-1">
-            <Info className="h-3 w-3" />O indice deriva do clima real
-            (temperatura, umidade e chuva) — nao e indice meteorologico oficial.
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-medio/60">
+        {minAtualizado != null && !erroClima && (
+          <span>
+            Clima atualizado{" "}
+            {minAtualizado === 0 ? "agora" : `ha ${minAtualizado} min`} · fonte{" "}
+            {clima?.fonte}
           </span>
-        </div>
-      )}
+        )}
+        <span className="flex items-center gap-1">
+          <Info className="h-3 w-3" />O indice deriva do clima real (temperatura,
+          umidade e chuva) — nao e indice meteorologico oficial.
+        </span>
+      </div>
 
       {/* Aviso de degradacao do clima */}
-      {ehClima && !climaUtil && !carregandoClima && (
+      {!climaUtil && !carregandoClima && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
           <CloudOff className="h-4 w-4 shrink-0" />
           Clima indisponivel no momento — mostrando densidade de clientes por
@@ -456,8 +438,8 @@ export function InteligenciaRegional() {
         </div>
       )}
 
-      {/* Filtros de faixa (climatizador): recolorem/atenuam o mapa */}
-      {ehClima && climaUtil && (
+      {/* Filtros de faixa: recolorem/atenuam o mapa */}
+      {climaUtil && (
         <BarraFiltros filtros={filtros} onChange={setFiltros} />
       )}
 
@@ -493,11 +475,7 @@ export function InteligenciaRegional() {
                   dimUF={filtrosLigados ? dimUF : undefined}
                 />
               )}
-              <Legenda
-                clima={ehClima && climaUtil}
-                maxDensidade={maxDensidade}
-                metricaBase={metricaBase}
-              />
+              <Legenda clima={climaUtil} maxDensidade={maxDensidade} />
               <p className="mt-2 text-center text-[11px] text-medio/50">
                 Clique num estado para ver os clientes de la.
               </p>
@@ -509,11 +487,9 @@ export function InteligenciaRegional() {
             <Reveal delay={60}>
               <RankingEstados
                 titulo={
-                  ehClima && climaUtil
+                  climaUtil
                     ? "Maiores indices de oportunidade"
-                    : `Estados com mais ${
-                        metricaBase === "vendas" ? "vendas" : "clientes"
-                      }`
+                    : "Estados com mais clientes"
                 }
                 itens={ranking}
               />
@@ -521,7 +497,7 @@ export function InteligenciaRegional() {
             <Reveal delay={120}>
               <DistribuicaoRegiao
                 dados={distRegiao}
-                rotulo={`Por ${metricaBase === "vendas" ? "vendas" : "clientes"} (dado interno)`}
+                rotulo="Por clientes (dado interno)"
               />
             </Reveal>
           </div>
@@ -529,7 +505,7 @@ export function InteligenciaRegional() {
       )}
 
       {/* Melhores oportunidades (climatizador) */}
-      {ehClima && climaUtil && oportunidades.length > 0 && (
+      {climaUtil && oportunidades.length > 0 && (
         <Reveal delay={80}>
           <div className="rounded-xl border border-black/5 bg-white p-4">
             <div className="mb-1 flex items-center gap-2">
@@ -629,7 +605,7 @@ export function InteligenciaRegional() {
           uf={ufClientes}
           onFechar={() => setUfClientes(null)}
           onAbrirNegocio={(id) => setNegocioId(id)}
-          climatizador={ehClima && climaUtil}
+          climatizador={climaUtil}
           resumoClima={climaPorUF.get(ufClientes)}
         />
       )}
@@ -653,8 +629,8 @@ export function InteligenciaRegional() {
 
 // ---- auxiliares de UI ----
 
-// Barra de filtros de faixa (multi-select) para o modo Climatizador. Cada chip
-// alterna uma faixa; grupos ativos combinam em AND (dentro do grupo, OR).
+// Barra de filtros de faixa (multi-select). Cada chip alterna uma faixa; grupos
+// ativos combinam em AND (dentro do grupo, OR).
 function BarraFiltros({
   filtros,
   onChange,
@@ -793,11 +769,9 @@ function fmtPct(v: number | null): string {
 function Legenda({
   clima,
   maxDensidade,
-  metricaBase,
 }: {
   clima: boolean;
   maxDensidade: number;
-  metricaBase: MetricaBase;
 }) {
   const grad = clima
     ? "linear-gradient(90deg,#5b7a76 0%,#3cbfb3 35%,#f59e0b 65%,#dc2626 100%)"
@@ -814,7 +788,7 @@ function Legenda({
         aria-hidden
       />
       <div className="text-xs text-medio/60">
-        {clima ? "Maior oportunidade" : `${maxDensidade} ${metricaBase}`}
+        {clima ? "Maior oportunidade" : `${maxDensidade} clientes`}
       </div>
     </div>
   );
