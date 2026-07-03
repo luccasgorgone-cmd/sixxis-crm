@@ -11,6 +11,11 @@
 // Fatia 2.52: a resposta agora e uma LISTA de mensagens curtas (max 3 linhas
 // cada), para o cliente nao receber um bloco gigante. Mantemos "texto" derivado
 // (mensagens juntas) por compatibilidade com quem ainda le uma mensagem so.
+// Alem disso, a Luna consulta a LOJA AO VIVO (tool use "buscar_produto") para
+// enviar link + preco REAIS; se a loja falhar, cai num fallback honesto (link da
+// base de conhecimento, sem inventar preco).
+
+import { buscarProdutos } from "./loja";
 
 export type LunaFinalidade = "VENDA" | "POS_VENDA";
 export type LunaMensagem = { autor: "cliente" | "luna"; texto: string };
@@ -32,9 +37,84 @@ export type ConfigLuna = {
   maxMensagensAntesHandoff?: number | null;
 };
 
-const TIMEOUT_MS = 20000;
+const TIMEOUT_MS = 30000;
 const MAX_TOKENS = 1024;
 const MAX_LINHAS_POR_MENSAGEM = 3;
+// Quantas rodadas de tool use permitimos antes de forcar a resposta final.
+const MAX_ITER_FERRAMENTA = 3;
+// Timeout proprio da consulta a loja (a loja nao respeita o AbortController da
+// Anthropic). Se estourar, cai no fallback honesto — nunca trava a Luna.
+const TIMEOUT_LOJA_MS = 8000;
+
+// Ferramenta que o modelo pode chamar para obter link + preco REAIS da loja.
+const FERRAMENTA_BUSCAR_PRODUTO = {
+  name: "buscar_produto",
+  description:
+    "Consulta o catalogo AO VIVO da loja Sixxis e retorna nome, preco, preco " +
+    "promocional e link (url) REAIS de produtos. Use SEMPRE que for recomendar " +
+    "ou citar um produto especifico, para enviar link e preco reais ao cliente. " +
+    "NUNCA invente preco ou link — obtenha aqui. Se o resultado vier vazio ou a " +
+    "loja estiver indisponivel, use o link que voce conhece da base de " +
+    "conhecimento e oriente o cliente a conferir o valor no site.",
+  input_schema: {
+    type: "object",
+    properties: {
+      termo: {
+        type: "string",
+        description:
+          "Termo de busca: modelo (ex.: SX070, M45, SX200), categoria " +
+          "(climatizador, aspirador, bike spinning) ou nome do produto.",
+      },
+    },
+    required: ["termo"],
+  },
+} as const;
+
+// Executa a busca na loja com timeout proprio e devolve um JSON compacto para o
+// modelo. NUNCA lanca: em falha, devolve um resultado que instrui o fallback.
+async function executarBuscarProduto(termo: string): Promise<string> {
+  const alvo = String(termo ?? "").trim();
+  try {
+    const produtos = await Promise.race([
+      buscarProdutos(alvo),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("timeout loja")), TIMEOUT_LOJA_MS),
+      ),
+    ]);
+    const ativos = produtos.filter((p) => p.ativo !== false);
+    if (ativos.length === 0) {
+      return JSON.stringify({
+        ok: true,
+        produtos: [],
+        instrucao:
+          "Nenhum produto encontrado para o termo. Nao invente preco/link. " +
+          "Se voce conhece o modelo pela base de conhecimento, envie o link do " +
+          "site e oriente o cliente a conferir o valor la.",
+      });
+    }
+    // Enxuga a lista para o modelo (so o que ele precisa para recomendar).
+    const enxuto = ativos.slice(0, 8).map((p) => ({
+      nome: p.nome,
+      categoria: p.categoria,
+      url: p.url,
+      preco: p.preco,
+      precoPromo: p.precoPromo,
+    }));
+    return JSON.stringify({ ok: true, produtos: enxuto });
+  } catch (e) {
+    const motivo = e instanceof Error ? e.message : String(e);
+    console.error(`[luna] buscar_produto falhou (termo="${alvo}"): ${motivo}`);
+    // FALLBACK honesto: loja indisponivel. NAO inventar preco.
+    return JSON.stringify({
+      ok: false,
+      erro: "loja indisponivel",
+      instrucao:
+        "A loja esta indisponivel no momento. NAO invente preco. Recomende o " +
+        "modelo ideal pela base de conhecimento, envie o link do produto no " +
+        "site e diga que o cliente pode conferir o valor atualizado la.",
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // BASE FIXA DE SEGURANCA (as TRAVAS). Embutida no codigo, NUNCA editavel pelo
@@ -100,6 +180,15 @@ necessidade e recomende o produto certo. Ex.: se o cliente demonstra interesse e
 climatizador, PERGUNTE o tamanho da area a climatizar e, com base na resposta,
 indique as opcoes adequadas da base de conhecimento; saiba diferenciar os
 produtos. Nao empurre o que nao serve.
+
+LINK E PRECO REAIS (obrigatorio): sempre que for RECOMENDAR ou CITAR um produto
+especifico, chame a ferramenta "buscar_produto" (com o modelo ou a categoria) e
+use o LINK e o PRECO REAIS que ela retornar. Nunca invente preco nem link.
+- Se houver preco promocional, destaque a economia (ex.: "de R$ X por R$ Y").
+- Envie o link em uma mensagem propria (linha separada) para facilitar o clique.
+- Se a ferramenta indicar loja indisponivel ou nao achar o produto, recomende o
+  modelo ideal pela base de conhecimento, envie o link do site e diga que o
+  cliente pode conferir o valor atualizado la — SEM inventar preco.
 `.trim();
 
 // Persona de POS-VENDA: suporte que coleta dados de forma organizada.
@@ -277,7 +366,11 @@ export async function gerarRespostaLuna(entrada: {
     }
   }
 
-  const mensagens = montarMensagens(historico);
+  // Conversa da Anthropic. O content pode ser string (historico) ou uma lista de
+  // blocos (turnos de tool use / tool result), por isso o tipo aberto.
+  type BlocoAnthropic = Record<string, unknown>;
+  type MsgAnthropic = { role: "user" | "assistant"; content: string | BlocoAnthropic[] };
+  const mensagens: MsgAnthropic[] = montarMensagens(historico);
   if (mensagens.length === 0) {
     return montarResultado(
       "handoff",
@@ -291,49 +384,97 @@ export async function gerarRespostaLuna(entrada: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.modelo,
-        max_tokens: MAX_TOKENS,
-        system,
-        messages: mensagens,
-      }),
-      signal: controller.signal,
-    });
+    // Loop de tool use: o modelo pode pedir "buscar_produto" para obter link +
+    // preco reais; executamos e devolvemos o resultado, ate ele responder.
+    for (let iter = 0; iter <= MAX_ITER_FERRAMENTA; iter++) {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: config.modelo,
+          max_tokens: MAX_TOKENS,
+          system,
+          messages: mensagens,
+          tools: [FERRAMENTA_BUSCAR_PRODUTO],
+        }),
+        signal: controller.signal,
+      });
 
-    if (!resp.ok) {
-      const corpo = (await resp.text().catch(() => "")).slice(0, 500);
-      console.error(
-        `[luna] Anthropic status ${resp.status} (modelo=${config.modelo}): ${corpo || "(sem corpo)"}`,
-      );
+      if (!resp.ok) {
+        const corpo = (await resp.text().catch(() => "")).slice(0, 500);
+        console.error(
+          `[luna] Anthropic status ${resp.status} (modelo=${config.modelo}): ${corpo || "(sem corpo)"}`,
+        );
+        return montarResultado(
+          "handoff",
+          ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
+          `falha Anthropic (status ${resp.status})`,
+        );
+      }
+
+      const data = (await resp.json().catch(() => null)) as {
+        stop_reason?: string;
+        content?: BlocoAnthropic[];
+      } | null;
+      const blocos = Array.isArray(data?.content) ? data.content : [];
+
+      // O modelo quer usar a ferramenta e ainda temos rodadas disponiveis.
+      const usosFerramenta = blocos.filter((b) => b?.type === "tool_use");
+      if (
+        data?.stop_reason === "tool_use" &&
+        usosFerramenta.length > 0 &&
+        iter < MAX_ITER_FERRAMENTA
+      ) {
+        // Anexa o turno do assistente (blocos crus) e responde cada tool_use.
+        mensagens.push({ role: "assistant", content: blocos });
+        const resultados: BlocoAnthropic[] = [];
+        for (const uso of usosFerramenta) {
+          const id = typeof uso.id === "string" ? uso.id : "";
+          let saida = JSON.stringify({
+            ok: false,
+            erro: "ferramenta desconhecida",
+          });
+          if (uso.name === "buscar_produto") {
+            const entradaFerr = (uso.input ?? {}) as { termo?: unknown };
+            saida = await executarBuscarProduto(String(entradaFerr.termo ?? ""));
+          }
+          resultados.push({
+            type: "tool_result",
+            tool_use_id: id,
+            content: saida,
+          });
+        }
+        mensagens.push({ role: "user", content: resultados });
+        continue; // proxima rodada: o modelo agora responde ao cliente
+      }
+
+      // Resposta final: junta o texto dos blocos e parseia a decisao.
+      const texto = blocos
+        .filter((b) => b?.type === "text" && typeof b.text === "string")
+        .map((b) => String(b.text))
+        .join("\n")
+        .trim();
+
+      const decisao = parsearDecisao(texto);
+      if (decisao) return decisao;
+
+      // Sem JSON parseavel: trata o texto como resposta normal (nunca quebra).
       return montarResultado(
-        "handoff",
-        ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
-        `falha Anthropic (status ${resp.status})`,
+        "responder",
+        [texto],
+        "resposta sem envelope JSON (fallback)",
       );
     }
 
-    const data = (await resp.json().catch(() => null)) as {
-      content?: { type?: string; text?: string }[];
-    } | null;
-    const bloco =
-      data?.content?.find((b) => b?.type === "text") ?? data?.content?.[0];
-    const bruto = typeof bloco?.text === "string" ? bloco.text.trim() : "";
-
-    const decisao = parsearDecisao(bruto);
-    if (decisao) return decisao;
-
-    // Sem JSON parseavel: trata o texto como resposta normal (nunca quebra).
+    // Excedeu o limite de rodadas de ferramenta sem resposta final.
     return montarResultado(
-      "responder",
-      [bruto],
-      "resposta sem envelope JSON (fallback)",
+      "handoff",
+      ["Vou confirmar essa informacao com um atendente e ja te retorno."],
+      "limite de rodadas de tool use atingido sem resposta final",
     );
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);
