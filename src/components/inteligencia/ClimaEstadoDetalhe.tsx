@@ -348,13 +348,14 @@ function Agora({
         </div>
       </div>
 
-      {/* Metricas do agora */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      {/* Metricas do agora. Tendencia tem o rotulo mais longo ("Esquentando"),
+          entao ocupa 2 colunas do grid de 6 p/ caber proporcional, sem vazar. */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Chip icon={<Droplets className="h-3.5 w-3.5" />} rotulo="Umidade" valor={fmtPct(atual?.umidade ?? resumo?.umidade)} />
         <Chip icon={<Wind className="h-3.5 w-3.5" />} rotulo="Vento" valor={fmtVento(atual?.vento)} />
         <Chip icon={<SunIcon className="h-3.5 w-3.5" />} rotulo="UV (hoje)" valor={fmtUv(uvHoje)} />
         <Chip icon={<CloudRain className="h-3.5 w-3.5" />} rotulo="Chuva agora" valor={fmtMm(atual?.chuva)} />
-        <div className="col-span-3 flex items-center rounded-lg border border-black/5 bg-white px-2.5 py-1.5 sm:col-span-1">
+        <div className="col-span-3 flex min-w-0 items-center overflow-hidden rounded-lg border border-black/5 bg-white px-2.5 py-1.5 sm:col-span-2">
           <ChipTendencia tendencia={tendencia} />
         </div>
       </div>
@@ -486,9 +487,9 @@ function BarraTemp({
 
 function DetalheItem({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="rounded-md border border-black/5 bg-white px-2 py-1.5">
-      <p className="text-[10px] text-medio/50">{rotulo}</p>
-      <p className="mt-0.5 text-xs font-semibold text-escuro">{valor}</p>
+    <div className="min-w-0 rounded-md border border-black/5 bg-white px-2 py-1.5">
+      <p className="truncate text-[10px] text-medio/50" title={rotulo}>{rotulo}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold text-escuro" title={valor}>{valor}</p>
     </div>
   );
 }
@@ -503,12 +504,12 @@ function Chip({
   valor: string;
 }) {
   return (
-    <div className="rounded-lg border border-black/5 bg-white px-2.5 py-1.5">
-      <div className="flex items-center gap-1 text-[11px] text-medio/60">
-        {icon}
-        {rotulo}
+    <div className="min-w-0 rounded-lg border border-black/5 bg-white px-2.5 py-1.5">
+      <div className="flex min-w-0 items-center gap-1 text-[11px] text-medio/60">
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0 truncate" title={rotulo}>{rotulo}</span>
       </div>
-      <p className="mt-0.5 text-sm font-semibold text-escuro">{valor}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-escuro" title={valor}>{valor}</p>
     </div>
   );
 }
@@ -524,11 +525,13 @@ function ChipTendencia({ tendencia }: { tendencia: Tendencia | null }) {
         ? { icon: <TrendingDown className="h-3.5 w-3.5" />, rotulo: "Esfriando", classe: "text-sky-600 dark:text-sky-400" }
         : { icon: <Minus className="h-3.5 w-3.5" />, rotulo: "Estavel", classe: "text-medio/70" };
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col">
       <span className="text-[11px] text-medio/60">Tendencia (7d)</span>
-      <span className={`mt-0.5 flex items-center gap-1 text-sm font-semibold ${cfg.classe}`}>
-        {cfg.icon}
-        {cfg.rotulo}
+      <span className={`mt-0.5 flex min-w-0 items-center gap-1 text-xs font-semibold ${cfg.classe}`}>
+        <span className="shrink-0">{cfg.icon}</span>
+        <span className="min-w-0 truncate" title={cfg.rotulo}>
+          {cfg.rotulo}
+        </span>
       </span>
     </div>
   );
