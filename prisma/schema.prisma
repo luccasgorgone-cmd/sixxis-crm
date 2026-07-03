@@ -940,3 +940,31 @@ model IntegracaoMercadoLivre {
   conectadoEm  DateTime?
   atualizadoEm DateTime  @updatedAt
 }
+
+// ---------------------------------------------------------------------------
+// PARCEIROS (Fatia 2.61): tecnicos parceiros pelo Brasil (ferramenta de
+// pos-venda). Entidade PROPRIA — NAO sao Lead/Negocio/Cliente, NAO entram no
+// funil nem em metricas de venda. UF/estado/regiao inferidos do DDD (lib/ddd),
+// com override manual. fretePadrao/freteObs para envio/recebimento.
+// ---------------------------------------------------------------------------
+model Parceiro {
+  id            String   @id @default(cuid())
+  nome          String
+  // Telefone com DDD -> infere uf/estado/regiao (lib/ddd), com override manual.
+  telefone      String?
+  cidade        String?
+  uf            String?
+  regiao        String?
+  email         String?
+  especialidade String?
+  observacoes   String?  @db.Text
+  // Frete de referencia para/deste parceiro e condicoes (prazo, transportadora).
+  fretePadrao   Decimal? @db.Decimal(12, 2)
+  freteObs      String?  @db.Text
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@index([ativo, uf])
+  @@index([regiao])
+}
