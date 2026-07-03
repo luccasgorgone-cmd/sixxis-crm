@@ -1,69 +1,26 @@
 "use client";
 
-// Aba Trends: hub de ATALHOS para pesquisa externa de interesse/preco/demanda.
-// Somente links (o CRM nao raspa nem inventa numero): cada termo abre em varias
-// ferramentas (Google Trends, Google Shopping, Mercado Livre, Amazon) em nova aba.
-//
-// NOTA DE PRODUTO: a integracao Mercado Livre por API (OAuth + /api/trends/
-// mercadolivre + model IntegracaoMercadoLivre + lib/mercadolivre.ts) foi
-// DESATIVADA da UI por decisao do dono (2.45-C). O backend segue dormante para
-// uso futuro; aqui usamos apenas o link de NAVEGACAO do ML (lista.mercadolivre),
-// que mostra anuncios/precos reais sem depender da API.
+// Aba Trends: hub de ATALHOS para o Google Trends (interesse de busca por termo).
+// Somente links (o CRM nao raspa nem inventa numero): cada termo abre no Google
+// Trends, em nova aba, fora do CRM.
 import {
   TrendingUp,
   ExternalLink,
   Fan,
   Bike,
   Wind,
-  ShoppingCart,
-  ShoppingBag,
-  Package,
   Flame,
   type LucideIcon,
 } from "lucide-react";
 import { Reveal } from "@/components/inteligencia/Reveal";
 
-// ---- Destinos externos: cada um monta uma URL de busca por termo ----
-// Slug do Mercado Livre: caminho de navegacao (espacos viram hifens).
-function slugML(termo: string): string {
-  return encodeURIComponent(termo.trim()).replace(/%20/g, "-");
+// URL de exploracao do Google Trends (Brasil, pt-BR) por termo.
+function urlTrends(termo: string): string {
+  return (
+    "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=" +
+    encodeURIComponent(termo)
+  );
 }
-
-type Destino = {
-  rotulo: string;
-  icon: LucideIcon;
-  url: (termo: string) => string;
-  descricao: string;
-};
-
-const DESTINOS: Destino[] = [
-  {
-    rotulo: "Trends",
-    icon: TrendingUp,
-    descricao: "Interesse de busca no tempo (Google Trends)",
-    url: (t) =>
-      "https://trends.google.com/trends/explore?geo=BR&hl=pt-BR&q=" +
-      encodeURIComponent(t),
-  },
-  {
-    rotulo: "Shopping",
-    icon: ShoppingCart,
-    descricao: "Precos e ofertas (Google Shopping)",
-    url: (t) => "https://www.google.com/search?tbm=shop&q=" + encodeURIComponent(t),
-  },
-  {
-    rotulo: "Mercado Livre",
-    icon: ShoppingBag,
-    descricao: "Anuncios e precos no Mercado Livre",
-    url: (t) => "https://lista.mercadolivre.com.br/" + slugML(t),
-  },
-  {
-    rotulo: "Amazon",
-    icon: Package,
-    descricao: "Anuncios e precos na Amazon Brasil",
-    url: (t) => "https://www.amazon.com.br/s?k=" + encodeURIComponent(t),
-  },
-];
 
 const CATEGORIAS: { rotulo: string; icon: LucideIcon; termos: string[] }[] = [
   {
@@ -94,7 +51,7 @@ const CATEGORIAS: { rotulo: string; icon: LucideIcon; termos: string[] }[] = [
   },
 ];
 
-// Atalhos gerais (nao por termo): panorama de demanda no Brasil.
+// Atalhos gerais (nao por termo): panorama de demanda no Brasil, tambem no Trends.
 const ATALHOS_GERAIS: { rotulo: string; url: string; descricao: string }[] = [
   {
     rotulo: "Google Trends — Em alta no Brasil",
@@ -120,29 +77,12 @@ export function TrendsHub() {
       <div>
         <h2 className="text-lg font-semibold text-escuro">Trends</h2>
         <p className="text-sm text-medio/60">
-          Atalhos para pesquisar interesse, preco e demanda em ferramentas
-          externas. Cada link abre fora do CRM, em nova aba.
+          Atalhos para o Google Trends: interesse de busca por termo no Brasil.
+          Cada link abre fora do CRM, em nova aba.
         </p>
       </div>
 
-      {/* Legenda dos destinos */}
-      <Reveal>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-black/5 bg-white px-4 py-3">
-          <span className="text-xs font-medium text-medio/70">Destinos:</span>
-          {DESTINOS.map((d) => (
-            <span
-              key={d.rotulo}
-              title={d.descricao}
-              className="flex cursor-help items-center gap-1.5 text-xs text-medio/70"
-            >
-              <d.icon className="h-3.5 w-3.5 text-tiffany" />
-              {d.rotulo}
-            </span>
-          ))}
-        </div>
-      </Reveal>
-
-      {/* Categorias x termos x destinos */}
+      {/* Categorias x termos (todos abrem no Google Trends) */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {CATEGORIAS.map((cat, i) => (
           <Reveal key={cat.rotulo} delay={i * 60}>
@@ -156,32 +96,19 @@ export function TrendsHub() {
                 </span>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="flex flex-wrap gap-1.5">
                 {cat.termos.map((termo) => (
-                  <div
+                  <a
                     key={termo}
-                    className="rounded-lg border border-black/5 bg-fundo p-2.5"
+                    href={urlTrends(termo)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Ver "${termo}" no Google Trends — abre fora do CRM`}
+                    className="flex items-center gap-1 rounded-full border border-black/10 bg-fundo px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
                   >
-                    <p className="mb-1.5 text-xs font-medium text-escuro">
-                      {termo}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DESTINOS.map((d) => (
-                        <a
-                          key={d.rotulo}
-                          href={d.url(termo)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={`${d.descricao} — abre fora do CRM`}
-                          className="flex items-center gap-1 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
-                        >
-                          <d.icon className="h-3 w-3" />
-                          {d.rotulo}
-                          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
+                    {termo}
+                    <ExternalLink className="h-3 w-3 opacity-50" />
+                  </a>
                 ))}
               </div>
             </div>
