@@ -32,6 +32,31 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const instanciaId = sp.get("instancia");
   if (instanciaId) where.instanciaId = instanciaId;
 
+  // Filtro direto por telefone (parcial, so digitos). Combina com o escopo (AND).
+  const telefone = sp.get("telefone")?.trim();
+  if (telefone) {
+    const dig = telefone.replace(/\D/g, "");
+    where.telefone = { contains: dig || telefone };
+  }
+
+  // Busca combinada: telefone OU nome do lead (aplicada dentro do escopo).
+  const busca = sp.get("busca")?.trim();
+  if (busca) {
+    const dig = busca.replace(/\D/g, "");
+    where.OR = [
+      { telefone: { contains: dig || busca } },
+      {
+        lead: {
+          OR: [
+            { nome: { contains: busca, mode: "insensitive" } },
+            { pushName: { contains: busca, mode: "insensitive" } },
+            { nomeManual: { contains: busca, mode: "insensitive" } },
+          ],
+        },
+      },
+    ];
+  }
+
   const periodo = sp.get("periodo");
   if (periodo) {
     const { inicio, fim } = resolverPeriodo(periodo, null, null, new Date());

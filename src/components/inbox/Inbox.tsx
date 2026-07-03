@@ -117,6 +117,20 @@ export function Inbox({
     }
   }, []);
 
+  // Deep-link opcional: /inbox?lead=<id> pre-abre a conversa daquele lead (ex.:
+  // vindo da aba de Chamadas). Roda uma vez, quando a lista carrega. Aditivo.
+  const leadAbertoRef = useRef(false);
+  useEffect(() => {
+    if (leadAbertoRef.current || conversas.length === 0) return;
+    const leadId = new URLSearchParams(window.location.search).get("lead");
+    if (!leadId) return;
+    const conv = conversas.find((c) => c.leadId === leadId);
+    if (conv) {
+      leadAbertoRef.current = true;
+      void abrirConversa(conv.id);
+    }
+  }, [conversas, abrirConversa]);
+
   // Socket ao vivo.
   useEffect(() => {
     const socket = getSocket();

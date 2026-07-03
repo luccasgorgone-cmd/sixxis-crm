@@ -4,6 +4,7 @@
 // escopo aplicado pelo backend. O CRM registra e organiza — a chamada e atendida
 // no WhatsApp/celular (a Evolution nao transmite audio). Marca vistas ao abrir.
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   PhoneIncoming,
   PhoneMissed,
@@ -14,6 +15,8 @@ import {
   Loader2,
   Smartphone,
   UserRound,
+  Search,
+  MessageSquare,
 } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
 import { horaCurta, rotuloDia, chaveDia, formatarTelefone } from "@/lib/format";
@@ -59,12 +62,32 @@ function rotuloFinalidade(f: string): string {
   return f === "POS_VENDA" ? "Pos-venda" : "Venda";
 }
 
+type Instancia = { id: string; nome: string; numero: string | null };
+
 export function Chamadas() {
   const [chamadas, setChamadas] = useState<Chamada[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [status, setStatus] = useState("");
   const [periodo, setPeriodo] = useState("");
+  const [instancia, setInstancia] = useState("");
+  const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [instancias, setInstancias] = useState<Instancia[]>([]);
+
+  // Debounce da busca (~250ms).
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaAplicada(busca), 250);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  // Numeros (instancias) para o filtro "numero que recebeu".
+  useEffect(() => {
+    fetch("/api/instancias")
+      .then((r) => (r.ok ? r.json() : { instancias: [] }))
+      .then((d) => setInstancias(d.instancias ?? []))
+      .catch(() => undefined);
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -73,6 +96,8 @@ export function Chamadas() {
       const p = new URLSearchParams();
       if (status) p.set("status", status);
       if (periodo) p.set("periodo", periodo);
+      if (instancia) p.set("instancia", instancia);
+      if (buscaAplicada.trim()) p.set("busca", buscaAplicada.trim());
       const r = await fetch(`/api/chamadas?${p.toString()}`);
       if (!r.ok) throw new Error();
       setChamadas((await r.json()).chamadas ?? []);
@@ -81,11 +106,23 @@ export function Chamadas() {
     } finally {
       setCarregando(false);
     }
-  }, [status, periodo]);
+  }, [status, periodo, instancia, buscaAplicada]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  const contadores = useMemo(() => {
+    let perdida = 0;
+    let recebida = 0;
+    let rejeitada = 0;
+    for (const c of chamadas) {
+      if (c.status === "perdida") perdida += 1;
+      else if (c.status === "recebida") recebida += 1;
+      else if (c.status === "rejeitada") rejeitada += 1;
+    }
+    return { perdida, recebida, rejeitada };
+  }, [chamadas]);
 
   // Ao abrir, marca as chamadas do escopo como vistas e avisa o badge do topo.
   useEffect(() => {
@@ -150,6 +187,15 @@ export function Chamadas() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar telefone ou nome"
+            className="campo w-56 pl-8"
+          />
+        </div>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="campo">
           {FILTROS_STATUS.map((f) => (
             <option key={f.v} value={f.v}>
@@ -164,7 +210,40 @@ export function Chamadas() {
             </option>
           ))}
         </select>
+        {instancias.length > 1 && (
+          <select value={instancia} onChange={(e) => setInstancia(e.target.value)} className="campo">
+            <option value="">Numero: todos</option>
+            {instancias.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nome}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
+
+      {/* Contadores por status (do resultado atual) */}
+      {chamadas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Contador
+            rotulo="Perdidas"
+            valor={contadores.perdida}
+            classe="bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+          />
+          <Contador
+            rotulo="Atendidas"
+            valor={contadores.recebida}
+            classe="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+          />
+          {contadores.rejeitada > 0 && (
+            <Contador
+              rotulo="Rejeitadas"
+              valor={contadores.rejeitada}
+              classe="bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+            />
+          )}
+        </div>
+      )}
 
       {/* Lista */}
       {carregando && chamadas.length === 0 ? (
@@ -231,8 +310,35 @@ function ItemChamada({ c }: { c: Chamada }) {
           )}
         </div>
       </div>
-      <span className="shrink-0 text-xs text-medio/50">{horaCurta(c.horaEm)}</span>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-xs text-medio/50">{horaCurta(c.horaEm)}</span>
+        {c.leadId && (
+          <Link
+            href={`/inbox?lead=${c.leadId}`}
+            title="Abrir a conversa no Inbox"
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-tiffany transition-colors hover:bg-tiffany/10"
+          >
+            <MessageSquare className="h-3 w-3" /> Inbox
+          </Link>
+        )}
+      </div>
     </div>
+  );
+}
+
+function Contador({
+  rotulo,
+  valor,
+  classe,
+}: {
+  rotulo: string;
+  valor: number;
+  classe: string;
+}) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium ${classe}`}>
+      <strong>{valor}</strong> {rotulo}
+    </span>
   );
 }
 
