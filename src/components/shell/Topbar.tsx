@@ -6,6 +6,7 @@ import { LogoutButton } from "./LogoutButton";
 import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
 import { SinoNotificacoes } from "./SinoNotificacoes";
 import { SinoAlertasSla } from "./SinoAlertasSla";
+import { SinoChamadas } from "./SinoChamadas";
 import { TemaToggle } from "./TemaToggle";
 
 const ROTULO_PAPEL: Record<string, string> = {
@@ -20,6 +21,7 @@ const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
   { prefixo: "/admin/metas", titulo: "Metas" },
   { prefixo: "/admin", titulo: "Administracao" },
   { prefixo: "/agenda", titulo: "Agenda" },
+  { prefixo: "/chamadas", titulo: "Chamadas" },
   { prefixo: "/dashboard", titulo: "Painel" },
   { prefixo: "/google-trends", titulo: "Google Trends" },
   { prefixo: "/inteligencia", titulo: "Clima" },
@@ -48,6 +50,7 @@ export function Topbar({
 
       <div className="flex items-center gap-3">
         <TemaToggle />
+        <SinoChamadas />
         <SinoAlertasSla agenteId={agenteId} papel={papel} />
         <SinoNotificacoes />
         <SinoLembretes papel={papel} agenteId={agenteId} />
