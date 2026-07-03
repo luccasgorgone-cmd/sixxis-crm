@@ -475,6 +475,12 @@ model Negocio {
   // motivoPerda guarda o CODE (ver lib/motivosPerda); obs e a observacao livre.
   motivoPerda   String?
   motivoPerdaObs String?           @db.Text
+  // Transporte da entrega (vale para venda e pos-venda). transportadora e a
+  // PRINCIPAL do negocio; cada RastreioNegocio pode ter a sua se o dono digitar.
+  transportadora  String?
+  dataEnvio       DateTime?
+  previsaoChegada DateTime?
+  rastreios     RastreioNegocio[]
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
   historicos    HistoricoNegocio[]
@@ -489,6 +495,19 @@ model Negocio {
   @@index([agenteId])
   @@index([finalidade])
   @@index([agenteId, status, fechadoEm])
+}
+
+// Codigo(s) de rastreio de um negocio. MULTIPLOS por negocio (varias remessas).
+// transportadora opcional por codigo; a principal fica em Negocio.transportadora.
+model RastreioNegocio {
+  id             String   @id @default(cuid())
+  negocioId      String
+  negocio        Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  codigo         String
+  transportadora String?
+  criadoEm       DateTime @default(now())
+
+  @@index([negocioId])
 }
 
 // Linha do tempo do negocio: cada mudanca relevante vira um registro.
