@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import {
   Inbox as InboxIcon,
   MessagesSquare,
+  Sparkles,
   KanbanSquare,
   LayoutDashboard,
   Target,
@@ -70,6 +71,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
       href: ehAdmin ? "/admin/dashboard" : "/dashboard",
       icone: LayoutDashboard,
     },
+    { rotulo: "Oracle", href: "/oracle", icone: Sparkles },
     { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
     { rotulo: "Sixxis", href: "/interno", icone: MessagesSquare },
     { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
