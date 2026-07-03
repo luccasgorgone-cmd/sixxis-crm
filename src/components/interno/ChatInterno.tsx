@@ -12,6 +12,9 @@ import {
   LogOut,
   AlertTriangle,
   Users2,
+  FileText,
+  Download,
+  X,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -42,10 +45,22 @@ type MensagemGrupo = {
   direcao: "IN" | "OUT";
   tipo: string;
   conteudo: string | null;
+  mediaUrl: string | null;
   autorJid: string | null;
   autorNome: string | null;
   hora: string;
 };
+
+const TIPOS_MIDIA = new Set(["IMAGEM", "VIDEO", "AUDIO", "DOCUMENTO"]);
+
+// Legenda placeholder gerada na ingestao ("[imagem]"...): nao exibir como texto.
+const RE_PLACEHOLDER =
+  /^\[(imagem|video|audio|documento|figurinha|localizacao|contato|contatos)\]/i;
+function legendaReal(conteudo: string | null): string | null {
+  if (!conteudo) return null;
+  const t = conteudo.trim();
+  return t && !RE_PLACEHOLDER.test(t) ? t : null;
+}
 
 const ROTULO_TIPO: Record<string, string> = {
   AUDIO: "Audio",
@@ -212,6 +227,7 @@ function ThreadGrupo({
   const [enviando, setEnviando] = useState(false);
   const [confirmarSair, setConfirmarSair] = useState(false);
   const [saindo, setSaindo] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
@@ -230,19 +246,21 @@ function ThreadGrupo({
     void carregar();
   }, [carregar]);
 
-  // Ao vivo: novas mensagens deste grupo.
+  // Ao vivo: novas mensagens deste grupo E atualizacoes (midia persistida).
   useEffect(() => {
     const socket = getSocket();
-    const onMensagem = (e: { grupoId: string; mensagemId: string }) => {
+    const recarregar = (e: { grupoId: string }) => {
       if (e.grupoId !== grupo.id) return;
       void (async () => {
         const r = await fetch(`/api/interno/grupos/${grupo.id}/mensagens`);
         if (r.ok) setMensagens((await r.json()).mensagens ?? []);
       })();
     };
-    socket.on("grupo:mensagem", onMensagem);
+    socket.on("grupo:mensagem", recarregar);
+    socket.on("grupo:atualizado", recarregar);
     return () => {
-      socket.off("grupo:mensagem", onMensagem);
+      socket.off("grupo:mensagem", recarregar);
+      socket.off("grupo:atualizado", recarregar);
     };
   }, [grupo.id]);
 
@@ -390,6 +408,29 @@ function ThreadGrupo({
         </div>
       )}
 
+      {/* Lightbox de imagem */}
+      {lightbox && (
+        <div
+          className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt="Imagem"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+          />
+        </div>
+      )}
+
       {/* Mensagens */}
       <div className="scroll-fino min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {carregando ? (
@@ -410,7 +451,7 @@ function ThreadGrupo({
                   </span>
                 </div>
                 {bloco.itens.map((m) => (
-                  <BolhaGrupo key={m.id} m={m} />
+                  <BolhaGrupo key={m.id} m={m} onAbrirImagem={setLightbox} />
                 ))}
               </div>
             ))}
@@ -451,9 +492,16 @@ function ThreadGrupo({
   );
 }
 
-function BolhaGrupo({ m }: { m: MensagemGrupo }) {
+function BolhaGrupo({
+  m,
+  onAbrirImagem,
+}: {
+  m: MensagemGrupo;
+  onAbrirImagem: (url: string) => void;
+}) {
   const ehOut = m.direcao === "OUT";
-  const corpo = m.conteudo?.trim() || ROTULO_TIPO[m.tipo] || "Mensagem";
+  const ehMidia = TIPOS_MIDIA.has(m.tipo);
+  const legenda = legendaReal(m.conteudo);
   return (
     <div className={`flex ${ehOut ? "justify-end" : "justify-start"}`}>
       <div
@@ -468,7 +516,20 @@ function BolhaGrupo({ m }: { m: MensagemGrupo }) {
             {m.autorNome}
           </p>
         )}
-        <span className="whitespace-pre-wrap break-words">{corpo}</span>
+        {ehMidia ? (
+          <div className="space-y-1">
+            <MidiaGrupo m={m} ehOut={ehOut} onAbrirImagem={onAbrirImagem} />
+            {legenda && (
+              <span className="block whitespace-pre-wrap break-words">
+                {legenda}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="whitespace-pre-wrap break-words">
+            {m.conteudo?.trim() || ROTULO_TIPO[m.tipo] || "Mensagem"}
+          </span>
+        )}
         <span
           className={`mt-1 block text-right text-[10px] ${
             ehOut ? "text-white/70" : "text-medio/50"
@@ -478,6 +539,72 @@ function BolhaGrupo({ m }: { m: MensagemGrupo }) {
         </span>
       </div>
     </div>
+  );
+}
+
+// Renderiza a midia por tipo (imagem/video/audio/documento). Sem mediaUrl ainda
+// (persistindo): placeholder discreto — o socket grupo:atualizado troca depois.
+function MidiaGrupo({
+  m,
+  ehOut,
+  onAbrirImagem,
+}: {
+  m: MensagemGrupo;
+  ehOut: boolean;
+  onAbrirImagem: (url: string) => void;
+}) {
+  const rotulo = (ROTULO_TIPO[m.tipo] ?? "Midia").toLowerCase();
+  if (!m.mediaUrl) {
+    return (
+      <span
+        className={`flex items-center gap-1.5 text-xs italic ${
+          ehOut ? "text-white/85" : "text-medio/70"
+        }`}
+      >
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> carregando {rotulo}...
+      </span>
+    );
+  }
+  if (m.tipo === "IMAGEM") {
+    return (
+      <button onClick={() => onAbrirImagem(m.mediaUrl!)} className="block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={m.mediaUrl}
+          alt="Imagem"
+          className="max-h-64 w-auto max-w-full rounded-lg object-cover"
+        />
+      </button>
+    );
+  }
+  if (m.tipo === "VIDEO") {
+    return (
+      <video
+        src={m.mediaUrl}
+        controls
+        className="max-h-64 w-full max-w-xs rounded-lg"
+      />
+    );
+  }
+  if (m.tipo === "AUDIO") {
+    return <audio src={m.mediaUrl} controls className="w-56 max-w-full" />;
+  }
+  // DOCUMENTO
+  return (
+    <a
+      href={m.mediaUrl}
+      target="_blank"
+      rel="noreferrer"
+      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium ${
+        ehOut
+          ? "bg-white/15 text-white hover:bg-white/25"
+          : "bg-fundo text-escuro hover:bg-black/5"
+      }`}
+    >
+      <FileText className="h-4 w-4 shrink-0" />
+      <span className="truncate">{legendaReal(m.conteudo) ?? "Documento"}</span>
+      <Download className="h-3.5 w-3.5 shrink-0 opacity-70" />
+    </a>
   );
 }
 
