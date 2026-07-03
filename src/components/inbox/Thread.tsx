@@ -444,6 +444,15 @@ function Bolha({
             apagada ? "text-medio/40" : ehOut ? "text-white/70" : "text-medio/50"
           }`}
         >
+          {/* Selo interno: mensagem enviada pela Luna (IA). So a equipe ve. */}
+          {ehOut && mensagem.viaIA && (
+            <span
+              className="flex items-center gap-0.5 font-medium opacity-90"
+              title="Enviada automaticamente pela Luna (IA)"
+            >
+              <Bot className="h-3 w-3" /> Luna ·
+            </span>
+          )}
           {/* Numero (instancia) por onde a mensagem entrou/saiu. */}
           {mensagem.instanciaRotulo && (
             <span className="truncate opacity-80" title={`Numero: ${mensagem.instanciaRotulo}`}>

@@ -48,6 +48,8 @@ export type MensagemItem = {
   apagada?: boolean;
   apagadaPor?: string | null; // "COLABORADOR" | "CLIENTE"
   apagadaEm?: string | null;
+  // Enviada pela Luna (IA)? Mostra selo interno "Luna" na bolha OUT.
+  viaIA?: boolean;
   // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
   instanciaRotulo?: string | null;
 };
@@ -68,6 +70,8 @@ export type EventoMensagemNova = {
   hora: string;
   naoLidas: number;
   ultimaMensagemEm: string;
+  // Enviada pela Luna (IA)? (mensagens OUT geradas pelo motor de atendimento).
+  viaIA?: boolean;
 };
 
 // Payload do evento "mensagem:midia" (mediaUrl preenchido em background/reproc.).

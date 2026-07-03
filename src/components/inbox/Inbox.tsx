@@ -139,6 +139,7 @@ export function Inbox({
                   mediaUrl: evt.mediaUrl,
                   statusEnvio: evt.statusEnvio,
                   hora: evt.hora,
+                  viaIA: evt.viaIA,
                 },
               ],
         );
