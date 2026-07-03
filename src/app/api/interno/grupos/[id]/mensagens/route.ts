@@ -50,6 +50,7 @@ export async function GET(
       direcao: true,
       tipo: true,
       conteudo: true,
+      mediaUrl: true,
       autorJid: true,
       autorNome: true,
       hora: true,

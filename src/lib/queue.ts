@@ -16,7 +16,7 @@ import { campoDono, filtroEquipe } from "./dono";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
-import { persistirMidia } from "./midia";
+import { persistirMidia, persistirMidiaGrupo } from "./midia";
 import { nomeEfetivo } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { aplicarModelo } from "./modelos";
@@ -1289,6 +1289,25 @@ async function processarMensagemGrupo(
     hora: msg.hora,
     ultimaMensagemEm: hora,
   });
+
+  // Midia do grupo: MESMO fluxo do cliente (baixa da Evolution -> R2), em
+  // background e best-effort. Erro aqui NUNCA quebra a ingestao. Quando pronta,
+  // emite grupo:atualizado para a UI trocar o placeholder pela midia.
+  if (ehMidia(tipo)) {
+    void persistirMidiaGrupo({
+      mensagemId: msg.id,
+      grupoId: grupo.id,
+      externalId,
+      jid,
+      instancia: nomeInstancia,
+      data,
+      io,
+    }).catch((e) =>
+      console.warn(
+        `[midia][grupo] erro inesperado ${externalId}: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    );
+  }
 }
 
 // Enriquecimento best-effort do grupo: subject e foto via Evolution.

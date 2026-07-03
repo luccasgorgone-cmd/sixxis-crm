@@ -435,6 +435,9 @@ model MensagemGrupo {
   direcao    DirecaoMsg
   conteudo   String?      @db.Text
   tipo       TipoMsg      @default(TEXTO)
+  // URL permanente da midia no R2 (mesmo padrao do inbox de clientes). Vazio =
+  // sem midia ou ainda persistindo.
+  mediaUrl   String?
   hora       DateTime     @default(now())
   criadoEm   DateTime     @default(now())
 
