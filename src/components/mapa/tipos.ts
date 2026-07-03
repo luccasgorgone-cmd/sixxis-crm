@@ -49,6 +49,8 @@ export type ClienteMapa = {
   // Garantia do cliente (pos-venda): null=nao definido, true=com, false=sem.
   garantia: boolean | null;
   segmento: "VAREJO" | "ATACADO" | null;
+  // Tem ao menos um codigo de rastreio (em algum negocio do lead).
+  temRastreio: boolean;
   status: "ABERTO" | "GANHO" | "PERDIDO" | "PENDENTE" | null;
   etapa: string | null;
   etapaId: string | null;

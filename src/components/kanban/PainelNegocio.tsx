@@ -35,6 +35,7 @@ import {
   ClipboardList,
   ShieldCheck,
   ShieldOff,
+  Truck,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -62,7 +63,7 @@ import {
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
-import { formatarBRL, formatarTelefone } from "@/lib/format";
+import { formatarBRL, formatarTelefone, dataNascParaInput } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
 type AbaMobile = "conversa" | "detalhes";
@@ -334,6 +335,12 @@ export function PainelNegocio({
                 />
 
                 <BlocoAcompanhamento
+                  detalhe={detalhe}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
+                />
+
+                <BlocoRastreio
                   detalhe={detalhe}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
@@ -1188,6 +1195,242 @@ export function BlocoAcompanhamento({
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Rastreio e transporte do NEGOCIO (venda e pos-venda). Transportadora principal
+// + datas de envio/previsao (PATCH negocio) e MULTIPLOS codigos de rastreio
+// (POST/DELETE), cada um com transportadora opcional. Reusado no Kanban e no Inbox.
+// ----------------------------------------------------------------------------
+export function BlocoRastreio({
+  detalhe,
+  recarregar,
+  onAtualizado,
+}: {
+  detalhe: DetalheNegocio;
+  recarregar: () => Promise<void>;
+  onAtualizado: () => void;
+}) {
+  const toast = useToast();
+  const [transportadora, setTransportadora] = useState(
+    detalhe.transportadora ?? "",
+  );
+  const [dataEnvio, setDataEnvio] = useState(dataNascParaInput(detalhe.dataEnvio));
+  const [previsao, setPrevisao] = useState(
+    dataNascParaInput(detalhe.previsaoChegada),
+  );
+  const [novoCodigo, setNovoCodigo] = useState("");
+  const [novaTransp, setNovaTransp] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [removendo, setRemovendo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTransportadora(detalhe.transportadora ?? "");
+  }, [detalhe.transportadora]);
+  useEffect(() => {
+    setDataEnvio(dataNascParaInput(detalhe.dataEnvio));
+  }, [detalhe.dataEnvio]);
+  useEffect(() => {
+    setPrevisao(dataNascParaInput(detalhe.previsaoChegada));
+  }, [detalhe.previsaoChegada]);
+
+  async function salvarTransporte(body: Record<string, unknown>): Promise<void> {
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/negocios/${detalhe.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        await recarregar();
+        onAtualizado();
+      } else {
+        const d = await r.json().catch(() => null);
+        if (!(r.status === 400 && d?.erro === "nada a atualizar")) {
+          toast.erro(d?.erro ?? "Nao foi possivel salvar.");
+        }
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function adicionarCodigo(): Promise<void> {
+    const codigo = novoCodigo.trim();
+    if (!codigo || salvando) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/negocios/${detalhe.id}/rastreios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codigo,
+          transportadora: novaTransp.trim() || null,
+        }),
+      });
+      if (r.ok) {
+        setNovoCodigo("");
+        setNovaTransp("");
+        await recarregar();
+        onAtualizado();
+      } else {
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel adicionar o codigo.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function removerCodigo(rid: string): Promise<void> {
+    // Otimista: some da lista na hora; em erro, recarregar restaura a verdade.
+    setRemovendo(rid);
+    try {
+      const r = await fetch(`/api/negocios/${detalhe.id}/rastreios/${rid}`, {
+        method: "DELETE",
+      });
+      if (r.ok) {
+        await recarregar();
+        onAtualizado();
+      } else {
+        toast.erro("Nao foi possivel remover.");
+        await recarregar();
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+      await recarregar();
+    } finally {
+      setRemovendo(null);
+    }
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
+      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-medio/50">
+        <Truck className="h-3.5 w-3.5" /> Rastreio e transporte
+        {salvando && <Loader2 className="h-3 w-3 animate-spin text-tiffany" />}
+      </h4>
+
+      {/* Transportadora principal + datas */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="sm:col-span-3">
+          <Rotulo>Transportadora (principal)</Rotulo>
+          <input
+            value={transportadora}
+            onChange={(e) => setTransportadora(e.target.value)}
+            onBlur={() => {
+              if ((transportadora.trim() || null) !== (detalhe.transportadora ?? null)) {
+                void salvarTransporte({ transportadora: transportadora.trim() });
+              }
+            }}
+            placeholder="Ex.: Correios, Jadlog, transportadora propria..."
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+        </div>
+        <div>
+          <Rotulo>Data de envio</Rotulo>
+          <input
+            type="date"
+            value={dataEnvio}
+            onChange={(e) => {
+              setDataEnvio(e.target.value);
+              void salvarTransporte({ dataEnvio: e.target.value || null });
+            }}
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+        </div>
+        <div>
+          <Rotulo>Previsao de chegada</Rotulo>
+          <input
+            type="date"
+            value={previsao}
+            onChange={(e) => {
+              setPrevisao(e.target.value);
+              void salvarTransporte({ previsaoChegada: e.target.value || null });
+            }}
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+        </div>
+      </div>
+
+      {/* Codigos de rastreio (multiplos) */}
+      <div>
+        <Rotulo>Codigos de rastreio</Rotulo>
+        {detalhe.rastreios.length === 0 ? (
+          <p className="mb-2 text-xs text-medio/50">
+            Nenhum codigo de rastreio ainda.
+          </p>
+        ) : (
+          <ul className="mb-2 space-y-1.5">
+            {detalhe.rastreios.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center gap-2 rounded-lg border border-black/5 bg-fundo px-2.5 py-1.5"
+              >
+                <Truck className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-xs text-escuro">
+                    {r.codigo}
+                  </p>
+                  {r.transportadora && (
+                    <p className="truncate text-[11px] text-medio/50">
+                      {r.transportadora}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => void removerCodigo(r.id)}
+                  disabled={removendo === r.id}
+                  title="Remover codigo"
+                  className="shrink-0 rounded p-1 text-medio/50 transition-colors hover:bg-black/5 hover:text-erro disabled:opacity-50"
+                >
+                  {removendo === r.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Adicionar codigo */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-40 flex-1">
+            <input
+              value={novoCodigo}
+              onChange={(e) => setNovoCodigo(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void adicionarCodigo()}
+              placeholder="Codigo de rastreio"
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            />
+          </div>
+          <div className="min-w-32 flex-1">
+            <input
+              value={novaTransp}
+              onChange={(e) => setNovaTransp(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void adicionarCodigo()}
+              placeholder="Transportadora (opcional)"
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            />
+          </div>
+          <button
+            onClick={() => void adicionarCodigo()}
+            disabled={salvando || !novoCodigo.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> Adicionar codigo
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

@@ -14,6 +14,7 @@ import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosIntere
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
+  BlocoRastreio,
   Notas,
 } from "@/components/kanban/PainelNegocio";
 import type { DetalheNegocio, ObservacaoOpcao } from "@/components/kanban/tipos";
@@ -122,6 +123,11 @@ export function PainelClienteInbox({
           {detalhe && negocioId && (
             <>
               <BlocoAcompanhamento
+                detalhe={detalhe}
+                recarregar={carregarNegocio}
+                onAtualizado={() => void carregarNegocio()}
+              />
+              <BlocoRastreio
                 detalhe={detalhe}
                 recarregar={carregarNegocio}
                 onAtualizado={() => void carregarNegocio()}

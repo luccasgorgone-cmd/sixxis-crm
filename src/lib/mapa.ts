@@ -21,6 +21,7 @@ export type NegocioMapa = {
   motivoPerda: string | null;
   motivoPerdaObs: string | null;
   etapa: { nome: string } | null;
+  rastreios: { id: string }[];
 };
 export type LeadMapa = {
   id: string;
@@ -70,6 +71,7 @@ export const selectLeadMapa = {
       motivoPerda: true,
       motivoPerdaObs: true,
       etapa: { select: { nome: true } },
+      rastreios: { select: { id: true }, take: 1 },
     },
   },
   produtosInteresse: {

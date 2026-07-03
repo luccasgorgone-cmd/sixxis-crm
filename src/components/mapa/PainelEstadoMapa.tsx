@@ -77,6 +77,7 @@ export function PainelEstadoMapa({
   const [busca, setBusca] = useState("");
   const [catFiltro, setCatFiltro] = useState(""); // "" = todas
   const [segFiltro, setSegFiltro] = useState<"" | "VAREJO" | "ATACADO">("");
+  const [rastreioFiltro, setRastreioFiltro] = useState<"" | "com" | "sem">("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("recentes");
   const [editando, setEditando] = useState<string | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
@@ -180,6 +181,8 @@ export function PainelEstadoMapa({
     if (segFiltro) {
       lista = lista.filter((c) => c.segmento === segFiltro);
     }
+    if (rastreioFiltro === "com") lista = lista.filter((c) => c.temRastreio);
+    else if (rastreioFiltro === "sem") lista = lista.filter((c) => !c.temRastreio);
     if (q) {
       lista = lista.filter(
         (c) =>
@@ -198,7 +201,7 @@ export function PainelEstadoMapa({
       });
     }
     return ord;
-  }, [dados, busca, catFiltro, segFiltro, ordenacao]);
+  }, [dados, busca, catFiltro, segFiltro, rastreioFiltro, ordenacao]);
 
   const titulo = dados ? `${dados.resumo.estado} (${uf})` : `Estado ${uf}`;
 
@@ -315,6 +318,24 @@ export function PainelEstadoMapa({
                     onClick={() => setSegFiltro("ATACADO")}
                   />
                 </div>
+                {/* Chips de rastreio (com/sem) */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <ChipCategoria
+                    rotulo="Rastreio: todos"
+                    ativo={rastreioFiltro === ""}
+                    onClick={() => setRastreioFiltro("")}
+                  />
+                  <ChipCategoria
+                    rotulo="Com rastreio"
+                    ativo={rastreioFiltro === "com"}
+                    onClick={() => setRastreioFiltro("com")}
+                  />
+                  <ChipCategoria
+                    rotulo="Sem rastreio"
+                    ativo={rastreioFiltro === "sem"}
+                    onClick={() => setRastreioFiltro("sem")}
+                  />
+                </div>
                 <div className="ml-auto flex items-center gap-1 text-[11px] text-medio/60">
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   <button
@@ -342,7 +363,7 @@ export function PainelEstadoMapa({
               <ListaClientes
                 clientes={clientesFiltrados}
                 vazio={
-                  busca || catFiltro || segFiltro
+                  busca || catFiltro || segFiltro || rastreioFiltro
                     ? "Nenhum cliente encontrado. Ajuste a busca ou os filtros."
                     : "Sem clientes neste estado ainda."
                 }

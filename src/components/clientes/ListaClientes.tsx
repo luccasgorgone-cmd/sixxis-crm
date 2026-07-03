@@ -115,6 +115,7 @@ export function ListaClientes({
   const [origemF, setOrigemF] = useState("");
   const [garantiaF, setGarantiaF] = useState("");
   const [segmentoF, setSegmentoF] = useState("");
+  const [rastreioF, setRastreioF] = useState("");
   const [ufF, setUfF] = useState("");
   const [cidadeF, setCidadeF] = useState("");
   const [agenteSel, setAgenteSel] = useState(""); // admin
@@ -182,6 +183,7 @@ export function ListaClientes({
       if (origemF) p.set("origem", origemF);
       if (garantiaF) p.set("garantia", garantiaF);
       if (segmentoF) p.set("segmento", segmentoF);
+      if (rastreioF) p.set("rastreio", rastreioF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
       if (periodo.preset === "custom") {
@@ -198,7 +200,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo]);
 
   useEffect(() => {
     void carregar();
@@ -714,6 +716,11 @@ export function ListaClientes({
           <option value="">Segmento: todos</option>
           <option value="VAREJO">Varejo</option>
           <option value="ATACADO">Atacado</option>
+        </select>
+        <select value={rastreioF} onChange={(e) => setRastreioF(e.target.value)} className="campo">
+          <option value="">Rastreio: todos</option>
+          <option value="com">Com rastreio</option>
+          <option value="sem">Sem rastreio</option>
         </select>
         <select value={ufF} onChange={(e) => setUfF(e.target.value)} className="campo">
           <option value="">Estado: todos</option>

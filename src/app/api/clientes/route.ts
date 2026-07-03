@@ -74,6 +74,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where.segmento = segmentoF;
   }
 
+  // Rastreio: com / sem (por negocio do lead). Usa AND para nao colidir com o
+  // filtro de negocios de temperatura/status abaixo.
+  const rastreioF = sp.get("rastreio");
+  if (rastreioF === "com" || rastreioF === "sem") {
+    const cond: Prisma.LeadWhereInput =
+      rastreioF === "com"
+        ? { negocios: { some: { rastreios: { some: {} } } } }
+        : { negocios: { none: { rastreios: { some: {} } } } };
+    where.AND = Array.isArray(where.AND)
+      ? [...where.AND, cond]
+      : where.AND
+        ? [where.AND, cond]
+        : [cond];
+  }
+
   const temperatura = sp.get("temperatura");
   const status = sp.get("status");
   const negFiltro: Prisma.NegocioWhereInput = {};
