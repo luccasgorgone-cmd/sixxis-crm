@@ -12,6 +12,27 @@ import {
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
 import { excluirLeadsCompleto } from "./exclusao";
+import { TEMPLATE_BASE_CONHECIMENTO } from "./lunaCatalogo";
+
+// Pre-configuracao "de fabrica" da Luna (campos EDITAVEIS). Aplicada no seed
+// SOMENTE quando o campo esta vazio — nunca sobrescreve o que o dono ja editou.
+// As TRAVAS de seguranca ficam fixas em lib/luna.ts; aqui e so persona/estilo.
+const LUNA_PROMPT_SISTEMA =
+  "Voce e a Luna, atendente virtual da Sixxis. Fale em portugues do Brasil com " +
+  "tom consultivo e sabio: educada, direta e profissional, sem giria e sem " +
+  "emoji. Respostas curtas e uteis, uma ideia por vez. Represente a Sixxis com " +
+  "cordialidade e confianca. Na venda, entenda a necessidade (por exemplo, o " +
+  "tamanho da area a climatizar) antes de recomendar e explique de forma simples " +
+  "por que aquele modelo se encaixa. No pos-venda, colete as informacoes com " +
+  "organizacao e paciencia. Priorize resolver o problema do cliente; quando algo " +
+  "fugir do que voce sabe, seja honesta e encaminhe para um atendente.";
+const LUNA_SAUDACAO = "Ola! Sou a Luna, da Sixxis. Como posso ajudar?";
+const LUNA_MENSAGEM_HANDOFF =
+  "Vou encaminhar voce para um de nossos atendentes. Assim que houver alguem " +
+  "disponivel, entrara em contato. Obrigada pela paciencia.";
+const LUNA_HANDOFF_PALAVRAS =
+  "atendente, humano, pessoa, vendedor, gerente, reclamacao";
+const LUNA_MAX_MENSAGENS_HANDOFF = 8;
 
 // Backfill (idempotente): metas sem autor (criadas antes da 2.18) recebem
 // criadoPorId = primeiro ADMIN, para a trava de edicao funcionar. Metas de
@@ -696,12 +717,44 @@ export async function seedConfiguracoes(): Promise<void> {
       console.log("[seed] configuracao CRM ok");
     }
 
+    // Config da Luna: cria pre-configurada (persona/saudacao/handoff/base). Se ja
+    // existir, preenche SO os campos vazios (nao sobrescreve edicao do dono).
+    // ativo continua false por padrao; modelo continua o default (haiku).
     const ia = await prisma.configAgenteIA.findFirst();
     if (!ia) {
-      await prisma.configAgenteIA.create({ data: {} });
-      console.log("[seed] config Agente IA criada");
+      await prisma.configAgenteIA.create({
+        data: {
+          promptSistema: LUNA_PROMPT_SISTEMA,
+          saudacaoAutomatica: LUNA_SAUDACAO,
+          mensagemHandoff: LUNA_MENSAGEM_HANDOFF,
+          handoffPalavras: LUNA_HANDOFF_PALAVRAS,
+          maxMensagensAntesHandoff: LUNA_MAX_MENSAGENS_HANDOFF,
+          baseConhecimento: TEMPLATE_BASE_CONHECIMENTO,
+          // ativo: false (default) e modelo: claude-haiku-4-5 (default).
+        },
+      });
+      console.log("[seed] config Agente IA criada (Luna pre-configurada)");
     } else {
-      console.log("[seed] config Agente IA ok");
+      const vazio = (v: string | null) => v == null || v.trim() === "";
+      const patch: Record<string, unknown> = {};
+      if (vazio(ia.promptSistema)) patch.promptSistema = LUNA_PROMPT_SISTEMA;
+      if (vazio(ia.saudacaoAutomatica)) patch.saudacaoAutomatica = LUNA_SAUDACAO;
+      if (vazio(ia.mensagemHandoff)) patch.mensagemHandoff = LUNA_MENSAGEM_HANDOFF;
+      if (vazio(ia.handoffPalavras)) patch.handoffPalavras = LUNA_HANDOFF_PALAVRAS;
+      if (ia.maxMensagensAntesHandoff == null) {
+        patch.maxMensagensAntesHandoff = LUNA_MAX_MENSAGENS_HANDOFF;
+      }
+      if (vazio(ia.baseConhecimento)) {
+        patch.baseConhecimento = TEMPLATE_BASE_CONHECIMENTO;
+      }
+      if (Object.keys(patch).length > 0) {
+        await prisma.configAgenteIA.update({ where: { id: ia.id }, data: patch });
+        console.log(
+          `[seed] config Agente IA: ${Object.keys(patch).length} campo(s) vazio(s) pre-preenchido(s)`,
+        );
+      } else {
+        console.log("[seed] config Agente IA ok");
+      }
     }
 
     const totalResp = await prisma.respostaRapida.count();
