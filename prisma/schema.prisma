@@ -210,6 +210,7 @@ model Agente {
   campanhas             Campanha[]
   notificacoes          Notificacao[]
   tarefas               Tarefa[]
+  chamadas              Chamada[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -265,6 +266,7 @@ model Lead {
   enderecos      Endereco[]
   tarefas        Tarefa[]
   produtosInteresse LeadProdutoInteresse[]
+  chamadas       Chamada[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -967,4 +969,40 @@ model Parceiro {
 
   @@index([ativo, uf])
   @@index([regiao])
+}
+
+// ---------------------------------------------------------------------------
+// CHAMADAS (Fatia 2.62): REGISTRO e HISTORICO de chamadas de WhatsApp recebidas.
+// A Evolution SO notifica o evento (offer/accept/terminate) — NAO transmite o
+// audio; atender por voz exige a API oficial da Meta. Por isso o CRM apenas
+// registra/organiza; nao atende no sistema. Nao entra em metricas de venda.
+// ---------------------------------------------------------------------------
+model Chamada {
+  id          String     @id @default(cuid())
+  // Id da chamada na Evolution (quando houver) — dedup idempotente entre restarts.
+  externalId  String?    @unique
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id])
+  telefone    String
+  // Sempre "recebida" (entrada) nesta fatia.
+  direcao     String     @default("recebida")
+  // "voz" | "video".
+  tipo        String     @default("voz")
+  // "recebida" (atendida) | "perdida" | "rejeitada".
+  status      String     @default("perdida")
+  // Numero (instancia Evolution) que recebeu a chamada.
+  instancia   String
+  instanciaId String?
+  finalidade  Finalidade @default(VENDA)
+  agenteId    String?
+  agente      Agente?    @relation(fields: [agenteId], references: [id])
+  // Visto pela equipe (para o badge de nao vistas).
+  visto       Boolean    @default(false)
+  horaEm      DateTime   @default(now())
+  criadoEm    DateTime   @default(now())
+
+  @@index([agenteId, horaEm])
+  @@index([instanciaId, horaEm])
+  @@index([finalidade, horaEm])
+  @@index([visto, status])
 }

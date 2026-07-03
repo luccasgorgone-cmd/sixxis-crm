@@ -681,6 +681,16 @@ function agendarMidia(
 const chamadasVistas = new Map<string, number>();
 const TTL_CHAMADA_MS = 10 * 60 * 1000;
 
+// Mapeia o status bruto do evento para o registro. Como o dedup grava no 1o
+// evento (normalmente "offer"), a maioria fica "perdida" — honesto: o CRM nao
+// atende audio; a chamada e atendida no WhatsApp/celular.
+function statusChamada(s?: string): string {
+  const v = (s ?? "").toLowerCase();
+  if (v.includes("accept") || v.includes("answer")) return "recebida";
+  if (v.includes("reject") || v.includes("declin")) return "rejeitada";
+  return "perdida";
+}
+
 // Chamada RECEBIDA (evento CALL): nao atende/streama. Resolve o setor pelo
 // numero que recebeu; se o cliente ja tem dono nesse setor, notifica o dono;
 // senao aciona a distribuicao (rotearLeadNovo) e notifica o escolhido. Registra
@@ -713,7 +723,7 @@ async function processarChamada(
   const nomeInstancia = payload?.instance ?? "sixxis-wa1";
   const instancia = await prisma.instanciaWhatsApp.findUnique({
     where: { instanciaEvolution: nomeInstancia },
-    select: { finalidade: true },
+    select: { id: true, finalidade: true },
   });
   const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
 
@@ -757,10 +767,39 @@ async function processarChamada(
       tipo: "CHAMADA",
       titulo: `${tipoChamada} recebida`,
       descricao: `${nomeEfetivo(lead)} esta ligando`,
-      link: "/inbox",
+      link: "/chamadas",
       leadId: lead.id,
     });
   }
+
+  // Persiste o REGISTRO da chamada (best-effort; nunca quebra a ingestao). Dedup
+  // por externalId (id da Evolution) quando houver — idempotente entre restarts.
+  try {
+    const externalId = chamada?.id ? `call-${chamada.id}` : `call-${randomUUID()}`;
+    await prisma.chamada.create({
+      data: {
+        externalId,
+        leadId: lead.id,
+        telefone,
+        direcao: "recebida",
+        tipo: chamada?.isVideo ? "video" : "voz",
+        status: statusChamada(chamada?.status),
+        instancia: nomeInstancia,
+        instanciaId: instancia?.id ?? null,
+        finalidade,
+        agenteId: donoId ?? null,
+        horaEm: new Date(),
+      },
+    });
+    (io ?? getIO())?.emit("chamada:nova", { agenteId: donoId ?? null, finalidade });
+  } catch (e) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {
+      console.warn(
+        `[chamada] falha ao persistir ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
   console.log(`[chamada] ${telefone} (${finalidade}) -> dono ${donoId ?? "sem dono"}`);
 }
 
