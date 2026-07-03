@@ -1,9 +1,12 @@
 // Inteligencia Regional: DETALHE de clima de um estado (drill-down do drawer).
 // Curva horaria de hoje (24h) + historico diario dos ultimos ~30 dias +
-// tendencia (media das maximas 7d vs 7d anteriores). Cache PERSISTENTE por UF
-// reusando ClimaCacheUF com `dias` sentinela (-1 horaria, -2 historico), mesma
-// disciplina da 2.40: um fetch que falha NUNCA sobrescreve o ultimo bom; TTL
-// horaria ~3h, historico ~12h. Sempre 200 com o melhor dado (partes degradam).
+// tendencia. Cache PERSISTENTE por UF reusando ClimaCacheUF com `dias` sentinela
+// (-1 horaria, -2 historico). Disciplina da 2.40: um fetch que falha NUNCA
+// sobrescreve o ultimo bom.
+//
+// STALE-WHILE-REVALIDATE (Fatia 2.50, igual /api/inteligencia/clima): responde NA
+// HORA com o cache (mesmo stale) e re-busca o que esta stale em BACKGROUND. So
+// bloqueia (com TETO ~8s) quando um bloco NAO tem NENHUM cache. Nunca pendura.
 // GET /api/inteligencia/clima/estado?uf=XX  (agente logado)
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +27,67 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const TETO_CACHE_VAZIO_MS = 8_000;
+
+// Lock por (uf:bloco) evita reconstrucoes concorrentes do mesmo dado.
+const emReconstrucao = new Set<string>();
+
+type Bloco = "hor" | "hist";
+const SENTINELA: Record<Bloco, number> = {
+  hor: DIAS_HORARIA,
+  hist: DIAS_HISTORICO,
+};
+
+async function buscarBloco(
+  uf: string,
+  bloco: Bloco,
+): Promise<{ erro: boolean } & object> {
+  return bloco === "hor" ? buscarHorariaComRetry(uf) : buscarHistoricoComRetry(uf);
+}
+
+async function upsertBloco(
+  uf: string,
+  bloco: Bloco,
+  dados: object,
+  quando: Date,
+): Promise<void> {
+  const dias = SENTINELA[bloco];
+  await prisma.climaCacheUF.upsert({
+    where: { uf_dias: { uf, dias } },
+    create: { uf, dias, dados, atualizadoEm: quando },
+    update: { dados, atualizadoEm: quando },
+  });
+}
+
+// Re-busca um bloco em BACKGROUND (sem await no request). Upsert so em sucesso;
+// erros capturados aqui — nunca derrubam o processo.
+function reconstruirBloco(uf: string, bloco: Bloco): void {
+  const chave = `${uf}:${bloco}`;
+  if (emReconstrucao.has(chave)) return;
+  emReconstrucao.add(chave);
+  void (async () => {
+    try {
+      const r = await buscarBloco(uf, bloco);
+      if (!r.erro) await upsertBloco(uf, bloco, r as object, new Date());
+    } catch (e) {
+      console.error(
+        `[clima/estado] reconstrucao ${chave} falhou:`,
+        e instanceof Error ? e.message : String(e),
+      );
+    } finally {
+      emReconstrucao.delete(chave);
+    }
+  })();
+}
+
+// Corre `p` contra um teto; null se o teto vencer (o fetch segue em background).
+function comTeto<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    p,
+    new Promise<null>((res) => setTimeout(() => res(null), ms)),
+  ]);
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -46,55 +110,50 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const linhaHor = rows.find((r) => r.dias === DIAS_HORARIA) ?? null;
   const linhaHist = rows.find((r) => r.dias === DIAS_HISTORICO) ?? null;
 
-  const horStale =
-    !linhaHor || refresh || agora - linhaHor.atualizadoEm.getTime() > TTL_HORARIA_MS;
-  const histStale =
-    !linhaHist ||
-    refresh ||
-    agora - linhaHist.atualizadoEm.getTime() > TTL_HISTORICO_MS;
+  const stale = (linha: (typeof rows)[number] | null, ttl: number): boolean =>
+    !linha || refresh || agora - linha.atualizadoEm.getTime() > ttl;
+  const horStale = stale(linhaHor, TTL_HORARIA_MS);
+  const histStale = stale(linhaHist, TTL_HISTORICO_MS);
 
-  // Re-busca em paralelo apenas o que esta ausente/stale.
-  const [novaHor, novoHist] = await Promise.all([
-    horStale ? buscarHorariaComRetry(uf) : Promise.resolve<BlocoHoraria | null>(null),
-    histStale
-      ? buscarHistoricoComRetry(uf)
-      : Promise.resolve<BlocoHistorico | null>(null),
+  // Estado inicial: o cache (mesmo stale). Blocos SEM cache serao buscados agora.
+  let horBloco = (linhaHor?.dados as unknown as BlocoHoraria) ?? null;
+  let horAtualizadoEm = linhaHor?.atualizadoEm ?? null;
+  let histBloco = (linhaHist?.dados as unknown as BlocoHistorico) ?? null;
+  let histAtualizadoEm = linhaHist?.atualizadoEm ?? null;
+
+  // Blocos com cache mas stale -> atualizam em BACKGROUND (respondemos com cache).
+  if (linhaHor && horStale) reconstruirBloco(uf, "hor");
+  if (linhaHist && histStale) reconstruirBloco(uf, "hist");
+
+  // Blocos SEM cache -> busca com TETO (precisamos de algo p/ mostrar). O que nao
+  // vier a tempo fica vazio e completa em background/proximo request.
+  const [rHor, rHist] = await Promise.all([
+    linhaHor
+      ? Promise.resolve<null>(null)
+      : comTeto(buscarHorariaComRetry(uf), TETO_CACHE_VAZIO_MS),
+    linhaHist
+      ? Promise.resolve<null>(null)
+      : comTeto(buscarHistoricoComRetry(uf), TETO_CACHE_VAZIO_MS),
   ]);
-
   const nowDate = new Date();
 
-  // Estado efetivo de cada bloco: novo bom -> usa e persiste; senao mantem o banco.
-  let horBloco: BlocoHoraria | null = linhaHor
-    ? (linhaHor.dados as unknown as BlocoHoraria)
-    : null;
-  let horAtualizadoEm: Date | null = linhaHor?.atualizadoEm ?? null;
-  if (novaHor && !novaHor.erro) {
-    await prisma.climaCacheUF.upsert({
-      where: { uf_dias: { uf, dias: DIAS_HORARIA } },
-      create: { uf, dias: DIAS_HORARIA, dados: novaHor as object, atualizadoEm: nowDate },
-      update: { dados: novaHor as object, atualizadoEm: nowDate },
-    });
-    horBloco = novaHor;
-    horAtualizadoEm = nowDate;
+  if (!linhaHor) {
+    if (rHor && !rHor.erro) {
+      await upsertBloco(uf, "hor", rHor as object, nowDate);
+      horBloco = rHor;
+      horAtualizadoEm = nowDate;
+    } else {
+      reconstruirBloco(uf, "hor"); // timeout/erro -> completa depois
+    }
   }
-
-  let histBloco: BlocoHistorico | null = linhaHist
-    ? (linhaHist.dados as unknown as BlocoHistorico)
-    : null;
-  let histAtualizadoEm: Date | null = linhaHist?.atualizadoEm ?? null;
-  if (novoHist && !novoHist.erro) {
-    await prisma.climaCacheUF.upsert({
-      where: { uf_dias: { uf, dias: DIAS_HISTORICO } },
-      create: {
-        uf,
-        dias: DIAS_HISTORICO,
-        dados: novoHist as object,
-        atualizadoEm: nowDate,
-      },
-      update: { dados: novoHist as object, atualizadoEm: nowDate },
-    });
-    histBloco = novoHist;
-    histAtualizadoEm = nowDate;
+  if (!linhaHist) {
+    if (rHist && !rHist.erro) {
+      await upsertBloco(uf, "hist", rHist as object, nowDate);
+      histBloco = rHist;
+      histAtualizadoEm = nowDate;
+    } else {
+      reconstruirBloco(uf, "hist");
+    }
   }
 
   const historico = histBloco?.historico ?? [];
