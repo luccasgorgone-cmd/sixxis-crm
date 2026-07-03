@@ -399,6 +399,48 @@ model Mensagem {
   @@index([conversaId, direcao])
 }
 
+// ---------------------------------------------------------------------------
+// CHAT INTERNO (Fatia 2.55): grupos de WhatsApp (@g.us) que os numeros da
+// empresa participam. ESTRUTURA ISOLADA — NAO sao Lead/Conversa/Negocio, NAO
+// entram no funil/Kanban/metricas. So comunicacao interna da equipe. Sem
+// nenhuma relacao com Lead/Negocio/Conversa (caminho paralelo dedicado).
+// ---------------------------------------------------------------------------
+model GrupoInterno {
+  id               String          @id @default(cuid())
+  // JID do grupo (...@g.us). Unico: um registro por grupo.
+  jid              String          @unique
+  // Assunto (subject) do grupo, quando conhecido.
+  nome             String?
+  fotoUrl          String?
+  // Numero (instancia Evolution) da empresa que participa do grupo.
+  instancia        String
+  // Arquivado: some da lista interna (nao sai do grupo no WhatsApp).
+  arquivado        Boolean         @default(false)
+  ultimaMensagemEm DateTime?
+  mensagens        MensagemGrupo[]
+  criadoEm         DateTime        @default(now())
+  atualizadoEm     DateTime        @updatedAt
+
+  @@index([arquivado, ultimaMensagemEm])
+}
+
+model MensagemGrupo {
+  id         String       @id @default(cuid())
+  grupoId    String
+  grupo      GrupoInterno @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  externalId String       @unique
+  // Autor da mensagem no grupo (membro que enviou). Em OUT = a propria empresa.
+  autorJid   String?
+  autorNome  String?
+  direcao    DirecaoMsg
+  conteudo   String?      @db.Text
+  tipo       TipoMsg      @default(TEXTO)
+  hora       DateTime     @default(now())
+  criadoEm   DateTime     @default(now())
+
+  @@index([grupoId, hora])
+}
+
 model Etapa {
   id         String          @id @default(cuid())
   nome       String
