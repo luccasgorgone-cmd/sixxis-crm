@@ -7,6 +7,7 @@ import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
 import { SinoNotificacoes } from "./SinoNotificacoes";
 import { SinoAlertasSla } from "./SinoAlertasSla";
 import { SinoChamadas } from "./SinoChamadas";
+import { DisponibilidadeUsuario } from "./DisponibilidadeUsuario";
 import { TemaToggle } from "./TemaToggle";
 
 const ROTULO_PAPEL: Record<string, string> = {
@@ -50,6 +51,8 @@ export function Topbar({
       <h1 className="text-sm font-semibold text-escuro">{titulo}</h1>
 
       <div className="flex items-center gap-3">
+        {/* Disponibilidade: so para quem recebe leads (nao-admin). Reusa Agente.ativo. */}
+        {papel !== "ADMIN" && <DisponibilidadeUsuario />}
         <TemaToggle />
         <SinoChamadas />
         <SinoAlertasSla agenteId={agenteId} papel={papel} />
