@@ -112,6 +112,46 @@ async function fetchJson(url: string): Promise<unknown | null> {
   }
 }
 
+// Variante instrumentada: le o corpo mesmo em !ok e expoe status + reason (a
+// Open-Meteo devolve { error:true, reason:"..." } em 400). Usada pela previsao e
+// pelo endpoint de diagnostico. Nao lanca; nunca loga em loop (o chamador decide).
+export type DiagFetch = {
+  ok: boolean;
+  status: number;
+  json: unknown | null;
+  reason: string | null;
+  corpo: string;
+};
+export async function fetchJsonDiag(url: string): Promise<DiagFetch> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    const corpo = await resp.text();
+    let json: unknown | null = null;
+    try {
+      json = JSON.parse(corpo);
+    } catch {
+      json = null;
+    }
+    const reason =
+      json && typeof json === "object" && "reason" in json
+        ? String((json as { reason: unknown }).reason)
+        : null;
+    return { ok: resp.ok, status: resp.status, json, reason, corpo: corpo.slice(0, 500) };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      json: null,
+      reason: e instanceof Error ? e.message : "erro de rede",
+      corpo: "",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Curva horaria de HOJE (24 pontos), ENRIQUECIDA: temperatura, umidade, sensacao
 // termica (apparent_temperature), vento (wind_speed_10m) e condicao (weather_code).
 export async function buscarHoraria(uf: string): Promise<BlocoHoraria> {
@@ -144,57 +184,149 @@ export async function buscarHoraria(uf: string): Promise<BlocoHoraria> {
   return { uf, horarioHoje: pontos, erro: false };
 }
 
-// Clima ATUAL + PREVISAO estendida (ate 16 dias) numa unica chamada forecast.
-// Daily: max/min, chuva (mm), prob. de chuva, vento max, UV, condicao. Current:
-// temp/sensacao/umidade/vento/chuva/condicao.
+// Variaveis diarias da previsao, em camadas: da mais completa para a basica. Se
+// a Open-Meteo recusar a camada completa (ex.: uma variavel nao suportada em todo
+// o horizonte), caimos para a proxima — sempre MAXIMIZANDO dado real; o que nao
+// vier fica null ("—" na UI, nunca inventado).
+const DAILY_FULL =
+  "temperature_2m_max,temperature_2m_min,precipitation_sum," +
+  "precipitation_probability_max,wind_speed_10m_max,uv_index_max,weather_code";
+const DAILY_SEM_UV_PROB =
+  "temperature_2m_max,temperature_2m_min,precipitation_sum," +
+  "wind_speed_10m_max,weather_code";
+const DAILY_BASICO =
+  "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code";
+const CAMADAS_DAILY = [DAILY_FULL, DAILY_SEM_UV_PROB, DAILY_BASICO];
+
+// Monta a URL da previsao (daily) para uma capital, dias e conjunto de variaveis.
+export function montarUrlPrevisao(
+  lat: number,
+  lon: number,
+  daily: string,
+  dias: number,
+): string {
+  return (
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=${daily}&forecast_days=${dias}&timezone=auto`
+  );
+}
+
+// Previsao estendida (ate 16 dias). SO daily — o clima atual e independente
+// (buscarAtual), para nao sumir quando a previsao falha. Tenta as camadas em
+// ordem e usa a primeira que a Open-Meteo aceitar; loga o motivo real da camada
+// completa quando precisa cair (um log por chamada, nunca em loop).
 export async function buscarPrevisao(uf: string): Promise<BlocoPrevisao> {
   const c = CAPITAIS[uf];
   if (!c) return { uf, atual: null, previsao: [], erro: true };
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}` +
-    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
-    `precipitation,wind_speed_10m,weather_code` +
-    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,` +
-    `precipitation_probability_max,wind_speed_10m_max,uv_index_max,weather_code` +
-    `&forecast_days=${PREVISAO_DIAS}&timezone=auto`;
-  const j = (await fetchJson(url)) as {
-    current?: Record<string, unknown>;
-    daily?: Record<string, unknown>;
-  } | null;
-  if (!j?.daily) return { uf, atual: null, previsao: [], erro: true };
 
-  const numOuNull = (v: unknown): number | null =>
-    typeof v === "number" ? v : null;
-  const cur = j.current ?? {};
-  const atual: ClimaAtual = {
-    temp: numOuNull(cur.temperature_2m),
-    sensacao: numOuNull(cur.apparent_temperature),
-    umidade: numOuNull(cur.relative_humidity_2m),
-    vento: numOuNull(cur.wind_speed_10m),
-    chuva: numOuNull(cur.precipitation),
-    weathercode: numOuNull(cur.weather_code),
+  let motivoFull: string | null = null;
+  for (let camada = 0; camada < CAMADAS_DAILY.length; camada++) {
+    const url = montarUrlPrevisao(c.lat, c.lon, CAMADAS_DAILY[camada], PREVISAO_DIAS);
+    const r = await fetchJsonDiag(url);
+    if (!r.ok || !r.json) {
+      if (camada === 0) motivoFull = r.reason ?? `HTTP ${r.status}`;
+      continue;
+    }
+    const daily = (r.json as { daily?: Record<string, unknown> }).daily;
+    if (!daily) {
+      if (camada === 0) motivoFull = "resposta sem bloco daily";
+      continue;
+    }
+    const dias = strArr(daily.time);
+    const tMax = numArr(daily.temperature_2m_max);
+    const tMin = numArr(daily.temperature_2m_min);
+    const chuva = numArr(daily.precipitation_sum);
+    const chuvaProb = numArr(daily.precipitation_probability_max);
+    const vento = numArr(daily.wind_speed_10m_max);
+    const uv = numArr(daily.uv_index_max);
+    const cond = numArr(daily.weather_code);
+    const previsao: PontoPrevisao[] = dias.map((d, i) => ({
+      dia: d,
+      tempMax: tMax[i] ?? null,
+      tempMin: tMin[i] ?? null,
+      chuva: chuva[i] ?? null,
+      chuvaProb: chuvaProb[i] ?? null,
+      vento: vento[i] ?? null,
+      uv: uv[i] ?? null,
+      weathercode: cond[i] ?? null,
+    }));
+    if (!previsao.length) {
+      if (camada === 0) motivoFull = "resposta daily vazia";
+      continue;
+    }
+    if (camada > 0) {
+      console.warn(
+        `[clima/previsao] ${uf}: camada completa recusada (motivo: ${motivoFull}); ` +
+          `usando camada ${camada} (${previsao.length} dias reais).`,
+      );
+    }
+    return { uf, atual: null, previsao, erro: false };
+  }
+  console.error(`[clima/previsao] ${uf}: todas as camadas falharam. Motivo: ${motivoFull}`);
+  return { uf, atual: null, previsao: [], erro: true };
+}
+
+// Diagnostico cru da previsao para 1 UF: status + reason da Open-Meteo na camada
+// completa e qual camada funciona. Usado pelo endpoint admin de diagnostico.
+export type DiagnosticoPrevisao = {
+  uf: string;
+  capital: string | null;
+  full: {
+    url: string;
+    status: number;
+    ok: boolean;
+    reason: string | null;
+    corpo: string;
+    dias: number | null;
   };
+  camadaQueFunciona: number | null; // indice em CAMADAS_DAILY (0 = completa)
+  diasNaCamada: number | null;
+};
+export async function diagnosticarPrevisao(uf: string): Promise<DiagnosticoPrevisao> {
+  const c = CAPITAIS[uf];
+  if (!c) {
+    return {
+      uf,
+      capital: null,
+      full: { url: "", status: 0, ok: false, reason: "uf invalida", corpo: "", dias: null },
+      camadaQueFunciona: null,
+      diasNaCamada: null,
+    };
+  }
+  const urlFull = montarUrlPrevisao(c.lat, c.lon, DAILY_FULL, PREVISAO_DIAS);
+  const r = await fetchJsonDiag(urlFull);
+  const diasFull = (() => {
+    const d = (r.json as { daily?: { time?: unknown } } | null)?.daily?.time;
+    return Array.isArray(d) ? d.length : null;
+  })();
 
-  const dias = strArr(j.daily.time);
-  const tMax = numArr(j.daily.temperature_2m_max);
-  const tMin = numArr(j.daily.temperature_2m_min);
-  const chuva = numArr(j.daily.precipitation_sum);
-  const chuvaProb = numArr(j.daily.precipitation_probability_max);
-  const vento = numArr(j.daily.wind_speed_10m_max);
-  const uv = numArr(j.daily.uv_index_max);
-  const cond = numArr(j.daily.weather_code);
-  const previsao: PontoPrevisao[] = dias.map((d, i) => ({
-    dia: d,
-    tempMax: tMax[i] ?? null,
-    tempMin: tMin[i] ?? null,
-    chuva: chuva[i] ?? null,
-    chuvaProb: chuvaProb[i] ?? null,
-    vento: vento[i] ?? null,
-    uv: uv[i] ?? null,
-    weathercode: cond[i] ?? null,
-  }));
-  if (!previsao.length) return { uf, atual, previsao: [], erro: true };
-  return { uf, atual, previsao, erro: false };
+  let camadaQueFunciona: number | null = null;
+  let diasNaCamada: number | null = null;
+  for (let i = 0; i < CAMADAS_DAILY.length; i++) {
+    const rr = await fetchJsonDiag(
+      montarUrlPrevisao(c.lat, c.lon, CAMADAS_DAILY[i], PREVISAO_DIAS),
+    );
+    const t = (rr.json as { daily?: { time?: unknown } } | null)?.daily?.time;
+    if (rr.ok && Array.isArray(t) && t.length > 0) {
+      camadaQueFunciona = i;
+      diasNaCamada = t.length;
+      break;
+    }
+  }
+  return {
+    uf,
+    capital: c.capital,
+    full: {
+      url: urlFull,
+      status: r.status,
+      ok: r.ok,
+      reason: r.reason,
+      corpo: r.corpo,
+      dias: diasFull,
+    },
+    camadaQueFunciona,
+    diasNaCamada,
+  };
 }
 
 // Historico diario dos ultimos ~30 dias (archive tem lag de 2-3 dias -> hoje-3).
