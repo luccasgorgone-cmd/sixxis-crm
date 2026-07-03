@@ -16,16 +16,20 @@ import {
   TTL_HORARIA_MS,
   TTL_HISTORICO_MS,
   TTL_PREVISAO_MS,
+  TTL_ATUAL_MS,
   DIAS_HORARIA,
   DIAS_HISTORICO,
   DIAS_PREVISAO,
+  DIAS_ATUAL,
   buscarHorariaComRetry,
   buscarHistoricoComRetry,
   buscarPrevisaoComRetry,
+  buscarAtualComRetry,
   calcularTendencia,
   type BlocoHoraria,
   type BlocoHistorico,
   type BlocoPrevisao,
+  type BlocoAtual,
   type DetalheClimaResp,
 } from "@/lib/clima-estado";
 
@@ -37,11 +41,12 @@ const TETO_CACHE_VAZIO_MS = 8_000;
 // Lock por (uf:bloco) evita reconstrucoes concorrentes do mesmo dado.
 const emReconstrucao = new Set<string>();
 
-type Bloco = "hor" | "hist" | "prev";
+type Bloco = "hor" | "hist" | "prev" | "atual";
 const SENTINELA: Record<Bloco, number> = {
   hor: DIAS_HORARIA,
   hist: DIAS_HISTORICO,
   prev: DIAS_PREVISAO,
+  atual: DIAS_ATUAL,
 };
 
 async function buscarBloco(
@@ -50,6 +55,7 @@ async function buscarBloco(
 ): Promise<{ erro: boolean } & object> {
   if (bloco === "hor") return buscarHorariaComRetry(uf);
   if (bloco === "hist") return buscarHistoricoComRetry(uf);
+  if (bloco === "atual") return buscarAtualComRetry(uf);
   return buscarPrevisaoComRetry(uf);
 }
 
@@ -110,21 +116,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const refresh = req.nextUrl.searchParams.get("refresh") === "1";
   const agora = Date.now();
 
-  // Ultimo bom de cada bloco (horaria/historico/previsao) desta UF no banco.
+  // Ultimo bom de cada bloco (atual/horaria/historico/previsao) desta UF no banco.
   const rows = await prisma.climaCacheUF.findMany({
-    where: { uf, dias: { in: [DIAS_HORARIA, DIAS_HISTORICO, DIAS_PREVISAO] } },
+    where: {
+      uf,
+      dias: { in: [DIAS_ATUAL, DIAS_HORARIA, DIAS_HISTORICO, DIAS_PREVISAO] },
+    },
   });
+  const linhaAtual = rows.find((r) => r.dias === DIAS_ATUAL) ?? null;
   const linhaHor = rows.find((r) => r.dias === DIAS_HORARIA) ?? null;
   const linhaHist = rows.find((r) => r.dias === DIAS_HISTORICO) ?? null;
   const linhaPrev = rows.find((r) => r.dias === DIAS_PREVISAO) ?? null;
 
   const stale = (linha: (typeof rows)[number] | null, ttl: number): boolean =>
     !linha || refresh || agora - linha.atualizadoEm.getTime() > ttl;
+  const atualStale = stale(linhaAtual, TTL_ATUAL_MS);
   const horStale = stale(linhaHor, TTL_HORARIA_MS);
   const histStale = stale(linhaHist, TTL_HISTORICO_MS);
   const prevStale = stale(linhaPrev, TTL_PREVISAO_MS);
 
   // Estado inicial: o cache (mesmo stale). Blocos SEM cache serao buscados agora.
+  let atualBloco = (linhaAtual?.dados as unknown as BlocoAtual) ?? null;
   let horBloco = (linhaHor?.dados as unknown as BlocoHoraria) ?? null;
   let horAtualizadoEm = linhaHor?.atualizadoEm ?? null;
   let histBloco = (linhaHist?.dados as unknown as BlocoHistorico) ?? null;
@@ -133,13 +145,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let prevAtualizadoEm = linhaPrev?.atualizadoEm ?? null;
 
   // Blocos com cache mas stale -> atualizam em BACKGROUND (respondemos com cache).
+  if (linhaAtual && atualStale) reconstruirBloco(uf, "atual");
   if (linhaHor && horStale) reconstruirBloco(uf, "hor");
   if (linhaHist && histStale) reconstruirBloco(uf, "hist");
   if (linhaPrev && prevStale) reconstruirBloco(uf, "prev");
 
   // Blocos SEM cache -> busca com TETO (precisamos de algo p/ mostrar). O que nao
-  // vier a tempo fica vazio e completa em background/proximo request.
-  const [rHor, rHist, rPrev] = await Promise.all([
+  // vier a tempo fica vazio e completa em background/proximo request. Cada bloco e
+  // INDEPENDENTE: um falhar nao zera os outros.
+  const [rAtual, rHor, rHist, rPrev] = await Promise.all([
+    linhaAtual
+      ? Promise.resolve<null>(null)
+      : comTeto(buscarAtualComRetry(uf), TETO_CACHE_VAZIO_MS),
     linhaHor
       ? Promise.resolve<null>(null)
       : comTeto(buscarHorariaComRetry(uf), TETO_CACHE_VAZIO_MS),
@@ -152,6 +169,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   ]);
   const nowDate = new Date();
 
+  if (!linhaAtual) {
+    if (rAtual && !rAtual.erro) {
+      await upsertBloco(uf, "atual", rAtual as object, nowDate);
+      atualBloco = rAtual;
+    } else {
+      reconstruirBloco(uf, "atual");
+    }
+  }
   if (!linhaHor) {
     if (rHor && !rHor.erro) {
       await upsertBloco(uf, "hor", rHor as object, nowDate);
@@ -182,11 +207,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const historico = histBloco?.historico ?? [];
   const previsao = prevBloco?.previsao ?? [];
+  // "agora" vem do bloco atual (independente); cai para o atual da previsao se
+  // por acaso existir num cache antigo. Nunca depende do sucesso da previsao 16d.
+  const climaAtual = atualBloco?.atual ?? prevBloco?.atual ?? null;
   const resp: DetalheClimaResp = {
     uf,
     capital: cap.capital,
     fonte: "Open-Meteo",
-    atual: prevBloco?.atual ?? null,
+    atual: climaAtual,
     horarioHoje: horBloco?.horarioHoje ?? [],
     horarioAtualizadoEm: horAtualizadoEm ? horAtualizadoEm.toISOString() : null,
     horarioErro: !horBloco || horBloco.horarioHoje.length === 0,

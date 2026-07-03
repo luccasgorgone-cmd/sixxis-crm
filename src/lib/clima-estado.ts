@@ -10,10 +10,13 @@ import { CAPITAIS } from "./capitais";
 export const TTL_HORARIA_MS = 3 * 60 * 60 * 1000;
 export const TTL_HISTORICO_MS = 12 * 60 * 60 * 1000;
 export const TTL_PREVISAO_MS = 6 * 60 * 60 * 1000;
+// Clima atual muda rapido; TTL curto (~1h).
+export const TTL_ATUAL_MS = 60 * 60 * 1000;
 // Sentinelas de `dias` para reusar a tabela ClimaCacheUF (evita colidir com {7,14}).
 export const DIAS_HORARIA = -1;
 export const DIAS_HISTORICO = -2;
 export const DIAS_PREVISAO = -5;
+export const DIAS_ATUAL = -6;
 const TIMEOUT_MS = 10_000;
 // Teto de dias da previsao diaria da Open-Meteo.
 const PREVISAO_DIAS = 16;
@@ -65,6 +68,7 @@ export type BlocoPrevisao = {
   previsao: PontoPrevisao[];
   erro: boolean;
 };
+export type BlocoAtual = { uf: string; atual: ClimaAtual | null; erro: boolean };
 
 // Resposta do endpoint de detalhe (sempre 200; partes podem degradar).
 export type DetalheClimaResp = {
@@ -182,6 +186,35 @@ export async function buscarHoraria(uf: string): Promise<BlocoHoraria> {
   }));
   if (!pontos.length) return { uf, horarioHoje: [], erro: true };
   return { uf, horarioHoje: pontos, erro: false };
+}
+
+// Clima ATUAL (current weather) — chamada LEVE e INDEPENDENTE da previsao de 16d,
+// para o "agora" continuar aparecendo mesmo se a previsao falhar.
+export async function buscarAtual(uf: string): Promise<BlocoAtual> {
+  const c = CAPITAIS[uf];
+  if (!c) return { uf, atual: null, erro: true };
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
+    `precipitation,wind_speed_10m,weather_code` +
+    `&forecast_days=1&timezone=auto`;
+  const j = (await fetchJson(url)) as { current?: Record<string, unknown> } | null;
+  if (!j?.current) return { uf, atual: null, erro: true };
+  const cur = j.current;
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+  const atual: ClimaAtual = {
+    temp: num(cur.temperature_2m),
+    sensacao: num(cur.apparent_temperature),
+    umidade: num(cur.relative_humidity_2m),
+    vento: num(cur.wind_speed_10m),
+    chuva: num(cur.precipitation),
+    weathercode: num(cur.weather_code),
+  };
+  return { uf, atual, erro: false };
+}
+export async function buscarAtualComRetry(uf: string): Promise<BlocoAtual> {
+  const r = await buscarAtual(uf);
+  return r.erro ? buscarAtual(uf) : r;
 }
 
 // Variaveis diarias da previsao, em camadas: da mais completa para a basica. Se
