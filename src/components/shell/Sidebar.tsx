@@ -20,6 +20,7 @@ import {
   MapPin,
   TrendingUp,
   Shield,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -81,6 +82,10 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
     { rotulo: "Google Trends", href: "/google-trends", icone: TrendingUp },
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
+    // Parceiros (tecnicos): ferramenta de pos-venda — visivel a ADMIN e POS_VENDA.
+    ...(ehAdmin || papel === "POS_VENDA"
+      ? [{ rotulo: "Parceiros", href: "/parceiros", icone: Wrench }]
+      : []),
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
       ? [{ rotulo: "Admin", href: "/admin", icone: Shield }]
