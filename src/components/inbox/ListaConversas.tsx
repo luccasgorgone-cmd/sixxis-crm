@@ -81,7 +81,7 @@ export function ListaConversas({
           <input
             value={busca}
             onChange={(e) => onBusca(e.target.value)}
-            placeholder="Buscar por nome ou telefone"
+            placeholder="Buscar por nome, telefone ou mensagem"
             className="w-full bg-transparent py-2 text-sm outline-none"
           />
         </div>
@@ -208,6 +208,15 @@ function ItemConversa({
             </span>
           )}
         </div>
+        {conversa.trechoBusca && (
+          <p
+            className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-tiffany"
+            title={conversa.trechoBusca}
+          >
+            <Search className="h-3 w-3 shrink-0" />
+            <span className="truncate">{conversa.trechoBusca}</span>
+          </p>
+        )}
       </div>
     </button>
   );

@@ -222,13 +222,43 @@ export function Inbox({
     });
   }, []);
 
-  // Aplica busca (sem acento, case-insensitive; telefone so digitos) + filtro.
+  // Busca por CONTEUDO das mensagens (backend, escopado). Dispara so quando ha
+  // termo; resultados trazem trechoBusca. Cancela requisicoes obsoletas.
+  const [resConteudo, setResConteudo] = useState<ConversaItem[]>([]);
+  useEffect(() => {
+    const q = buscaAplicada.trim();
+    if (!q) {
+      setResConteudo([]);
+      return;
+    }
+    let cancelado = false;
+    const qs = new URLSearchParams({ texto: q });
+    if (finalidade) qs.set("finalidade", finalidade);
+    fetch(`/api/conversas?${qs.toString()}`)
+      .then((r) => (r.ok ? r.json() : { conversas: [] }))
+      .then((d) => {
+        if (!cancelado) setResConteudo((d.conversas ?? []) as ConversaItem[]);
+      })
+      .catch(() => {
+        if (!cancelado) setResConteudo([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [buscaAplicada, finalidade]);
+
+  // Aplica busca (nome/telefone local, sem acento) + filtro. Ao buscar, une os
+  // resultados por CONTEUDO (backend) — dedup por id, preservando o trecho.
   const filtradas = useMemo(() => {
     const q = normalizarTexto(buscaAplicada);
     const qDigitos = buscaAplicada.replace(/\D/g, "");
-    return conversas.filter((c) => {
+    const passaFiltro = (c: ConversaItem) => {
       if (filtro === "minhas" && c.agenteId !== agenteIdAtual) return false;
       if (filtro === "naoLidas" && c.naoLidas <= 0) return false;
+      return true;
+    };
+    const locais = conversas.filter((c) => {
+      if (!passaFiltro(c)) return false;
       if (q) {
         const nome = normalizarTexto(c.leadNome ?? "");
         const tel = c.leadTelefone.replace(/\D/g, "");
@@ -238,7 +268,19 @@ export function Inbox({
       }
       return true;
     });
-  }, [conversas, buscaAplicada, filtro, agenteIdAtual]);
+    if (!buscaAplicada.trim()) return locais;
+    // Une com os que bateram no conteudo (respeitando o mesmo filtro).
+    const mapa = new Map<string, ConversaItem>(locais.map((c) => [c.id, c]));
+    for (const c of resConteudo) {
+      if (!passaFiltro(c)) continue;
+      const existente = mapa.get(c.id);
+      if (!existente) mapa.set(c.id, c);
+      else if (c.trechoBusca && !existente.trechoBusca) {
+        mapa.set(c.id, { ...existente, trechoBusca: c.trechoBusca });
+      }
+    }
+    return Array.from(mapa.values());
+  }, [conversas, buscaAplicada, filtro, agenteIdAtual, resConteudo]);
 
   const conversaAberta = useMemo(
     () => conversas.find((c) => c.id === selecionada) ?? null,

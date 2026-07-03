@@ -30,6 +30,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where.finalidade = f;
   }
 
+  // Busca por CONTEUDO das mensagens (case-insensitive). Combina com o escopo
+  // acima (AND implicito) — nao acha conversas fora do que o usuario ve.
+  const texto = req.nextUrl.searchParams.get("texto")?.trim();
+  if (texto) {
+    where.mensagens = {
+      some: { conteudo: { contains: texto, mode: "insensitive" } },
+    };
+  }
+
   const conversas = await prisma.conversa.findMany({
     where,
     orderBy: [{ ultimaMensagemEm: "desc" }, { criadoEm: "desc" }],
@@ -80,10 +89,31 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     )[0].id;
   }
 
+  // Trecho que bateu na busca: 1 consulta extra (nao N+1) so para as conversas
+  // ja filtradas. Pega a mensagem correspondente mais recente por conversa.
+  const trechos = new Map<string, string>();
+  if (texto && conversas.length > 0) {
+    const casadas = await prisma.mensagem.findMany({
+      where: {
+        conversaId: { in: conversas.map((c) => c.id) },
+        conteudo: { contains: texto, mode: "insensitive" },
+      },
+      orderBy: { hora: "desc" },
+      select: { conversaId: true, conteudo: true },
+      take: 400,
+    });
+    for (const m of casadas) {
+      if (m.conteudo && !trechos.has(m.conversaId)) {
+        trechos.set(m.conversaId, m.conteudo);
+      }
+    }
+  }
+
   const admin = ehAdmin(agente.papel);
   const lista = conversas.map((c) => ({
     id: c.id,
     leadId: c.leadId,
+    ...(texto ? { trechoBusca: trechos.get(c.id) ?? null } : {}),
     negocioId: negocioDaConversa(c.lead.negocios, c.finalidade),
     leadNome: nomeEfetivo(c.lead),
     leadFoto: c.lead.fotoUrl,

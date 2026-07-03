@@ -34,6 +34,8 @@ export type ConversaItem = {
   instanciaId?: string | null;
   instanciaNome?: string | null;
   instanciaNumero?: string | null;
+  // Trecho da mensagem que bateu na busca por conteudo (quando ha ?texto=).
+  trechoBusca?: string | null;
 };
 
 export type MensagemItem = {
