@@ -551,6 +551,31 @@ async function marcarApagadaPeloCliente(
   console.log(`[ingest] mensagem ${externalIdRevogado} marcada como apagada (CLIENTE)`);
 }
 
+// Reacao recebida do cliente: grava reacaoDeCliente na mensagem alvo (pelo
+// externalId referenciado). emoji vazio "" = reacao removida -> limpa. Best-effort.
+async function registrarReacaoCliente(
+  externalIdAlvo: string,
+  emoji: string,
+  io: Server | null,
+): Promise<void> {
+  const msg = await prisma.mensagem.findUnique({
+    where: { externalId: externalIdAlvo },
+    select: { id: true, conversa: { select: { id: true } } },
+  });
+  if (!msg) return; // reacao a mensagem que nao esta no nosso historico
+  const reacaoDeCliente = emoji.trim() ? emoji.trim() : null;
+  await prisma.mensagem.update({
+    where: { id: msg.id },
+    data: { reacaoDeCliente },
+  });
+  (io ?? getIO())?.emit("mensagem:reacao", {
+    conversaId: msg.conversa.id,
+    mensagemId: msg.id,
+    reacaoDeCliente,
+  });
+  console.log(`[ingest] reacao do cliente em ${externalIdAlvo}: ${reacaoDeCliente ?? "(removida)"}`);
+}
+
 // Detecta o id revogado num evento: protocolMessage REVOKE (no upsert) ou
 // messageStubType REVOKE (no update). Retorna o id da mensagem original.
 function idRevogado(payload: EventoEvolution): string | null {
@@ -1428,6 +1453,26 @@ async function processarEvento(
   }
 
   const fromMe = data?.key?.fromMe === true;
+
+  // REACAO recebida (cliente reagiu a uma mensagem). Chega como upsert com
+  // message.reactionMessage = { key: { id }, text: emoji }. Ignora o eco das
+  // NOSSAS reacoes (fromMe). Best-effort: erro aqui nao quebra a ingestao.
+  const reacaoWa = (
+    data?.message as { reactionMessage?: { key?: { id?: string }; text?: string } } | undefined
+  )?.reactionMessage;
+  if (reacaoWa && !fromMe) {
+    const alvo = reacaoWa.key?.id;
+    if (alvo) {
+      try {
+        await registrarReacaoCliente(alvo, reacaoWa.text ?? "", io);
+      } catch (e) {
+        console.warn(
+          `[reacao] falha ao registrar reacao do cliente: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    return;
+  }
 
   // GRUPOS (@g.us): caminho PARALELO e ISOLADO (chat interno). Registra na
   // estrutura propria (GrupoInterno/MensagemGrupo) e RETORNA — nunca entra no
