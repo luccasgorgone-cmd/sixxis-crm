@@ -26,6 +26,7 @@ export function BarraFiltros({
   agenteId,
   etiquetas,
   agentes,
+  mostrarTemperatura = true,
   onBusca,
   onEtiqueta,
   onTemperatura,
@@ -40,6 +41,8 @@ export function BarraFiltros({
   agenteId: string;
   etiquetas: EtiquetaChip[];
   agentes: AgenteResumo[];
+  // Pos-venda nao usa temperatura -> esconde o filtro.
+  mostrarTemperatura?: boolean;
   onBusca: (v: string) => void;
   onEtiqueta: (v: string) => void;
   onTemperatura: (v: string) => void;
@@ -71,18 +74,20 @@ export function BarraFiltros({
         ))}
       </select>
 
-      <select
-        value={temperatura}
-        onChange={(e) => onTemperatura(e.target.value)}
-        className="rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm text-escuro outline-none focus:border-tiffany"
-      >
-        <option value="">Toda temperatura</option>
-        {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => (
-          <option key={t} value={t}>
-            {TEMPERATURA_INFO[t].rotulo}
-          </option>
-        ))}
-      </select>
+      {mostrarTemperatura && (
+        <select
+          value={temperatura}
+          onChange={(e) => onTemperatura(e.target.value)}
+          className="rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm text-escuro outline-none focus:border-tiffany"
+        >
+          <option value="">Toda temperatura</option>
+          {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => (
+            <option key={t} value={t}>
+              {TEMPERATURA_INFO[t].rotulo}
+            </option>
+          ))}
+        </select>
+      )}
 
       {ehAdmin && (
         <>

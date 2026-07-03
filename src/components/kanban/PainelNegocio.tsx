@@ -34,6 +34,7 @@ import {
   Building2,
   ClipboardList,
   ShieldCheck,
+  ShieldOff,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
@@ -674,29 +675,33 @@ function NegocioAcoes({
           </div>
           <p className="mt-1 text-xs text-medio/50">{formatarBRL(detalhe.valor)}</p>
         </div>
-        <div>
-          <Rotulo>Temperatura</Rotulo>
-          <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
-              const ativo = detalhe.temperatura === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => {
-                    if (!ativo) void salvar({ temperatura: t });
-                  }}
-                  className={`rounded-lg border px-1.5 py-1 transition-colors ${
-                    ativo
-                      ? "border-tiffany bg-tiffany/5"
-                      : "border-transparent hover:bg-black/5"
-                  }`}
-                >
-                  <BadgeTemperatura temperatura={t} />
-                </button>
-              );
-            })}
+        {/* Temperatura so na VENDA. Pos-venda usa ganho/pendente/perdido +
+            garantia (o campo Negocio.temperatura permanece no banco). */}
+        {detalhe.finalidade !== "POS_VENDA" && (
+          <div>
+            <Rotulo>Temperatura</Rotulo>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
+                const ativo = detalhe.temperatura === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      if (!ativo) void salvar({ temperatura: t });
+                    }}
+                    className={`rounded-lg border px-1.5 py-1 transition-colors ${
+                      ativo
+                        ? "border-tiffany bg-tiffany/5"
+                        : "border-transparent hover:bg-black/5"
+                    }`}
+                  >
+                    <BadgeTemperatura temperatura={t} />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Etapa */}
@@ -1129,50 +1134,60 @@ export function BlocoAcompanhamento({
         </div>
       </div>
 
-      {/* Garantia (3 estados): editavel por pos-venda/admin; demais visualizam. */}
-      <div>
-        <Rotulo>Garantia</Rotulo>
-        <div className="flex flex-wrap gap-1.5">
-          {(
-            [
-              [true, "Garantia"],
-              [false, "Sem garantia"],
-              [null, "Nao definido"],
-            ] as [boolean | null, string][]
-          ).map(([valor, rotulo]) => {
-            const ativo = (cliente.garantia ?? null) === valor;
-            const corAtivo =
-              valor === true
-                ? "border-green-500 bg-green-50 text-green-700"
-                : valor === false
-                  ? "border-amber-500 bg-amber-50 text-amber-700"
-                  : "border-medio/40 bg-black/5 text-medio";
-            return (
-              <button
-                key={String(valor)}
-                disabled={!podeEditarGarantia || salvando}
-                onClick={() => {
-                  if (ativo) return;
-                  void salvar({ garantia: valor });
-                }}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  ativo
-                    ? corAtivo
-                    : "border-black/10 bg-white text-medio/70 hover:bg-black/5"
-                } ${!podeEditarGarantia ? "cursor-default opacity-90" : ""}`}
-              >
-                {valor === true && <ShieldCheck className="h-3.5 w-3.5" />}
-                {rotulo}
-              </button>
-            );
-          })}
+      {/* Garantia: conceito de POS-VENDA. So aparece na pos-venda, como escolha
+          binaria com cor (Com=verde, Sem=ambar); sem "Nao definido" na UI (se vier
+          null, nenhum fica ativo e o hint pede para definir). Some na venda. */}
+      {detalhe.finalidade === "POS_VENDA" && (
+        <div>
+          <Rotulo>Garantia</Rotulo>
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                [true, "Com garantia"],
+                [false, "Sem garantia"],
+              ] as [boolean, string][]
+            ).map(([valor, rotulo]) => {
+              const ativo = (cliente.garantia ?? null) === valor;
+              const corAtivo =
+                valor === true
+                  ? "border-green-500 bg-green-50 text-green-700"
+                  : "border-amber-500 bg-amber-50 text-amber-700";
+              return (
+                <button
+                  key={String(valor)}
+                  disabled={!podeEditarGarantia || salvando}
+                  onClick={() => {
+                    if (ativo) return;
+                    void salvar({ garantia: valor });
+                  }}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    ativo
+                      ? corAtivo
+                      : "border-black/10 bg-white text-medio/70 hover:bg-black/5"
+                  } ${!podeEditarGarantia ? "cursor-default opacity-90" : ""}`}
+                >
+                  {valor === true ? (
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                  ) : (
+                    <ShieldOff className="h-3.5 w-3.5" />
+                  )}
+                  {rotulo}
+                </button>
+              );
+            })}
+          </div>
+          {cliente.garantia == null && (
+            <p className="mt-1 text-[11px] text-medio/50">
+              Garantia ainda nao definida.
+            </p>
+          )}
+          {!podeEditarGarantia && (
+            <p className="mt-1 text-[11px] text-medio/50">
+              Somente pos-venda edita a garantia.
+            </p>
+          )}
         </div>
-        {!podeEditarGarantia && (
-          <p className="mt-1 text-[11px] text-medio/50">
-            Somente pos-venda edita a garantia.
-          </p>
-        )}
-      </div>
+      )}
     </section>
   );
 }

@@ -93,6 +93,12 @@ export function Kanban({
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Pos-venda nao usa temperatura: limpa o filtro ao entrar (o select some, entao
+  // um filtro remanescente esconderia cards sem o usuario poder limpar).
+  useEffect(() => {
+    if (finalidade === "POS_VENDA") setTemperatura("");
+  }, [finalidade]);
+
   // Servidor: so finalidade + dono (papel). Busca/temperatura/etiqueta sao
   // aplicadas no cliente sobre os cards ja carregados.
   const query = useMemo(() => {
@@ -397,6 +403,7 @@ export function Kanban({
         agenteId={agenteId}
         etiquetas={etiquetas}
         agentes={agentes}
+        mostrarTemperatura={finalidade !== "POS_VENDA"}
         onBusca={setBusca}
         onEtiqueta={setEtiquetaId}
         onTemperatura={setTemperatura}

@@ -43,6 +43,10 @@ export type ClienteMapa = {
   nome: string;
   telefone: string;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
+  // Finalidade do negocio principal (para ocultar temperatura na pos-venda).
+  finalidade: "VENDA" | "POS_VENDA" | null;
+  // Garantia do cliente (pos-venda): null=nao definido, true=com, false=sem.
+  garantia: boolean | null;
   status: "ABERTO" | "GANHO" | "PERDIDO" | "PENDENTE" | null;
   etapa: string | null;
   etapaId: string | null;

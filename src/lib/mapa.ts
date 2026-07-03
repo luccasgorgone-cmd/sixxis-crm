@@ -13,6 +13,7 @@ export type NegocioMapa = {
   status: "ABERTO" | "GANHO" | "PERDIDO";
   pendente: boolean;
   temperatura: "QUENTE" | "MORNO" | "FRIO";
+  finalidade: "VENDA" | "POS_VENDA";
   valor: unknown;
   etapaId: string | null;
   criadoEm: Date;
@@ -29,6 +30,7 @@ export type LeadMapa = {
   telefone: string;
   origem: string | null;
   anuncioTitulo: string | null;
+  garantia: boolean | null;
   criadoEm: Date;
   enderecos: { uf: string | null; cidade: string | null }[];
   conversas: { id: string; ultimaMensagemEm: Date | null }[];
@@ -45,6 +47,7 @@ export const selectLeadMapa = {
   telefone: true,
   origem: true,
   anuncioTitulo: true,
+  garantia: true,
   criadoEm: true,
   enderecos: {
     select: { uf: true, cidade: true },
@@ -57,6 +60,7 @@ export const selectLeadMapa = {
       status: true,
       pendente: true,
       temperatura: true,
+      finalidade: true,
       valor: true,
       etapaId: true,
       criadoEm: true,

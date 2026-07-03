@@ -37,6 +37,8 @@ export type CardNegocio = {
   temperatura: Temperatura;
   status: StatusNeg;
   finalidade: Finalidade;
+  // Garantia do cliente (pos-venda): null=nao definido, true=com, false=sem.
+  garantia: boolean | null;
   pendente: boolean;
   motivoPendencia: string | null;
   motivoPerda: string | null;

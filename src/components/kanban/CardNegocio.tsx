@@ -5,7 +5,7 @@
 // pela finalidade; badge de finalidade para o admin.
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, UserPlus, BellRing } from "lucide-react";
+import { Clock, UserPlus, BellRing, ShieldCheck, ShieldOff } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -35,6 +35,9 @@ export function CardNegocio({
 
   const nome = card.leadNome?.trim() || card.leadTelefone;
   const cor = corFinalidade(card.finalidade);
+  // Pos-venda nao usa temperatura; usa garantia (marcador colorido). Venda mantem
+  // a temperatura como sempre.
+  const ehPosVenda = card.finalidade === "POS_VENDA";
 
   const style = {
     borderLeftColor: cor.hex,
@@ -52,6 +55,7 @@ export function CardNegocio({
         arrastando ? "rotate-1 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"
       } ${isDragging ? "opacity-40" : ""}`}
     >
+      {/* cabecalho */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <AvatarCliente
@@ -64,11 +68,15 @@ export function CardNegocio({
             {nome}
           </p>
         </div>
-        <BadgeTemperatura
-          temperatura={card.temperatura}
-          variante="ponto"
-          className="mt-1.5"
-        />
+        {ehPosVenda ? (
+          <GarantiaMarcador garantia={card.garantia} />
+        ) : (
+          <BadgeTemperatura
+            temperatura={card.temperatura}
+            variante="ponto"
+            className="mt-1.5"
+          />
+        )}
       </div>
 
       {card.valor != null && (
@@ -172,5 +180,29 @@ export function CardNegocio({
         </div>
       </div>
     </div>
+  );
+}
+
+// Marcador de garantia no card de pos-venda: verde (com), ambar (sem), cinza
+// (a definir). Compacto (so o icone com cor + tooltip).
+function GarantiaMarcador({ garantia }: { garantia: boolean | null }) {
+  if (garantia === true) {
+    return (
+      <span title="Com garantia" className="mt-1 shrink-0 text-green-600">
+        <ShieldCheck className="h-4 w-4" />
+      </span>
+    );
+  }
+  if (garantia === false) {
+    return (
+      <span title="Sem garantia" className="mt-1 shrink-0 text-amber-600">
+        <ShieldOff className="h-4 w-4" />
+      </span>
+    );
+  }
+  return (
+    <span title="Garantia a definir" className="mt-1 shrink-0 text-medio/40">
+      <ShieldOff className="h-4 w-4" />
+    </span>
   );
 }

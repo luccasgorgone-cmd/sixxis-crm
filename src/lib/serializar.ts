@@ -14,6 +14,8 @@ export const includeCard = {
       fotoUrl: true,
       telefone: true,
       origem: true,
+      // Garantia (pos-venda): marcador colorido no card de pos-venda.
+      garantia: true,
       etiquetas: { include: { etiqueta: true } },
     },
   },
@@ -36,6 +38,7 @@ export function cardNegocio(n: NegocioCard) {
     temperatura: n.temperatura,
     status: n.status,
     finalidade: n.finalidade,
+    garantia: n.lead.garantia,
     pendente: n.pendente,
     motivoPendencia: n.motivoPendencia,
     motivoPerda: n.motivoPerda,

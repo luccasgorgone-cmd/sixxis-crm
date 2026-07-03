@@ -35,6 +35,8 @@ type ClienteMapa = {
   nome: string;
   telefone: string;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
+  finalidade: "VENDA" | "POS_VENDA" | null;
+  garantia: boolean | null;
   status: "ABERTO" | "GANHO" | "PERDIDO" | "PENDENTE" | null;
   etapa: string | null;
   etapaId: string | null;
@@ -109,6 +111,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       nome: nomeEfetivo(lead),
       telefone: formatarTelefone(lead.telefone),
       temperatura: principal?.temperatura ?? null,
+      finalidade: principal?.finalidade ?? null,
+      garantia: lead.garantia,
       status: statusDoLead(lead),
       etapa: principal?.etapa?.nome ?? null,
       etapaId: principal?.etapaId ?? null,

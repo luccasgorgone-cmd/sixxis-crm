@@ -17,6 +17,8 @@ import {
   Repeat2,
   ThermometerSun,
   ArrowUpDown,
+  ShieldCheck,
+  ShieldOff,
 } from "lucide-react";
 import Link from "next/link";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -496,6 +498,29 @@ function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
   );
 }
 
+// Chip de garantia (pos-venda) com cor: verde (com), ambar (sem), cinza (definir).
+function GarantiaChip({ garantia }: { garantia: boolean | null }) {
+  if (garantia === true) {
+    return (
+      <span className="flex items-center gap-1 rounded-md border border-green-500 bg-green-50 px-1.5 py-1 text-[11px] font-medium text-green-700">
+        <ShieldCheck className="h-3.5 w-3.5" /> Com garantia
+      </span>
+    );
+  }
+  if (garantia === false) {
+    return (
+      <span className="flex items-center gap-1 rounded-md border border-amber-500 bg-amber-50 px-1.5 py-1 text-[11px] font-medium text-amber-700">
+        <ShieldOff className="h-3.5 w-3.5" /> Sem garantia
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 rounded-md border border-black/10 bg-white px-1.5 py-1 text-[11px] font-medium text-medio/60">
+      <ShieldOff className="h-3.5 w-3.5" /> Garantia a definir
+    </span>
+  );
+}
+
 function ChipCategoria({
   rotulo,
   ativo,
@@ -643,29 +668,34 @@ function ListaClientes({
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-black/5 pt-2">
             {c.negocioId ? (
               <>
-                <label className="flex items-center gap-1 text-[11px] text-medio/60">
-                  <BadgeTemperatura
-                    temperatura={c.temperatura ?? "MORNO"}
-                    variante="ponto"
-                  />
-                  <select
-                    value={c.temperatura ?? "MORNO"}
-                    disabled={editando === c.negocioId}
-                    onChange={(e) =>
-                      onEditarTemp(
-                        c,
-                        e.target.value as "QUENTE" | "MORNO" | "FRIO",
-                      )
-                    }
-                    className="rounded-md border border-black/10 bg-white px-1.5 py-1 text-xs outline-none focus:border-tiffany disabled:opacity-50"
-                  >
-                    {TEMPERATURAS.map((t) => (
-                      <option key={t} value={t}>
-                        {t.charAt(0) + t.slice(1).toLowerCase()}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {/* Temperatura so na VENDA; pos-venda mostra a garantia (cor). */}
+                {c.finalidade === "POS_VENDA" ? (
+                  <GarantiaChip garantia={c.garantia} />
+                ) : (
+                  <label className="flex items-center gap-1 text-[11px] text-medio/60">
+                    <BadgeTemperatura
+                      temperatura={c.temperatura ?? "MORNO"}
+                      variante="ponto"
+                    />
+                    <select
+                      value={c.temperatura ?? "MORNO"}
+                      disabled={editando === c.negocioId}
+                      onChange={(e) =>
+                        onEditarTemp(
+                          c,
+                          e.target.value as "QUENTE" | "MORNO" | "FRIO",
+                        )
+                      }
+                      className="rounded-md border border-black/10 bg-white px-1.5 py-1 text-xs outline-none focus:border-tiffany disabled:opacity-50"
+                    >
+                      {TEMPERATURAS.map((t) => (
+                        <option key={t} value={t}>
+                          {t.charAt(0) + t.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
                 <select
                   value={c.etapaId ?? ""}
