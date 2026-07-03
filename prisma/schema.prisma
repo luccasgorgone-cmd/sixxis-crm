@@ -86,6 +86,13 @@ enum Finalidade {
   POS_VENDA
 }
 
+// Segmento comercial do CLIENTE (fica no Lead: um cliente e sempre varejo OU
+// atacado, nao varia por negocio). null = nao definido.
+enum Segmento {
+  VAREJO
+  ATACADO
+}
+
 // Finalidade de uma etapa do funil. AMBAS aparece nos dois funis.
 enum FinalidadeEtapa {
   VENDA
@@ -220,6 +227,9 @@ model Lead {
   empresa       String?
   cpf           String?
   cnpj          String?
+  // Segmento comercial do cliente (regra do time de VENDA): varejo ou atacado.
+  // null = nao definido. Fica no Lead (nao varia por negocio).
+  segmento      Segmento?
   // Data de nascimento (apenas a data; hora ignorada). Base para aniversarios.
   dataNascimento DateTime?
   anotacoes     String?        @db.Text

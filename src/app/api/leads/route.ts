@@ -13,7 +13,12 @@ import { campoDono, temAcesso } from "@/lib/dono";
 import { espelharDonoNasConversas } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
 import { parseDataNascimento } from "@/lib/format";
-import { Finalidade, AtividadeTipo } from "@/generated/prisma/enums";
+import { Finalidade, AtividadeTipo, Segmento } from "@/generated/prisma/enums";
+
+// Valida o segmento do corpo (VAREJO/ATACADO) ou null (nao definido).
+function lerSegmento(v: unknown): Segmento | null {
+  return v === Segmento.VAREJO || v === Segmento.ATACADO ? v : null;
+}
 
 // Campos opcionais de endereco aceitos no cadastro (mesmo shape do endpoint de
 // enderecos). Cria um Endereco (principal) quando ao menos um vier preenchido.
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     email?: string | null;
     cpf?: string | null;
     cnpj?: string | null;
+    segmento?: string | null;
     dataNascimento?: string | null;
     endereco?: EnderecoEntrada;
     assumir?: boolean;
@@ -167,6 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       email: body.email?.trim() || null,
       cpf: body.cpf?.trim() || null,
       cnpj: body.cnpj?.trim() || null,
+      segmento: lerSegmento(body.segmento),
       dataNascimento,
       origem: "manual",
       aceitaContato: true,

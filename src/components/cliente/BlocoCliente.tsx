@@ -20,6 +20,7 @@ import {
   Cake,
   Briefcase,
   Megaphone,
+  Store,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -45,6 +46,7 @@ export type ClientePainel = {
   empresa: string | null;
   cpf: string | null;
   cnpj?: string | null;
+  segmento?: "VAREJO" | "ATACADO" | null;
   dataNascimento?: string | null;
   anotacoes: string | null;
   aceitaContato?: boolean;
@@ -185,6 +187,15 @@ export function BlocoCliente({
               placeholder=""
             />
           )}
+          {/* Segmento comercial (Varejo/Atacado) com badge; vazio honesto. */}
+          <div className="flex items-center gap-2 text-sm">
+            <Store className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+            {cliente.segmento ? (
+              <BadgeSegmento segmento={cliente.segmento} />
+            ) : (
+              <span className="text-medio/40">Segmento nao definido</span>
+            )}
+          </div>
           {cliente.anotacoes && (
             <div className="mt-2 flex gap-2 rounded-lg bg-fundo px-3 py-2">
               <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-medio/50" />
@@ -304,6 +315,30 @@ function OptOut({
   );
 }
 
+// Badge compacto do segmento comercial. Varejo = tiffany, Atacado = escuro.
+// Reusavel (mapa/lista/drawer) para marcar o segmento com cor consistente.
+export function BadgeSegmento({
+  segmento,
+  className = "",
+}: {
+  segmento: "VAREJO" | "ATACADO";
+  className?: string;
+}) {
+  const varejo = segmento === "VAREJO";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+        varejo
+          ? "bg-tiffany/10 text-tiffany"
+          : "bg-escuro/10 text-escuro dark:bg-white/10"
+      } ${className}`}
+    >
+      <Store className="h-2.5 w-2.5" />
+      {varejo ? "Varejo" : "Atacado"}
+    </span>
+  );
+}
+
 function Linha({
   icone: Icone,
   valor,
@@ -343,6 +378,7 @@ function Formulario({
   const [dataNascimento, setDataNascimento] = useState(
     dataNascParaInput(cliente.dataNascimento),
   );
+  const [segmento, setSegmento] = useState<string>(cliente.segmento ?? "");
   const [anotacoes, setAnotacoes] = useState(cliente.anotacoes ?? "");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -360,6 +396,7 @@ function Formulario({
           empresa,
           cpf,
           cnpj,
+          segmento: segmento || null,
           dataNascimento,
           anotacoes,
         }),
@@ -413,6 +450,20 @@ function Formulario({
         onChange={setDataNascimento}
         tipo="date"
       />
+      <div>
+        <label className="mb-1 block text-xs font-medium text-medio/70">
+          Segmento (Varejo/Atacado)
+        </label>
+        <select
+          value={segmento}
+          onChange={(e) => setSegmento(e.target.value)}
+          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+        >
+          <option value="">Nao definido</option>
+          <option value="VAREJO">Varejo</option>
+          <option value="ATACADO">Atacado</option>
+        </select>
+      </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-medio/70">
           Anotacoes

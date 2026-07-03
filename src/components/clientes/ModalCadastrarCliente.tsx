@@ -37,6 +37,7 @@ export function ModalCadastrarCliente({
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
+  const [segmento, setSegmento] = useState(""); // "" = nao definido (opcional)
   // Dados adicionais (opcionais), recolhidos por padrao para o cadastro rapido.
   const [mostrarAdicionais, setMostrarAdicionais] = useState(false);
   const [dataNascimento, setDataNascimento] = useState("");
@@ -93,6 +94,7 @@ export function ModalCadastrarCliente({
           email: email.trim() || null,
           cpf: cpf.trim() || null,
           cnpj: cnpj.trim() || null,
+          segmento: segmento || null,
           dataNascimento: dataNascimento || null,
           endereco: {
             cep: cep.trim() || null,
@@ -245,6 +247,19 @@ export function ModalCadastrarCliente({
                 />
               </Campo>
             </div>
+
+            {/* Segmento comercial (regra do time de Venda). Opcional, mas visivel. */}
+            <Campo rotulo="Segmento (regra de Venda) — opcional">
+              <select
+                value={segmento}
+                onChange={(e) => setSegmento(e.target.value)}
+                className="campo w-full"
+              >
+                <option value="">Nao definido</option>
+                <option value="VAREJO">Varejo</option>
+                <option value="ATACADO">Atacado</option>
+              </select>
+            </Campo>
 
             {/* Dados adicionais (opcional): nascimento + endereco com ViaCEP. */}
             <div className="rounded-xl border border-black/5">

@@ -56,6 +56,7 @@ export async function GET(
           empresa: true,
           cpf: true,
           cnpj: true,
+          segmento: true,
           dataNascimento: true,
           anotacoes: true,
           aceitaContato: true,

@@ -13,7 +13,7 @@ import {
 } from "@/lib/cliente";
 import { parseDataNascimento } from "@/lib/format";
 import { getIO } from "@/lib/socket";
-import { AtividadeTipo } from "@/generated/prisma/enums";
+import { AtividadeTipo, Segmento } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -82,6 +82,7 @@ export async function PATCH(
       empresa: true,
       cpf: true,
       cnpj: true,
+      segmento: true,
       dataNascimento: true,
       anotacoes: true,
       aceitaContato: true,
@@ -118,6 +119,7 @@ export async function PATCH(
   const tentaBase =
     CAMPOS.some(({ chave }) => body[chave] !== undefined) ||
     body.dataNascimento !== undefined ||
+    body.segmento !== undefined ||
     typeof body.aceitaContato === "boolean";
   const tentaAcomp =
     body.notaFiscal !== undefined || body.empresaFaturadaId !== undefined;
@@ -154,6 +156,18 @@ export async function PATCH(
     if ((nova ? nova.getTime() : null) !== atualMs) {
       data.dataNascimento = nova;
       mudancas.push("data de nascimento");
+    }
+  }
+
+  // Segmento comercial (enum VAREJO/ATACADO ou null). Editavel como os demais.
+  if (body.segmento !== undefined) {
+    const novo =
+      body.segmento === Segmento.VAREJO || body.segmento === Segmento.ATACADO
+        ? body.segmento
+        : null;
+    if (novo !== (lead.segmento ?? null)) {
+      data.segmento = novo;
+      mudancas.push("segmento");
     }
   }
 
