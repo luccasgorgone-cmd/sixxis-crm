@@ -752,6 +752,11 @@ model ConfiguracaoCRM {
   logoData           String?   @db.Text
   logoMime           String?
   logoEm             DateTime?
+  // Favicon do CRM (PNG). Mesmo padrao da logo: guardado no banco (data URL) e
+  // servido por /api/favicon; faviconEm versiona o cache. null = usa o padrao.
+  faviconData        String?   @db.Text
+  faviconMime        String?
+  faviconEm          DateTime?
   // Meta Conversions API (server-side). Token guardado aqui (nunca exposto ao
   // browser). testEventCode usa o modo de teste do Gerenciador de Eventos.
   metaPixelId        String?

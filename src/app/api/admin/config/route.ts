@@ -9,7 +9,7 @@ import {
   type DiaHorario,
 } from "@/lib/horario";
 import { HORARIOS_PADRAO } from "@/lib/seed";
-import { validarLogo } from "@/lib/marca";
+import { validarLogo, validarFavicon } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +41,8 @@ export async function GET(): Promise<NextResponse> {
       mensagemForaHorario: config.mensagemForaHorario,
       temLogo: Boolean(config.logoData),
       logoEm: config.logoEm?.getTime() ?? 0,
+      temFavicon: Boolean(config.faviconData),
+      faviconEm: config.faviconEm?.getTime() ?? 0,
     },
     abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
   });
@@ -60,6 +62,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     logoMime?: unknown;
     // Sinal explicito para remover a logo atual.
     removerLogo?: boolean;
+    faviconData?: unknown;
+    faviconMime?: unknown;
+    removerFavicon?: boolean;
   };
   try {
     body = await req.json();
@@ -102,6 +107,28 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
       } catch (e) {
         return NextResponse.json(
           { erro: e instanceof Error ? e.message : "logo invalida" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Favicon: remover, ou validar (PNG) e salvar com nova versao (faviconEm).
+    if (body.removerFavicon === true) {
+      data.faviconData = null;
+      data.faviconMime = null;
+      data.faviconEm = null;
+    } else if (body.faviconData !== undefined) {
+      try {
+        const { data: favData, mime } = validarFavicon(
+          body.faviconData,
+          body.faviconMime,
+        );
+        data.faviconData = favData;
+        data.faviconMime = mime;
+        data.faviconEm = new Date();
+      } catch (e) {
+        return NextResponse.json(
+          { erro: e instanceof Error ? e.message : "favicon invalido" },
           { status: 400 },
         );
       }

@@ -7,10 +7,14 @@ export type Marca = {
   // Versao p/ cache-busting do <img src="/api/logo?v=...">. 0 quando sem logo.
   logoEm: number;
   nomeEmpresa: string | null;
+  // Favicon dedicado (PNG). temFavicon=false -> app usa a logo ou o padrao.
+  temFavicon: boolean;
+  faviconEm: number;
 };
 
 // Limite final aceito no servidor (defesa; o cliente ja otimiza antes).
 export const LOGO_MAX_BYTES = 200 * 1024; // ~200KB (margem sobre a meta de 150KB)
+export const FAVICON_MAX_BYTES = 1024 * 1024; // ~1MB (favicon PNG)
 
 const MIMES_RASTER = ["image/png", "image/jpeg", "image/webp"];
 
@@ -18,17 +22,55 @@ const MIMES_RASTER = ["image/png", "image/jpeg", "image/webp"];
 export async function obterMarca(): Promise<Marca> {
   try {
     const config = await prisma.configuracaoCRM.findFirst({
-      select: { nomeEmpresa: true, logoData: true, logoEm: true },
+      select: {
+        nomeEmpresa: true,
+        logoData: true,
+        logoEm: true,
+        faviconData: true,
+        faviconEm: true,
+      },
     });
     return {
       temLogo: Boolean(config?.logoData),
       logoEm: config?.logoEm?.getTime() ?? 0,
       nomeEmpresa: config?.nomeEmpresa ?? null,
+      temFavicon: Boolean(config?.faviconData),
+      faviconEm: config?.faviconEm?.getTime() ?? 0,
     };
   } catch {
     // Banco indisponivel (ex.: prerender sem DB): fallback para a marca Sixxis.
-    return { temLogo: false, logoEm: 0, nomeEmpresa: null };
+    return {
+      temLogo: false,
+      logoEm: 0,
+      nomeEmpresa: null,
+      temFavicon: false,
+      faviconEm: 0,
+    };
   }
+}
+
+export type FaviconValidado = { data: string; mime: string };
+
+// Valida o favicon enviado pelo admin: SOMENTE PNG (data URL), ate ~1MB. Lanca
+// Error com mensagem clara. O favicon e um asset raster pequeno.
+export function validarFavicon(
+  faviconData: unknown,
+  _faviconMime: unknown,
+): FaviconValidado {
+  if (typeof faviconData !== "string" || !faviconData.trim()) {
+    throw new Error("Imagem ausente.");
+  }
+  const m = /^data:(image\/[a-z+]+);base64,([A-Za-z0-9+/=]+)$/.exec(faviconData);
+  if (!m) throw new Error("Formato invalido (envie um PNG).");
+  const tipo = m[1].toLowerCase();
+  if (tipo !== "image/png") {
+    throw new Error("Use um arquivo PNG para o favicon.");
+  }
+  const bytes = Buffer.byteLength(m[2], "base64");
+  if (bytes > FAVICON_MAX_BYTES) {
+    throw new Error("Favicon muito grande (limite ~1MB).");
+  }
+  return { data: faviconData, mime: tipo };
 }
 
 // Remove vetores de XSS de um SVG: <script>, handlers on*, e URIs javascript:.

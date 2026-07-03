@@ -11,19 +11,23 @@ const inter = Inter({
   display: "swap",
 });
 
-// Titulo da aba = nome da empresa (se houver). Favicon dinamico derivado da
-// logo quando configurada; senao mantem o padrao do app.
+// Titulo da aba = nome da empresa (se houver). Favicon: prioriza o PNG dedicado
+// (upload no admin); senao cai no derivado da logo; senao o padrao do app.
 export async function generateMetadata(): Promise<Metadata> {
-  const { nomeEmpresa, temLogo, logoEm } = await obterMarca();
+  const { nomeEmpresa, temLogo, logoEm, temFavicon, faviconEm } =
+    await obterMarca();
   const titulo = nomeEmpresa ? `${nomeEmpresa} CRM` : "Sixxis CRM";
+  const iconUrl = temFavicon
+    ? `/api/favicon?v=${faviconEm}`
+    : temLogo
+      ? `/api/logo?v=${logoEm}`
+      : null;
   return {
     title: titulo,
     description: nomeEmpresa
       ? `CRM de WhatsApp da ${nomeEmpresa}`
       : "CRM de WhatsApp da Sixxis",
-    ...(temLogo
-      ? { icons: { icon: `/api/logo?v=${logoEm}` } }
-      : {}),
+    ...(iconUrl ? { icons: { icon: iconUrl } } : {}),
   };
 }
 

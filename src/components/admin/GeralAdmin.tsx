@@ -9,6 +9,7 @@ import { Cabecalho, SkeletonTabela, CampoTexto } from "./VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 import { LogoUploader } from "./LogoUploader";
+import { FaviconUploader } from "./FaviconUploader";
 
 type Faixa = { inicio: string; fim: string };
 type DiaHorario = { dia: number; aberto: boolean; faixas: Faixa[] };
@@ -19,6 +20,8 @@ type Config = {
   mensagemForaHorario: string | null;
   temLogo: boolean;
   logoEm: number;
+  temFavicon: boolean;
+  faviconEm: number;
 };
 
 const NOMES = [
@@ -217,6 +220,15 @@ export function GeralAdmin() {
           onChange={() => {
             // Recarrega o estado local e revalida os server components (sidebar,
             // login, favicon) para refletir a troca sem reload manual.
+            void carregar();
+            router.refresh();
+          }}
+        />
+
+        <FaviconUploader
+          temFavicon={config.temFavicon}
+          faviconEm={config.faviconEm}
+          onChange={() => {
             void carregar();
             router.refresh();
           }}
