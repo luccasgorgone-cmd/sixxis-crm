@@ -72,6 +72,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
       "handoffSeClientePedir",
       "handoffSeLeadQuente",
       "cupomAtivo",
+      "atendeVenda",
+      "atendePosVenda",
     ];
     for (const k of booleanos) {
       if (body[k] !== undefined) {
@@ -107,6 +109,15 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     if (body.horarios !== undefined) {
       const h = normalizarHorarios(body.horarios);
       if (h) data.horarios = h as unknown as Prisma.InputJsonValue;
+    }
+    // Instancias que a IA atende: lista de IDs (strings). Vazia = todos os numeros.
+    if (body.instanciasAtendidas !== undefined) {
+      const ids = Array.isArray(body.instanciasAtendidas)
+        ? (body.instanciasAtendidas as unknown[]).filter(
+            (x): x is string => typeof x === "string",
+          )
+        : [];
+      data.instanciasAtendidas = ids as unknown as Prisma.InputJsonValue;
     }
 
     // Singleton: atualiza sem depender do id; cria se nao houver linha.

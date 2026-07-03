@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Clock,
   Power,
+  Check,
 } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
@@ -40,6 +41,16 @@ type Config = {
   cupomPrimeiraCompra: string | null;
   cupomDescricao: string | null;
   cupomAtivo: boolean;
+  atendeVenda: boolean;
+  atendePosVenda: boolean;
+  instanciasAtendidas: string[] | null;
+};
+
+type InstanciaSol = {
+  id: string;
+  nome: string;
+  numero: string | null;
+  finalidade: "VENDA" | "POS_VENDA";
 };
 
 const MODELOS: { id: string; rotulo: string }[] = [
@@ -73,6 +84,8 @@ export function IAAdmin() {
   const [salvando, setSalvando] = useState(false);
   // Resumo do horario comercial vigente (so leitura, para o painel de controle).
   const [horarioCRM, setHorarioCRM] = useState<HorarioCRM | null>(null);
+  // Numeros (instancias) ativos, para escolher quais a Sol atende.
+  const [instancias, setInstancias] = useState<InstanciaSol[]>([]);
 
   useEffect(() => {
     fetch("/api/admin/config")
@@ -85,6 +98,10 @@ export function IAAdmin() {
           });
         }
       })
+      .catch(() => undefined);
+    fetch("/api/instancias")
+      .then((r) => (r.ok ? r.json() : { instancias: [] }))
+      .then((d) => setInstancias(d.instancias ?? []))
       .catch(() => undefined);
   }, []);
 
@@ -150,6 +167,15 @@ export function IAAdmin() {
 
   const c = config;
   const set = (patch: Partial<Config>) => setConfig({ ...c, ...patch });
+
+  // Marca/desmarca uma instancia na lista de numeros atendidos pela Sol.
+  const alternarInstancia = (id: string) => {
+    const atual = c.instanciasAtendidas ?? [];
+    const nova = atual.includes(id)
+      ? atual.filter((x) => x !== id)
+      : [...atual, id];
+    set({ instanciasAtendidas: nova });
+  };
 
   return (
     <div className="p-6">
@@ -257,6 +283,77 @@ export function IAAdmin() {
             valor={c.responderLeadNovo}
             onChange={(v) => set({ responderLeadNovo: v })}
           />
+        </Secao>
+
+        {/* O que a Sol atende: setores + numeros (alem das travas ativo/horario). */}
+        <Secao
+          titulo="O que a Sol atende"
+          descricao="Escolha os setores e numeros que a Sol atende. As travas de ativa e horario continuam valendo."
+        >
+          <Toggle
+            titulo="Atende Venda"
+            descricao="A Sol responde conversas do setor de Venda."
+            valor={c.atendeVenda}
+            onChange={(v) => set({ atendeVenda: v })}
+          />
+          <Toggle
+            titulo="Atende Pos-venda"
+            descricao="A Sol responde conversas do setor de Pos-venda."
+            valor={c.atendePosVenda}
+            onChange={(v) => set({ atendePosVenda: v })}
+          />
+
+          {(["VENDA", "POS_VENDA"] as const).map((fin) => {
+            const habilitado =
+              fin === "VENDA" ? c.atendeVenda : c.atendePosVenda;
+            if (!habilitado) return null;
+            const doSetor = instancias.filter((i) => i.finalidade === fin);
+            if (doSetor.length === 0) return null;
+            return (
+              <Cartao key={fin}>
+                <Rotulo>
+                  {fin === "VENDA" ? "Numeros de Venda" : "Numeros de Pos-venda"}
+                </Rotulo>
+                <p className="mb-2 flex items-start gap-1 text-xs text-medio/60">
+                  <Info className="mt-0.5 h-3 w-3 shrink-0 text-tiffany" />
+                  Nenhum marcado = a Sol atende TODOS os numeros deste setor.
+                </p>
+                <div className="space-y-1.5">
+                  {doSetor.map((i) => {
+                    const marcado = (c.instanciasAtendidas ?? []).includes(i.id);
+                    return (
+                      <button
+                        key={i.id}
+                        onClick={() => alternarInstancia(i.id)}
+                        aria-pressed={marcado}
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-black/5 bg-white px-3 py-2 text-left transition-colors hover:bg-fundo"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm text-escuro">
+                            {i.nome}
+                          </span>
+                          {i.numero && (
+                            <span className="block truncate text-xs text-medio/60">
+                              {i.numero}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                            marcado
+                              ? "border-tiffany bg-tiffany text-white"
+                              : "border-black/15 bg-white text-transparent"
+                          }`}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Cartao>
+            );
+          })}
         </Secao>
 
         {/* Horario de operacao */}

@@ -909,10 +909,34 @@ async function responderComLunaSePreciso(
 ): Promise<boolean> {
   try {
     const cfg = await prisma.configAgenteIA.findFirst({
-      select: { ativo: true, opera24h: true },
+      select: {
+        ativo: true,
+        opera24h: true,
+        atendeVenda: true,
+        atendePosVenda: true,
+        instanciasAtendidas: true,
+      },
     });
     // TRAVA MESTRA: sem config ou inativa -> Luna nao age (aviso fixo segue).
     if (!cfg || !cfg.ativo) return false;
+
+    // Setor (finalidade) habilitado? Senao a IA nao atua (comportamento atual).
+    const setorOk =
+      finalidade === Finalidade.POS_VENDA ? cfg.atendePosVenda : cfg.atendeVenda;
+    if (!setorOk) return false;
+
+    // Numero (instancia) habilitado? Lista com itens = so esses; vazia/null = todos.
+    const idsAtendidas = Array.isArray(cfg.instanciasAtendidas)
+      ? (cfg.instanciasAtendidas as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
+      : [];
+    if (
+      idsAtendidas.length > 0 &&
+      (!conversa.instanciaId || !idsAtendidas.includes(conversa.instanciaId))
+    ) {
+      return false;
+    }
 
     // Ja transferida para humano nesta conversa -> a Luna nao reassume. Suprime
     // tambem o aviso fixo (um atendente ja esta cuidando).

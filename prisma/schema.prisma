@@ -826,6 +826,12 @@ model ConfigAgenteIA {
   cupomPrimeiraCompra String?  @default("SIXXIS05")
   cupomDescricao      String?  @default("5% na primeira compra")
   cupomAtivo          Boolean  @default(true)
+  // Setores que a IA atende (alem das travas ativo/horario). VENDA por padrao.
+  atendeVenda         Boolean  @default(true)
+  atendePosVenda      Boolean  @default(false)
+  // IDs de InstanciaWhatsApp que a IA atende. null/vazio = todos os numeros das
+  // finalidades habilitadas.
+  instanciasAtendidas Json?
   atualizadoEm        DateTime @updatedAt
 }
 
