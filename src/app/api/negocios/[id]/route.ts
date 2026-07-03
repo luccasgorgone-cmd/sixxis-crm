@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { serializarClientePainel } from "@/lib/cliente";
+import { parseDataNascimento } from "@/lib/format";
 import { getIO } from "@/lib/socket";
 import { Prisma } from "@/generated/prisma/client";
 import {
@@ -82,6 +83,7 @@ export async function GET(
         orderBy: { criadoEm: "desc" },
         include: { agente: { select: { nome: true } } },
       },
+      rastreios: { orderBy: { criadoEm: "asc" } },
     },
   });
 
@@ -156,6 +158,16 @@ export async function GET(
         ? rotuloMotivo(negocio.motivoPerda)
         : null,
       motivoPerdaObs: negocio.motivoPerdaObs,
+      // Transporte + rastreio (venda e pos-venda).
+      transportadora: negocio.transportadora,
+      dataEnvio: negocio.dataEnvio,
+      previsaoChegada: negocio.previsaoChegada,
+      rastreios: negocio.rastreios.map((r) => ({
+        id: r.id,
+        codigo: r.codigo,
+        transportadora: r.transportadora,
+        criadoEm: r.criadoEm,
+      })),
       fechadoEm: negocio.fechadoEm,
       conversaId: conversa?.id ?? null,
       atendidoPor: conversa?.atendidoPor ?? null,
@@ -206,6 +218,9 @@ export async function PATCH(
     produtos?: unknown;
     pendente?: boolean;
     motivoPendencia?: string | null;
+    transportadora?: string | null;
+    dataEnvio?: string | null;
+    previsaoChegada?: string | null;
   };
   try {
     body = await req.json();
@@ -425,6 +440,26 @@ export async function PATCH(
   } else if (body.motivoPendencia !== undefined) {
     // Edicao do motivo sem alternar o estado.
     data.motivoPendencia = body.motivoPendencia?.trim() || null;
+  }
+
+  // ---- Transporte (transportadora principal + datas de envio/previsao) ----
+  if (body.transportadora !== undefined) {
+    data.transportadora =
+      body.transportadora === null || String(body.transportadora).trim() === ""
+        ? null
+        : String(body.transportadora).trim();
+  }
+  for (const campo of ["dataEnvio", "previsaoChegada"] as const) {
+    if (body[campo] !== undefined) {
+      const parsed = parseDataNascimento(body[campo]);
+      if (!parsed.ok) {
+        return NextResponse.json(
+          { erro: `${campo} invalida` },
+          { status: 400 },
+        );
+      }
+      data[campo] = parsed.valor;
+    }
   }
 
   if (

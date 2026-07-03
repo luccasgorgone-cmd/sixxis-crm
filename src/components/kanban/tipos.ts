@@ -122,12 +122,24 @@ export type DetalheNegocio = CardNegocio & {
   dono: { id: string; nome: string } | null;
   produtos: unknown;
   motivoPerda: string | null;
+  // Transporte + rastreio do negocio (venda e pos-venda).
+  transportadora: string | null;
+  dataEnvio: string | null;
+  previsaoChegada: string | null;
+  rastreios: RastreioItem[];
   fechadoEm: string | null;
   conversaId: string | null;
   atendidoPor: "HUMANO" | "IA" | null;
   notas: NotaItem[];
   historico: ItemHistorico[];
   lembretes: LembreteItem[];
+};
+
+export type RastreioItem = {
+  id: string;
+  codigo: string;
+  transportadora: string | null;
+  criadoEm: string;
 };
 
 // Cores/rotulos de temperatura.
