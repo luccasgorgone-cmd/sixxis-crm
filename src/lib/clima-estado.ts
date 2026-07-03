@@ -25,6 +25,7 @@ export type PontoHora = {
   umidade: number | null;
   sensacao: number | null;
   vento: number | null;
+  chuvaProb: number | null;
   weathercode: number | null;
 };
 export type PontoDia = {
@@ -128,6 +129,7 @@ export async function buscarHoraria(uf: string): Promise<BlocoHoraria> {
   const umid = numArr(j.hourly.relative_humidity_2m);
   const sens = numArr(j.hourly.apparent_temperature);
   const vento = numArr(j.hourly.wind_speed_10m);
+  const prob = numArr(j.hourly.precipitation_probability);
   const cond = numArr(j.hourly.weather_code);
   const pontos: PontoHora[] = horas.map((t, i) => ({
     hora: t.length >= 16 ? t.slice(11, 16) : t, // "HH:MM"
@@ -135,6 +137,7 @@ export async function buscarHoraria(uf: string): Promise<BlocoHoraria> {
     umidade: umid[i] ?? null,
     sensacao: sens[i] ?? null,
     vento: vento[i] ?? null,
+    chuvaProb: prob[i] ?? null,
     weathercode: cond[i] ?? null,
   }));
   if (!pontos.length) return { uf, horarioHoje: [], erro: true };

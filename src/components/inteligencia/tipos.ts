@@ -67,6 +67,7 @@ export type PontoHora = {
   umidade: number | null;
   sensacao: number | null;
   vento: number | null;
+  chuvaProb: number | null;
   weathercode: number | null;
 };
 export type PontoDia = {
