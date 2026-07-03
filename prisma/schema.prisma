@@ -522,7 +522,12 @@ model Negocio {
   agente        Agente?            @relation(fields: [agenteId], references: [id])
   etapaId       String?
   etapa         Etapa?             @relation(fields: [etapaId], references: [id])
+  // valor = TOTAL do pedido (valorProdutos + frete) — usado inclusive pela
+  // conversao Meta CAPI ao marcar GANHO. valorProdutos = soma dos itens.
   valor         Decimal?           @db.Decimal(12, 2)
+  valorProdutos Decimal?           @db.Decimal(12, 2)
+  frete         Decimal?           @db.Decimal(12, 2)
+  itensPedido   ItemPedido[]
   produtos      Json?
   status        StatusNeg          @default(ABERTO)
   temperatura   Temperatura        @default(MORNO)
@@ -946,6 +951,23 @@ model IntegracaoMercadoLivre {
   mlUserId     String?
   conectadoEm  DateTime?
   atualizadoEm DateTime  @updatedAt
+}
+
+// Item de um PEDIDO fechado (ganho) — venda ou pecas. Fatia 2.71. Desnormaliza a
+// descricao/valores (historico imutavel mesmo que o catalogo mude). Cascade com
+// o Negocio. produtoCatalogoId e apenas referencia (sem FK).
+model ItemPedido {
+  id                String   @id @default(cuid())
+  negocioId         String
+  negocio           Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  produtoCatalogoId String?
+  descricao         String
+  quantidade        Int      @default(1)
+  valorUnitario     Decimal  @db.Decimal(12, 2)
+  subtotal          Decimal  @db.Decimal(12, 2)
+  criadoEm          DateTime @default(now())
+
+  @@index([negocioId])
 }
 
 // Catalogo de produtos e pecas selecionaveis para PEDIDOS (Fatia 2.71).

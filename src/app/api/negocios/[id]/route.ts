@@ -224,6 +224,15 @@ export async function PATCH(
     transportadora?: string | null;
     dataEnvio?: string | null;
     previsaoChegada?: string | null;
+    // Fechamento de pedido (ganho): itens + frete. Quando presentes, o valor do
+    // negocio (total) e derivado deles (produtos + frete) e ItemPedido e gravado.
+    itens?: {
+      produtoCatalogoId?: string | null;
+      descricao?: string;
+      quantidade?: number;
+      valorUnitario?: number;
+    }[];
+    frete?: number | null;
   };
   try {
     body = await req.json();
@@ -269,6 +278,30 @@ export async function PATCH(
   let atividadePendencia: string | null = null;
   const agora = new Date();
 
+  // ---- Fechamento de PEDIDO (opcional): itens + frete ----
+  // Normaliza os itens e calcula os totais. Quando ha itens, o VALOR do negocio
+  // (total) passa a ser produtos + frete — e e esse total que a conversao usa.
+  const itensPedido = Array.isArray(body.itens)
+    ? body.itens
+        .map((it) => ({
+          produtoCatalogoId:
+            typeof it.produtoCatalogoId === "string" ? it.produtoCatalogoId : null,
+          descricao: String(it.descricao ?? "").trim(),
+          quantidade: Math.max(1, Math.floor(Number(it.quantidade) || 1)),
+          valorUnitario: Math.max(0, Number(it.valorUnitario) || 0),
+        }))
+        .filter((it) => it.descricao)
+    : [];
+  const temPedido = itensPedido.length > 0;
+  const valorProdutos = temPedido
+    ? itensPedido.reduce((acc, it) => acc + it.quantidade * it.valorUnitario, 0)
+    : null;
+  const freteInformado =
+    body.frete !== undefined && body.frete !== null
+      ? Math.max(0, Number(body.frete) || 0)
+      : null;
+  const totalPedido = temPedido ? (valorProdutos ?? 0) + (freteInformado ?? 0) : null;
+
   // ---- Mudanca de etapa ----
   if (body.etapaId) {
     const destino = await prisma.etapa.findUnique({
@@ -296,12 +329,16 @@ export async function PATCH(
     data.entrouEtapaEm = agora;
 
     if (destino.tipo === TipoEtapa.GANHO) {
+      // Total: do PEDIDO (produtos + frete) quando ha itens; senao o valor
+      // informado (fluxo antigo) ou o valor atual do negocio.
       const valorEfetivo =
-        body.valor != null
-          ? body.valor
-          : negocio.valor != null
-            ? Number(negocio.valor)
-            : null;
+        totalPedido != null
+          ? totalPedido
+          : body.valor != null
+            ? body.valor
+            : negocio.valor != null
+              ? Number(negocio.valor)
+              : null;
       if (valorEfetivo == null || valorEfetivo <= 0) {
         return NextResponse.json(
           { erro: "valor e obrigatorio para marcar como ganho" },
@@ -311,9 +348,32 @@ export async function PATCH(
       data.valor = valorEfetivo;
       data.status = StatusNeg.GANHO;
       data.fechadoEm = agora;
+      // Fechamento de pedido: grava os itens (substitui os anteriores deste
+      // negocio) + valorProdutos + frete. O historico do cliente guarda o pedido.
+      if (temPedido) {
+        data.valorProdutos = valorProdutos;
+        data.frete = freteInformado;
+        data.itensPedido = {
+          deleteMany: {},
+          create: itensPedido.map((it) => ({
+            produtoCatalogoId: it.produtoCatalogoId,
+            descricao: it.descricao,
+            quantidade: it.quantidade,
+            valorUnitario: it.valorUnitario,
+            subtotal: it.quantidade * it.valorUnitario,
+          })),
+        };
+      } else if (freteInformado != null) {
+        data.frete = freteInformado;
+      }
+      const detalhePedido = temPedido
+        ? ` — ${itensPedido.length} ${itensPedido.length === 1 ? "item" : "itens"}${
+            freteInformado ? ` + frete ${brl(freteInformado)}` : ""
+          }`
+        : "";
       historicos.push({
         tipo: TipoHistorico.GANHO,
-        descricao: `Negocio ganho (${brl(valorEfetivo)})`,
+        descricao: `Negocio ganho (${brl(valorEfetivo)})${detalhePedido}`,
       });
     } else if (destino.tipo === TipoEtapa.PERDIDO) {
       const motivo = body.motivoPerda?.trim() || negocio.motivoPerda || "";

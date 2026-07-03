@@ -18,7 +18,7 @@ import { ColunaKanban } from "./ColunaKanban";
 import { CardNegocio } from "./CardNegocio";
 import { corFinalidade } from "@/components/BadgeFinalidade";
 import { BarraFiltros } from "./BarraFiltros";
-import { ModalFechamento } from "./ModalFechamento";
+import { ModalFechamento, type DadosFechamento } from "./ModalFechamento";
 import { ModalAtribuir } from "./ModalAtribuir";
 import { PainelNegocio } from "./PainelNegocio";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -291,10 +291,7 @@ export function Kanban({
     }
   }
 
-  async function confirmarFechamento(dados: {
-    valor?: number;
-    motivoPerda?: string;
-  }) {
+  async function confirmarFechamento(dados: DadosFechamento) {
     if (!pendente) return;
     const ok = await patch(pendente.negocioId, {
       etapaId: pendente.etapaId,
@@ -545,6 +542,7 @@ export function Kanban({
         <ModalFechamento
           tipo={pendente.tipo}
           valorInicial={pendente.valorInicial}
+          finalidade={finalidade}
           onConfirmar={confirmarFechamento}
           onCancelar={() => setPendente(null)}
         />

@@ -467,6 +467,7 @@ export function PainelNegocio({
         <ModalFechamento
           tipo={modal.tipo}
           valorInicial={detalhe.valor}
+          finalidade={detalhe.finalidade}
           onConfirmar={async (dados) => {
             // Ganho/Perdido limpam a pendencia (estados mutuamente exclusivos).
             const ok = await salvar({
