@@ -45,6 +45,7 @@ import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
+import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
 import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
@@ -125,8 +126,16 @@ export function PainelNegocio({
   const [modal, setModal] = useState<{
     tipo: "ganho" | "perdido";
     etapaId: string;
+    itensIniciais?: ItemPedidoSeed[];
   } | null>(null);
   const [iniciandoConversa, setIniciandoConversa] = useState(false);
+
+  // Repetir pedido: abre o compositor de ganho pre-carregado com os itens do
+  // pedido escolhido (editavel). Alvo: a etapa de GANHO do funil.
+  const etapaGanhoId = etapas.find((e) => e.tipo === "GANHO")?.id ?? null;
+  function repetirPedido(itens: ItemPedidoSeed[]) {
+    if (etapaGanhoId) setModal({ tipo: "ganho", etapaId: etapaGanhoId, itensIniciais: itens });
+  }
 
   const carregar = useCallback(async () => {
     try {
@@ -370,6 +379,11 @@ export function PainelNegocio({
                   onAtualizado={() => void carregar()}
                 />
 
+                <BlocoPedidos
+                  leadId={detalhe.cliente.id}
+                  onRepetir={etapaGanhoId ? repetirPedido : undefined}
+                />
+
                 <BlocoAcompanhamento
                   detalhe={detalhe}
                   recarregar={carregar}
@@ -468,6 +482,7 @@ export function PainelNegocio({
           tipo={modal.tipo}
           valorInicial={detalhe.valor}
           finalidade={detalhe.finalidade}
+          itensIniciais={modal.itensIniciais}
           onConfirmar={async (dados) => {
             // Ganho/Perdido limpam a pendencia (estados mutuamente exclusivos).
             const ok = await salvar({

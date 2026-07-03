@@ -44,6 +44,7 @@ export function ModalFechamento({
   valorInicial,
   finalidade = "VENDA",
   freteInicial,
+  itensIniciais,
   onConfirmar,
   onCancelar,
 }: {
@@ -51,6 +52,12 @@ export function ModalFechamento({
   valorInicial?: number | null;
   finalidade?: "VENDA" | "POS_VENDA";
   freteInicial?: number | null;
+  itensIniciais?: {
+    produtoCatalogoId: string | null;
+    descricao: string;
+    quantidade: number;
+    valorUnitario: number;
+  }[];
   onConfirmar: (dados: DadosFechamento) => Promise<void>;
   onCancelar: () => void;
 }) {
@@ -63,9 +70,20 @@ export function ModalFechamento({
   const [erro, setErro] = useState<string | null>(null);
 
   const [catalogo, setCatalogo] = useState<CatalogoItem[]>([]);
-  const [itens, setItens] = useState<Linha[]>([]);
-  const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
   const contador = useRef(0);
+  const [itens, setItens] = useState<Linha[]>(() =>
+    (itensIniciais ?? []).map((it) => {
+      contador.current += 1;
+      return {
+        key: `l${contador.current}`,
+        produtoCatalogoId: it.produtoCatalogoId,
+        descricao: it.descricao,
+        quantidade: it.quantidade,
+        valorUnitario: it.valorUnitario,
+      };
+    }),
+  );
+  const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
 
   useEffect(() => {
     if (!ehGanho) return;
