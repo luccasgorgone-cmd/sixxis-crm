@@ -19,6 +19,9 @@ export type ConversaItem = {
   // Presente na lista real do Inbox (/api/conversas); ausente nos usos embutidos
   // do Thread (Kanban/supervisao), que nao precisam do painel de cliente.
   leadId?: string;
+  // Negocio da finalidade da conversa (null se o lead nao tem negocio dela). O
+  // painel do Inbox usa para os blocos de nivel negocio (acompanhamento/notas).
+  negocioId?: string | null;
   leadNome: string | null;
   leadFoto?: string | null;
   leadTelefone: string;

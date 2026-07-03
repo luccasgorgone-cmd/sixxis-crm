@@ -34,7 +34,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where,
     orderBy: [{ ultimaMensagemEm: "desc" }, { criadoEm: "desc" }],
     include: {
-      lead: { select: selectClienteBasico },
+      lead: {
+        select: {
+          ...selectClienteBasico,
+          // Negocios do lead (leves) p/ associar o negocio da finalidade da
+          // conversa — usado pelo painel completo do Inbox (acompanhamento/notas).
+          negocios: {
+            select: {
+              id: true,
+              finalidade: true,
+              status: true,
+              criadoEm: true,
+            },
+          },
+        },
+      },
       instanciaRef: { select: { nome: true, numero: true } },
       mensagens: {
         orderBy: { hora: "desc" },
@@ -45,10 +59,32 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     take: 200,
   });
 
+  // Negocio associado a conversa: mesmo lead + mesma finalidade. Prefere o ABERTO;
+  // senao o mais recente por criacao. null quando o lead nao tem negocio da
+  // finalidade (o painel do Inbox omite os blocos de nivel negocio graciosamente).
+  function negocioDaConversa(
+    negocios: {
+      id: string;
+      finalidade: Finalidade;
+      status: string;
+      criadoEm: Date;
+    }[],
+    finalidade: Finalidade,
+  ): string | null {
+    const daFinalidade = negocios.filter((n) => n.finalidade === finalidade);
+    if (daFinalidade.length === 0) return null;
+    const aberto = daFinalidade.find((n) => n.status === "ABERTO");
+    if (aberto) return aberto.id;
+    return [...daFinalidade].sort(
+      (a, b) => b.criadoEm.getTime() - a.criadoEm.getTime(),
+    )[0].id;
+  }
+
   const admin = ehAdmin(agente.papel);
   const lista = conversas.map((c) => ({
     id: c.id,
     leadId: c.leadId,
+    negocioId: negocioDaConversa(c.lead.negocios, c.finalidade),
     leadNome: nomeEfetivo(c.lead),
     leadFoto: c.lead.fotoUrl,
     leadTelefone: c.lead.telefone,

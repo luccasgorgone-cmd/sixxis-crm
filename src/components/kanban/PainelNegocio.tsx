@@ -1014,7 +1014,7 @@ function BlocoPendencia({
 // ----------------------------------------------------------------------------
 type EmpresaOpcao = { id: string; nome: string };
 
-function BlocoAcompanhamento({
+export function BlocoAcompanhamento({
   detalhe,
   recarregar,
   onAtualizado,
@@ -1335,7 +1335,7 @@ function BlocoAgendar({
 // ----------------------------------------------------------------------------
 // Notas internas do negocio.
 // ----------------------------------------------------------------------------
-function Notas({
+export function Notas({
   detalhe,
   negocioId,
   presets,

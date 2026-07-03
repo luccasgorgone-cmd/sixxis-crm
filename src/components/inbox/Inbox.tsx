@@ -266,8 +266,11 @@ export function Inbox({
           {/* Coluna de dados do cliente (email/CPF/nascimento/endereco/anuncio).
               Aparece em telas largas; no mobile a thread ocupa tudo. */}
           {conversaAberta.leadId && (
-            <aside className="hidden w-[340px] shrink-0 border-l border-black/5 xl:block">
-              <PainelClienteInbox leadId={conversaAberta.leadId} />
+            <aside className="hidden w-[360px] shrink-0 border-l border-black/5 xl:block">
+              <PainelClienteInbox
+                leadId={conversaAberta.leadId}
+                negocioId={conversaAberta.negocioId}
+              />
             </aside>
           )}
         </>
