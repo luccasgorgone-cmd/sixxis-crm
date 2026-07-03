@@ -59,22 +59,52 @@ export type ClientesEstadoResp = {
   clientes: ClienteEstado[];
 };
 
-// Resposta de GET /api/inteligencia/clima/estado?uf=XX (drill-down).
-export type PontoHora = { hora: string; temp: number | null; umidade: number | null };
+// Resposta de GET /api/inteligencia/clima/estado?uf=XX (drill-down). Espelha
+// lib/clima-estado (server).
+export type PontoHora = {
+  hora: string;
+  temp: number | null;
+  umidade: number | null;
+  sensacao: number | null;
+  vento: number | null;
+  weathercode: number | null;
+};
 export type PontoDia = {
   dia: string;
   tempMax: number | null;
   tempMin: number | null;
   chuva: number | null;
 };
+export type PontoPrevisao = {
+  dia: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  chuva: number | null;
+  chuvaProb: number | null;
+  vento: number | null;
+  uv: number | null;
+  weathercode: number | null;
+};
+export type ClimaAtual = {
+  temp: number | null;
+  sensacao: number | null;
+  umidade: number | null;
+  vento: number | null;
+  chuva: number | null;
+  weathercode: number | null;
+};
 export type Tendencia = "esquentando" | "esfriando" | "estavel";
 export type DetalheClimaResp = {
   uf: string;
   capital: string;
   fonte: string;
+  atual: ClimaAtual | null;
   horarioHoje: PontoHora[];
   horarioAtualizadoEm: string | null;
   horarioErro: boolean;
+  previsao: PontoPrevisao[];
+  previsaoAtualizadoEm: string | null;
+  previsaoErro: boolean;
   historico: PontoDia[];
   historicoAtualizadoEm: string | null;
   historicoErro: boolean;

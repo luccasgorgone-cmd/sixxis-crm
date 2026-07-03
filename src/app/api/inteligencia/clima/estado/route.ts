@@ -15,13 +15,17 @@ import { CAPITAIS } from "@/lib/capitais";
 import {
   TTL_HORARIA_MS,
   TTL_HISTORICO_MS,
+  TTL_PREVISAO_MS,
   DIAS_HORARIA,
   DIAS_HISTORICO,
+  DIAS_PREVISAO,
   buscarHorariaComRetry,
   buscarHistoricoComRetry,
+  buscarPrevisaoComRetry,
   calcularTendencia,
   type BlocoHoraria,
   type BlocoHistorico,
+  type BlocoPrevisao,
   type DetalheClimaResp,
 } from "@/lib/clima-estado";
 
@@ -33,17 +37,20 @@ const TETO_CACHE_VAZIO_MS = 8_000;
 // Lock por (uf:bloco) evita reconstrucoes concorrentes do mesmo dado.
 const emReconstrucao = new Set<string>();
 
-type Bloco = "hor" | "hist";
+type Bloco = "hor" | "hist" | "prev";
 const SENTINELA: Record<Bloco, number> = {
   hor: DIAS_HORARIA,
   hist: DIAS_HISTORICO,
+  prev: DIAS_PREVISAO,
 };
 
 async function buscarBloco(
   uf: string,
   bloco: Bloco,
 ): Promise<{ erro: boolean } & object> {
-  return bloco === "hor" ? buscarHorariaComRetry(uf) : buscarHistoricoComRetry(uf);
+  if (bloco === "hor") return buscarHorariaComRetry(uf);
+  if (bloco === "hist") return buscarHistoricoComRetry(uf);
+  return buscarPrevisaoComRetry(uf);
 }
 
 async function upsertBloco(
@@ -103,37 +110,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const refresh = req.nextUrl.searchParams.get("refresh") === "1";
   const agora = Date.now();
 
-  // Ultimo bom de cada bloco (horaria/historico) desta UF no banco.
+  // Ultimo bom de cada bloco (horaria/historico/previsao) desta UF no banco.
   const rows = await prisma.climaCacheUF.findMany({
-    where: { uf, dias: { in: [DIAS_HORARIA, DIAS_HISTORICO] } },
+    where: { uf, dias: { in: [DIAS_HORARIA, DIAS_HISTORICO, DIAS_PREVISAO] } },
   });
   const linhaHor = rows.find((r) => r.dias === DIAS_HORARIA) ?? null;
   const linhaHist = rows.find((r) => r.dias === DIAS_HISTORICO) ?? null;
+  const linhaPrev = rows.find((r) => r.dias === DIAS_PREVISAO) ?? null;
 
   const stale = (linha: (typeof rows)[number] | null, ttl: number): boolean =>
     !linha || refresh || agora - linha.atualizadoEm.getTime() > ttl;
   const horStale = stale(linhaHor, TTL_HORARIA_MS);
   const histStale = stale(linhaHist, TTL_HISTORICO_MS);
+  const prevStale = stale(linhaPrev, TTL_PREVISAO_MS);
 
   // Estado inicial: o cache (mesmo stale). Blocos SEM cache serao buscados agora.
   let horBloco = (linhaHor?.dados as unknown as BlocoHoraria) ?? null;
   let horAtualizadoEm = linhaHor?.atualizadoEm ?? null;
   let histBloco = (linhaHist?.dados as unknown as BlocoHistorico) ?? null;
   let histAtualizadoEm = linhaHist?.atualizadoEm ?? null;
+  let prevBloco = (linhaPrev?.dados as unknown as BlocoPrevisao) ?? null;
+  let prevAtualizadoEm = linhaPrev?.atualizadoEm ?? null;
 
   // Blocos com cache mas stale -> atualizam em BACKGROUND (respondemos com cache).
   if (linhaHor && horStale) reconstruirBloco(uf, "hor");
   if (linhaHist && histStale) reconstruirBloco(uf, "hist");
+  if (linhaPrev && prevStale) reconstruirBloco(uf, "prev");
 
   // Blocos SEM cache -> busca com TETO (precisamos de algo p/ mostrar). O que nao
   // vier a tempo fica vazio e completa em background/proximo request.
-  const [rHor, rHist] = await Promise.all([
+  const [rHor, rHist, rPrev] = await Promise.all([
     linhaHor
       ? Promise.resolve<null>(null)
       : comTeto(buscarHorariaComRetry(uf), TETO_CACHE_VAZIO_MS),
     linhaHist
       ? Promise.resolve<null>(null)
       : comTeto(buscarHistoricoComRetry(uf), TETO_CACHE_VAZIO_MS),
+    linhaPrev
+      ? Promise.resolve<null>(null)
+      : comTeto(buscarPrevisaoComRetry(uf), TETO_CACHE_VAZIO_MS),
   ]);
   const nowDate = new Date();
 
@@ -155,15 +170,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       reconstruirBloco(uf, "hist");
     }
   }
+  if (!linhaPrev) {
+    if (rPrev && !rPrev.erro) {
+      await upsertBloco(uf, "prev", rPrev as object, nowDate);
+      prevBloco = rPrev;
+      prevAtualizadoEm = nowDate;
+    } else {
+      reconstruirBloco(uf, "prev");
+    }
+  }
 
   const historico = histBloco?.historico ?? [];
+  const previsao = prevBloco?.previsao ?? [];
   const resp: DetalheClimaResp = {
     uf,
     capital: cap.capital,
     fonte: "Open-Meteo",
+    atual: prevBloco?.atual ?? null,
     horarioHoje: horBloco?.horarioHoje ?? [],
     horarioAtualizadoEm: horAtualizadoEm ? horAtualizadoEm.toISOString() : null,
     horarioErro: !horBloco || horBloco.horarioHoje.length === 0,
+    previsao,
+    previsaoAtualizadoEm: prevAtualizadoEm ? prevAtualizadoEm.toISOString() : null,
+    previsaoErro: !prevBloco || previsao.length === 0,
     historico,
     historicoAtualizadoEm: histAtualizadoEm ? histAtualizadoEm.toISOString() : null,
     historicoErro: !histBloco || historico.length === 0,
