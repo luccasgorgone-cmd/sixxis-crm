@@ -18,6 +18,7 @@ import {
   type CriteriosSegmento,
 } from "./oracleCampanha";
 import { resolverDestinatarios, normalizarFiltro } from "./campanha";
+import { nomeEfetivo, selectClienteBasico } from "./cliente";
 import { CanalEnvio, StatusCampanha, StatusDestino } from "../generated/prisma/enums";
 import { Prisma } from "../generated/prisma/client";
 import {
@@ -87,6 +88,12 @@ QUANDO O USUARIO CONFIRMAR (ex.: "sim, prepara"): chame "criar_rascunho_campanha
 com o mesmo segmento e a mensagem aprovada. Ele cria um RASCUNHO — NADA e enviado.
 Depois, informe: "Rascunho criado com N pessoas. Revise e dispare voce mesmo na aba
 Campanhas." Deixe claro que o disparo depende do clique dele; voce NUNCA dispara.
+
+CONVERSAS (leitura): para perguntas sobre os atendimentos ("quais as duvidas mais
+comuns?", "algum cliente reclamou de X?", "o que perguntam sobre garantia?"), use a
+ferramenta "buscar_conversas" com um termo. Ela retorna TRECHOS no escopo do usuario
+(nao-admin so as proprias conversas). SO LEITURA. Analise os trechos e resuma padroes/
+duvidas/objecoes — nunca invente conteudo que nao veio nos trechos.
 
 FORMATO DE RESPOSTA (obrigatorio): responda SOMENTE com um objeto JSON valido, sem
 cercas de codigo, sem texto antes ou depois, no formato exato:
@@ -516,6 +523,71 @@ async function criarRascunhoCampanha(
   };
 }
 
+// BUSCA no CONTEUDO das conversas (SO LEITURA). Escopo IGUAL ao Inbox: nao-admin
+// so as conversas atribuidas a ele (conversa.agenteId = self); admin todas. Retorna
+// TRECHOS (nao a conversa inteira) agrupados por cliente, para o Oracle analisar
+// duvidas comuns, objecoes, reclamacoes — sempre dentro do escopo do usuario.
+async function buscarConversas(agente: SessaoAgente, termo: string) {
+  const t = (termo ?? "").trim();
+  if (!t) return { termo: "", conversas: 0, resultados: [] };
+  const admin = ehAdmin(agente.papel);
+
+  const mensagens = await prisma.mensagem.findMany({
+    where: {
+      conteudo: { contains: t, mode: "insensitive" },
+      apagada: false,
+      // ESCOPO: fora do admin, so mensagens de conversas do proprio usuario.
+      ...(admin ? {} : { conversa: { agenteId: agente.id } }),
+    },
+    orderBy: { hora: "desc" },
+    take: 60,
+    select: {
+      conteudo: true,
+      direcao: true,
+      hora: true,
+      conversa: {
+        select: {
+          id: true,
+          finalidade: true,
+          lead: { select: selectClienteBasico },
+        },
+      },
+    },
+  });
+
+  // Agrupa por conversa; ate 3 trechos por conversa (nao expõe a conversa toda).
+  const porConversa = new Map<
+    string,
+    { cliente: string; finalidade: string; trechos: { quem: string; texto: string }[] }
+  >();
+  for (const m of mensagens) {
+    const cid = m.conversa.id;
+    if (!porConversa.has(cid)) {
+      porConversa.set(cid, {
+        cliente: nomeEfetivo(m.conversa.lead),
+        finalidade: m.conversa.finalidade,
+        trechos: [],
+      });
+    }
+    const g = porConversa.get(cid)!;
+    if (g.trechos.length < 3) {
+      g.trechos.push({
+        quem: m.direcao === "IN" ? "cliente" : "atendente",
+        texto: (m.conteudo ?? "").slice(0, 240),
+      });
+    }
+  }
+
+  const resultados = Array.from(porConversa.values()).slice(0, 15);
+  return {
+    termo: t,
+    escopo: admin ? "empresa" : "sua carteira",
+    conversas: resultados.length,
+    mensagensEncontradas: mensagens.length,
+    resultados,
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -547,6 +619,10 @@ async function executarFerramenta(
       case "criar_rascunho_campanha":
         return JSON.stringify(
           await criarRascunhoCampanha(agente, input as { finalidade?: string; canal?: string; uf?: string; segmento?: string; semCompraDias?: number; mensagem?: string; assunto?: string }),
+        );
+      case "buscar_conversas":
+        return JSON.stringify(
+          await buscarConversas(agente, String((input as { termo?: string }).termo ?? "")),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -662,6 +738,21 @@ const FERRAMENTAS = [
         assunto: { type: "string", description: "Assunto (so para e-mail)." },
       },
       required: ["finalidade", "mensagem"],
+    },
+  },
+  {
+    name: "buscar_conversas",
+    description:
+      "Busca no CONTEUDO das conversas dos clientes por um termo/palavra e retorna TRECHOS " +
+      "relevantes (por cliente), no escopo do usuario (nao-admin so as proprias conversas). " +
+      "SO LEITURA. Use para analisar duvidas comuns, objecoes, reclamacoes, temas recorrentes " +
+      "(ex.: 'reclamou', 'preco', 'garantia', 'nota fiscal').",
+    input_schema: {
+      type: "object",
+      properties: {
+        termo: { type: "string", description: "Palavra ou frase a procurar nas mensagens." },
+      },
+      required: ["termo"],
     },
   },
 ] as const;
