@@ -14,7 +14,7 @@ import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono, filtroEquipe } from "./dono";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
-import { fetchFotoPerfil, enviarTexto } from "./evolution";
+import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia } from "./midia";
 import { nomeEfetivo } from "./cliente";
@@ -379,6 +379,8 @@ type EventoEvolution = {
       id?: string;
       remoteJid?: string;
       fromMe?: boolean;
+      // Em grupos, o membro que enviou (jid do participante).
+      participant?: string;
     };
     pushName?: string;
     message?: Record<string, unknown> | null;
@@ -1197,6 +1199,124 @@ async function enviarMensagensLuna(
   }
 }
 
+// ---------------------------------------------------------------------------
+// CHAT INTERNO (Fatia 2.55): ingestao PARALELA e ISOLADA de grupos (@g.us).
+// Grava em GrupoInterno/MensagemGrupo. NUNCA cria Lead/Conversa/Negocio, nao
+// entra no funil/metricas. Best-effort: erros aqui nao quebram a ingestao de
+// clientes (o chamador ja captura, mas reforçamos com try/catch proprio).
+// ---------------------------------------------------------------------------
+async function processarMensagemGrupo(
+  payload: EventoEvolution,
+  io: Server | null,
+): Promise<void> {
+  const data = payload?.data;
+  const jid = data?.key?.remoteJid;
+  const externalId = data?.key?.id;
+  if (!jid || !externalId || !jid.endsWith("@g.us")) return;
+
+  // Idempotencia: mensagem de grupo ja registrada -> nao duplica.
+  const jaExiste = await prisma.mensagemGrupo.findUnique({
+    where: { externalId },
+    select: { id: true },
+  });
+  if (jaExiste) return;
+
+  const fromMe = data?.key?.fromMe === true;
+  const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
+  const tipo = mapearTipo(data?.messageType);
+  const conteudo = extrairConteudo(data?.message);
+  const ts = data?.messageTimestamp;
+  const hora = ts ? new Date(Number(ts) * 1000) : new Date();
+  const nomeInstancia = payload?.instance ?? "sixxis-wa1";
+  // Autor: em grupos vem em key.participant; nome pelo pushName (so em entrada).
+  const autorJid = data?.key?.participant ?? (fromMe ? null : jid);
+  const autorNome = fromMe ? null : (data?.pushName ?? null);
+
+  // Upsert do grupo pelo jid (nunca toca em Lead/Conversa).
+  const grupoExistente = await prisma.grupoInterno.findUnique({
+    where: { jid },
+    select: { id: true },
+  });
+  let grupo;
+  if (grupoExistente) {
+    grupo = await prisma.grupoInterno.update({
+      where: { jid },
+      data: { instancia: nomeInstancia, ultimaMensagemEm: hora },
+      select: { id: true, nome: true, fotoUrl: true },
+    });
+  } else {
+    grupo = await prisma.grupoInterno.create({
+      data: { jid, instancia: nomeInstancia, ultimaMensagemEm: hora },
+      select: { id: true, nome: true, fotoUrl: true },
+    });
+    // Grupo novo: busca subject/foto (best-effort, sem bloquear a ingestao).
+    void enriquecerGrupo(grupo.id, jid, nomeInstancia).catch(() => undefined);
+  }
+
+  let msg;
+  try {
+    msg = await prisma.mensagemGrupo.create({
+      data: {
+        grupoId: grupo.id,
+        externalId,
+        autorJid,
+        autorNome,
+        direcao,
+        conteudo,
+        tipo,
+        hora,
+      },
+    });
+  } catch (e) {
+    // Corrida: outro job gravou a mesma mensagem. Idempotente.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return;
+    }
+    throw e;
+  }
+
+  // Evento proprio (nao interfere no inbox de clientes).
+  (io ?? getIO())?.emit("grupo:mensagem", {
+    grupoId: grupo.id,
+    jid,
+    nome: grupo.nome,
+    fotoUrl: grupo.fotoUrl,
+    mensagemId: msg.id,
+    direcao: msg.direcao,
+    tipo: msg.tipo,
+    conteudo: msg.conteudo,
+    autorNome: msg.autorNome,
+    hora: msg.hora,
+    ultimaMensagemEm: hora,
+  });
+}
+
+// Enriquecimento best-effort do grupo: subject e foto via Evolution.
+async function enriquecerGrupo(
+  grupoId: string,
+  jid: string,
+  instancia: string,
+): Promise<void> {
+  let subject: string | null = null;
+  let fotoUrl: string | null = null;
+  const info = await metadataGrupo(instancia, jid);
+  if (info) {
+    subject = info.subject;
+    fotoUrl = info.fotoUrl;
+  }
+  // Fallback da foto: fetchProfilePictureUrl com o jid do grupo.
+  if (!fotoUrl) fotoUrl = await fetchFotoPerfil(instancia, jid);
+  if (!subject && !fotoUrl) return;
+  await prisma.grupoInterno.update({
+    where: { id: grupoId },
+    data: {
+      ...(subject ? { nome: subject } : {}),
+      ...(fotoUrl ? { fotoUrl } : {}),
+    },
+  });
+  getIO()?.emit("grupo:atualizado", { grupoId, jid, nome: subject, fotoUrl });
+}
+
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
 async function processarEvento(
   payload: EventoEvolution,
@@ -1251,17 +1371,26 @@ async function processarEvento(
 
   const fromMe = data?.key?.fromMe === true;
 
+  // GRUPOS (@g.us): caminho PARALELO e ISOLADO (chat interno). Registra na
+  // estrutura propria (GrupoInterno/MensagemGrupo) e RETORNA — nunca entra no
+  // fluxo de leads/funil/metricas. Best-effort: erro aqui nao quebra a ingestao.
+  if (jid.endsWith("@g.us")) {
+    try {
+      await processarMensagemGrupo(payload, io);
+    } catch (e) {
+      console.warn(
+        `[grupo] falha ao processar ${jid}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    return;
+  }
+
   // Ignora "leads fantasma": remetentes que nao sao clientes de fato.
-  //   @g.us      -> grupos
   //   @broadcast -> listas de transmissao (e status@broadcast: status/stories)
   //   @newsletter-> canais/newsletters
   // Clientes normais (@s.whatsapp.net) seguem o fluxo. Anuncios (Click-to-
   // WhatsApp) chegam por @s.whatsapp.net e continuam entrando.
-  if (
-    jid.endsWith("@g.us") ||
-    jid.endsWith("@broadcast") ||
-    jid.endsWith("@newsletter")
-  ) {
+  if (jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) {
     return;
   }
 

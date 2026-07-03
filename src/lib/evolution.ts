@@ -207,6 +207,62 @@ export async function fetchFotoPerfil(
   }
 }
 
+// Metadata de um grupo (@g.us): assunto (subject) e foto. Usado para nomear os
+// grupos internos. GET {BASE}/group/findGroupInfos/{instance}?groupJid=...
+// Nunca lanca; retorna null quando indisponivel.
+export async function metadataGrupo(
+  instancia: string,
+  jid: string,
+): Promise<{ subject: string | null; fotoUrl: string | null } | null> {
+  const cfg = baseEKey();
+  if (!cfg || !instancia || !jid) return null;
+  try {
+    const resp = await fetch(
+      `${cfg.base}/group/findGroupInfos/${instancia}?groupJid=${encodeURIComponent(jid)}`,
+      { headers: { apikey: cfg.apikey } },
+    );
+    if (!resp.ok) return null;
+    const raw = (await resp.json().catch(() => null)) as {
+      subject?: string | null;
+      pictureUrl?: string | null;
+      profilePicUrl?: string | null;
+    } | null;
+    if (!raw) return null;
+    const subject =
+      typeof raw.subject === "string" && raw.subject ? raw.subject : null;
+    const foto = raw.pictureUrl ?? raw.profilePicUrl ?? null;
+    return { subject, fotoUrl: typeof foto === "string" && foto ? foto : null };
+  } catch {
+    return null;
+  }
+}
+
+// Sai de um grupo (@g.us) no WhatsApp pela instancia dada. Evolution v2:
+// DELETE {BASE}/group/leaveGroup/{instance}?groupJid=...  Nunca lanca.
+export async function sairGrupo(
+  jid: string,
+  instancia: string | null | undefined,
+): Promise<{ ok: boolean; status?: number; raw: unknown }> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  try {
+    const resp = await fetch(
+      `${cfg.base}/group/leaveGroup/${instance}?groupJid=${encodeURIComponent(jid)}`,
+      { method: "DELETE", headers: { apikey: cfg.apikey } },
+    );
+    const raw = await resp.json().catch(() => null);
+    return { ok: resp.ok, status: resp.status, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // Estado de conexao de uma instancia: GET /instance/connectionState/{instance}.
 // Retorna "open" | "close" | "connecting" | "desconhecido".
 export async function estadoConexao(instancia: string): Promise<string> {
