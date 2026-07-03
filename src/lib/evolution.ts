@@ -134,6 +134,41 @@ export async function enviarMidia(
   }
 }
 
+// POST {BASE}/message/sendSticker/{INSTANCE} body { number, sticker }. Envia uma
+// figurinha (URL publica ou base64). Se o endpoint de sticker nao existir/falhar,
+// cai para envio como imagem (fallback) — a figurinha ainda chega ao cliente.
+export async function enviarFigurinha(
+  numero: string,
+  midia: string,
+  instancia?: string | null,
+): Promise<ResultadoEnvio> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  const url = `${cfg.base}/message/sendSticker/${instance}`;
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({ number: numero, sticker: midia }),
+    });
+    const raw: unknown = await resp.json().catch(() => null);
+    if (resp.ok) {
+      const externalId =
+        typeof raw === "object" && raw !== null
+          ? (raw as { key?: { id?: string } }).key?.id
+          : undefined;
+      return { ok: true, externalId, raw };
+    }
+    // Fallback: envia como imagem normal.
+    return await enviarMidia(numero, midia, "image", instancia);
+  } catch {
+    return await enviarMidia(numero, midia, "image", instancia);
+  }
+}
+
 // Baixa a midia de uma mensagem (base64) via Evolution.
 // Evolution v2: POST {BASE}/chat/getBase64FromMediaMessage/{instance} espera o
 // OBJETO DE MENSAGEM COMPLETO no campo `message` — { key, message, ... } —, ou

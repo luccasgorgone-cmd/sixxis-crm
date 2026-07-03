@@ -27,6 +27,7 @@ import {
   Boxes,
   BellRing,
   Target,
+  Sticker,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const SECOES: Secao[] = [
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },
+  { rotulo: "Figurinhas", href: "/admin/figurinhas", icone: Sticker },
   { rotulo: "Assistente de Escrita", href: "/admin/assistente-escrita", icone: Wand2 },
   { rotulo: "Alertas de SLA", href: "/admin/alertas", icone: BellRing },
   { rotulo: "Comunicacoes", href: "/admin/comunicacoes", icone: Megaphone },

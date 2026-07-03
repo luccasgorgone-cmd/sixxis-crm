@@ -943,6 +943,19 @@ model IntegracaoMercadoLivre {
   atualizadoEm DateTime  @updatedAt
 }
 
+// Figurinhas (stickers) predefinidas da Sixxis para os atendentes enviarem no
+// Inbox. Gerenciaveis pelo admin (sobe imagem no R2). Fatia 2.66.
+model FigurinhaSixxis {
+  id       String   @id @default(cuid())
+  nome     String
+  url      String
+  ordem    Int      @default(0)
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  @@index([ativo, ordem])
+}
+
 // ---------------------------------------------------------------------------
 // PARCEIROS (Fatia 2.61): tecnicos parceiros pelo Brasil (ferramenta de
 // pos-venda). Entidade PROPRIA — NAO sao Lead/Negocio/Cliente, NAO entram no

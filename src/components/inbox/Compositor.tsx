@@ -17,9 +17,11 @@ import {
   Wand2,
   Undo2,
   Smile,
+  Sticker,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorEmoji } from "./SeletorEmoji";
+import { SeletorFigurinha } from "./SeletorFigurinha";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
 import type { ProdutoLoja } from "@/components/loja/tipos";
 import {
@@ -93,6 +95,12 @@ export function Compositor({
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
   const [mostrarEmojis, setMostrarEmojis] = useState(false);
+  const [mostrarFigurinhas, setMostrarFigurinhas] = useState(false);
+  const [figurinhas, setFigurinhas] = useState<
+    { id: string; nome: string; url: string }[]
+  >([]);
+  const [figurinhasCarregadas, setFigurinhasCarregadas] = useState(false);
+  const [enviandoFigurinha, setEnviandoFigurinha] = useState(false);
 
   // Varinha magica: reescreve o texto aplicando um tom (via IA). So aparece se
   // houver tons ativos (assistente ligado no admin).
@@ -267,6 +275,45 @@ export function Compositor({
       const pos = start + emoji.length;
       el.setSelectionRange(pos, pos);
     }, 0);
+  }
+
+  // Abre o painel de figurinhas (carrega sob demanda na 1a vez).
+  function abrirFigurinhas() {
+    setMostrarFigurinhas((v) => !v);
+    if (!figurinhasCarregadas) {
+      setFigurinhasCarregadas(true);
+      fetch("/api/figurinhas")
+        .then((r) => (r.ok ? r.json() : { figurinhas: [] }))
+        .then((d) => setFigurinhas(d.figurinhas ?? []))
+        .catch(() => undefined);
+    }
+  }
+
+  async function enviarFigurinhaMsg(figurinhaId: string) {
+    if (enviandoFigurinha) return;
+    setEnviandoFigurinha(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/mensagens/enviar-figurinha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversaId,
+          figurinhaId,
+          ...(instanciaSel ? { instanciaId: instanciaSel } : {}),
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      if (!r.ok) {
+        setErro("Falha ao enviar a figurinha. Verifique a conexao com o WhatsApp.");
+      }
+      setMostrarFigurinhas(false);
+    } catch {
+      setErro("Nao foi possivel enviar a figurinha agora.");
+    } finally {
+      setEnviandoFigurinha(false);
+    }
   }
 
   function inserirProduto(p: ProdutoLoja) {
@@ -630,6 +677,16 @@ export function Compositor({
         />
       )}
 
+      {mostrarFigurinhas && (
+        <SeletorFigurinha
+          figurinhas={figurinhas}
+          carregando={!figurinhasCarregadas}
+          enviando={enviandoFigurinha}
+          onEscolher={(id) => void enviarFigurinhaMsg(id)}
+          onFechar={() => setMostrarFigurinhas(false)}
+        />
+      )}
+
       {instancias.length > 1 && (
         <div className="mb-2 flex items-center gap-2 px-1">
           <span className="text-[11px] font-medium text-medio/60">
@@ -735,6 +792,18 @@ export function Compositor({
             }`}
           >
             <Smile className="h-5 w-5" />
+          </button>
+          <button
+            onClick={abrirFigurinhas}
+            title="Figurinhas"
+            aria-label="Figurinhas"
+            className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${
+              mostrarFigurinhas
+                ? "border-tiffany bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio hover:bg-black/5"
+            }`}
+          >
+            <Sticker className="h-5 w-5" />
           </button>
           <button
             onClick={() => setSeletorProduto(true)}
