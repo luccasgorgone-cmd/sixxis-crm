@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, Bot, Info } from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
+import { SandboxLuna } from "./SandboxLuna";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 
@@ -312,6 +313,9 @@ export function IAAdmin() {
             </select>
           </Cartao>
         </Secao>
+
+        {/* Sandbox de teste (efemero; nada e enviado a clientes) */}
+        <SandboxLuna />
 
         <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-black/5 bg-fundo px-6 py-3">
           <button
