@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Store,
+  Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -32,7 +33,8 @@ import { paramsEscopo } from "@/lib/escopo";
 import { BreakdownProdutos } from "./BreakdownProdutos";
 import type { ClienteMapa, EstadoDetalheResp } from "./tipos";
 
-type Ordenacao = "recentes" | "valor";
+type Ordenacao = "compradores" | "recentes" | "valor";
+const LIMITE_LISTA = 20;
 
 type EtapaOpcao = { id: string; nome: string; tipo?: string };
 
@@ -78,7 +80,8 @@ export function PainelEstadoMapa({
   const [catFiltro, setCatFiltro] = useState(""); // "" = todas
   const [segFiltro, setSegFiltro] = useState<"" | "VAREJO" | "ATACADO">("");
   const [rastreioFiltro, setRastreioFiltro] = useState<"" | "com" | "sem">("");
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>("recentes");
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>("compradores");
+  const [mostrarTodos, setMostrarTodos] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
 
@@ -191,7 +194,13 @@ export function PainelEstadoMapa({
       );
     }
     const ord = [...lista];
-    if (ordenacao === "valor") {
+    if (ordenacao === "compradores") {
+      // Melhores compradores: maior valor comprado, desempate por qtd de compras.
+      ord.sort(
+        (a, b) =>
+          b.valorComprado - a.valorComprado || b.totalCompras - a.totalCompras,
+      );
+    } else if (ordenacao === "valor") {
       ord.sort((a, b) => b.valorAberto - a.valorAberto);
     } else {
       ord.sort((a, b) => {
@@ -202,6 +211,11 @@ export function PainelEstadoMapa({
     }
     return ord;
   }, [dados, busca, catFiltro, segFiltro, rastreioFiltro, ordenacao]);
+
+  // Reinicia a expansao quando filtros/ordenacao mudam (lista nova).
+  useEffect(() => {
+    setMostrarTodos(false);
+  }, [busca, catFiltro, segFiltro, rastreioFiltro, ordenacao]);
 
   const titulo = dados ? `${dados.resumo.estado} (${uf})` : `Estado ${uf}`;
 
@@ -339,6 +353,16 @@ export function PainelEstadoMapa({
                 <div className="ml-auto flex items-center gap-1 text-[11px] text-medio/60">
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   <button
+                    onClick={() => setOrdenacao("compradores")}
+                    className={`rounded-md px-1.5 py-0.5 font-medium transition-colors ${
+                      ordenacao === "compradores"
+                        ? "bg-tiffany text-white"
+                        : "hover:bg-black/5"
+                    }`}
+                  >
+                    Compradores
+                  </button>
+                  <button
                     onClick={() => setOrdenacao("recentes")}
                     className={`rounded-md px-1.5 py-0.5 font-medium transition-colors ${
                       ordenacao === "recentes"
@@ -361,12 +385,17 @@ export function PainelEstadoMapa({
                 </div>
               </div>
               <ListaClientes
-                clientes={clientesFiltrados}
+                clientes={
+                  mostrarTodos
+                    ? clientesFiltrados
+                    : clientesFiltrados.slice(0, LIMITE_LISTA)
+                }
                 vazio={
                   busca || catFiltro || segFiltro || rastreioFiltro
                     ? "Nenhum cliente encontrado. Ajuste a busca ou os filtros."
                     : "Sem clientes neste estado ainda."
                 }
+                destaqueValorComprado={ordenacao === "compradores"}
                 etapas={etapas}
                 editando={editando}
                 onEditarTemp={(c, t) =>
@@ -377,6 +406,16 @@ export function PainelEstadoMapa({
                 }
                 onAbrirNegocio={onAbrirNegocio}
               />
+              {clientesFiltrados.length > LIMITE_LISTA && (
+                <button
+                  onClick={() => setMostrarTodos((v) => !v)}
+                  className="mt-3 w-full rounded-lg border border-black/10 px-3 py-1.5 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+                >
+                  {mostrarTodos
+                    ? "Ver menos"
+                    : `Ver todos (${clientesFiltrados.length})`}
+                </button>
+              )}
             </div>
           ) : aba === "compradores" ? (
             <div className="space-y-4 p-4">
@@ -737,6 +776,14 @@ function ListaClientes({
                   {c.produtoClassificado}
                 </span>
                 {c.segmento && <BadgeSegmento segmento={c.segmento} />}
+                {c.temRastreio && (
+                  <span
+                    title="Tem codigo de rastreio"
+                    className="flex items-center gap-0.5 rounded-full bg-tiffany/10 px-1.5 py-0.5 text-[10px] font-medium text-tiffany"
+                  >
+                    <Truck className="h-2.5 w-2.5" /> Rastreio
+                  </span>
+                )}
                 {c.status === "PENDENTE" ? (
                   <BadgePendente />
                 ) : c.status ? (
