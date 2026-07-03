@@ -4,7 +4,14 @@
 // Organizado em secoes: Ativacao, Horario de operacao, Comportamento, Handoff e
 // Persona.
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Bot, Info } from "lucide-react";
+import {
+  Loader2,
+  Bot,
+  Info,
+  AlertTriangle,
+  Clock,
+  Power,
+} from "lucide-react";
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
 import { SandboxLuna } from "./SandboxLuna";
@@ -41,12 +48,45 @@ const MODELOS: { id: string; rotulo: string }[] = [
   { id: "claude-haiku-4-5", rotulo: "Haiku (rapido/barato)" },
 ];
 
+// Resumo do horario comercial vigente (da ConfiguracaoCRM), so leitura.
+type HorarioCRM = { horarios: DiaHorario[]; abertoAgora: boolean };
+const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+
+// "09:00-18:00" por dia aberto, agrupado; dias fechados omitidos.
+function resumoHorario(horarios: DiaHorario[]): string {
+  const partes = horarios
+    .filter((h) => h.aberto && h.faixas.length > 0)
+    .map(
+      (h) =>
+        `${DIAS_CURTOS[h.dia]} ${h.faixas
+          .map((f) => `${f.inicio}-${f.fim}`)
+          .join(", ")}`,
+    );
+  return partes.length ? partes.join(" · ") : "Nenhum dia aberto configurado";
+}
+
 export function IAAdmin() {
   const toast = useToast();
   const [config, setConfig] = useState<Config | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  // Resumo do horario comercial vigente (so leitura, para o painel de controle).
+  const [horarioCRM, setHorarioCRM] = useState<HorarioCRM | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.config?.horarios) {
+          setHorarioCRM({
+            horarios: d.config.horarios as DiaHorario[],
+            abertoAgora: Boolean(d.abertoAgora),
+          });
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -115,24 +155,102 @@ export function IAAdmin() {
     <div className="p-6">
       <Cabecalho titulo="Agente IA" subtitulo="Configuracao do atendente automatico" />
 
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-tiffany/20 bg-tiffany/5 p-3 text-sm text-medio">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-tiffany" />
-        <span>
-          Configuracao pronta; a ativacao da IA (execucao real) chega em breve. Por
-          enquanto, nada e respondido automaticamente.
-        </span>
+      {/* Painel de controle da Luna: liga/desliga o atendimento REAL + gatilho. */}
+      <div className="mb-6 max-w-2xl">
+        <div
+          className={`rounded-2xl border p-4 ${
+            c.ativo
+              ? "border-tiffany/40 bg-tiffany/5"
+              : "border-black/10 bg-white"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                  c.ativo ? "bg-tiffany/15 text-tiffany" : "bg-black/5 text-medio"
+                }`}
+              >
+                <Bot className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-escuro">
+                  Luna no WhatsApp
+                </p>
+                <p className="text-xs text-medio/60">
+                  Atendimento automatico com clientes reais.
+                </p>
+              </div>
+            </div>
+            <span
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                c.ativo
+                  ? "bg-tiffany/15 text-tiffany"
+                  : "bg-black/5 text-medio/70"
+              }`}
+            >
+              <Power className="h-3.5 w-3.5" />
+              {c.ativo ? "Ativa" : "Inativa"}
+            </span>
+          </div>
+
+          {/* Aviso forte antes de ativar. */}
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Ao ativar, a Luna passa a responder clientes reais fora do horario
+              comercial (ou a qualquer hora, se &quot;atende direto&quot; estiver
+              ligado). Deixe desligada ate ter certeza.
+            </span>
+          </div>
+
+          {/* Toggle mestre. */}
+          <div className="mt-3">
+            <Toggle
+              titulo="Luna ativa (responder clientes reais)"
+              descricao="Liga/desliga o atendimento automatico no WhatsApp."
+              valor={c.ativo}
+              onChange={(v) => set({ ativo: v })}
+              icone
+            />
+          </div>
+
+          {/* Resumo do gatilho. */}
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <InfoCard
+              rotulo="Quando responde"
+              valor={
+                c.opera24h ? "A qualquer hora (direto)" : "So fora do horario"
+              }
+            />
+            <InfoCard
+              rotulo="Ritmo"
+              valor={`${c.segundosAntesDeResponder ?? 7}s antes de responder`}
+            />
+            <InfoCard
+              rotulo="Estado agora"
+              valor={
+                horarioCRM
+                  ? horarioCRM.abertoAgora
+                    ? "Dentro do horario"
+                    : "Fora do horario"
+                  : "—"
+              }
+            />
+          </div>
+          <p className="mt-2 flex items-start gap-1.5 text-[11px] text-medio/60">
+            <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>
+              Horario comercial:{" "}
+              {horarioCRM ? resumoHorario(horarioCRM.horarios) : "carregando..."}
+            </span>
+          </p>
+        </div>
       </div>
 
       <div className="max-w-2xl space-y-6">
-        {/* Ativacao */}
+        {/* Ativacao (o liga/desliga mestre fica no painel de controle acima). */}
         <Secao titulo="Ativacao">
-          <Toggle
-            titulo="Agente IA ativo"
-            descricao="Habilita o atendente automatico (efetivo na proxima fatia)."
-            valor={c.ativo}
-            onChange={(v) => set({ ativo: v })}
-            icone
-          />
           <Toggle
             titulo="Responder lead novo"
             descricao="A IA inicia o atendimento de leads recem-chegados."
@@ -397,6 +515,20 @@ function Cartao({ children }: { children: React.ReactNode }) {
 function Rotulo({ children }: { children: React.ReactNode }) {
   return (
     <label className="mb-1 block text-sm font-medium text-escuro">{children}</label>
+  );
+}
+
+// Cartao compacto de leitura (rotulo + valor) do painel de controle da Luna.
+function InfoCard({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-black/5 bg-white px-3 py-2">
+      <p className="truncate text-[10px] uppercase tracking-wide text-medio/50">
+        {rotulo}
+      </p>
+      <p className="mt-0.5 truncate text-xs font-semibold text-escuro" title={valor}>
+        {valor}
+      </p>
+    </div>
   );
 }
 
