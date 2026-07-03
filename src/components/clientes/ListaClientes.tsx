@@ -5,6 +5,7 @@
 // inline + abertura do painel do cliente. Usa o kit visual (KpiCard, EmptyState,
 // TabelaOrdenavel).
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Search,
@@ -12,6 +13,8 @@ import {
   Plus,
   X,
   MessageSquare,
+  MessageCircle,
+  Loader2,
   FileText,
   Contact,
   Building2,
@@ -140,6 +143,28 @@ export function ListaClientes({
   const [painelId, setPainelId] = useState<string | null>(null);
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
+
+  // Abrir/iniciar conversa a partir da lista: garante a conversa e vai ao Inbox
+  // (o Inbox pre-abre pelo ?lead=). Nao dispara nada.
+  const router = useRouter();
+  const [abrindoConversa, setAbrindoConversa] = useState<string | null>(null);
+  const abrirConversa = useCallback(
+    async (leadId: string) => {
+      if (abrindoConversa) return;
+      setAbrindoConversa(leadId);
+      try {
+        await fetch("/api/conversas/iniciar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId }),
+        });
+      } catch {
+        // segue para o Inbox mesmo assim (idempotente)
+      }
+      router.push(`/inbox?lead=${leadId}`);
+    },
+    [abrindoConversa, router],
+  );
 
   useEffect(() => {
     fetch("/api/etiquetas")
@@ -513,6 +538,29 @@ export function ListaClientes({
           <MessageSquare className="h-3.5 w-3.5 text-medio/40" />
           {c.qtdMensagens}
         </span>
+      ),
+    },
+    {
+      chave: "acoes",
+      rotulo: "",
+      align: "right",
+      render: (c) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void abrirConversa(c.leadId);
+          }}
+          disabled={abrindoConversa === c.leadId}
+          title="Abrir conversa no Inbox"
+          aria-label="Abrir conversa"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-tiffany/10 hover:text-tiffany disabled:opacity-50"
+        >
+          {abrindoConversa === c.leadId ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <MessageCircle className="h-4 w-4" />
+          )}
+        </button>
       ),
     },
   ];

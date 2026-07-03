@@ -21,6 +21,7 @@ import {
   Repeat,
   UserPlus,
   MessageSquare,
+  MessageCircle,
   ListChecks,
   ShoppingBag,
   History,
@@ -125,6 +126,7 @@ export function PainelNegocio({
     tipo: "ganho" | "perdido";
     etapaId: string;
   } | null>(null);
+  const [iniciandoConversa, setIniciandoConversa] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -144,6 +146,28 @@ export function PainelNegocio({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Inicia a conversa do lead (in-place): cria/garante e recarrega o painel para
+  // o embed da conversa aparecer. Nao dispara nada — o embed permite o 1o envio.
+  const iniciarConversa = useCallback(async () => {
+    if (!detalhe || iniciandoConversa) return;
+    setIniciandoConversa(true);
+    try {
+      const r = await fetch("/api/conversas/iniciar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: detalhe.cliente.id,
+          finalidade: detalhe.finalidade,
+        }),
+      });
+      if (r.ok) await carregar();
+    } catch {
+      // silencioso: o botao volta ao estado normal
+    } finally {
+      setIniciandoConversa(false);
+    }
+  }, [detalhe, iniciandoConversa, carregar]);
 
   useEffect(() => {
     fetch("/api/observacoes")
@@ -307,9 +331,21 @@ export function PainelNegocio({
                   ehAdmin={ehAdmin}
                 />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-medio/50">
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-medio/50">
                   <MessageSquare className="h-8 w-8 text-medio/30" />
                   <p className="text-sm">Este lead ainda nao tem conversa.</p>
+                  <button
+                    onClick={() => void iniciarConversa()}
+                    disabled={iniciandoConversa}
+                    className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
+                  >
+                    {iniciandoConversa ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <MessageCircle className="h-4 w-4" />
+                    )}
+                    Iniciar conversa
+                  </button>
                 </div>
               )}
             </div>
