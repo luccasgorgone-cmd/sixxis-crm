@@ -5,18 +5,105 @@
 // legiveis, com numeros/listas). Respeita o escopo do usuario (aplicado no
 // backend); a nota de escopo deixa isso claro. Dark mode, responsivo.
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Send, Loader2, ShieldCheck, Building2 } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  Loader2,
+  ShieldCheck,
+  Building2,
+  DollarSign,
+  Filter,
+  Trophy,
+  MapPin,
+  Users,
+  Target,
+  Headset,
+  Activity,
+  type LucideIcon,
+} from "lucide-react";
 
 type Bolha =
   | { autor: "user"; texto: string }
   | { autor: "oracle"; mensagens: string[] };
 
-const SUGESTOES = [
-  "Como foram as vendas do mes?",
-  "Como esta meu funil?",
-  "Qual estado tem mais oportunidade?",
-  "Como estao minhas metas?",
-];
+type Relatorio = {
+  id: string;
+  titulo: string;
+  descricao: string;
+  Icone: LucideIcon;
+  pergunta: string;
+};
+
+// Relatorios prontos: cada card dispara uma pergunta bem formulada ao Oracle
+// (reusa /api/oracle/chat). O escopo e aplicado no backend — os cards apenas se
+// adaptam ao papel no rotulo/pergunta (ex.: equipe x proprio).
+function relatorios(ehAdmin: boolean): Relatorio[] {
+  return [
+    {
+      id: "vendas",
+      titulo: "Vendas do periodo",
+      descricao: "Total, ganhos, perdidos e ticket medio",
+      Icone: DollarSign,
+      pergunta:
+        "Como foram as vendas neste mes? Traga total vendido, negocios ganhos, perdidos, em aberto e o ticket medio.",
+    },
+    {
+      id: "funil",
+      titulo: "Funil de conversao",
+      descricao: "Negocios por etapa e onde travam",
+      Icone: Filter,
+      pergunta:
+        "Analise meu funil: negocios abertos por etapa (quantidade e valor) e aponte onde estao travando.",
+    },
+    {
+      id: "desempenho",
+      titulo: ehAdmin ? "Desempenho da equipe" : "Meu desempenho",
+      descricao: ehAdmin ? "Ranking de vendedores no periodo" : "Seus resultados no periodo",
+      Icone: Trophy,
+      pergunta: ehAdmin
+        ? "Mostre o ranking de desempenho dos vendedores neste mes, por valor vendido."
+        : "Como esta o meu desempenho de vendas neste mes?",
+    },
+    {
+      id: "mapa",
+      titulo: "Oportunidades no mapa",
+      descricao: "Clima quente cruzado com clientes",
+      Icone: MapPin,
+      pergunta:
+        "Onde tenho mais oportunidade? Cruze o indice de oportunidade (clima) com a minha distribuicao de clientes por estado e recomende prioridades.",
+    },
+    {
+      id: "clientes",
+      titulo: ehAdmin ? "Clientes da empresa" : "Meus clientes",
+      descricao: "Resumo por segmento e estado",
+      Icone: Users,
+      pergunta:
+        "Faca um resumo dos clientes: total, por segmento (varejo/atacado) e destaque os estados com mais clientes.",
+    },
+    {
+      id: "metas",
+      titulo: "Metas e progresso",
+      descricao: "Onde estou frente ao alvo",
+      Icone: Target,
+      pergunta: "Como estao as metas e o progresso ate agora?",
+    },
+    {
+      id: "atendimentos",
+      titulo: "Atendimentos",
+      descricao: "Volume de conversas no periodo",
+      Icone: Headset,
+      pergunta: "Qual o volume de atendimentos e mensagens recebidas neste mes?",
+    },
+    {
+      id: "diagnostico",
+      titulo: "Diagnostico geral",
+      descricao: "Cruza tudo e aponta prioridades",
+      Icone: Activity,
+      pergunta:
+        "Faca um diagnostico geral do meu cenario: cruze vendas, funil, metas e oportunidades de mercado, e aponte as 3 prioridades da semana.",
+    },
+  ];
+}
 
 export function ChatOracle({ papel }: { papel: string }) {
   const ehAdmin = papel === "ADMIN";
@@ -105,7 +192,7 @@ export function ChatOracle({ papel }: { papel: string }) {
       <div className="scroll-fino min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
           {mensagens.length === 0 && !enviando ? (
-            <Boasvindas ehAdmin={ehAdmin} onSugestao={(s) => void perguntar(s)} />
+            <Boasvindas ehAdmin={ehAdmin} onRelatorio={(p) => void perguntar(p)} />
           ) : (
             mensagens.map((m, i) =>
               m.autor === "user" ? (
@@ -193,38 +280,70 @@ export function ChatOracle({ papel }: { papel: string }) {
 
 function Boasvindas({
   ehAdmin,
-  onSugestao,
+  onRelatorio,
 }: {
   ehAdmin: boolean;
-  onSugestao: (s: string) => void;
+  onRelatorio: (pergunta: string) => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-10 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tiffany/10 text-tiffany">
-        <Sparkles className="h-7 w-7" />
-      </span>
+    <div className="flex flex-col gap-5 py-4">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tiffany/10 text-tiffany">
+          <Sparkles className="h-7 w-7" />
+        </span>
+        <div>
+          <p className="text-base font-semibold text-escuro">
+            Ola! Sou o Oracle, seu analista de gestao.
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-medio/60">
+            Escolha um relatorio pronto ou faca uma pergunta.
+            {ehAdmin
+              ? " Voce tem a visao geral da empresa."
+              : " Mostro os dados da sua carteira."}
+          </p>
+        </div>
+      </div>
+
+      {/* Relatorios rapidos (cards) */}
       <div>
-        <p className="text-base font-semibold text-escuro">
-          Ola! Sou o Oracle, seu analista de gestao.
+        <p className="mb-2 px-0.5 text-xs font-semibold uppercase tracking-wide text-medio/50">
+          Relatorios rapidos
         </p>
-        <p className="mx-auto mt-1 max-w-md text-sm text-medio/60">
-          Pergunte sobre suas vendas, clientes, funil, metas, mapa e mercado.
-          {ehAdmin
-            ? " Voce tem a visao geral da empresa."
-            : " Mostro os dados da sua carteira."}
-        </p>
+        <CardsRelatorio ehAdmin={ehAdmin} onRelatorio={onRelatorio} />
       </div>
-      <div className="flex flex-wrap justify-center gap-2">
-        {SUGESTOES.map((s) => (
+    </div>
+  );
+}
+
+function CardsRelatorio({
+  ehAdmin,
+  onRelatorio,
+}: {
+  ehAdmin: boolean;
+  onRelatorio: (pergunta: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {relatorios(ehAdmin).map((r) => {
+        const Icone = r.Icone;
+        return (
           <button
-            key={s}
-            onClick={() => onSugestao(s)}
-            className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+            key={r.id}
+            onClick={() => onRelatorio(r.pergunta)}
+            className="flex items-start gap-3 rounded-xl border border-black/5 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-tiffany/40 hover:shadow-md"
           >
-            {s}
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-tiffany/10 text-tiffany">
+              <Icone className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-escuro">
+                {r.titulo}
+              </span>
+              <span className="block text-xs text-medio/60">{r.descricao}</span>
+            </span>
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
