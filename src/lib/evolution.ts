@@ -169,6 +169,38 @@ export async function enviarFigurinha(
   }
 }
 
+// POST {BASE}/message/sendReaction/{INSTANCE} body { key, reaction }. Reage a uma
+// mensagem (emoji). reaction "" remove a reacao (toggle, como no WhatsApp). O key
+// identifica a mensagem alvo: { id: externalId, remoteJid, fromMe }.
+export async function enviarReacao(
+  instancia: string | null | undefined,
+  key: { id: string; remoteJid: string; fromMe: boolean },
+  emoji: string,
+): Promise<{ ok: boolean; status?: number; raw: unknown }> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  try {
+    const resp = await fetch(`${cfg.base}/message/sendReaction/${instance}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({
+        key: { id: key.id, remoteJid: key.remoteJid, fromMe: key.fromMe },
+        reaction: emoji,
+      }),
+    });
+    const raw = await resp.json().catch(() => null);
+    return { ok: resp.ok, status: resp.status, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // Baixa a midia de uma mensagem (base64) via Evolution.
 // Evolution v2: POST {BASE}/chat/getBase64FromMediaMessage/{instance} espera o
 // OBJETO DE MENSAGEM COMPLETO no campo `message` — { key, message, ... } —, ou

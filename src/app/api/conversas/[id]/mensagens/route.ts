@@ -47,6 +47,9 @@ export async function GET(
       apagadaEm: true,
       // Selo interno "Luna" nas mensagens enviadas pela IA.
       viaIA: true,
+      // Reacoes (emoji) — nossa e a do cliente.
+      reacao: true,
+      reacaoDeCliente: true,
       // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
       instancia: true,
       instanciaId: true,

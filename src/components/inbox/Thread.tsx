@@ -16,6 +16,7 @@ import {
   Trash2,
   Ban,
   Eye,
+  Smile,
   Loader2,
   RefreshCw,
   Download,
@@ -297,6 +298,9 @@ const TIPOS_MIDIA = new Set(["IMAGEM", "VIDEO", "AUDIO", "DOCUMENTO"]);
 // Legenda placeholder gerada na ingestao ("[imagem]", "[audio]"...): nao deve
 // ser exibida como texto/legenda real do cliente.
 const RE_PLACEHOLDER = /^\[(imagem|video|audio|documento|figurinha|localizacao|contato|contatos)\]/i;
+
+// Emojis de reacao padrao do WhatsApp.
+const EMOJIS_REACAO = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 function legendaReal(conteudo: string | null): string | null {
   if (!conteudo) return null;
   const t = conteudo.trim();
@@ -326,6 +330,44 @@ function Bolha({
   const mediaUrl = mensagem.mediaUrl || mediaLocal;
   const apagada = mensagem.apagada || apagadaLocal;
   const apagadaPor = mensagem.apagadaPor ?? (apagadaLocal ? "COLABORADOR" : null);
+
+  // Reacao (emoji) — otimista. reacaoLocal=undefined => usa a da mensagem.
+  const [reacaoLocal, setReacaoLocal] = useState<string | null | undefined>(undefined);
+  const [pickerReacao, setPickerReacao] = useState(false);
+  const [reagindo, setReagindo] = useState(false);
+  const reacao = reacaoLocal !== undefined ? reacaoLocal : mensagem.reacao ?? null;
+  const reacaoCliente = mensagem.reacaoDeCliente ?? null;
+  // Reagir a mensagens nao apagadas (o backend valida o id real do WhatsApp).
+  const podeReagir = !apagada;
+
+  async function reagir(emoji: string) {
+    if (reagindo) return;
+    setPickerReacao(false);
+    setReagindo(true);
+    const anterior = reacao;
+    // Otimista (toggle): mesmo emoji remove.
+    setReacaoLocal(anterior === emoji ? null : emoji);
+    try {
+      const r = await fetch(`/api/mensagens/${mensagem.id}/reagir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (r.ok) {
+        const d = await r.json().catch(() => null);
+        setReacaoLocal(d?.reacao ?? null);
+      } else {
+        setReacaoLocal(anterior); // reverte
+        const d = await r.json().catch(() => null);
+        toast.erro(d?.erro ?? "Nao foi possivel reagir.");
+      }
+    } catch {
+      setReacaoLocal(anterior);
+      toast.erro("Falha de conexao.");
+    } finally {
+      setReagindo(false);
+    }
+  }
 
   // So pode revogar a propria mensagem enviada, recente e ainda nao apagada.
   const podeRevogar =
@@ -361,6 +403,40 @@ function Bolha({
 
   return (
     <div className={`group flex items-center gap-1.5 ${ehOut ? "justify-end" : "justify-start"}`}>
+      {/* Acoes auxiliares (reagir / apagar) — aparecem no hover. */}
+      {podeReagir && (
+        <div className="relative order-1 shrink-0">
+          <button
+            onClick={() => setPickerReacao((v) => !v)}
+            disabled={reagindo}
+            title="Reagir"
+            aria-label="Reagir"
+            className="rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-tiffany group-hover:opacity-100"
+          >
+            {reagindo ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Smile className="h-3.5 w-3.5" />
+            )}
+          </button>
+          {pickerReacao && (
+            <div className="absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-black/10 bg-white px-1.5 py-1 shadow-lg">
+              {EMOJIS_REACAO.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => void reagir(e)}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none transition-transform hover:scale-125 ${
+                    reacao === e ? "bg-tiffany/15" : "hover:bg-fundo"
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {/* Acao apagar (so na propria mensagem enviada) */}
       {podeRevogar && (
         <button
@@ -379,7 +455,7 @@ function Bolha({
       )}
 
       <div
-        className={`order-2 max-w-[75%] rounded-xl px-3 py-2 text-sm shadow-sm ${
+        className={`relative order-2 max-w-[75%] rounded-xl px-3 py-2 text-sm shadow-sm ${
           apagada
             ? "border border-dashed border-black/15 bg-black/5 text-medio/70"
             : ehOut
@@ -387,6 +463,18 @@ function Bolha({
               : "rounded-bl-sm bg-white text-escuro"
         }`}
       >
+        {/* Selo da(s) reacao(oes), sobreposto na borda inferior (estilo WhatsApp).
+            A do cliente e a nossa; ambas podem coexistir. */}
+        {(reacao || reacaoCliente) && (
+          <span
+            className={`absolute -bottom-2.5 flex items-center gap-0.5 rounded-full border border-black/10 bg-white px-1 py-0.5 text-xs shadow-sm dark:bg-white ${
+              ehOut ? "right-1.5" : "left-1.5"
+            }`}
+          >
+            {reacaoCliente && <span title="Reacao do cliente">{reacaoCliente}</span>}
+            {reacao && <span title="Sua reacao">{reacao}</span>}
+          </span>
+        )}
         {apagada ? (
           <div>
             <span className="flex items-center gap-1.5 italic text-medio/60">

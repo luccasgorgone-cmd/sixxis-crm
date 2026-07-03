@@ -194,11 +194,36 @@ export function Inbox({
       );
     }
 
+    // Reacao (nossa ou do cliente) mudou: atualiza a bolha na thread aberta.
+    function onReacao(evt: {
+      conversaId: string;
+      mensagemId: string;
+      reacao?: string | null;
+      reacaoDeCliente?: string | null;
+    }) {
+      if (selecionadaRef.current !== evt.conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId
+            ? {
+                ...m,
+                ...(evt.reacao !== undefined ? { reacao: evt.reacao } : {}),
+                ...(evt.reacaoDeCliente !== undefined
+                  ? { reacaoDeCliente: evt.reacaoDeCliente }
+                  : {}),
+              }
+            : m,
+        ),
+      );
+    }
+
     socket.on("mensagem:nova", onNova);
     socket.on("mensagem:midia", onMidia);
+    socket.on("mensagem:reacao", onReacao);
     return () => {
       socket.off("mensagem:nova", onNova);
       socket.off("mensagem:midia", onMidia);
+      socket.off("mensagem:reacao", onReacao);
     };
   }, [carregarConversas]);
 

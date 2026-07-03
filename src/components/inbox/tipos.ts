@@ -54,6 +54,9 @@ export type MensagemItem = {
   viaIA?: boolean;
   // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
   instanciaRotulo?: string | null;
+  // Reacoes (emoji) estilo WhatsApp: a nossa e a do cliente.
+  reacao?: string | null;
+  reacaoDeCliente?: string | null;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

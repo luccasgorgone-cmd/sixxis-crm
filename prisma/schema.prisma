@@ -392,6 +392,10 @@ model Mensagem {
   apagadaEm   DateTime?
   apagadaPor  String?
   apagadaPorId String?
+  // Reacoes (emoji) estilo WhatsApp. reacao = a NOSSA (enviada pelo atendente);
+  // reacaoDeCliente = a que o cliente enviou. null = sem reacao. Fatia 2.69.
+  reacao          String?
+  reacaoDeCliente String?
   // Payload bruto da Evolution. Podado (NULL) apos RETENCAO_RAW_MESES; o conteudo
   // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
   raw         Json?
