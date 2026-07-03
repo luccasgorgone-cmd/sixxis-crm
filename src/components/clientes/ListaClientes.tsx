@@ -37,6 +37,7 @@ import {
   BadgeFinalidade,
 } from "@/components/badges";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
+import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
 import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
 import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
@@ -60,6 +61,7 @@ type Cliente = {
   qtdMensagens: number;
   empresaFaturada: string | null;
   garantia: boolean | null;
+  segmento: "VAREJO" | "ATACADO" | null;
   uf: string | null;
   cidade: string | null;
   produtosInteresse: { id: string; nome: string }[];
@@ -112,6 +114,7 @@ export function ListaClientes({
   const [produtoInteresseF, setProdutoInteresseF] = useState("");
   const [origemF, setOrigemF] = useState("");
   const [garantiaF, setGarantiaF] = useState("");
+  const [segmentoF, setSegmentoF] = useState("");
   const [ufF, setUfF] = useState("");
   const [cidadeF, setCidadeF] = useState("");
   const [agenteSel, setAgenteSel] = useState(""); // admin
@@ -178,6 +181,7 @@ export function ListaClientes({
       if (produtoInteresseF) p.set("produtoInteresse", produtoInteresseF);
       if (origemF) p.set("origem", origemF);
       if (garantiaF) p.set("garantia", garantiaF);
+      if (segmentoF) p.set("segmento", segmentoF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
       if (periodo.preset === "custom") {
@@ -194,7 +198,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, semDono, agenteSel, ehAdmin, periodo]);
 
   useEffect(() => {
     void carregar();
@@ -454,6 +458,17 @@ export function ListaClientes({
       render: (c) => <SeloGarantia garantia={c.garantia} />,
     },
     {
+      chave: "segmento",
+      rotulo: "Segmento",
+      sortValue: (c) => c.segmento ?? "",
+      render: (c) =>
+        c.segmento ? (
+          <BadgeSegmento segmento={c.segmento} />
+        ) : (
+          <span className="text-xs text-medio/40">—</span>
+        ),
+    },
+    {
       chave: "ultimoContato",
       rotulo: "Ultimo contato",
       align: "right",
@@ -694,6 +709,11 @@ export function ListaClientes({
           <option value="sim">Com garantia</option>
           <option value="nao">Sem garantia</option>
           <option value="nao_definido">Nao definido</option>
+        </select>
+        <select value={segmentoF} onChange={(e) => setSegmentoF(e.target.value)} className="campo">
+          <option value="">Segmento: todos</option>
+          <option value="VAREJO">Varejo</option>
+          <option value="ATACADO">Atacado</option>
         </select>
         <select value={ufF} onChange={(e) => setUfF(e.target.value)} className="campo">
           <option value="">Estado: todos</option>

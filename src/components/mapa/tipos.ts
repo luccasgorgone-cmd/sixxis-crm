@@ -18,6 +18,7 @@ export type ResumoUF = {
   populacao: number | null;
   clientesPor100k: number | null;
   produtosTop: ProdutoTop[];
+  porSegmento: { varejo: number; atacado: number; naoDefinido: number };
   novosPorMes: { ultimos30: number; ultimos90: number };
   ultimoContato: string | null;
 };
@@ -47,6 +48,7 @@ export type ClienteMapa = {
   finalidade: "VENDA" | "POS_VENDA" | null;
   // Garantia do cliente (pos-venda): null=nao definido, true=com, false=sem.
   garantia: boolean | null;
+  segmento: "VAREJO" | "ATACADO" | null;
   status: "ABERTO" | "GANHO" | "PERDIDO" | "PENDENTE" | null;
   etapa: string | null;
   etapaId: string | null;
@@ -129,6 +131,7 @@ export type FiltrosMapa = {
   categoria: string | null;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
   situacao: "abertos" | "ganhos" | "perdidos" | null;
+  segmento: "VAREJO" | "ATACADO" | null;
   // Janela por ultimo contato (dias). null = todos. Backend aceita 7/30/90/180.
   periodo: 7 | 30 | 90 | 180 | null;
 };
@@ -136,6 +139,7 @@ export const FILTROS_MAPA_VAZIO: FiltrosMapa = {
   categoria: null,
   temperatura: null,
   situacao: null,
+  segmento: null,
   periodo: null,
 };
 
@@ -144,6 +148,7 @@ export function queryFiltros(f: FiltrosMapa, escopo = ""): string {
   if (f.categoria) p.set("categoria", f.categoria);
   if (f.temperatura) p.set("temperatura", f.temperatura);
   if (f.situacao) p.set("situacao", f.situacao);
+  if (f.segmento) p.set("segmento", f.segmento);
   if (f.periodo) p.set("periodo", String(f.periodo));
   for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
   const s = p.toString();
@@ -151,5 +156,5 @@ export function queryFiltros(f: FiltrosMapa, escopo = ""): string {
 }
 
 export function algumFiltroMapa(f: FiltrosMapa): boolean {
-  return !!(f.categoria || f.temperatura || f.situacao || f.periodo);
+  return !!(f.categoria || f.temperatura || f.situacao || f.segmento || f.periodo);
 }

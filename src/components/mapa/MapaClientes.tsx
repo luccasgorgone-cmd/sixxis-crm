@@ -276,6 +276,21 @@ export function MapaClientes() {
           }
         />
         <SelectFiltro
+          rotulo="Segmento"
+          valor={filtros.segmento ?? ""}
+          opcoes={[
+            { v: "", r: "Todos" },
+            { v: "VAREJO", r: "Varejo" },
+            { v: "ATACADO", r: "Atacado" },
+          ]}
+          onChange={(v) =>
+            setFiltros((f) => ({
+              ...f,
+              segmento: (v || null) as FiltrosMapa["segmento"],
+            }))
+          }
+        />
+        <SelectFiltro
           rotulo="Periodo"
           valor={filtros.periodo ? String(filtros.periodo) : ""}
           opcoes={[

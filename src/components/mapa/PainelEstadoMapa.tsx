@@ -19,10 +19,12 @@ import {
   ArrowUpDown,
   ShieldCheck,
   ShieldOff,
+  Store,
 } from "lucide-react";
 import Link from "next/link";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { BadgeStatusNegocio, BadgePendente } from "@/components/badges";
+import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
 import { EstadoErro } from "@/components/ui/Estado";
 import { Reveal } from "@/components/inteligencia/Reveal";
 import { formatarBRL, normalizarTexto } from "@/lib/format";
@@ -74,6 +76,7 @@ export function PainelEstadoMapa({
   const [aba, setAba] = useState<Aba>("geral");
   const [busca, setBusca] = useState("");
   const [catFiltro, setCatFiltro] = useState(""); // "" = todas
+  const [segFiltro, setSegFiltro] = useState<"" | "VAREJO" | "ATACADO">("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("recentes");
   const [editando, setEditando] = useState<string | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
@@ -174,6 +177,9 @@ export function PainelEstadoMapa({
     if (catFiltro) {
       lista = lista.filter((c) => c.produtoClassificado === catFiltro);
     }
+    if (segFiltro) {
+      lista = lista.filter((c) => c.segmento === segFiltro);
+    }
     if (q) {
       lista = lista.filter(
         (c) =>
@@ -192,7 +198,7 @@ export function PainelEstadoMapa({
       });
     }
     return ord;
-  }, [dados, busca, catFiltro, ordenacao]);
+  }, [dados, busca, catFiltro, segFiltro, ordenacao]);
 
   const titulo = dados ? `${dados.resumo.estado} (${uf})` : `Estado ${uf}`;
 
@@ -291,6 +297,24 @@ export function PainelEstadoMapa({
                     ))}
                   </div>
                 )}
+                {/* Chips de segmento (Varejo/Atacado) */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <ChipCategoria
+                    rotulo="Todos segmentos"
+                    ativo={segFiltro === ""}
+                    onClick={() => setSegFiltro("")}
+                  />
+                  <ChipCategoria
+                    rotulo="Varejo"
+                    ativo={segFiltro === "VAREJO"}
+                    onClick={() => setSegFiltro("VAREJO")}
+                  />
+                  <ChipCategoria
+                    rotulo="Atacado"
+                    ativo={segFiltro === "ATACADO"}
+                    onClick={() => setSegFiltro("ATACADO")}
+                  />
+                </div>
                 <div className="ml-auto flex items-center gap-1 text-[11px] text-medio/60">
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   <button
@@ -318,7 +342,7 @@ export function PainelEstadoMapa({
               <ListaClientes
                 clientes={clientesFiltrados}
                 vazio={
-                  busca || catFiltro
+                  busca || catFiltro || segFiltro
                     ? "Nenhum cliente encontrado. Ajuste a busca ou os filtros."
                     : "Sem clientes neste estado ainda."
                 }
@@ -490,11 +514,67 @@ function VisaoGeral({ dados }: { dados: EstadoDetalheResp }) {
         </div>
       </Reveal>
 
+      <Reveal delay={90}>
+        <div className="rounded-lg border border-black/5 bg-white p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-escuro">
+            <Store className="h-4 w-4 text-tiffany" />
+            Segmento (Varejo x Atacado)
+          </p>
+          <BreakdownSegmento seg={r.porSegmento} />
+        </div>
+      </Reveal>
+
       <p className="text-xs text-medio/50">
         Temperatura dos clientes: {r.porTemperatura.quente} quentes ·{" "}
         {r.porTemperatura.morno} mornos · {r.porTemperatura.frio} frios.
       </p>
     </div>
+  );
+}
+
+// Breakdown Varejo x Atacado (barras horizontais compactas, cores Sixxis).
+// Inclui "Nao definido" quando houver, com rotulo honesto.
+function BreakdownSegmento({
+  seg,
+}: {
+  seg: { varejo: number; atacado: number; naoDefinido: number };
+}) {
+  const total = seg.varejo + seg.atacado + seg.naoDefinido;
+  if (total === 0) {
+    return (
+      <p className="py-2 text-center text-xs text-medio/50">
+        Sem clientes neste estado.
+      </p>
+    );
+  }
+  const linhas: { rotulo: string; qtd: number; cor: string }[] = [
+    { rotulo: "Varejo", qtd: seg.varejo, cor: "#3cbfb3" },
+    { rotulo: "Atacado", qtd: seg.atacado, cor: "#0f2e2b" },
+    { rotulo: "Nao definido", qtd: seg.naoDefinido, cor: "#94a3b8" },
+  ].filter((l) => l.qtd > 0);
+  const max = Math.max(...linhas.map((l) => l.qtd));
+  return (
+    <ul className="space-y-1.5">
+      {linhas.map((l) => (
+        <li key={l.rotulo} className="flex items-center gap-2">
+          <span className="w-24 shrink-0 truncate text-xs text-medio/80">
+            {l.rotulo}
+          </span>
+          <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-black/5">
+            <span
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                width: `${max ? (l.qtd / max) * 100 : 0}%`,
+                backgroundColor: l.cor,
+              }}
+            />
+          </span>
+          <span className="w-8 shrink-0 text-right text-xs font-semibold text-escuro">
+            {l.qtd}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -635,6 +715,7 @@ function ListaClientes({
                 <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-medio/80">
                   {c.produtoClassificado}
                 </span>
+                {c.segmento && <BadgeSegmento segmento={c.segmento} />}
                 {c.status === "PENDENTE" ? (
                   <BadgePendente />
                 ) : c.status ? (

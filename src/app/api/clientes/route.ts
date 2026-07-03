@@ -68,6 +68,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   else if (garantiaF === "nao") where.garantia = false;
   else if (garantiaF === "nao_definido") where.garantia = null;
 
+  // Segmento comercial: VAREJO / ATACADO.
+  const segmentoF = sp.get("segmento");
+  if (segmentoF === "VAREJO" || segmentoF === "ATACADO") {
+    where.segmento = segmentoF;
+  }
+
   const temperatura = sp.get("temperatura");
   const status = sp.get("status");
   const negFiltro: Prisma.NegocioWhereInput = {};
@@ -101,6 +107,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donoPosVendaId: true,
       criadoEm: true,
       garantia: true,
+      segmento: true,
       origem: true,
       anuncioTitulo: true,
       anuncioUrl: true,
@@ -159,6 +166,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     qtdMensagens: number;
     empresaFaturada: string | null;
     garantia: boolean | null;
+    segmento: "VAREJO" | "ATACADO" | null;
     uf: string | null;
     cidade: string | null;
     produtosInteresse: { id: string; nome: string }[];
@@ -246,6 +254,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       qtdMensagens,
       empresaFaturada: l.empresaFaturada?.nome ?? null,
       garantia: l.garantia,
+      segmento: l.segmento,
       uf,
       cidade,
       produtosInteresse: l.produtosInteresse.map((pi) => ({
