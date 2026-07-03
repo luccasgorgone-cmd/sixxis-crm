@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Shield,
   Wrench,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -86,6 +87,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     ...(ehAdmin || papel === "POS_VENDA"
       ? [{ rotulo: "Parceiros", href: "/parceiros", icone: Wrench }]
       : []),
+    { rotulo: "Campanhas", href: "/campanhas", icone: Megaphone },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
       ? [{ rotulo: "Admin", href: "/admin", icone: Shield }]

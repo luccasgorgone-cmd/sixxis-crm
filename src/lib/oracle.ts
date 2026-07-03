@@ -12,7 +12,13 @@ import { prisma } from "./prisma";
 import { escopoLeadWhere, ehAdmin, type SessaoAgente } from "./autorizacao";
 import { resolverPeriodo } from "./metricas";
 import { ufPorTelefone } from "./ddd";
-import { contarSegmentoOracle, type CriteriosSegmento } from "./oracleCampanha";
+import {
+  contarSegmentoOracle,
+  leadIdsSegmentoOracle,
+  type CriteriosSegmento,
+} from "./oracleCampanha";
+import { resolverDestinatarios, normalizarFiltro } from "./campanha";
+import { CanalEnvio, StatusCampanha, StatusDestino } from "../generated/prisma/enums";
 import { Prisma } from "../generated/prisma/client";
 import {
   StatusNeg,
@@ -55,10 +61,11 @@ relacoes uteis (estado quente x sua base; funil parado x metas; ticket x segment
 e traga a conexao + uma recomendacao acionavel. So conecte o que os dados mostram.
 
 TRAVAS DE SEGURANCA (fixas, inviolaveis):
-- SO LEITURA. Voce NAO executa nenhuma acao que altere, crie ou exclua dados
-  (nada de disparar campanha, mover negocio, editar cliente). Se pedirem uma acao,
-  explique que essa capacidade ainda nao esta disponivel aqui e ficara como
-  sugestao para aprovacao — voce NAO age.
+- SO LEITURA, com UMA excecao controlada: voce PODE preparar um RASCUNHO de
+  campanha (ferramenta "criar_rascunho_campanha") QUANDO o usuario confirmar.
+  Voce NUNCA dispara a campanha — o disparo e SEMPRE acao manual do usuario na aba
+  Campanhas. Nenhuma outra escrita: nada de mover negocio, editar cliente, excluir
+  dados. Para outras acoes, explique que ficam como sugestao para aprovacao.
 - ESCOPO DO USUARIO: os dados que voce recebe das ferramentas JA vem filtrados
   pelo escopo do usuario logado. NUNCA tente burlar isso, NUNCA peca nem exponha
   dados de OUTRO usuario. Se perguntarem dados de outra pessoa e o usuario nao for
@@ -76,6 +83,10 @@ SEGMENTO (criterios) e uma sugestao de MENSAGEM (tom Sixxis, PT-BR, sem emoji; p
 dar 1-2 variacoes). REGRA DE OURO: voce NUNCA dispara campanha — voce PREPARA; o
 disparo e SEMPRE uma acao manual do usuario. Termine perguntando se ele quer que
 voce PREPARE o rascunho para revisar e disparar.
+QUANDO O USUARIO CONFIRMAR (ex.: "sim, prepara"): chame "criar_rascunho_campanha"
+com o mesmo segmento e a mensagem aprovada. Ele cria um RASCUNHO — NADA e enviado.
+Depois, informe: "Rascunho criado com N pessoas. Revise e dispare voce mesmo na aba
+Campanhas." Deixe claro que o disparo depende do clique dele; voce NUNCA dispara.
 
 FORMATO DE RESPOSTA (obrigatorio): responda SOMENTE com um objeto JSON valido, sem
 cercas de codigo, sem texto antes ou depois, no formato exato:
@@ -439,6 +450,72 @@ async function sugerirCampanha(
   };
 }
 
+// CRIA um RASCUNHO de campanha (apenas quando o usuario CONFIRMA). Escopado.
+// NUNCA dispara — status RASCUNHO e SEM enfileirar o worker. O disparo real e
+// uma acao manual do usuario na aba Campanhas.
+async function criarRascunhoCampanha(
+  agente: SessaoAgente,
+  input: { finalidade?: string; canal?: string; uf?: string; segmento?: string; semCompraDias?: number; mensagem?: string; assunto?: string },
+) {
+  const mensagem = String(input.mensagem ?? "").trim();
+  if (!mensagem) return { erro: "mensagem obrigatoria para preparar o rascunho" };
+  const criterios = criteriosDe(input);
+  const canal: CanalEnvio =
+    input.canal === "SMS" ? CanalEnvio.SMS : input.canal === "EMAIL" ? CanalEnvio.EMAIL : CanalEnvio.WHATSAPP;
+  const admin = ehAdmin(agente.papel);
+
+  const { leadIds, truncado } = await leadIdsSegmentoOracle(agente, criterios);
+  if (leadIds.length === 0) {
+    return { erro: "nenhum destinatario no seu escopo para esse segmento" };
+  }
+  // Reaplica escopo (dono) + opt-out + canal via o resolver oficial de campanha.
+  const { incluidos, puladosOptOut, puladosSemCanal } = await resolverDestinatarios({
+    finalidade: criterios.finalidade,
+    canal,
+    filtro: normalizarFiltro({}),
+    alvoId: admin ? null : agente.id,
+    todos: admin,
+    leadIds,
+  });
+  if (incluidos.length === 0) {
+    return { erro: "nenhum destinatario valido (sem canal ou opt-out) para o segmento" };
+  }
+
+  const campanha = await prisma.campanha.create({
+    data: {
+      agenteId: agente.id,
+      finalidade: criterios.finalidade,
+      canal,
+      mensagem,
+      assunto: input.assunto ? String(input.assunto).trim() || null : null,
+      filtroJson: { origem: "oracle", criterios } as unknown as Prisma.InputJsonValue,
+      total: incluidos.length,
+      pulados: puladosOptOut + puladosSemCanal,
+      // RASCUNHO e SEM enqueue -> jamais dispara aqui.
+      status: StatusCampanha.RASCUNHO,
+      destinos: {
+        create: incluidos.map((d) => ({
+          leadId: d.leadId,
+          destino: d.destino,
+          status: StatusDestino.PENDENTE,
+        })),
+      },
+    },
+    select: { id: true, total: true },
+  });
+
+  return {
+    ok: true,
+    campanhaId: campanha.id,
+    tamanhoPublico: campanha.total,
+    truncado,
+    link: "/campanhas",
+    aviso:
+      "RASCUNHO criado — NADA foi enviado. Informe o usuario que ele deve REVISAR e " +
+      "DISPARAR manualmente na aba Campanhas (/campanhas). Voce NUNCA dispara.",
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -466,6 +543,10 @@ async function executarFerramenta(
       case "sugerir_campanha":
         return JSON.stringify(
           await sugerirCampanha(agente, input as { finalidade?: string; uf?: string; segmento?: string; semCompraDias?: number; foco?: string }),
+        );
+      case "criar_rascunho_campanha":
+        return JSON.stringify(
+          await criarRascunhoCampanha(agente, input as { finalidade?: string; canal?: string; uf?: string; segmento?: string; semCompraDias?: number; mensagem?: string; assunto?: string }),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -561,6 +642,26 @@ const FERRAMENTAS = [
         foco: { type: "string", description: "Foco/tema (ex.: climatizador) — orienta a mensagem." },
       },
       required: ["finalidade"],
+    },
+  },
+  {
+    name: "criar_rascunho_campanha",
+    description:
+      "Cria um RASCUNHO de campanha (status RASCUNHO) SOMENTE quando o usuario CONFIRMAR. " +
+      "NUNCA dispara — o disparo e acao manual do usuario na aba Campanhas. Escopado ao usuario. " +
+      "Use o mesmo segmento sugerido e inclua a mensagem aprovada.",
+    input_schema: {
+      type: "object",
+      properties: {
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"] },
+        canal: { type: "string", enum: ["WHATSAPP", "SMS", "EMAIL"], description: "Padrao WHATSAPP." },
+        uf: { type: "string" },
+        segmento: { type: "string", enum: ["VAREJO", "ATACADO"] },
+        semCompraDias: { type: "number" },
+        mensagem: { type: "string", description: "Texto da campanha (tom Sixxis, sem emoji)." },
+        assunto: { type: "string", description: "Assunto (so para e-mail)." },
+      },
+      required: ["finalidade", "mensagem"],
     },
   },
 ] as const;
