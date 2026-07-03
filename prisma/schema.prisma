@@ -948,6 +948,28 @@ model IntegracaoMercadoLivre {
   atualizadoEm DateTime  @updatedAt
 }
 
+// Catalogo de produtos e pecas selecionaveis para PEDIDOS (Fatia 2.71).
+// tipo=PRODUTO (venda) | PECA (pos-venda). Gerenciavel no admin. Nao entra em
+// metricas — e uma lista de referencia para montar itens de pedido.
+enum TipoCatalogo {
+  PRODUTO
+  PECA
+}
+
+model ProdutoCatalogo {
+  id            String       @id @default(cuid())
+  nome          String
+  categoria     String?
+  modelo        String?
+  precoSugerido Decimal?     @db.Decimal(12, 2)
+  tipo          TipoCatalogo @default(PRODUTO)
+  ativo         Boolean      @default(true)
+  ordem         Int          @default(0)
+  criadoEm      DateTime     @default(now())
+
+  @@index([tipo, ativo, ordem])
+}
+
 // Status de um item em assistencia (aba Local, pos-venda). Fatia 2.70.
 enum StatusAssistencia {
   RECEBIDO
