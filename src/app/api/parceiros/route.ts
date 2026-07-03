@@ -9,6 +9,7 @@ import {
   parseFrete,
   textoOuNull,
   filtrosParceiro,
+  parseCategorias,
 } from "@/lib/parceiro";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       regiao,
       email: textoOuNull(body.email),
       especialidade: textoOuNull(body.especialidade),
+      categorias: parseCategorias(body.categorias),
       observacoes: textoOuNull(body.observacoes),
       fretePadrao: parseFrete(body.fretePadrao),
       freteObs: textoOuNull(body.freteObs),

@@ -8,6 +8,7 @@ import {
   resolverLocal,
   parseFrete,
   textoOuNull,
+  parseCategorias,
 } from "@/lib/parceiro";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -73,6 +74,7 @@ export async function PUT(
   if (body.cidade !== undefined) data.cidade = textoOuNull(body.cidade);
   if (body.email !== undefined) data.email = textoOuNull(body.email);
   if (body.especialidade !== undefined) data.especialidade = textoOuNull(body.especialidade);
+  if (body.categorias !== undefined) data.categorias = parseCategorias(body.categorias);
   if (body.observacoes !== undefined) data.observacoes = textoOuNull(body.observacoes);
   if (body.freteObs !== undefined) data.freteObs = textoOuNull(body.freteObs);
   if (body.fretePadrao !== undefined) data.fretePadrao = parseFrete(body.fretePadrao);

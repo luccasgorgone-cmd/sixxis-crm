@@ -959,6 +959,9 @@ model Parceiro {
   regiao        String?
   email         String?
   especialidade String?
+  // Categorias de produto que o parceiro atende (reais da loja), ex.:
+  // ["climatizadores","aspiradores","spinning"]. Campo estruturado p/ filtro.
+  categorias    Json?
   observacoes   String?  @db.Text
   // Frete de referencia para/deste parceiro e condicoes (prazo, transportadora).
   fretePadrao   Decimal? @db.Decimal(12, 2)

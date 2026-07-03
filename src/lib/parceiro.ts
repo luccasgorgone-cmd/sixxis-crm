@@ -4,6 +4,25 @@ import { ufPorTelefone, infoPorUF } from "./ddd";
 import { Papel } from "../generated/prisma/enums";
 import type { Prisma } from "../generated/prisma/client";
 
+// Categorias de produto REAIS da loja que um parceiro pode atender. Fonte unica
+// (usada na validacao dos endpoints e na UI de cadastro/filtro).
+export const CATEGORIAS_PARCEIRO = [
+  { id: "climatizadores", rotulo: "Climatizadores" },
+  { id: "aspiradores", rotulo: "Aspiradores" },
+  { id: "spinning", rotulo: "Spinning" },
+] as const;
+
+const IDS_CATEGORIA = new Set<string>(CATEGORIAS_PARCEIRO.map((c) => c.id));
+
+// Normaliza uma lista de categorias recebida: so ids validos, sem repetir.
+export function parseCategorias(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const validas = v.filter(
+    (x): x is string => typeof x === "string" && IDS_CATEGORIA.has(x),
+  );
+  return Array.from(new Set(validas));
+}
+
 // WhereInput a partir dos filtros da querystring (lista e agregacao por estado).
 export function filtrosParceiro(sp: URLSearchParams): Prisma.ParceiroWhereInput {
   const where: Prisma.ParceiroWhereInput = {};
@@ -20,6 +39,11 @@ export function filtrosParceiro(sp: URLSearchParams): Prisma.ParceiroWhereInput 
   if (regiao) where.regiao = regiao;
   const esp = sp.get("especialidade");
   if (esp) where.especialidade = { contains: esp, mode: "insensitive" };
+  const categoria = sp.get("categoria");
+  if (categoria && IDS_CATEGORIA.has(categoria)) {
+    // Parceiros cuja lista JSON de categorias contem a categoria pedida.
+    where.categorias = { array_contains: categoria };
+  }
   const ativo = sp.get("ativo");
   if (ativo === "1") where.ativo = true;
   else if (ativo === "0") where.ativo = false;

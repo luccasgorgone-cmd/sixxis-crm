@@ -29,6 +29,7 @@ import {
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 import { ufPorTelefone, infoPorUF } from "@/lib/ddd";
+import { CATEGORIAS_PARCEIRO } from "@/lib/parceiro";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
 type Parceiro = {
@@ -40,6 +41,7 @@ type Parceiro = {
   regiao: string | null;
   email: string | null;
   especialidade: string | null;
+  categorias: string[] | null;
   observacoes: string | null;
   fretePadrao: number | null;
   freteObs: string | null;
@@ -51,8 +53,14 @@ type Filtros = {
   uf: string;
   regiao: string;
   especialidade: string;
+  categoria: string;
   ativo: string; // "" todos | "1" ativos | "0" inativos
 };
+
+// Rotulo de exibicao de uma categoria pelo id.
+const ROTULO_CATEGORIA: Record<string, string> = Object.fromEntries(
+  CATEGORIAS_PARCEIRO.map((c) => [c.id, c.rotulo]),
+);
 
 const REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"];
 const UFS = [
@@ -60,7 +68,14 @@ const UFS = [
   "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
   "SP", "SE", "TO",
 ];
-const VAZIO: Filtros = { q: "", uf: "", regiao: "", especialidade: "", ativo: "1" };
+const VAZIO: Filtros = {
+  q: "",
+  uf: "",
+  regiao: "",
+  especialidade: "",
+  categoria: "",
+  ativo: "1",
+};
 
 function qs(f: Filtros): string {
   const p = new URLSearchParams();
@@ -68,6 +83,7 @@ function qs(f: Filtros): string {
   if (f.uf) p.set("uf", f.uf);
   if (f.regiao) p.set("regiao", f.regiao);
   if (f.especialidade.trim()) p.set("especialidade", f.especialidade.trim());
+  if (f.categoria) p.set("categoria", f.categoria);
   if (f.ativo) p.set("ativo", f.ativo);
   return p.toString();
 }
@@ -215,6 +231,18 @@ export function Parceiros({ papel }: { papel: string }) {
             </option>
           ))}
         </select>
+        <select
+          value={filtros.categoria}
+          onChange={(e) => setFiltros((f) => ({ ...f, categoria: e.target.value }))}
+          className="campo"
+        >
+          <option value="">Categoria: todas</option>
+          {CATEGORIAS_PARCEIRO.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.rotulo}
+            </option>
+          ))}
+        </select>
         <input
           value={filtros.especialidade}
           onChange={(e) => setFiltros((f) => ({ ...f, especialidade: e.target.value }))}
@@ -230,7 +258,7 @@ export function Parceiros({ papel }: { papel: string }) {
           <option value="0">Inativos</option>
           <option value="">Todos</option>
         </select>
-        {(filtros.q || filtros.uf || filtros.regiao || filtros.especialidade || filtros.ativo !== "1") && (
+        {(filtros.q || filtros.uf || filtros.regiao || filtros.especialidade || filtros.categoria || filtros.ativo !== "1") && (
           <button
             onClick={() => setFiltros(VAZIO)}
             className="rounded-md px-2 py-1 text-xs font-medium text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro"
@@ -441,6 +469,14 @@ function CardParceiro({
             {p.especialidade}
           </span>
         )}
+        {(p.categorias ?? []).map((c) => (
+          <span
+            key={c}
+            className="rounded-full bg-escuro/10 px-2 py-0.5 text-[10px] font-medium text-escuro dark:bg-white/10 dark:text-white/80"
+          >
+            {ROTULO_CATEGORIA[c] ?? c}
+          </span>
+        ))}
       </div>
       {(p.fretePadrao != null || p.freteObs) && (
         <p className="mt-1.5 flex items-start gap-1 text-xs text-medio/70">
@@ -541,7 +577,13 @@ function FormParceiro({
   const [cidade, setCidade] = useState(parceiro?.cidade ?? "");
   const [uf, setUf] = useState(parceiro?.uf ?? "");
   const [especialidade, setEspecialidade] = useState(parceiro?.especialidade ?? "");
+  const [categorias, setCategorias] = useState<string[]>(parceiro?.categorias ?? []);
   const [email, setEmail] = useState(parceiro?.email ?? "");
+
+  const alternarCategoria = (id: string) =>
+    setCategorias((atual) =>
+      atual.includes(id) ? atual.filter((c) => c !== id) : [...atual, id],
+    );
   const [fretePadrao, setFretePadrao] = useState(
     parceiro?.fretePadrao != null ? String(parceiro.fretePadrao) : "",
   );
@@ -572,6 +614,7 @@ function FormParceiro({
         // Envia a UF efetiva (manual ou a do DDD) — o backend recalcula a regiao.
         uf: ufEfetiva || null,
         especialidade: especialidade.trim() || null,
+        categorias,
         email: email.trim() || null,
         fretePadrao: fretePadrao.trim() === "" ? null : Number(fretePadrao),
         freteObs: freteObs.trim() || null,
@@ -625,6 +668,28 @@ function FormParceiro({
               <input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)} className="campo w-full" placeholder="Ex.: refrigeracao" />
             </Campo>
           </div>
+          <Campo rotulo="Categorias que atende">
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIAS_PARCEIRO.map((c) => {
+                const marcada = categorias.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => alternarCategoria(c.id)}
+                    aria-pressed={marcada}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      marcada
+                        ? "border-tiffany bg-tiffany/10 text-tiffany"
+                        : "border-black/10 text-medio hover:border-tiffany/40"
+                    }`}
+                  >
+                    {c.rotulo}
+                  </button>
+                );
+              })}
+            </div>
+          </Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo rotulo="Cidade">
               <input value={cidade} onChange={(e) => setCidade(e.target.value)} className="campo w-full" placeholder="Cidade" />
