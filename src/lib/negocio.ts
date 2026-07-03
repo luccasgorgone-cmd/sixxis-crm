@@ -45,6 +45,48 @@ export async function garantirNegocioParaLead(
   const etapa = await primeiraEtapaAberta(finalidade);
   if (!etapa) return null; // funil ainda nao configurado
 
+  // LEAD PERDIDO QUE VOLTA: sem negocio aberto, mas ha um PERDIDO na finalidade ->
+  // REABRE o mesmo negocio (nao cria duplicata). Preserva TODO o historico: o
+  // registro da PERDA (HistoricoNegocio.PERDA) e os rastreios continuam ligados a
+  // este negocio; apenas volta a ficar ABERTO na 1a etapa e registra o retorno.
+  const perdido = await prisma.negocio.findFirst({
+    where: { leadId, finalidade, status: StatusNeg.PERDIDO },
+    orderBy: { atualizadoEm: "desc" },
+    select: { id: true, motivoPerda: true },
+  });
+  if (perdido) {
+    const reaberto = await prisma.negocio.update({
+      where: { id: perdido.id },
+      data: {
+        status: StatusNeg.ABERTO,
+        etapaId: etapa.id,
+        entrouEtapaEm: new Date(),
+        fechadoEm: null,
+        // Limpa o motivo (agora esta aberto); a PERDA anterior permanece no
+        // HistoricoNegocio, entao o registro da perda NAO some.
+        motivoPerda: null,
+        motivoPerdaObs: null,
+        historicos: {
+          create: {
+            tipo: TipoHistorico.NOTA,
+            descricao: `Cliente retornou apos perda${
+              perdido.motivoPerda ? " (perda anterior preservada no historico)" : ""
+            }`,
+          },
+        },
+      },
+      select: { id: true, etapaId: true },
+    });
+    if (emitir) {
+      getIO()?.emit("negocio:atualizado", {
+        negocioId: reaberto.id,
+        etapaId: reaberto.etapaId,
+        motivo: "reaberto",
+      });
+    }
+    return reaberto.id;
+  }
+
   const negocio = await prisma.negocio.create({
     data: {
       leadId,
