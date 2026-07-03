@@ -22,6 +22,7 @@ import {
   Shield,
   Wrench,
   Megaphone,
+  PackageOpen,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -85,7 +86,10 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
     // Parceiros (tecnicos): ferramenta de pos-venda — visivel a ADMIN e POS_VENDA.
     ...(ehAdmin || papel === "POS_VENDA"
-      ? [{ rotulo: "Parceiros", href: "/parceiros", icone: Wrench }]
+      ? [
+          { rotulo: "Parceiros", href: "/parceiros", icone: Wrench },
+          { rotulo: "Local", href: "/local", icone: PackageOpen },
+        ]
       : []),
     { rotulo: "Campanhas", href: "/campanhas", icone: Megaphone },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },

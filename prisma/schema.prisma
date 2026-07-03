@@ -267,6 +267,7 @@ model Lead {
   tarefas        Tarefa[]
   produtosInteresse LeadProdutoInteresse[]
   chamadas       Chamada[]
+  itensLocal     ItemLocal[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -945,6 +946,41 @@ model IntegracaoMercadoLivre {
   mlUserId     String?
   conectadoEm  DateTime?
   atualizadoEm DateTime  @updatedAt
+}
+
+// Status de um item em assistencia (aba Local, pos-venda). Fatia 2.70.
+enum StatusAssistencia {
+  RECEBIDO
+  EM_ANALISE
+  EM_REPARO
+  AGUARDANDO_PECA
+  PRONTO
+  ENTREGUE
+}
+
+// ITEM LOCAL (Fatia 2.70): produto EM ASSISTENCIA fisicamente na empresa
+// (Aracatuba). Entidade PROPRIA de pos-venda — NAO entra em metricas de venda.
+// Vinculo opcional ao cliente dono do produto (leadId).
+model ItemLocal {
+  id               String            @id @default(cuid())
+  leadId           String?
+  lead             Lead?             @relation(fields: [leadId], references: [id])
+  descricaoProduto String
+  modelo           String?
+  categoria        String?
+  numeroSerie      String?
+  defeitoRelatado  String?           @db.Text
+  status           StatusAssistencia @default(RECEBIDO)
+  localizacao      String?
+  tecnicoResponsavel String?
+  observacoes      String?           @db.Text
+  dataEntrada      DateTime          @default(now())
+  dataSaida        DateTime?
+  criadoEm         DateTime          @default(now())
+  atualizadoEm     DateTime          @updatedAt
+
+  @@index([status, dataEntrada])
+  @@index([dataEntrada])
 }
 
 // Figurinhas (stickers) predefinidas da Sixxis para os atendentes enviarem no
