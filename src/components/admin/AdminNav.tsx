@@ -20,6 +20,7 @@ import {
   MessageSquareDot,
   Megaphone,
   Bot,
+  Sparkles,
   Wand2,
   BarChart3,
   Building2,
@@ -55,6 +56,7 @@ const SECOES: Secao[] = [
   { rotulo: "Geral e horario", href: "/admin/geral", icone: Clock },
   { rotulo: "Evolution", href: "/admin/evolution", icone: MessageSquareDot },
   { rotulo: "Agente IA", href: "/admin/ia", icone: Bot },
+  { rotulo: "Oracle", href: "/admin/oracle", icone: Sparkles },
   { rotulo: "Relatorios", href: "/admin/relatorios", icone: BarChart3 },
 ];
 

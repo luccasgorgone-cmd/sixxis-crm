@@ -880,6 +880,20 @@ model ConfigAgenteIA {
   atualizadoEm        DateTime @updatedAt
 }
 
+// Configuracao do ORACLE (agente de inteligencia de gestao). Singleton, editavel
+// pelo admin. As TRAVAS de seguranca e a persona base ficam FIXAS em lib/oracle.ts;
+// aqui o admin so COMPLEMENTA: modelo, orientacoes extras e base de conhecimento.
+model ConfigOracle {
+  id               String   @id @default(cuid())
+  modelo           String   @default("claude-sonnet-4-6")
+  // Orientacoes extras (estilo/enfase) que complementam a persona — nunca as travas.
+  promptSistema    String?  @db.Text
+  // Conhecimento da empresa que o admin quer que o Oracle saiba.
+  baseConhecimento String?  @db.Text
+  ativo            Boolean  @default(true)
+  atualizadoEm     DateTime @updatedAt
+}
+
 // Assistente de escrita ("varinha magica"): reescreve o texto do atendente no
 // compositor aplicando um TOM. Config singleton (liga/desliga + modelo).
 model AssistenteTom {

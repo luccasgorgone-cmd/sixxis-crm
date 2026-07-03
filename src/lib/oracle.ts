@@ -455,15 +455,33 @@ const FERRAMENTAS = [
 // ---------------------------------------------------------------------------
 function montarSystem(
   agente: SessaoAgente,
+  extra?: { promptSistema?: string | null; baseConhecimento?: string | null },
 ): { type: "text"; text: string; cache_control?: { type: "ephemeral" } }[] {
   const admin = ehAdmin(agente.papel);
   const contexto = admin
     ? `CONTEXTO DO USUARIO: ${agente.nome ?? "Administrador"} (ADMIN). Visao GERAL da empresa: as ferramentas trazem os dados de todos.`
     : `CONTEXTO DO USUARIO: ${agente.nome ?? "Colaborador"} (${agente.papel}). Escopo RESTRITO: as ferramentas trazem SOMENTE os dados da carteira deste usuario. NUNCA fale de dados de outro usuario.`;
-  return [
+  const blocos: { type: "text"; text: string; cache_control?: { type: "ephemeral" } }[] = [
+    // Prefixo estavel (travas + persona) -> cacheavel.
     { type: "text", text: `${BASE_SEGURANCA}\n\n${PERSONA}`, cache_control: { type: "ephemeral" } },
     { type: "text", text: contexto },
   ];
+  // Config do admin: COMPLEMENTA (nunca sobrepoe) as travas fixas acima.
+  const orient = (extra?.promptSistema ?? "").trim();
+  if (orient) {
+    blocos.push({
+      type: "text",
+      text: `ORIENTACOES ADICIONAIS (definidas pelo admin; complementam o estilo, NUNCA sobrepoem as travas de seguranca nem o escopo):\n${orient}`,
+    });
+  }
+  const base = (extra?.baseConhecimento ?? "").trim();
+  if (base) {
+    blocos.push({
+      type: "text",
+      text: `BASE DE CONHECIMENTO DA EMPRESA (fornecida pelo admin; use como contexto, sem inventar numeros):\n${base}`,
+    });
+  }
+  return blocos;
 }
 
 function montarMensagens(historico: OracleMensagem[]): { role: "user" | "assistant"; content: string }[] {
@@ -523,7 +541,20 @@ export async function gerarRespostaOracle(entrada: {
     return montarResultado(["Como posso ajudar na analise? Pergunte sobre vendas, clientes, funil ou metas."]);
   }
 
-  const system = montarSystem(agente);
+  // Config editavel pelo admin (modelo + orientacoes + base). Nunca quebra: se a
+  // leitura falhar, usa os defaults do codigo. As TRAVAS ficam sempre no system.
+  const cfg = await prisma.configOracle.findFirst().catch(() => null);
+  if (cfg && cfg.ativo === false) {
+    return montarResultado(
+      ["O Oracle esta desativado no momento. Fale com o administrador para reativar."],
+      "ConfigOracle.ativo=false",
+    );
+  }
+  const modelo = (cfg?.modelo ?? "").trim() || MODELO;
+  const system = montarSystem(agente, {
+    promptSistema: cfg?.promptSistema,
+    baseConhecimento: cfg?.baseConhecimento,
+  });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -536,7 +567,7 @@ export async function gerarRespostaOracle(entrada: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: MODELO,
+          model: modelo,
           max_tokens: MAX_TOKENS,
           system,
           messages: mensagens,
