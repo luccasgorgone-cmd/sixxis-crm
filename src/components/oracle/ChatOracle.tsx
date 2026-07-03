@@ -19,8 +19,20 @@ import {
   Target,
   Headset,
   Activity,
+  LayoutGrid,
+  Trash2,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
+
+// Comandos rapidos (chips acima do compositor): atalhos de periodo e acoes.
+const COMANDOS: { rotulo: string; pergunta: string }[] = [
+  { rotulo: "Resumo do dia", pergunta: "Me de um resumo do dia de hoje: vendas, atendimentos e o que precisa de atencao." },
+  { rotulo: "O que priorizar", pergunta: "Com base nos dados, o que devo priorizar hoje? Liste as 3 acoes mais importantes." },
+  { rotulo: "Hoje", pergunta: "Como estao as vendas e os atendimentos de hoje?" },
+  { rotulo: "Esta semana", pergunta: "Como foi esta semana em vendas e atendimentos?" },
+  { rotulo: "Este mes", pergunta: "Faca um resumo deste mes: vendas, metas e clientes." },
+];
 
 type Bolha =
   | { autor: "user"; texto: string }
@@ -111,7 +123,16 @@ export function ChatOracle({ papel }: { papel: string }) {
   const [input, setInput] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [painelRelatorios, setPainelRelatorios] = useState(false);
   const fimRef = useRef<HTMLDivElement>(null);
+
+  const temConversa = mensagens.length > 0;
+
+  function limpar() {
+    setMensagens([]);
+    setErro(null);
+    setPainelRelatorios(false);
+  }
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ block: "end" });
@@ -170,7 +191,7 @@ export function ChatOracle({ papel }: { papel: string }) {
           </p>
         </div>
         <span
-          className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
+          className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium md:inline-flex ${
             ehAdmin
               ? "bg-tiffany/10 text-tiffany"
               : "bg-black/5 text-medio/70"
@@ -186,7 +207,47 @@ export function ChatOracle({ papel }: { papel: string }) {
             </>
           )}
         </span>
+        {/* Relatorios: sempre acessivel (colapsa apos a 1a pergunta). */}
+        {temConversa && (
+          <button
+            onClick={() => setPainelRelatorios((v) => !v)}
+            title="Relatorios rapidos"
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              painelRelatorios
+                ? "border-tiffany bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio hover:bg-black/5 hover:text-escuro"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Relatorios</span>
+          </button>
+        )}
+        {temConversa && (
+          <button
+            onClick={limpar}
+            title="Limpar conversa"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Limpar</span>
+          </button>
+        )}
       </header>
+
+      {/* Painel colapsavel de relatorios (apos a 1a pergunta) */}
+      {temConversa && painelRelatorios && (
+        <div className="shrink-0 border-b border-black/5 bg-white px-4 py-3 sm:px-6">
+          <div className="mx-auto max-w-3xl">
+            <CardsRelatorio
+              ehAdmin={ehAdmin}
+              onRelatorio={(p) => {
+                setPainelRelatorios(false);
+                void perguntar(p);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Conversa */}
       <div className="scroll-fino min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
@@ -210,9 +271,9 @@ export function ChatOracle({ papel }: { papel: string }) {
                     m.mensagens.map((bloco, k) => (
                       <div
                         key={k}
-                        className="max-w-[92%] whitespace-pre-line rounded-2xl rounded-bl-sm border border-black/5 bg-white px-4 py-3 text-sm leading-relaxed text-escuro"
+                        className="max-w-[92%] rounded-2xl rounded-bl-sm border border-black/5 bg-white px-4 py-3 text-sm text-escuro"
                       >
-                        {bloco}
+                        <Bloco texto={bloco} />
                       </div>
                     ))
                   ) : (
@@ -241,8 +302,25 @@ export function ChatOracle({ papel }: { papel: string }) {
         </div>
       )}
 
+      {/* Comandos rapidos (atalhos) */}
+      <div className="border-t border-black/5 bg-white px-4 pt-2.5 sm:px-6">
+        <div className="scroll-fino mx-auto flex max-w-3xl items-center gap-1.5 overflow-x-auto pb-0.5">
+          <Zap className="h-3.5 w-3.5 shrink-0 text-tiffany" />
+          {COMANDOS.map((c) => (
+            <button
+              key={c.rotulo}
+              onClick={() => void perguntar(c.pergunta)}
+              disabled={enviando}
+              className="shrink-0 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-50"
+            >
+              {c.rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Compositor */}
-      <div className="border-t border-black/5 bg-white px-4 py-3 sm:px-6">
+      <div className="bg-white px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
           <textarea
             value={input}
@@ -313,6 +391,85 @@ function Boasvindas({
       </div>
     </div>
   );
+}
+
+// Renderiza um bloco de texto do Oracle com formatacao leve: **negrito**, listas
+// com "- "/"•" (viram bullets) e "1) "/"1." (numeradas), e subtitulos (linha
+// curta terminando em ":"). Deixa a resposta estruturada e legivel.
+function inline(texto: string): React.ReactNode {
+  return texto.split(/(\*\*[^*]+\*\*)/g).map((p, i) => {
+    const m = p.match(/^\*\*([^*]+)\*\*$/);
+    return m ? (
+      <strong key={i} className="font-semibold text-escuro">
+        {m[1]}
+      </strong>
+    ) : (
+      <span key={i}>{p}</span>
+    );
+  });
+}
+
+function Bloco({ texto }: { texto: string }) {
+  const linhas = texto.replace(/\r\n/g, "\n").split("\n");
+  const nodes: React.ReactNode[] = [];
+  let lista: { tipo: "ul" | "ol"; itens: string[] } | null = null;
+  const flush = () => {
+    if (!lista) return;
+    const l = lista;
+    nodes.push(
+      <ul key={`l${nodes.length}`} className="my-1 space-y-1">
+        {l.itens.map((it, i) => (
+          <li key={i} className="flex gap-2">
+            {l.tipo === "ol" ? (
+              <span className="shrink-0 font-semibold text-tiffany">{i + 1}.</span>
+            ) : (
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-tiffany" />
+            )}
+            <span className="min-w-0 leading-relaxed">{inline(it)}</span>
+          </li>
+        ))}
+      </ul>,
+    );
+    lista = null;
+  };
+  for (const raw of linhas) {
+    const l = raw.trimEnd();
+    const mUl = l.match(/^\s*[-•]\s+(.*)$/);
+    const mOl = l.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (mUl) {
+      if (lista?.tipo !== "ul") {
+        flush();
+        lista = { tipo: "ul", itens: [] };
+      }
+      lista.itens.push(mUl[1]);
+      continue;
+    }
+    if (mOl) {
+      if (lista?.tipo !== "ol") {
+        flush();
+        lista = { tipo: "ol", itens: [] };
+      }
+      lista.itens.push(mOl[1]);
+      continue;
+    }
+    flush();
+    if (l.trim() === "") continue;
+    if (/:$/.test(l) && l.length <= 60) {
+      nodes.push(
+        <p key={`p${nodes.length}`} className="mt-1.5 font-semibold text-escuro">
+          {inline(l)}
+        </p>,
+      );
+      continue;
+    }
+    nodes.push(
+      <p key={`p${nodes.length}`} className="leading-relaxed">
+        {inline(l)}
+      </p>,
+    );
+  }
+  flush();
+  return <div className="space-y-1">{nodes}</div>;
 }
 
 function CardsRelatorio({
