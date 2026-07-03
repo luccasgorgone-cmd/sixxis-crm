@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Inbox as InboxIcon,
+  MessagesSquare,
   KanbanSquare,
   LayoutDashboard,
   Target,
@@ -70,6 +71,7 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
       icone: LayoutDashboard,
     },
     { rotulo: "Inbox", href: "/inbox", icone: InboxIcon },
+    { rotulo: "Sixxis", href: "/interno", icone: MessagesSquare },
     { rotulo: "Kanban", href: "/kanban", icone: KanbanSquare },
     { rotulo: "Clientes", href: "/clientes", icone: Contact },
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
