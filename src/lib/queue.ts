@@ -12,7 +12,7 @@ import { normalizarJid } from "./phone";
 import { garantirNegocioParaLead } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
-import { campoDono } from "./dono";
+import { campoDono, filtroEquipe } from "./dono";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { fetchFotoPerfil, enviarTexto } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
@@ -33,6 +33,7 @@ import {
   StatusCampanha,
   StatusDestino,
   AtividadeTipo,
+  StatusLembrete,
 } from "../generated/prisma/enums";
 
 const NOME_FILA = "messages-in";
@@ -913,6 +914,14 @@ async function responderComLunaSePreciso(
     // TRAVA MESTRA: sem config ou inativa -> Luna nao age (aviso fixo segue).
     if (!cfg || !cfg.ativo) return false;
 
+    // Ja transferida para humano nesta conversa -> a Luna nao reassume. Suprime
+    // tambem o aviso fixo (um atendente ja esta cuidando).
+    const conv = await prisma.conversa.findUnique({
+      where: { id: conversa.id },
+      select: { handoffFeitoEm: true },
+    });
+    if (conv?.handoffFeitoEm) return true;
+
     // Gatilho de horario: opera24h responde sempre; senao SO fora do expediente.
     if (!cfg.opera24h) {
       const crm = await prisma.configuracaoCRM.findFirst({
@@ -963,6 +972,13 @@ async function executarRespostaLuna(
   const cfg = await prisma.configAgenteIA.findFirst();
   if (!cfg || !cfg.ativo) return;
 
+  // Handoff feito no intervalo (humano assumiu)? Nao responde.
+  const conv = await prisma.conversa.findUnique({
+    where: { id: conversa.id },
+    select: { handoffFeitoEm: true },
+  });
+  if (conv?.handoffFeitoEm) return;
+
   // Ultimas 15 mensagens (ordem cronologica) -> historico da Luna.
   const ultimas = await prisma.mensagem.findMany({
     where: { conversaId: conversa.id },
@@ -1008,11 +1024,81 @@ async function executarRespostaLuna(
   }
 
   // responder | handoff: envia cada mensagem do array, na ordem, com intervalo.
-  // (No handoff, as mensagens ja avisam que vao transferir; o lembrete pro
-  //  atendente e o "cessar respostas" entram na Parte 3.)
+  // No handoff as mensagens ja avisam que vao transferir.
   if (resultado.mensagens.length > 0) {
     await enviarMensagensLuna(conversa, telefone, lead, resultado.mensagens, io);
   }
+
+  // Handoff (cliente pediu humano): cria lembrete pro atendente do setor e marca
+  // a conversa para a Luna PARAR de responder este lead. So no handoff.
+  if (resultado.acao === "handoff") {
+    await tratarHandoffLuna(conversa, lead, finalidade).catch((e) =>
+      console.warn(
+        `[luna] falha no handoff ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    );
+  }
+}
+
+// Handoff: descobre o atendente do setor (dono do lead; senao 1o da equipe),
+// cria um Lembrete PENDENTE e marca a conversa (handoffFeitoEm) para a Luna
+// cessar. So chamado no acao='handoff'.
+async function tratarHandoffLuna(
+  conversa: ConvLuna,
+  lead: LeadLuna,
+  finalidade: Finalidade,
+): Promise<void> {
+  const leadDb = await prisma.lead.findUnique({
+    where: { id: lead.id },
+    select: { donoId: true, donoPosVendaId: true },
+  });
+  // Atendente do setor: VENDA -> dono; POS_VENDA -> dono pos-venda.
+  let agenteId = leadDb ? leadDb[campoDono(finalidade)] : null;
+  // Fallback: 1o da equipe da finalidade (o round-robin normalmente ja definiu
+  // o dono antes; isto cobre o caso de o dono estar vazio).
+  if (!agenteId) {
+    const primeiro = await prisma.agente.findFirst({
+      where: filtroEquipe(finalidade),
+      orderBy: { criadoEm: "asc" },
+      select: { id: true },
+    });
+    agenteId = primeiro?.id ?? null;
+  }
+
+  // Marca a conversa para a Luna parar (mesmo que nao haja atendente disponivel).
+  await prisma.conversa.update({
+    where: { id: conversa.id },
+    data: { handoffFeitoEm: new Date() },
+  });
+
+  if (!agenteId) {
+    console.warn(
+      `[luna] handoff sem atendente disponivel (lead ${lead.id}, ${finalidade})`,
+    );
+    return;
+  }
+
+  await prisma.lembrete.create({
+    data: {
+      leadId: lead.id,
+      agenteId,
+      finalidade,
+      dataHora: new Date(),
+      nota: "Cliente pediu atendimento humano via Luna — retornar.",
+      status: StatusLembrete.PENDENTE,
+    },
+  });
+
+  await criarNotificacao({
+    agenteId,
+    tipo: "LEMBRETE",
+    titulo: "Cliente pediu atendimento humano",
+    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Luna).`,
+    link: "/inbox",
+    leadId: lead.id,
+  });
+
+  getIO()?.emit("conversa:atualizada", { leadId: lead.id, finalidade });
 }
 
 // Envia as mensagens da Luna, na ordem, gravando cada uma como OUT viaIA=true.

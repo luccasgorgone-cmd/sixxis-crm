@@ -344,6 +344,9 @@ model Conversa {
   // Ultima vez que enviamos a mensagem automatica de "fora do horario" nesta
   // conversa (evita repetir a cada mensagem; reenvia apos ~8h).
   foraHorarioAvisadoEm DateTime?
+  // Quando a Luna transferiu esta conversa para um humano (handoff). Depois
+  // disso a Luna NAO responde mais este lead (um atendente assume).
+  handoffFeitoEm   DateTime?
   mensagens        Mensagem[]
   criadoEm         DateTime          @default(now())
 
