@@ -69,6 +69,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       modelo: config.modelo,
       promptSistema: config.promptSistema,
       maxMensagensAntesHandoff: config.maxMensagensAntesHandoff,
+      cupomPrimeiraCompra: config.cupomPrimeiraCompra,
+      cupomDescricao: config.cupomDescricao,
+      cupomAtivo: config.cupomAtivo,
     },
     catalogo: config.baseConhecimento ?? "",
   });

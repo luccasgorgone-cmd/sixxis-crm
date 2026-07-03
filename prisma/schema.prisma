@@ -814,6 +814,11 @@ model ConfigAgenteIA {
   mensagemHandoff          String? @db.Text
   handoffSeClientePedir    Boolean @default(true)
   handoffSeLeadQuente      Boolean @default(false)
+  // Cupom de primeira compra que a Luna pode oferecer em momentos estrategicos
+  // (intencao de compra, objecao de preco, fechamento). Editavel/desativavel.
+  cupomPrimeiraCompra String?  @default("SIXXIS05")
+  cupomDescricao      String?  @default("5% na primeira compra")
+  cupomAtivo          Boolean  @default(true)
   atualizadoEm        DateTime @updatedAt
 }
 

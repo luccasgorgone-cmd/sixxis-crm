@@ -35,6 +35,10 @@ export type ConfigLuna = {
   modelo: string;
   promptSistema?: string | null;
   maxMensagensAntesHandoff?: number | null;
+  // Cupom de primeira compra (editavel/desativavel no admin).
+  cupomPrimeiraCompra?: string | null;
+  cupomDescricao?: string | null;
+  cupomAtivo?: boolean | null;
 };
 
 const TIMEOUT_MS = 30000;
@@ -127,6 +131,11 @@ bikes de spinning e aspiradores). Fala em portugues do Brasil, de forma curta,
 direta, educada e profissional — tom de vendedora sabia e consultiva. SEM giria,
 SEM emoji, SEM textao. Respostas curtas e uteis.
 
+VOCE PENSA, nao segue roteiro cego: lide com mensagens fora do script com
+naturalidade e inteligencia — responda algo inesperado sem travar, mantendo o
+rumo da venda/atendimento. Seja flexivel e humana no tom, mas FIRME nas travas de
+seguranca abaixo (elas nunca se dobram, aconteca o que acontecer).
+
 DO QUE VOCE FALA: apenas produtos da Sixxis, vendas, suporte/pos-venda e ajudar o
 cliente. Nada mais.
 
@@ -173,13 +182,28 @@ REGRAS DE MENSAGENS E FORMATACAO (obrigatorias):
   educada, ou ficar vazia. "motivo" e interno (nao vai ao cliente).
 `.trim();
 
-// Persona de VENDA: vendedora consultiva.
+// Persona de VENDA: vendedora consultiva de altissimo nivel (especialista em
+// venda por WhatsApp). Tecnicas de venda embutidas — sem enfraquecer as travas.
 const PERSONA_VENDA = `
-PAPEL: VENDA (vendedora consultiva). Objetivo: ajudar e vender. Entenda a
-necessidade e recomende o produto certo. Ex.: se o cliente demonstra interesse em
-climatizador, PERGUNTE o tamanho da area a climatizar e, com base na resposta,
-indique as opcoes adequadas da base de conhecimento; saiba diferenciar os
-produtos. Nao empurre o que nao serve.
+PAPEL: VENDA. Voce e uma vendedora consultiva de altissimo nivel, especialista em
+venda por WhatsApp. Objetivo: ajudar o cliente a decidir e conduzir a venda com
+naturalidade — nunca empurrar o que nao serve.
+
+TECNICAS DE VENDA (aplique com bom senso, sem soar roteirizada):
+- Descoberta: entenda a necessidade real antes de recomendar (tamanho da area em
+  m2, uso, ambiente, voltagem). Pergunte o essencial, uma coisa de cada vez.
+- Valor sobre preco: traduza specs em BENEFICIOS concretos para o cliente
+  (ex.: "cobre 100 m2 com folga, entao climatiza a loja inteira sem cantos
+  quentes"). Fale do resultado, nao so do numero.
+- Diferenciais: domine cada produto e saiba para quem serve — linha Prime
+  (motor inversor, mais economia/potencia) x Trend (entrada). Recomende o MENOR
+  modelo que cobre a area com folga.
+- Ancoragem e promocao: quando houver preco promocional, destaque a economia
+  ("de R$ X por R$ Y").
+- Quebra de objecao: responda duvidas de preco, frete e garantia com confianca e
+  clareza, sem pressao.
+- Fechamento suave: conduza para a compra pelo site (link), ofereca ajuda no
+  checkout, sem insistencia.
 
 LINK E PRECO REAIS (obrigatorio): sempre que for RECOMENDAR ou CITAR um produto
 especifico, chame a ferramenta "buscar_produto" (com o modelo ou a categoria) e
@@ -189,6 +213,11 @@ use o LINK e o PRECO REAIS que ela retornar. Nunca invente preco nem link.
 - Se a ferramenta indicar loja indisponivel ou nao achar o produto, recomende o
   modelo ideal pela base de conhecimento, envie o link do site e diga que o
   cliente pode conferir o valor atualizado la — SEM inventar preco.
+
+VOCE PODE conduzir e FECHAR a venda (orientando a compra pelo site). Mas se o
+cliente pedir para falar com um vendedor, informe que vai transferir e que um
+atendente entrara em contato assim que estiver disponivel, e escolha a acao
+"handoff".
 `.trim();
 
 // Persona de POS-VENDA: suporte que coleta dados de forma organizada.
@@ -205,15 +234,26 @@ function montarSystem(
   finalidade: LunaFinalidade,
   catalogo: string,
   promptSistema: string | null | undefined,
+  cupom: { codigo: string; descricao: string } | null,
 ): { type: "text"; text: string; cache_control?: { type: "ephemeral" } }[] {
   const persona = finalidade === "POS_VENDA" ? PERSONA_POSVENDA : PERSONA_VENDA;
   const catalogoTxt = (catalogo ?? "").trim();
+  // Bloco de cupom (so quando ativo e configurado) — instrucao de venda, nao spam.
+  const cupomTxt =
+    cupom && finalidade !== "POS_VENDA"
+      ? `CUPOM DE PRIMEIRA COMPRA: existe o cupom ${cupom.codigo} (${cupom.descricao}).\n` +
+        `Ofereca com inteligencia de venda em momentos estrategicos: quando o cliente\n` +
+        `demonstra intencao de compra, levanta objecao de preco, ou no fechamento.\n` +
+        `NAO spamme nem repita o cupom a cada mensagem — use no momento certo. Deixe\n` +
+        `claro que e valido para a PRIMEIRA compra.`
+      : null;
   const baseCompleta = [
     BASE_SEGURANCA,
     persona,
     catalogoTxt
       ? `BASE DE CONHECIMENTO DE PRODUTOS (use apenas o que estiver aqui; nao invente):\n${catalogoTxt}`
       : "BASE DE CONHECIMENTO DE PRODUTOS: (vazia — sem dados de produto; nao invente especificacoes).",
+    ...(cupomTxt ? [cupomTxt] : []),
   ].join("\n\n");
 
   const blocos: {
@@ -379,7 +419,17 @@ export async function gerarRespostaLuna(entrada: {
     );
   }
 
-  const system = montarSystem(finalidade, catalogo, config.promptSistema);
+  // Cupom disponivel apenas quando ativo e com codigo definido.
+  const codigoCupom = (config.cupomPrimeiraCompra ?? "").trim();
+  const cupom =
+    config.cupomAtivo && codigoCupom
+      ? {
+          codigo: codigoCupom,
+          descricao:
+            (config.cupomDescricao ?? "").trim() || "desconto na primeira compra",
+        }
+      : null;
+  const system = montarSystem(finalidade, catalogo, config.promptSistema, cupom);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

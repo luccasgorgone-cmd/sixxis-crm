@@ -71,6 +71,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
       "usarHorarioComercial",
       "handoffSeClientePedir",
       "handoffSeLeadQuente",
+      "cupomAtivo",
     ];
     for (const k of booleanos) {
       if (body[k] !== undefined) {
@@ -84,6 +85,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
       "handoffPalavras",
       "saudacaoAutomatica",
       "mensagemHandoff",
+      "cupomPrimeiraCompra",
+      "cupomDescricao",
     ];
     for (const k of textos) {
       if (body[k] !== undefined) {

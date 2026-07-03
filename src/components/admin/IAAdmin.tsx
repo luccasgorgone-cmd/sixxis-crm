@@ -30,6 +30,9 @@ type Config = {
   mensagemHandoff: string | null;
   handoffSeClientePedir: boolean;
   handoffSeLeadQuente: boolean;
+  cupomPrimeiraCompra: string | null;
+  cupomDescricao: string | null;
+  cupomAtivo: boolean;
 };
 
 const MODELOS: { id: string; rotulo: string }[] = [
@@ -284,6 +287,41 @@ export function IAAdmin() {
               className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs outline-none focus:border-tiffany"
             />
           </Cartao>
+        </Secao>
+
+        {/* Cupom / promocao */}
+        <Secao
+          titulo="Cupom de primeira compra"
+          descricao="A Luna oferece este cupom em momentos estrategicos (intencao de compra, objecao de preco, fechamento) — com inteligencia de venda, sem spam."
+        >
+          <Toggle
+            titulo="Oferecer cupom de primeira compra"
+            descricao="Habilita a Luna a mencionar o cupom quando fizer sentido."
+            valor={c.cupomAtivo}
+            onChange={(v) => set({ cupomAtivo: v })}
+          />
+          {c.cupomAtivo && (
+            <>
+              <Cartao>
+                <Rotulo>Codigo do cupom</Rotulo>
+                <input
+                  value={c.cupomPrimeiraCompra ?? ""}
+                  onChange={(e) => set({ cupomPrimeiraCompra: e.target.value })}
+                  placeholder="Ex.: SIXXIS05"
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+                />
+              </Cartao>
+              <Cartao>
+                <Rotulo>Descricao do beneficio</Rotulo>
+                <input
+                  value={c.cupomDescricao ?? ""}
+                  onChange={(e) => set({ cupomDescricao: e.target.value })}
+                  placeholder="Ex.: 5% na primeira compra"
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+                />
+              </Cartao>
+            </>
+          )}
         </Secao>
 
         {/* Persona */}
