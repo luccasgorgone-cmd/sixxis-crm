@@ -31,6 +31,7 @@ export type LeadMapa = {
   origem: string | null;
   anuncioTitulo: string | null;
   garantia: boolean | null;
+  segmento: "VAREJO" | "ATACADO" | null;
   criadoEm: Date;
   enderecos: { uf: string | null; cidade: string | null }[];
   conversas: { id: string; ultimaMensagemEm: Date | null }[];
@@ -48,6 +49,7 @@ export const selectLeadMapa = {
   origem: true,
   anuncioTitulo: true,
   garantia: true,
+  segmento: true,
   criadoEm: true,
   enderecos: {
     select: { uf: true, cidade: true },
@@ -153,6 +155,8 @@ export type ResumoUF = {
   populacao: number | null;
   clientesPor100k: number | null;
   produtosTop: { rotulo: CategoriaProduto; qtd: number }[];
+  // Segmento comercial dos clientes da UF (Varejo/Atacado + nao definido).
+  porSegmento: { varejo: number; atacado: number; naoDefinido: number };
   // Leads criados nas ultimas janelas (dimensao de tempo). Derivado de criadoEm,
   // sem migracao: agregacao em memoria sobre o que ja vem no select.
   novosPorMes: { ultimos30: number; ultimos90: number };
@@ -173,10 +177,16 @@ export function montarResumo(
   const catCount = new Map<CategoriaProduto, number>();
   let ultimo: Date | null = null;
   const novosPorMes = { ultimos30: 0, ultimos90: 0 };
+  const porSegmento = { varejo: 0, atacado: 0, naoDefinido: 0 };
   const agora = Date.now();
   const dia = 24 * 60 * 60 * 1000;
 
   for (const lead of leads) {
+    // Segmento comercial do cliente.
+    if (lead.segmento === "VAREJO") porSegmento.varejo++;
+    else if (lead.segmento === "ATACADO") porSegmento.atacado++;
+    else porSegmento.naoDefinido++;
+
     // Temperatura do lead = a do negocio principal (se houver).
     const principal = negocioPrincipal(lead);
     if (principal) {
@@ -232,6 +242,7 @@ export function montarResumo(
     populacao: populacao ?? null,
     clientesPor100k,
     produtosTop,
+    porSegmento,
     novosPorMes,
     ultimoContato: ultimo ? ultimo.toISOString() : null,
   };

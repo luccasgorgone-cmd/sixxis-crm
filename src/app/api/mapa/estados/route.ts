@@ -33,6 +33,7 @@ type Filtros = {
   categoria: string | null;
   temperatura: "QUENTE" | "MORNO" | "FRIO" | null;
   situacao: "abertos" | "ganhos" | "perdidos" | null;
+  segmento: "VAREJO" | "ATACADO" | null;
   periodo: Periodo | null;
 };
 
@@ -40,6 +41,7 @@ function lerFiltros(sp: URLSearchParams): Filtros {
   const cat = sp.get("categoria");
   const temp = sp.get("temperatura");
   const sit = sp.get("situacao");
+  const seg = sp.get("segmento");
   const per = Number(sp.get("periodo"));
   return {
     categoria: cat && CATEGORIAS_PRODUTO.includes(cat as never) ? cat : null,
@@ -47,12 +49,14 @@ function lerFiltros(sp: URLSearchParams): Filtros {
       temp === "QUENTE" || temp === "MORNO" || temp === "FRIO" ? temp : null,
     situacao:
       sit === "abertos" || sit === "ganhos" || sit === "perdidos" ? sit : null,
+    segmento: seg === "VAREJO" || seg === "ATACADO" ? seg : null,
     periodo: PERIODOS_VALIDOS.includes(per as Periodo) ? (per as Periodo) : null,
   };
 }
 
 function leadPassa(lead: LeadMapa, f: Filtros): boolean {
   if (f.categoria && classificarLead(lead) !== f.categoria) return false;
+  if (f.segmento && lead.segmento !== f.segmento) return false;
   if (f.temperatura) {
     const p = negocioPrincipal(lead);
     if (!p || p.temperatura !== f.temperatura) return false;
