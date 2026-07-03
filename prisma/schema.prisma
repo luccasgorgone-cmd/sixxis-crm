@@ -791,6 +791,9 @@ model ConfigAgenteIA {
   ativo               Boolean  @default(false)
   modelo              String   @default("claude-haiku-4-5")
   promptSistema       String?  @db.Text
+  // Base de conhecimento de produtos (texto livre editavel pelo dono). A Luna
+  // injeta isto no prompt para vender/atender com precisao. null = nao definido.
+  baseConhecimento    String?  @db.Text
   responderForaHorario Boolean @default(false)
   responderLeadNovo   Boolean  @default(false)
   handoffPalavras     String?

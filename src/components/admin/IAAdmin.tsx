@@ -14,6 +14,9 @@ type Config = {
   ativo: boolean;
   modelo: string;
   promptSistema: string | null;
+  baseConhecimento: string | null;
+  // Somente leitura (vem do GET): template para popular a base de conhecimento.
+  templateBaseConhecimento?: string;
   responderForaHorario: boolean;
   responderLeadNovo: boolean;
   handoffPalavras: string | null;
@@ -247,10 +250,45 @@ export function IAAdmin() {
           </Cartao>
         </Secao>
 
+        {/* Base de conhecimento de produtos */}
+        <Secao
+          titulo="Base de conhecimento de produtos"
+          descricao="O que a Luna sabe sobre os produtos para vender e atender bem."
+        >
+          <Cartao>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <Rotulo>Descricoes, diferencas e recomendacao por area</Rotulo>
+              {!(c.baseConhecimento ?? "").trim() && c.templateBaseConhecimento && (
+                <button
+                  onClick={() =>
+                    set({ baseConhecimento: c.templateBaseConhecimento ?? "" })
+                  }
+                  className="rounded-md border border-black/10 px-2 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+                >
+                  Usar template inicial
+                </button>
+              )}
+            </div>
+            <p className="mb-2 flex items-start gap-1 text-xs text-medio/60">
+              <Info className="mt-0.5 h-3 w-3 shrink-0 text-tiffany" />
+              Preencha com os DADOS REAIS de cada produto (area recomendada,
+              diferenciais). Enquanto os campos estiverem em branco, a Luna nao vai
+              afirmar especificacoes — ela e instruida a nao inventar.
+            </p>
+            <textarea
+              value={c.baseConhecimento ?? ""}
+              onChange={(e) => set({ baseConhecimento: e.target.value })}
+              rows={12}
+              placeholder="Clique em 'Usar template inicial' e preencha os campos com ___"
+              className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs outline-none focus:border-tiffany"
+            />
+          </Cartao>
+        </Secao>
+
         {/* Persona */}
         <Secao titulo="Persona">
           <Cartao>
-            <Rotulo>Prompt do sistema</Rotulo>
+            <Rotulo>Prompt do sistema (personalidade extra)</Rotulo>
             <textarea
               value={c.promptSistema ?? ""}
               onChange={(e) => set({ promptSistema: e.target.value })}

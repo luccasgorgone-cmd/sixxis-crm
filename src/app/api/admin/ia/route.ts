@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
 import { normalizarHorarios } from "@/lib/horario";
 import { HORARIOS_PADRAO } from "@/lib/seed";
+import { TEMPLATE_BASE_CONHECIMENTO } from "@/lib/lunaCatalogo";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -24,6 +25,9 @@ function paraUI(c: Awaited<ReturnType<typeof pegar>>) {
   return {
     ...c,
     horarios: normalizarHorarios(c.horarios) ?? HORARIOS_PADRAO,
+    // Template inicial para o admin popular a base de conhecimento (nao grava
+    // sozinho: o dono clica para inserir e depois preenche com dados reais).
+    templateBaseConhecimento: TEMPLATE_BASE_CONHECIMENTO,
   };
 }
 
@@ -76,6 +80,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
     const textos: (keyof Prisma.ConfigAgenteIAUpdateManyMutationInput)[] = [
       "promptSistema",
+      "baseConhecimento",
       "handoffPalavras",
       "saudacaoAutomatica",
       "mensagemHandoff",
