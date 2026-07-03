@@ -156,7 +156,7 @@ export function Parceiros({ papel }: { papel: string }) {
   );
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="scroll-fino h-full space-y-4 overflow-y-auto p-6">
       {/* Cabecalho */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -250,17 +250,22 @@ export function Parceiros({ papel }: { papel: string }) {
               <p className="mb-3 text-sm font-semibold text-escuro">
                 Parceiros por estado
               </p>
-              {carregando && parceiros.length === 0 ? (
-                <div className="skeleton h-[360px] w-full rounded-xl" />
-              ) : (
-                <MapaBrasil
-                  cor={corPorUF}
-                  tooltip={tooltip}
-                  ufAtivo={ufAtivo}
-                  onHoverUF={setUfAtivo}
-                  onClickUF={(uf) => setUfAtivo(uf)}
-                />
-              )}
+              {/* Mapa contido: largura maxima + centralizado. O SVG e h-auto,
+                  entao limitar a largura garante que a altura caiba na tela e o
+                  Brasil apareca inteiro (sem estourar a viewport). */}
+              <div className="mx-auto w-full max-w-[440px]">
+                {carregando && parceiros.length === 0 ? (
+                  <div className="skeleton aspect-[460/480] w-full rounded-xl" />
+                ) : (
+                  <MapaBrasil
+                    cor={corPorUF}
+                    tooltip={tooltip}
+                    ufAtivo={ufAtivo}
+                    onHoverUF={setUfAtivo}
+                    onClickUF={(uf) => setUfAtivo(uf)}
+                  />
+                )}
+              </div>
               <LegendaGradiente
                 rotulo="Parceiros por estado"
                 gradiente={gradienteCss(ESCALA_DENSIDADE)}
