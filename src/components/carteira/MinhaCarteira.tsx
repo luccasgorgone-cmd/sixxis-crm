@@ -680,7 +680,7 @@ function Kpi({
         <Icone className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="text-xl font-semibold leading-none text-escuro">{valor}</p>
+        <p className="truncate text-xl font-semibold leading-none text-escuro" title={valor}>{valor}</p>
         <p className="mt-1 truncate text-xs text-medio/60">{rotulo}</p>
         {detalhe && <p className="truncate text-[11px] text-medio/50">{detalhe}</p>}
       </div>

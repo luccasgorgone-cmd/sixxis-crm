@@ -327,13 +327,13 @@ export function BadgeSegmento({
   const varejo = segmento === "VAREJO";
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
         varejo
           ? "bg-tiffany/10 text-tiffany"
           : "bg-escuro/10 text-escuro dark:bg-white/10"
       } ${className}`}
     >
-      <Store className="h-2.5 w-2.5" />
+      <Store className="h-2.5 w-2.5 shrink-0" />
       {varejo ? "Varejo" : "Atacado"}
     </span>
   );

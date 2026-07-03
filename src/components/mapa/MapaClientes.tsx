@@ -445,9 +445,9 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 function Kpi({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="rounded-xl border border-black/5 bg-white px-3 py-2">
-      <p className="text-[11px] text-medio/60">{rotulo}</p>
-      <p className="mt-0.5 text-base font-semibold text-escuro">{valor}</p>
+    <div className="min-w-0 rounded-xl border border-black/5 bg-white px-3 py-2">
+      <p className="truncate text-[11px] text-medio/60" title={rotulo}>{rotulo}</p>
+      <p className="mt-0.5 truncate text-base font-semibold text-escuro" title={valor}>{valor}</p>
     </div>
   );
 }

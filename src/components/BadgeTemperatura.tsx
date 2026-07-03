@@ -22,9 +22,9 @@ export function BadgeTemperatura({
   }
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium ${info.cor} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium ${info.cor} ${className}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${info.ponto}`} />
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${info.ponto}`} />
       {info.rotulo}
     </span>
   );

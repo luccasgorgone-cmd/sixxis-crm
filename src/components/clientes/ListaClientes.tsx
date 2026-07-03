@@ -815,15 +815,15 @@ export function ListaClientes({
 function SeloGarantia({ garantia }: { garantia: boolean | null }) {
   if (garantia === true) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">
-        <ShieldCheck className="h-3 w-3" /> Garantia
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">
+        <ShieldCheck className="h-3 w-3 shrink-0" /> Garantia
       </span>
     );
   }
   if (garantia === false) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-        <ShieldOff className="h-3 w-3" /> Sem garantia
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+        <ShieldOff className="h-3 w-3 shrink-0" /> Sem garantia
       </span>
     );
   }

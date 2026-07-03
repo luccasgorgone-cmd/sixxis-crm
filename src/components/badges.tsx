@@ -40,9 +40,9 @@ function Pill({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${classe} ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${classe} ${className}`}
     >
-      {Icone && <Icone className="h-3 w-3" />}
+      {Icone && <Icone className="h-3 w-3 shrink-0" />}
       {children}
     </span>
   );
@@ -83,9 +83,9 @@ export function BadgePendente({
   return (
     <span
       title={motivo ? `Pendente: ${motivo}` : "Pendente"}
-      className={`inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-700 ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-700 ${className}`}
     >
-      <PauseCircle className="h-3 w-3" />
+      <PauseCircle className="h-3 w-3 shrink-0" />
       Pendente
     </span>
   );

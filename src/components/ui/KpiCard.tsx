@@ -46,7 +46,7 @@ export function KpiCard({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-2xl font-semibold leading-none text-escuro">{valor}</p>
+        <p className="truncate text-2xl font-semibold leading-none text-escuro" title={valor}>{valor}</p>
         <p className="mt-1 truncate text-xs text-medio/60">{rotulo}</p>
         <div className="flex items-center gap-1.5">
           {detalhe && <p className="truncate text-[11px] text-medio/50">{detalhe}</p>}

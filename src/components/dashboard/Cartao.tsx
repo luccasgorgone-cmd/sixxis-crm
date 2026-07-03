@@ -16,20 +16,20 @@ export function Cartao({
 }) {
   return (
     <div
-      className={`rounded-xl border p-4 ${
+      className={`min-w-0 rounded-xl border p-4 ${
         destaque
           ? "border-tiffany/30 bg-tiffany/5"
           : "border-black/5 bg-white"
       }`}
     >
-      <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-medio/50">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-medio/50" title={rotulo}>
           {rotulo}
         </p>
-        {Icone && <Icone className="h-4 w-4 text-tiffany" />}
+        {Icone && <Icone className="h-4 w-4 shrink-0 text-tiffany" />}
       </div>
-      <p className="text-2xl font-semibold text-escuro">{valor}</p>
-      {detalhe && <p className="mt-0.5 text-xs text-medio/60">{detalhe}</p>}
+      <p className="truncate text-2xl font-semibold text-escuro" title={String(valor)}>{valor}</p>
+      {detalhe && <p className="mt-0.5 truncate text-xs text-medio/60" title={detalhe}>{detalhe}</p>}
     </div>
   );
 }

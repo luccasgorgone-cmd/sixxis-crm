@@ -415,9 +415,9 @@ function RecorteFinalidade({ titulo, m }: { titulo: string; m: Metricas }) {
 
 function Mini({ rotulo, valor }: { rotulo: string; valor: string | number }) {
   return (
-    <div>
-      <p className="text-xs text-medio/50">{rotulo}</p>
-      <p className="text-lg font-semibold text-escuro">{valor}</p>
+    <div className="min-w-0">
+      <p className="truncate text-xs text-medio/50" title={rotulo}>{rotulo}</p>
+      <p className="truncate text-lg font-semibold text-escuro" title={String(valor)}>{valor}</p>
     </div>
   );
 }
