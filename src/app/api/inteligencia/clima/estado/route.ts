@@ -16,15 +16,19 @@ import { CAPITAIS } from "@/lib/capitais";
 import {
   TTL_HORARIA_MS,
   TTL_HISTORICO_MS,
+  TTL_UV_MS,
   DIAS_HORARIA,
   DIAS_HISTORICO,
+  DIAS_UV,
   buscarHorariaComRetry,
   buscarHistoricoComRetry,
+  buscarUvComRetry,
   derivarAtual,
   derivarPrevisaoDiaria,
   calcularTendencia,
   type BlocoHoraria,
   type BlocoHistorico,
+  type BlocoUv,
   type DetalheClimaResp,
 } from "@/lib/clima-estado";
 
@@ -36,17 +40,20 @@ const TETO_CACHE_VAZIO_MS = 8_000;
 // Lock por (uf:bloco) evita reconstrucoes concorrentes do mesmo dado.
 const emReconstrucao = new Set<string>();
 
-type Bloco = "hor" | "hist";
+type Bloco = "hor" | "hist" | "uv";
 const SENTINELA: Record<Bloco, number> = {
   hor: DIAS_HORARIA,
   hist: DIAS_HISTORICO,
+  uv: DIAS_UV,
 };
 
 async function buscarBloco(
   uf: string,
   bloco: Bloco,
 ): Promise<{ erro: boolean } & object> {
-  return bloco === "hor" ? buscarHorariaComRetry(uf) : buscarHistoricoComRetry(uf);
+  if (bloco === "hor") return buscarHorariaComRetry(uf);
+  if (bloco === "uv") return buscarUvComRetry(uf);
+  return buscarHistoricoComRetry(uf);
 }
 
 async function upsertBloco(
@@ -106,27 +113,32 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const refresh = req.nextUrl.searchParams.get("refresh") === "1";
   const agora = Date.now();
 
-  // Ultimo bom de cada bloco (horaria/historico) desta UF no banco.
+  // Ultimo bom de cada bloco (horaria/historico/uv) desta UF no banco.
   const rows = await prisma.climaCacheUF.findMany({
-    where: { uf, dias: { in: [DIAS_HORARIA, DIAS_HISTORICO] } },
+    where: { uf, dias: { in: [DIAS_HORARIA, DIAS_HISTORICO, DIAS_UV] } },
   });
   const linhaHor = rows.find((r) => r.dias === DIAS_HORARIA) ?? null;
   const linhaHist = rows.find((r) => r.dias === DIAS_HISTORICO) ?? null;
+  const linhaUv = rows.find((r) => r.dias === DIAS_UV) ?? null;
 
   const stale = (linha: (typeof rows)[number] | null, ttl: number): boolean =>
     !linha || refresh || agora - linha.atualizadoEm.getTime() > ttl;
   const horStale = stale(linhaHor, TTL_HORARIA_MS);
   const histStale = stale(linhaHist, TTL_HISTORICO_MS);
+  const uvStale = stale(linhaUv, TTL_UV_MS);
 
   // Estado inicial: o cache (mesmo stale). Blocos SEM cache serao buscados agora.
   let horBloco = (linhaHor?.dados as unknown as BlocoHoraria) ?? null;
   let horAtualizadoEm = linhaHor?.atualizadoEm ?? null;
   let histBloco = (linhaHist?.dados as unknown as BlocoHistorico) ?? null;
   let histAtualizadoEm = linhaHist?.atualizadoEm ?? null;
+  const uvBloco = (linhaUv?.dados as unknown as BlocoUv) ?? null;
 
   // Blocos com cache mas stale -> atualizam em BACKGROUND (respondemos com cache).
   if (linhaHor && horStale) reconstruirBloco(uf, "hor");
   if (linhaHist && histStale) reconstruirBloco(uf, "hist");
+  // UV e OPCIONAL e NAO-BLOQUEANTE: sempre em background (nunca segura a resposta).
+  if (uvStale) reconstruirBloco(uf, "uv");
 
   // Blocos SEM cache -> busca com TETO (precisamos de algo p/ mostrar). O que nao
   // vier a tempo fica vazio e completa em background/proximo request.
@@ -161,7 +173,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // DERIVADOS da horaria (fonte unica): atual, curva 24h e previsao 7 dias.
   const atual = horBloco ? derivarAtual(horBloco) : null;
-  const previsao = horBloco ? derivarPrevisaoDiaria(horBloco) : [];
+  const previsaoBase = horBloco ? derivarPrevisaoDiaria(horBloco) : [];
+  // Enriquece com UV do bloco opcional (se veio); senao uv fica null ("—").
+  const previsao = previsaoBase.map((p) => ({
+    ...p,
+    uv: uvBloco?.uvPorDia?.[p.dia] ?? null,
+  }));
   const horario24h = horBloco ? horBloco.horarioHoje.slice(0, 24) : [];
   const historico = histBloco?.historico ?? [];
 

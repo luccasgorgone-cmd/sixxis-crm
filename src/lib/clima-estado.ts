@@ -80,6 +80,13 @@ export type BlocoPrevisao = {
   erro: boolean;
 };
 export type BlocoAtual = { uf: string; atual: ClimaAtual | null; erro: boolean };
+// UV maximo por dia (YYYY-MM-DD -> indice UV). Bloco OPCIONAL e nao-bloqueante:
+// se falhar, a previsao fica com uv null ("—" na UI).
+export type BlocoUv = {
+  uf: string;
+  uvPorDia: Record<string, number | null>;
+  erro: boolean;
+};
 
 // Resposta do endpoint de detalhe (sempre 200; partes podem degradar).
 export type DetalheClimaResp = {
@@ -405,6 +412,28 @@ export async function buscarHorariaComRetry(uf: string): Promise<BlocoHoraria> {
 export async function buscarHistoricoComRetry(uf: string): Promise<BlocoHistorico> {
   const r = await buscarHistorico(uf);
   return r.erro ? buscarHistorico(uf) : r;
+}
+
+// UV opcional: query daily MINIMA (so uv_index_max, 7 dias) — leve (1 variavel).
+// Nao-bloqueante: se abortar/falhar, a previsao segue com uv null. Nunca inventa.
+export async function buscarUv(uf: string, dias = HORARIA_DIAS): Promise<BlocoUv> {
+  const c = CAPITAIS[uf];
+  if (!c) return { uf, uvPorDia: {}, erro: true };
+  const url = montarUrlPrevisao(c.lat, c.lon, "uv_index_max", dias);
+  const j = (await fetchJson(url)) as { daily?: Record<string, unknown> } | null;
+  if (!j?.daily) return { uf, uvPorDia: {}, erro: true };
+  const diasArr = strArr(j.daily.time);
+  const uvArr = numArr(j.daily.uv_index_max);
+  if (!diasArr.length) return { uf, uvPorDia: {}, erro: true };
+  const uvPorDia: Record<string, number | null> = {};
+  diasArr.forEach((d, i) => {
+    uvPorDia[d] = uvArr[i] ?? null;
+  });
+  return { uf, uvPorDia, erro: false };
+}
+export async function buscarUvComRetry(uf: string): Promise<BlocoUv> {
+  const r = await buscarUv(uf);
+  return r.erro ? buscarUv(uf) : r;
 }
 
 // Tendencia: media das maximas dos ultimos 7 dias vs os 7 anteriores.
