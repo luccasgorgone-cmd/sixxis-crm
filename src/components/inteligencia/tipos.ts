@@ -63,10 +63,12 @@ export type ClientesEstadoResp = {
 // lib/clima-estado (server).
 export type PontoHora = {
   hora: string;
+  iso: string;
   temp: number | null;
   umidade: number | null;
   sensacao: number | null;
   vento: number | null;
+  chuva: number | null;
   chuvaProb: number | null;
   weathercode: number | null;
 };
