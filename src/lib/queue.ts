@@ -18,6 +18,7 @@ import { fetchFotoPerfil, enviarTexto } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia } from "./midia";
 import { nomeEfetivo } from "./cliente";
+import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import {
@@ -872,6 +873,220 @@ async function responderForaHorarioSePreciso(
   }
 }
 
+// ---------------------------------------------------------------------------
+// MOTOR DE ATENDIMENTO DA LUNA (Fatia 2.48-B). TODO gated por ConfigAgenteIA.ativo:
+// enquanto ativo=false a Luna NAO envia NADA — o worker segue com o aviso fixo de
+// fora do horario. So age quando ativo=true. Nunca trava a ingestao (best-effort).
+// ---------------------------------------------------------------------------
+
+type ConvLuna = { id: string; instancia: string; instanciaId: string | null };
+type LeadLuna = {
+  id: string;
+  nome: string | null;
+  pushName: string | null;
+  nomeManual: string | null;
+  telefone: string;
+  fotoUrl: string | null;
+};
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Debounce por conversa: junta mensagens quebradas do cliente e responde UMA vez.
+// Guarda o timer agendado por conversaId (best-effort, em memoria do worker).
+const lunaAgendada = new Map<string, ReturnType<typeof setTimeout>>();
+
+// Decide se a Luna assume esta mensagem IN. Retorna true quando a Luna assumiu
+// (agendou resposta) — nesse caso o worker NAO envia o aviso fixo de fora-horario.
+// Retorna false quando a Luna nao atua (inativa, dentro do horario, ou erro) —
+// e o comportamento atual (aviso fixo) segue normalmente.
+async function responderComLunaSePreciso(
+  conversa: ConvLuna,
+  telefone: string,
+  lead: LeadLuna,
+  finalidade: Finalidade,
+  io: Server | null,
+): Promise<boolean> {
+  try {
+    const cfg = await prisma.configAgenteIA.findFirst({
+      select: { ativo: true, opera24h: true },
+    });
+    // TRAVA MESTRA: sem config ou inativa -> Luna nao age (aviso fixo segue).
+    if (!cfg || !cfg.ativo) return false;
+
+    // Gatilho de horario: opera24h responde sempre; senao SO fora do expediente.
+    if (!cfg.opera24h) {
+      const crm = await prisma.configuracaoCRM.findFirst({
+        select: { horarios: true, fuso: true },
+      });
+      const aberto = estaAbertoAgora(
+        normalizarHorarios(crm?.horarios),
+        crm?.fuso ?? "America/Sao_Paulo",
+      );
+      if (aberto) return false; // dentro do horario: humano atende (aviso fixo no-op)
+    }
+
+    // Debounce: se ja ha resposta agendada, ela lera o historico atualizado.
+    if (lunaAgendada.has(conversa.id)) return true;
+    const seg = await prisma.configAgenteIA
+      .findFirst({ select: { segundosAntesDeResponder: true } })
+      .then((c) => c?.segundosAntesDeResponder ?? 7);
+    const espera = Math.max(0, Math.min(60, seg)) * 1000;
+    const timer = setTimeout(() => {
+      lunaAgendada.delete(conversa.id);
+      void executarRespostaLuna(conversa, telefone, lead, finalidade, io).catch(
+        (e) =>
+          console.warn(
+            `[luna] falha ao responder ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+      );
+    }, espera);
+    lunaAgendada.set(conversa.id, timer);
+    return true; // a Luna assumiu esta conversa
+  } catch (e) {
+    // Robustez: qualquer erro aqui NAO pode travar a ingestao. Cai no aviso fixo.
+    console.warn(
+      `[luna] erro ao decidir resposta ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return false;
+  }
+}
+
+// Executa a resposta da Luna: le o historico ATUALIZADO, chama o motor e age.
+async function executarRespostaLuna(
+  conversa: ConvLuna,
+  telefone: string,
+  lead: LeadLuna,
+  finalidade: Finalidade,
+  io: Server | null,
+): Promise<void> {
+  // Re-checa a trava mestra no disparo (a config pode ter mudado no intervalo).
+  const cfg = await prisma.configAgenteIA.findFirst();
+  if (!cfg || !cfg.ativo) return;
+
+  // Ultimas 15 mensagens (ordem cronologica) -> historico da Luna.
+  const ultimas = await prisma.mensagem.findMany({
+    where: { conversaId: conversa.id },
+    orderBy: { hora: "desc" },
+    take: 15,
+    select: { direcao: true, conteudo: true, transcricao: true },
+  });
+  const historico = ultimas
+    .reverse()
+    .map((m) => ({
+      autor: (m.direcao === DirecaoMsg.IN ? "cliente" : "luna") as
+        | "cliente"
+        | "luna",
+      texto: (m.transcricao ?? m.conteudo ?? "").trim(),
+    }))
+    .filter((m) => m.texto !== "");
+  // So responde se ha algo novo do cliente por ultimo (anti-flood/anti-duplicata).
+  if (historico.length === 0) return;
+  if (historico[historico.length - 1].autor !== "cliente") return;
+
+  const finLuna: LunaFinalidade =
+    finalidade === Finalidade.POS_VENDA ? "POS_VENDA" : "VENDA";
+  const resultado = await gerarRespostaLuna({
+    finalidade: finLuna,
+    historico,
+    config: {
+      modelo: cfg.modelo,
+      promptSistema: cfg.promptSistema,
+      maxMensagensAntesHandoff: cfg.maxMensagensAntesHandoff,
+      cupomPrimeiraCompra: cfg.cupomPrimeiraCompra,
+      cupomDescricao: cfg.cupomDescricao,
+      cupomAtivo: cfg.cupomAtivo,
+    },
+    catalogo: cfg.baseConhecimento ?? "",
+  });
+
+  // Silenciar (abuso/fora do escopo): nao responde e NAO cria lembrete. So loga.
+  if (resultado.acao === "silenciar") {
+    console.log(
+      `[luna] silenciou ${telefone} (${finLuna}): ${resultado.motivo ?? "sem motivo"}`,
+    );
+    return;
+  }
+
+  // responder | handoff: envia cada mensagem do array, na ordem, com intervalo.
+  // (No handoff, as mensagens ja avisam que vao transferir; o lembrete pro
+  //  atendente e o "cessar respostas" entram na Parte 3.)
+  if (resultado.mensagens.length > 0) {
+    await enviarMensagensLuna(conversa, telefone, lead, resultado.mensagens, io);
+  }
+}
+
+// Envia as mensagens da Luna, na ordem, gravando cada uma como OUT viaIA=true.
+async function enviarMensagensLuna(
+  conversa: ConvLuna,
+  telefone: string,
+  lead: LeadLuna,
+  mensagens: string[],
+  io: Server | null,
+): Promise<void> {
+  for (let i = 0; i < mensagens.length; i++) {
+    const texto = mensagens[i];
+    if (!texto?.trim()) continue;
+    if (i > 0) await esperar(1500); // intervalo natural entre bolhas
+
+    const r = await enviarTexto(telefone, texto, conversa.instancia);
+    const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
+    const agora = new Date();
+
+    let msg;
+    const dados = {
+      conversaId: conversa.id,
+      direcao: DirecaoMsg.OUT,
+      tipo: TipoMsg.TEXTO,
+      conteudo: texto,
+      instancia: conversa.instancia,
+      instanciaId: conversa.instanciaId,
+      statusEnvio: status,
+      lida: true,
+      viaIA: true,
+      hora: agora,
+    };
+    try {
+      msg = await prisma.mensagem.create({
+        data: { externalId: r.externalId ?? `out-luna-${randomUUID()}`, ...dados },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        msg = await prisma.mensagem.create({
+          data: { externalId: `out-luna-${randomUUID()}`, ...dados },
+        });
+      } else {
+        throw e;
+      }
+    }
+
+    await prisma.conversa.update({
+      where: { id: conversa.id },
+      data: { ultimaMensagemEm: agora },
+    });
+
+    (io ?? getIO())?.emit("mensagem:nova", {
+      leadId: lead.id,
+      leadNome: nomeEfetivo(lead),
+      leadFoto: lead.fotoUrl,
+      leadTelefone: telefone,
+      conversaId: conversa.id,
+      mensagemId: msg.id,
+      direcao: msg.direcao,
+      tipo: msg.tipo,
+      conteudo: msg.conteudo,
+      mediaUrl: msg.mediaUrl,
+      statusEnvio: msg.statusEnvio,
+      hora: msg.hora,
+      naoLidas: 0,
+      ultimaMensagemEm: agora,
+      viaIA: true,
+    });
+
+    // Falha de envio: nao insiste com as proximas mensagens.
+    if (!r.ok) break;
+  }
+}
+
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
 async function processarEvento(
   payload: EventoEvolution,
@@ -1143,15 +1358,26 @@ async function processarEvento(
     // horario — o lead e atribuido mesmo fora do expediente.)
     await rotearLeadNovo(lead.id, finalidade);
 
-    // Auto-resposta de FORA DO HORARIO: apenas em mensagens de ENTRADA, uma vez
-    // (nao repete a cada mensagem; reenvia apos ~8h). Nao bloqueia o roteamento.
+    // Atendimento automatico em mensagens de ENTRADA. Primeiro a LUNA (gated por
+    // ConfigAgenteIA.ativo): se ela assumir, NAO envia o aviso fixo. Se a Luna
+    // estiver inativa/dentro do horario/erro, cai no comportamento atual (aviso
+    // fixo de fora do horario). Nada disso bloqueia o roteamento.
     if (direcao === DirecaoMsg.IN) {
-      await responderForaHorarioSePreciso(
-        { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId, foraHorarioAvisadoEm: conversa.foraHorarioAvisadoEm },
+      const lunaAssumiu = await responderComLunaSePreciso(
+        { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId },
         telefone,
         lead,
+        finalidade,
         io,
       );
+      if (!lunaAssumiu) {
+        await responderForaHorarioSePreciso(
+          { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId, foraHorarioAvisadoEm: conversa.foraHorarioAvisadoEm },
+          telefone,
+          lead,
+          io,
+        );
+      }
     }
   } catch (erro) {
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
