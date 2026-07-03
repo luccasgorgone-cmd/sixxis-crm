@@ -97,7 +97,7 @@ export function Compositor({
   const [mostrarEmojis, setMostrarEmojis] = useState(false);
   const [mostrarFigurinhas, setMostrarFigurinhas] = useState(false);
   const [figurinhas, setFigurinhas] = useState<
-    { id: string; nome: string; url: string }[]
+    { id: string; nome: string; url: string; favorita?: boolean }[]
   >([]);
   const [figurinhasCarregadas, setFigurinhasCarregadas] = useState(false);
   const [enviandoFigurinha, setEnviandoFigurinha] = useState(false);
@@ -286,6 +286,30 @@ export function Compositor({
         .then((r) => (r.ok ? r.json() : { figurinhas: [] }))
         .then((d) => setFigurinhas(d.figurinhas ?? []))
         .catch(() => undefined);
+    }
+  }
+
+  // Favoritar/desfavoritar (global). Otimista + reordena (favoritas primeiro).
+  async function favoritarFigurinha(figurinhaId: string) {
+    setFigurinhas((prev) =>
+      [...prev.map((f) => (f.id === figurinhaId ? { ...f, favorita: !f.favorita } : f))].sort(
+        (a, b) => Number(b.favorita ?? false) - Number(a.favorita ?? false),
+      ),
+    );
+    try {
+      const r = await fetch(`/api/figurinhas/${figurinhaId}/favoritar`, {
+        method: "POST",
+      });
+      if (!r.ok) {
+        // reverte
+        setFigurinhas((prev) =>
+          [...prev.map((f) => (f.id === figurinhaId ? { ...f, favorita: !f.favorita } : f))].sort(
+            (a, b) => Number(b.favorita ?? false) - Number(a.favorita ?? false),
+          ),
+        );
+      }
+    } catch {
+      // silencioso
     }
   }
 
@@ -683,6 +707,7 @@ export function Compositor({
           carregando={!figurinhasCarregadas}
           enviando={enviandoFigurinha}
           onEscolher={(id) => void enviarFigurinhaMsg(id)}
+          onFavoritar={(id) => void favoritarFigurinha(id)}
           onFechar={() => setMostrarFigurinhas(false)}
         />
       )}

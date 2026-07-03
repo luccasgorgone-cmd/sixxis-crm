@@ -13,8 +13,9 @@ export async function GET(): Promise<NextResponse> {
   }
   const figurinhas = await prisma.figurinhaSixxis.findMany({
     where: { ativo: true },
-    orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
-    select: { id: true, nome: true, url: true },
+    // Favoritas primeiro (acesso rapido), depois pela ordem.
+    orderBy: [{ favorita: "desc" }, { ordem: "asc" }, { criadoEm: "asc" }],
+    select: { id: true, nome: true, url: true, favorita: true },
   });
   return NextResponse.json({ figurinhas });
 }

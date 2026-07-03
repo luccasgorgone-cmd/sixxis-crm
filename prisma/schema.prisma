@@ -955,6 +955,9 @@ model FigurinhaSixxis {
   url      String
   ordem    Int      @default(0)
   ativo    Boolean  @default(true)
+  // Favorito GLOBAL (figurinhas sao compartilhadas da empresa): aparecem no topo
+  // do seletor para acesso rapido. Fatia 2.69.
+  favorita Boolean  @default(false)
   criadoEm DateTime @default(now())
 
   @@index([ativo, ordem])
