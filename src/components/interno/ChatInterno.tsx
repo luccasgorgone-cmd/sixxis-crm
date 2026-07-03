@@ -15,6 +15,8 @@ import {
   FileText,
   Download,
   X,
+  Paperclip,
+  Mic,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -228,6 +230,14 @@ function ThreadGrupo({
   const [confirmarSair, setConfirmarSair] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // Envio de midia: preview de imagem, progresso do upload e gravacao de audio.
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null);
+  const [enviandoMidia, setEnviandoMidia] = useState(false);
+  const [progresso, setProgresso] = useState(0);
+  const [gravando, setGravando] = useState(false);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
+  const gravadorRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const fimRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
@@ -328,6 +338,108 @@ function ThreadGrupo({
     } finally {
       setSaindo(false);
     }
+  }
+
+  // Sobe um arquivo ao grupo (com barra de progresso via XHR).
+  const enviarArquivo = useCallback(
+    (file: File, legenda?: string): Promise<void> =>
+      new Promise((resolve) => {
+        setEnviandoMidia(true);
+        setProgresso(0);
+        const fd = new FormData();
+        fd.append("arquivo", file);
+        if (legenda) fd.append("legenda", legenda);
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `/api/interno/grupos/${grupo.id}/midia`);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            setProgresso(Math.round((ev.loaded / ev.total) * 100));
+          }
+        };
+        const finalizar = () => {
+          setEnviandoMidia(false);
+          setProgresso(0);
+          resolve();
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            void carregar();
+            onAcao();
+          } else {
+            let erro = "Nao foi possivel enviar a midia.";
+            try {
+              erro = JSON.parse(xhr.responseText)?.erro ?? erro;
+            } catch {
+              // mantem mensagem padrao
+            }
+            toast.erro(erro);
+          }
+          finalizar();
+        };
+        xhr.onerror = () => {
+          toast.erro("Falha de conexao.");
+          finalizar();
+        };
+        xhr.send(fd);
+      }),
+    [grupo.id, carregar, onAcao, toast],
+  );
+
+  function aoEscolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.type.startsWith("image/")) {
+      setPreview({ file, url: URL.createObjectURL(file) });
+    } else {
+      void enviarArquivo(file);
+    }
+  }
+
+  function confirmarPreview() {
+    if (!preview) return;
+    const { file, url } = preview;
+    setPreview(null);
+    URL.revokeObjectURL(url);
+    void enviarArquivo(file);
+  }
+
+  function cancelarPreview() {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  }
+
+  async function iniciarGravacao() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size) chunksRef.current.push(ev.data);
+      };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const mime = rec.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: mime });
+        const ext = mime.includes("ogg") ? "ogg" : "webm";
+        void enviarArquivo(new File([blob], `audio.${ext}`, { type: mime }));
+      };
+      gravadorRef.current = rec;
+      rec.start();
+      setGravando(true);
+    } catch {
+      toast.erro("Nao foi possivel acessar o microfone.");
+    }
+  }
+
+  function pararGravacao(enviar: boolean) {
+    const rec = gravadorRef.current;
+    gravadorRef.current = null;
+    setGravando(false);
+    if (!rec) return;
+    if (!enviar) rec.onstop = null;
+    rec.stop();
+    if (!enviar) rec.stream.getTracks().forEach((t) => t.stop());
   }
 
   const blocos = agruparPorDia(mensagens);
@@ -460,33 +572,121 @@ function ThreadGrupo({
         <div ref={fimRef} />
       </div>
 
+      {/* Preview de imagem antes de enviar */}
+      {preview && (
+        <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="modal-in flex w-full max-w-md flex-col rounded-xl bg-white p-4 shadow-xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview.url}
+              alt="Previa"
+              className="max-h-[60vh] w-full rounded-lg object-contain"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                onClick={cancelarPreview}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarPreview}
+                className="flex items-center gap-1.5 rounded-lg bg-tiffany px-4 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+              >
+                <Send className="h-4 w-4" /> Enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Compositor */}
-      <div className="flex items-end gap-2 border-t border-black/5 bg-white p-2.5">
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void enviar();
-            }
-          }}
-          rows={1}
-          placeholder="Mensagem para o grupo..."
-          className="scroll-fino max-h-28 flex-1 resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-        />
-        <button
-          onClick={() => void enviar()}
-          disabled={enviando || !texto.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-tiffany text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
-          aria-label="Enviar"
-        >
-          {enviando ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+      <div className="border-t border-black/5 bg-white">
+        {enviandoMidia && (
+          <div className="h-1 w-full bg-black/5">
+            <div
+              className="h-1 bg-tiffany transition-all"
+              style={{ width: `${progresso}%` }}
+            />
+          </div>
+        )}
+        <div className="flex items-end gap-2 p-2.5">
+          <input
+            ref={inputArquivoRef}
+            type="file"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv"
+            onChange={aoEscolherArquivo}
+            className="hidden"
+          />
+          {gravando ? (
+            <div className="flex flex-1 items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 dark:bg-red-500/10 dark:text-red-300">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+              Gravando audio...
+              <button
+                onClick={() => pararGravacao(false)}
+                title="Cancelar"
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-medio/70 hover:bg-black/5 hover:text-escuro"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => pararGravacao(true)}
+                title="Enviar audio"
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-tiffany text-white hover:bg-tiffany-escuro"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
-            <Send className="h-4 w-4" />
+            <>
+              <button
+                onClick={() => inputArquivoRef.current?.click()}
+                disabled={enviandoMidia}
+                title="Anexar imagem, video ou arquivo"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro disabled:opacity-50"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+              <textarea
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void enviar();
+                  }
+                }}
+                rows={1}
+                placeholder="Mensagem para o grupo..."
+                className="scroll-fino max-h-28 flex-1 resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              />
+              {texto.trim() ? (
+                <button
+                  onClick={() => void enviar()}
+                  disabled={enviando}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-tiffany text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
+                  aria-label="Enviar"
+                >
+                  {enviando ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => void iniciarGravacao()}
+                  disabled={enviandoMidia}
+                  title="Gravar audio"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-black/5 hover:text-escuro disabled:opacity-50"
+                  aria-label="Gravar audio"
+                >
+                  <Mic className="h-5 w-5" />
+                </button>
+              )}
+            </>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );
