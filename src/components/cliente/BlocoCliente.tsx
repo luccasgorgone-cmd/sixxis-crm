@@ -21,6 +21,7 @@ import {
   Briefcase,
   Megaphone,
   Store,
+  ExternalLink,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { useToast } from "@/components/ui/Toast";
@@ -51,9 +52,32 @@ export type ClientePainel = {
   anotacoes: string | null;
   aceitaContato?: boolean;
   origem: string | null;
+  origemDetalhe?: string | null;
+  anuncioId?: string | null;
   anuncioTitulo?: string | null;
   anuncioUrl?: string | null;
+  ctwaClid?: string | null;
 };
+
+// Rotulo da plataforma do anuncio, inferido da URL/detalhe (Meta/Google).
+function plataformaAnuncio(
+  url?: string | null,
+  detalhe?: string | null,
+): string | null {
+  const s = `${url ?? ""} ${detalhe ?? ""}`.toLowerCase();
+  if (/instagram|\big\b/.test(s)) return "Instagram";
+  if (/facebook|fb\.com|fb\.me|fbclid/.test(s)) return "Facebook";
+  if (/google|goo\.gl|gclid|youtube|youtu\.be/.test(s)) return "Google";
+  return null;
+}
+
+// Rotulo de uma origem generica (nao-anuncio), ou null se desconhecida/vazia.
+function rotuloOrigem(origem: string | null): string | null {
+  if (origem === "whatsapp") return "WhatsApp";
+  if (origem === "manual") return "Cadastro manual";
+  if (origem === "site") return "Site";
+  return origem?.trim() || null;
+}
 
 export function BlocoCliente({
   cliente,
@@ -204,40 +228,61 @@ export function BlocoCliente({
               </p>
             </div>
           )}
-          {/* Origem (incl. anuncio Click-to-WhatsApp). Visivel a vendedor e admin. */}
-          {(cliente.origem || cliente.anuncioTitulo) && (
-            <div className="mt-2 flex gap-2 rounded-lg bg-fundo px-3 py-2">
-              <Megaphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-medio/50" />
-              <div className="min-w-0 text-xs">
-                <p className="font-medium text-medio/80">
-                  Origem:{" "}
-                  {cliente.origem === "anuncio"
-                    ? "Anuncio"
-                    : cliente.origem === "whatsapp"
-                      ? "WhatsApp"
-                      : cliente.origem === "manual"
-                        ? "Cadastro manual"
-                        : (cliente.origem ?? "—")}
-                </p>
-                {cliente.anuncioTitulo &&
-                  (cliente.anuncioUrl ? (
+          {/* Origem. Anuncio (Click-to-WhatsApp) ganha destaque com titulo+link;
+              origem generica fica discreta. Visivel a vendedor e admin. */}
+          {(() => {
+            const ehAnuncio =
+              cliente.origem === "anuncio" ||
+              Boolean(
+                cliente.anuncioTitulo ||
+                  cliente.anuncioUrl ||
+                  cliente.anuncioId ||
+                  cliente.ctwaClid,
+              );
+            if (ehAnuncio) {
+              const plataforma = plataformaAnuncio(
+                cliente.anuncioUrl,
+                cliente.origemDetalhe,
+              );
+              return (
+                <div className="mt-2 rounded-lg border border-tiffany/25 bg-tiffany/[0.06] px-3 py-2.5">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-tiffany-escuro">
+                    <Megaphone className="h-3.5 w-3.5 shrink-0" />
+                    Veio de um anuncio{plataforma ? ` no ${plataforma}` : ""}
+                  </p>
+                  {cliente.anuncioTitulo && (
+                    <p
+                      className="mt-1 line-clamp-2 text-xs text-escuro"
+                      title={cliente.anuncioTitulo}
+                    >
+                      {cliente.anuncioTitulo}
+                    </p>
+                  )}
+                  {cliente.anuncioUrl && (
                     <a
                       href={cliente.anuncioUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="truncate text-tiffany hover:underline"
-                      title={cliente.anuncioTitulo}
+                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-tiffany hover:underline"
                     >
-                      {cliente.anuncioTitulo}
+                      <ExternalLink className="h-3 w-3" /> Ver anuncio
                     </a>
-                  ) : (
-                    <p className="truncate text-medio/60" title={cliente.anuncioTitulo}>
-                      {cliente.anuncioTitulo}
-                    </p>
-                  ))}
+                  )}
+                </div>
+              );
+            }
+            const rotulo = rotuloOrigem(cliente.origem);
+            if (!rotulo) return null;
+            return (
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-fundo px-3 py-2 text-xs text-medio/70">
+                <Megaphone className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+                <span>
+                  Origem:{" "}
+                  <span className="font-medium text-medio/80">{rotulo}</span>
+                </span>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {podeEditar && cliente.aceitaContato !== undefined && (
             <OptOut

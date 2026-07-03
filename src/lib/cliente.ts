@@ -61,8 +61,11 @@ export const selectClientePainel = {
   anotacoes: true,
   aceitaContato: true,
   origem: true,
+  origemDetalhe: true,
+  anuncioId: true,
   anuncioTitulo: true,
   anuncioUrl: true,
+  ctwaClid: true,
 } as const;
 
 // Linha do banco (subset de Lead) que o serializador do painel espera.
@@ -78,8 +81,11 @@ export type LeadPainelRow = LeadNomeavel & {
   anotacoes: string | null;
   aceitaContato: boolean;
   origem: string | null;
+  origemDetalhe: string | null;
+  anuncioId: string | null;
   anuncioTitulo: string | null;
   anuncioUrl: string | null;
+  ctwaClid: string | null;
 };
 
 // Serializa um Lead (selectClientePainel) no shape do ClientePainel do BlocoCliente.
@@ -102,7 +108,10 @@ export function serializarClientePainel(l: LeadPainelRow) {
     anotacoes: l.anotacoes,
     aceitaContato: l.aceitaContato,
     origem: l.origem,
+    origemDetalhe: l.origemDetalhe,
+    anuncioId: l.anuncioId,
     anuncioTitulo: l.anuncioTitulo,
     anuncioUrl: l.anuncioUrl,
+    ctwaClid: l.ctwaClid,
   };
 }
