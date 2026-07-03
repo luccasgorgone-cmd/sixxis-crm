@@ -1,16 +1,16 @@
 "use client";
 
-// Painel meteorologico COMPLETO de um estado (dentro do drawer da Inteligencia
+// Painel meteorologico PREMIUM de um estado (dentro do drawer da Inteligencia
 // Regional, modo Climatizador). Busca /api/inteligencia/clima/estado?uf=XX e
-// mostra: AGORA (atual + indice Sixxis), curva 24h (temp + sensacao + prob.
-// chuva), previsao estendida ate 16 dias (dia a dia), historico ~30d e tendencia.
-// Skeleton enquanto carrega; cada parte degrada isolada sem quebrar o painel.
+// mostra: AGORA (atual + indice Sixxis + tendencia), curva 24h (temp + sensacao +
+// prob. chuva), previsao de 7 DIAS interativa (cards clicaveis com detalhe) e o
+// historico ~30d. Tudo derivado da query horaria (fonte unica leve). Cada bloco
+// degrada isolado com aviso discreto; skeleton no carregamento. Sem emoji.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
   ComposedChart,
+  Line,
   Bar,
   XAxis,
   YAxis,
@@ -31,10 +31,14 @@ import {
   CalendarRange,
 } from "lucide-react";
 import { condicaoWeathercode } from "@/lib/weathercode";
-import type { ClimaUF, DetalheClimaResp, Tendencia } from "./tipos";
+import { Reveal } from "./Reveal";
+import type { ClimaUF, DetalheClimaResp, PontoPrevisao, Tendencia } from "./tipos";
 
 function fmtTemp(v: number | null | undefined): string {
   return v == null ? "—" : `${Math.round(v)}°C`;
+}
+function fmtGrau(v: number | null | undefined): string {
+  return v == null ? "—" : `${Math.round(v)}°`;
 }
 function fmtPct(v: number | null | undefined): string {
   return v == null ? "—" : `${Math.round(v)}%`;
@@ -55,9 +59,6 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 } as const;
 
-const HORIZONTES = [7, 14, 16] as const;
-type Horizonte = (typeof HORIZONTES)[number];
-
 export function ClimaEstadoDetalhe({
   uf,
   resumo,
@@ -68,7 +69,6 @@ export function ClimaEstadoDetalhe({
   const [dados, setDados] = useState<DetalheClimaResp | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
-  const [horizonte, setHorizonte] = useState<Horizonte>(7);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -88,11 +88,8 @@ export function ClimaEstadoDetalhe({
     void carregar();
   }, [carregar]);
 
-  const previsao = useMemo(
-    () => (dados?.previsao ?? []).slice(0, horizonte),
-    [dados, horizonte],
-  );
-  const uvHoje = dados?.previsao?.[0]?.uv ?? null;
+  const previsao = dados?.previsao ?? [];
+  const uvHoje = previsao[0]?.uv ?? null;
 
   return (
     <section className="border-b border-black/5 bg-fundo/40 px-4 py-3">
@@ -112,8 +109,8 @@ export function ClimaEstadoDetalhe({
       {carregando && !dados ? (
         <div className="mt-3 space-y-3">
           <div className="skeleton h-[120px] w-full rounded-lg" />
+          <div className="skeleton h-[110px] w-full rounded-lg" />
           <div className="skeleton h-[150px] w-full rounded-lg" />
-          <div className="skeleton h-[130px] w-full rounded-lg" />
         </div>
       ) : erro && !dados ? (
         <Aviso texto="Nao foi possivel carregar a meteorologia." onRetry={carregar} />
@@ -128,6 +125,12 @@ export function ClimaEstadoDetalhe({
                     data={dados.horarioHoje}
                     margin={{ top: 5, right: 8, left: -18, bottom: 0 }}
                   >
+                    <defs>
+                      <linearGradient id="gradTempHora" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3cbfb3" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#3cbfb3" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8e7" vertical={false} />
                     <XAxis
                       dataKey="hora"
@@ -169,7 +172,7 @@ export function ClimaEstadoDetalhe({
                       type="monotone"
                       dataKey="temp"
                       stroke="#3cbfb3"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
                       isAnimationActive={false}
                     />
@@ -196,29 +199,10 @@ export function ClimaEstadoDetalhe({
             )}
           </Grafico>
 
-          {/* Previsao estendida (dia a dia) */}
-          <Grafico
-            titulo="Previsao estendida"
-            acao={
-              <div className="flex overflow-hidden rounded-md border border-black/10">
-                {HORIZONTES.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => setHorizonte(h)}
-                    className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                      horizonte === h
-                        ? "bg-tiffany text-white"
-                        : "bg-white text-medio hover:bg-black/5"
-                    }`}
-                  >
-                    {h}d
-                  </button>
-                ))}
-              </div>
-            }
-          >
+          {/* Previsao 7 dias — cards interativos */}
+          <Grafico titulo="Proximos dias">
             {dados && !dados.previsaoErro && previsao.length > 0 ? (
-              <TabelaPrevisao previsao={previsao} />
+              <PrevisaoSemana previsao={previsao} />
             ) : (
               <MiniVazio texto="Previsao indisponivel no momento." />
             )}
@@ -319,7 +303,7 @@ function diaSemana(d: string): string {
   return Number.isNaN(dt.getTime()) ? "" : DIAS_SEMANA[dt.getUTCDay()];
 }
 
-// ---- AGORA ----
+// ---- AGORA (destaque) ----
 function Agora({
   atual,
   resumo,
@@ -337,26 +321,28 @@ function Agora({
   return (
     <div className="space-y-2">
       {/* Faixa principal do "agora" */}
-      <div className="flex items-center gap-3 rounded-lg border border-black/5 bg-white px-3 py-2.5">
-        <CondIcon className="h-8 w-8 shrink-0 text-tiffany" />
+      <div className="flex items-center gap-3 rounded-xl border border-tiffany/20 bg-gradient-to-br from-tiffany/[0.07] to-transparent px-3 py-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-tiffany/10">
+          <CondIcon className="h-7 w-7 text-tiffany" />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-escuro">
+            <span className="text-3xl font-semibold leading-none text-escuro">
               {fmtTemp(tempAtual)}
             </span>
             <span className="truncate text-xs text-medio/70">{cond.rotulo}</span>
           </div>
-          <p className="text-[11px] text-medio/60">
+          <p className="mt-1 text-[11px] text-medio/60">
             Sensacao {fmtTemp(atual?.sensacao)}
           </p>
         </div>
         {/* Indice de oportunidade Sixxis (proprietario) */}
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 rounded-lg border border-tiffany/20 bg-white px-2.5 py-1.5 text-right">
           <p className="flex items-center justify-end gap-1 text-[10px] text-medio/50">
             <Gauge className="h-3 w-3" />
             Indice Sixxis
           </p>
-          <p className="text-lg font-semibold text-tiffany">
+          <p className="text-xl font-semibold text-tiffany">
             {resumo?.indiceOportunidade != null ? resumo.indiceOportunidade : "—"}
           </p>
         </div>
@@ -376,60 +362,133 @@ function Agora({
   );
 }
 
-// ---- Tabela de previsao estendida ----
-function TabelaPrevisao({
-  previsao,
-}: {
-  previsao: DetalheClimaResp["previsao"];
-}) {
+// ---- Previsao 7 dias: cards clicaveis + detalhe do dia selecionado ----
+function PrevisaoSemana({ previsao }: { previsao: PontoPrevisao[] }) {
+  const [sel, setSel] = useState(0);
+  const selecionado = previsao[Math.min(sel, previsao.length - 1)];
+
+  // Faixa de temperatura da semana p/ a barrinha visual de cada dia.
+  const [semMin, semMax] = useMemo(() => {
+    const mins = previsao.map((p) => p.tempMin).filter((v): v is number => v != null);
+    const maxs = previsao.map((p) => p.tempMax).filter((v): v is number => v != null);
+    if (!mins.length || !maxs.length) return [null, null] as const;
+    return [Math.min(...mins), Math.max(...maxs)] as const;
+  }, [previsao]);
+
   return (
-    <div className="scroll-fino overflow-x-auto">
-      <table className="w-full min-w-[420px] text-xs">
-        <thead>
-          <tr className="text-left text-[10px] uppercase tracking-wide text-medio/50">
-            <th className="py-1 pr-2 font-medium">Dia</th>
-            <th className="py-1 pr-2 font-medium">Condicao</th>
-            <th className="py-1 pr-2 text-right font-medium">Max/Min</th>
-            <th className="py-1 pr-2 text-right font-medium">Chuva</th>
-            <th className="py-1 pr-2 text-right font-medium">Vento</th>
-            <th className="py-1 text-right font-medium">UV</th>
-          </tr>
-        </thead>
-        <tbody>
-          {previsao.map((p) => {
-            const cond = condicaoWeathercode(p.weathercode);
-            const Ic = cond.Icone;
-            return (
-              <tr key={p.dia} className="border-t border-black/5">
-                <td className="py-1.5 pr-2 whitespace-nowrap">
-                  <span className="font-medium text-escuro">{diaSemana(p.dia)}</span>{" "}
-                  <span className="text-medio/50">{fmtDia(p.dia)}</span>
-                </td>
-                <td className="py-1.5 pr-2">
-                  <span className="flex items-center gap-1.5 text-medio/80">
-                    <Ic className="h-3.5 w-3.5 shrink-0 text-tiffany" />
-                    <span className="truncate">{cond.rotulo}</span>
-                  </span>
-                </td>
-                <td className="py-1.5 pr-2 text-right whitespace-nowrap font-medium text-escuro">
-                  {fmtTemp(p.tempMax)} <span className="text-medio/40">/</span>{" "}
-                  {fmtTemp(p.tempMin)}
-                </td>
-                <td className="py-1.5 pr-2 text-right whitespace-nowrap text-medio/80">
-                  {fmtMm(p.chuva)}
-                  {p.chuvaProb != null && (
-                    <span className="text-medio/40"> ({Math.round(p.chuvaProb)}%)</span>
-                  )}
-                </td>
-                <td className="py-1.5 pr-2 text-right whitespace-nowrap text-medio/80">
-                  {fmtVento(p.vento)}
-                </td>
-                <td className="py-1.5 text-right text-medio/80">{fmtUv(p.uv)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div>
+      <div className="scroll-fino -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {previsao.map((p, i) => {
+          const cond = condicaoWeathercode(p.weathercode);
+          const Ic = cond.Icone;
+          const ativo = i === sel;
+          return (
+            <button
+              key={p.dia}
+              onClick={() => setSel(i)}
+              className={`flex w-[72px] shrink-0 flex-col items-center gap-1 rounded-lg border px-1.5 py-2 transition-colors ${
+                ativo
+                  ? "border-tiffany bg-tiffany/5"
+                  : "border-black/5 bg-white hover:border-tiffany/40"
+              }`}
+            >
+              <span className="text-[11px] font-semibold text-escuro">
+                {i === 0 ? "Hoje" : diaSemana(p.dia)}
+              </span>
+              <span className="text-[10px] text-medio/50">{fmtDia(p.dia)}</span>
+              <Ic className="my-0.5 h-5 w-5 text-tiffany" />
+              <span className="text-xs font-semibold text-escuro">
+                {fmtGrau(p.tempMax)}
+              </span>
+              <BarraTemp
+                min={p.tempMin}
+                max={p.tempMax}
+                semMin={semMin}
+                semMax={semMax}
+              />
+              <span className="text-[10px] text-medio/50">{fmtGrau(p.tempMin)}</span>
+              <span className="mt-0.5 flex items-center gap-0.5 text-[10px] text-sky-600 dark:text-sky-400">
+                <CloudRain className="h-2.5 w-2.5" />
+                {p.chuvaProb != null ? `${Math.round(p.chuvaProb)}%` : "—"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Detalhe do dia selecionado */}
+      {selecionado && (
+        <Reveal key={selecionado.dia}>
+          <div className="mt-2 rounded-lg border border-black/5 bg-fundo/60 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              {(() => {
+                const Ic = condicaoWeathercode(selecionado.weathercode).Icone;
+                return <Ic className="h-4 w-4 text-tiffany" />;
+              })()}
+              <p className="text-sm font-semibold text-escuro">
+                {diaSemana(selecionado.dia)} {fmtDia(selecionado.dia)}
+              </p>
+              <span className="text-xs text-medio/60">
+                {condicaoWeathercode(selecionado.weathercode).rotulo}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <DetalheItem rotulo="Maxima / minima" valor={`${fmtTemp(selecionado.tempMax)} / ${fmtTemp(selecionado.tempMin)}`} />
+              <DetalheItem
+                rotulo="Chuva"
+                valor={
+                  selecionado.chuvaProb != null
+                    ? `${fmtMm(selecionado.chuva)} (${Math.round(selecionado.chuvaProb)}%)`
+                    : fmtMm(selecionado.chuva)
+                }
+              />
+              <DetalheItem rotulo="Vento" valor={fmtVento(selecionado.vento)} />
+              <DetalheItem rotulo="UV" valor={fmtUv(selecionado.uv)} />
+            </div>
+          </div>
+        </Reveal>
+      )}
+    </div>
+  );
+}
+
+// Barrinha visual: faixa min->max do dia dentro da faixa da semana.
+function BarraTemp({
+  min,
+  max,
+  semMin,
+  semMax,
+}: {
+  min: number | null;
+  max: number | null;
+  semMin: number | null;
+  semMax: number | null;
+}) {
+  if (min == null || max == null || semMin == null || semMax == null || semMax <= semMin) {
+    return <span className="h-1 w-8 rounded-full bg-black/5" />;
+  }
+  const faixa = semMax - semMin;
+  const left = ((min - semMin) / faixa) * 100;
+  const width = Math.max(6, ((max - min) / faixa) * 100);
+  return (
+    <span className="relative h-1 w-8 overflow-hidden rounded-full bg-black/5">
+      <span
+        className="absolute inset-y-0 rounded-full"
+        style={{
+          left: `${left}%`,
+          width: `${width}%`,
+          background: "linear-gradient(90deg,#3cbfb3,#f59e0b)",
+        }}
+      />
+    </span>
+  );
+}
+
+function DetalheItem({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="rounded-md border border-black/5 bg-white px-2 py-1.5">
+      <p className="text-[10px] text-medio/50">{rotulo}</p>
+      <p className="mt-0.5 text-xs font-semibold text-escuro">{valor}</p>
     </div>
   );
 }
@@ -500,7 +559,7 @@ function Grafico({
 
 function MiniVazio({ texto }: { texto: string }) {
   return (
-    <div className="flex h-[110px] flex-col items-center justify-center gap-1.5 text-center text-xs text-medio/50">
+    <div className="flex h-[100px] flex-col items-center justify-center gap-1.5 text-center text-xs text-medio/50">
       <CloudOff className="h-5 w-5" />
       {texto}
     </div>
