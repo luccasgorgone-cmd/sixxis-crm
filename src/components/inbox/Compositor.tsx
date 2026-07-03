@@ -16,8 +16,10 @@ import {
   Paperclip,
   Wand2,
   Undo2,
+  Smile,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
+import { SeletorEmoji } from "./SeletorEmoji";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
 import type { ProdutoLoja } from "@/components/loja/tipos";
 import {
@@ -90,6 +92,7 @@ export function Compositor({
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
+  const [mostrarEmojis, setMostrarEmojis] = useState(false);
 
   // Varinha magica: reescreve o texto aplicando um tom (via IA). So aparece se
   // houver tons ativos (assistente ligado no admin).
@@ -246,6 +249,24 @@ export function Compositor({
     setMostrar(false);
     setBusca("");
     setTimeout(() => ref.current?.focus(), 0);
+  }
+
+  // Insere o emoji na posicao do cursor (ou no fim), mantendo o foco no campo.
+  function inserirEmoji(emoji: string) {
+    const el = ref.current;
+    if (textoAnterior !== null) setTextoAnterior(null);
+    if (!el) {
+      setTexto((t) => t + emoji);
+      return;
+    }
+    const start = el.selectionStart ?? texto.length;
+    const end = el.selectionEnd ?? texto.length;
+    setTexto(texto.slice(0, start) + emoji + texto.slice(end));
+    setTimeout(() => {
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
   }
 
   function inserirProduto(p: ProdutoLoja) {
@@ -602,6 +623,13 @@ export function Compositor({
         />
       )}
 
+      {mostrarEmojis && (
+        <SeletorEmoji
+          onEscolher={inserirEmoji}
+          onFechar={() => setMostrarEmojis(false)}
+        />
+      )}
+
       {instancias.length > 1 && (
         <div className="mb-2 flex items-center gap-2 px-1">
           <span className="text-[11px] font-medium text-medio/60">
@@ -677,8 +705,8 @@ export function Compositor({
           </div>
         ) : (
           <>
-        {/* Acoes auxiliares em grade 2x2 a esquerda (chat mais alto). */}
-        <div className="grid shrink-0 grid-cols-2 grid-rows-2 gap-1">
+        {/* Acoes auxiliares em grade (2 colunas) a esquerda. */}
+        <div className="grid shrink-0 grid-cols-2 gap-1">
           <button
             onClick={() => {
               setMostrar((v) => !v);
@@ -693,6 +721,20 @@ export function Compositor({
             }`}
           >
             <Zap className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => {
+              setMostrarEmojis((v) => !v);
+            }}
+            title="Emojis"
+            aria-label="Emojis"
+            className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${
+              mostrarEmojis
+                ? "border-tiffany bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio hover:bg-black/5"
+            }`}
+          >
+            <Smile className="h-5 w-5" />
           </button>
           <button
             onClick={() => setSeletorProduto(true)}
