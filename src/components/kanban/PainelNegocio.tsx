@@ -877,12 +877,16 @@ function NegocioAcoes({
         )}
       </div>
 
-      {/* Produtos */}
+      {/* Produtos (venda) / Pecas necessarias (pos-venda) */}
       <div>
-        <Rotulo>Produtos</Rotulo>
+        <Rotulo>
+          {detalhe.finalidade === "POS_VENDA" ? "Pecas necessarias" : "Produtos"}
+        </Rotulo>
         <div className="space-y-1.5">
           {produtos.length === 0 && (
-            <p className="text-sm text-medio/50">Nenhum produto.</p>
+            <p className="text-sm text-medio/50">
+              {detalhe.finalidade === "POS_VENDA" ? "Nenhuma peca indicada." : "Nenhum produto."}
+            </p>
           )}
           {produtos.map((p, i) => (
             <div
@@ -901,18 +905,24 @@ function NegocioAcoes({
               </button>
             </div>
           ))}
-          <input
-            value={novoProduto}
-            onChange={(e) => setNovoProduto(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && novoProduto.trim()) {
-                void salvar({ produtos: [...produtos, novoProduto.trim()] });
-                setNovoProduto("");
-              }
-            }}
-            placeholder="Adicionar produto e Enter"
-            className="w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
-          />
+          {detalhe.finalidade === "POS_VENDA" ? (
+            <AdicionarPeca
+              onAdicionar={(texto) => void salvar({ produtos: [...produtos, texto] })}
+            />
+          ) : (
+            <input
+              value={novoProduto}
+              onChange={(e) => setNovoProduto(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && novoProduto.trim()) {
+                  void salvar({ produtos: [...produtos, novoProduto.trim()] });
+                  setNovoProduto("");
+                }
+              }}
+              placeholder="Adicionar produto e Enter"
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
+            />
+          )}
         </div>
       </div>
 
@@ -1741,5 +1751,82 @@ function TimelineNegocio({ detalhe }: { detalhe: DetalheNegocio }) {
         );
       })}
     </ol>
+  );
+}
+
+// Indicacao de PECA necessaria (pos-venda): escolhe a peca do catalogo (por
+// categoria/modelo) + quantidade e adiciona a lista de pecas do negocio. Fatia 2.71.
+function AdicionarPeca({ onAdicionar }: { onAdicionar: (texto: string) => void }) {
+  const [pecas, setPecas] = useState<
+    { id: string; nome: string; categoria: string | null; modelo: string | null }[]
+  >([]);
+  const [sel, setSel] = useState("");
+  const [qtd, setQtd] = useState(1);
+
+  useEffect(() => {
+    fetch("/api/catalogo?tipo=PECA")
+      .then((r) => (r.ok ? r.json() : { itens: [] }))
+      .then((d) => setPecas(d.itens ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  const grupos = new Map<string, typeof pecas>();
+  for (const p of pecas) {
+    const g = p.categoria ?? "Outros";
+    if (!grupos.has(g)) grupos.set(g, []);
+    grupos.get(g)!.push(p);
+  }
+
+  function add() {
+    const p = pecas.find((x) => x.id === sel);
+    if (!p) return;
+    const nome = [p.nome, p.modelo].filter(Boolean).join(" ");
+    onAdicionar(qtd > 1 ? `${nome} (${qtd}x)` : nome);
+    setSel("");
+    setQtd(1);
+  }
+
+  if (pecas.length === 0) {
+    return (
+      <p className="text-xs text-medio/50">
+        Nenhuma peca no catalogo. Cadastre em Admin &gt; Catalogo de pedidos.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={sel}
+        onChange={(e) => setSel(e.target.value)}
+        className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-tiffany"
+      >
+        <option value="">Escolha a peca...</option>
+        {Array.from(grupos.entries()).map(([g, lista]) => (
+          <optgroup key={g} label={g}>
+            {lista.map((p) => (
+              <option key={p.id} value={p.id}>
+                {[p.nome, p.modelo].filter(Boolean).join(" ")}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <input
+        type="number"
+        min="1"
+        value={qtd}
+        onChange={(e) => setQtd(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+        className="w-14 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-tiffany"
+        title="Quantidade"
+      />
+      <button
+        onClick={add}
+        disabled={!sel}
+        className="shrink-0 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
+      >
+        Adicionar
+      </button>
+    </div>
   );
 }
