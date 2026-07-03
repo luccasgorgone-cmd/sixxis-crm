@@ -383,7 +383,7 @@ model Mensagem {
   // Enviada pela Luna (IA)? Marca OUT geradas pelo motor de atendimento. iaNome
   // e so para exibicao interna (selo na equipe); o cliente ve mensagem normal.
   viaIA       Boolean      @default(false)
-  iaNome      String?      @default("Luna")
+  iaNome      String?      @default("Sol")
   // Apagamento (revoke). O conteudo NUNCA e removido — so marcado. apagadaPor:
   // "COLABORADOR" (revogou para o cliente) | "CLIENTE" (cliente apagou).
   apagada     Boolean      @default(false)

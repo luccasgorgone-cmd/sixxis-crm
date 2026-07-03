@@ -1084,7 +1084,7 @@ async function tratarHandoffLuna(
       agenteId,
       finalidade,
       dataHora: new Date(),
-      nota: "Cliente pediu atendimento humano via Luna — retornar.",
+      nota: "Cliente pediu atendimento humano via Sol — retornar.",
       status: StatusLembrete.PENDENTE,
     },
   });
@@ -1093,7 +1093,7 @@ async function tratarHandoffLuna(
     agenteId,
     tipo: "LEMBRETE",
     titulo: "Cliente pediu atendimento humano",
-    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Luna).`,
+    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Sol).`,
     link: "/inbox",
     leadId: lead.id,
   });

@@ -175,7 +175,7 @@ export function IAAdmin() {
               </span>
               <div>
                 <p className="text-sm font-semibold text-escuro">
-                  Luna no WhatsApp
+                  Sol no WhatsApp
                 </p>
                 <p className="text-xs text-medio/60">
                   Atendimento automatico com clientes reais.
@@ -198,7 +198,7 @@ export function IAAdmin() {
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Ao ativar, a Luna passa a responder clientes reais fora do horario
+              Ao ativar, a Sol passa a responder clientes reais fora do horario
               comercial (ou a qualquer hora, se &quot;atende direto&quot; estiver
               ligado). Deixe desligada ate ter certeza.
             </span>
@@ -207,7 +207,7 @@ export function IAAdmin() {
           {/* Toggle mestre. */}
           <div className="mt-3">
             <Toggle
-              titulo="Luna ativa (responder clientes reais)"
+              titulo="Sol ativa (responder clientes reais)"
               descricao="Liga/desliga o atendimento automatico no WhatsApp."
               valor={c.ativo}
               onChange={(v) => set({ ativo: v })}
@@ -375,7 +375,7 @@ export function IAAdmin() {
         {/* Base de conhecimento de produtos */}
         <Secao
           titulo="Base de conhecimento de produtos"
-          descricao="O que a Luna sabe sobre os produtos para vender e atender bem."
+          descricao="O que a Sol sabe sobre os produtos para vender e atender bem."
         >
           <Cartao>
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -394,7 +394,7 @@ export function IAAdmin() {
             <p className="mb-2 flex items-start gap-1 text-xs text-medio/60">
               <Info className="mt-0.5 h-3 w-3 shrink-0 text-tiffany" />
               Preencha com os DADOS REAIS de cada produto (area recomendada,
-              diferenciais). Enquanto os campos estiverem em branco, a Luna nao vai
+              diferenciais). Enquanto os campos estiverem em branco, a Sol nao vai
               afirmar especificacoes — ela e instruida a nao inventar.
             </p>
             <textarea
@@ -410,11 +410,11 @@ export function IAAdmin() {
         {/* Cupom / promocao */}
         <Secao
           titulo="Cupom de primeira compra"
-          descricao="A Luna oferece este cupom em momentos estrategicos (intencao de compra, objecao de preco, fechamento) — com inteligencia de venda, sem spam."
+          descricao="A Sol oferece este cupom em momentos estrategicos (intencao de compra, objecao de preco, fechamento) — com inteligencia de venda, sem spam."
         >
           <Toggle
             titulo="Oferecer cupom de primeira compra"
-            descricao="Habilita a Luna a mencionar o cupom quando fizer sentido."
+            descricao="Habilita a Sol a mencionar o cupom quando fizer sentido."
             valor={c.cupomAtivo}
             onChange={(v) => set({ cupomAtivo: v })}
           />

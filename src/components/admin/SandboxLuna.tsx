@@ -83,7 +83,7 @@ export function SandboxLuna() {
       });
       const d = await r.json().catch(() => null);
       if (!r.ok) {
-        setErro(d?.erro ?? "Falha ao consultar a Luna.");
+        setErro(d?.erro ?? "Falha ao consultar a Sol.");
         return;
       }
       const mensagensLuna: string[] = Array.isArray(d?.mensagens)
@@ -117,10 +117,10 @@ export function SandboxLuna() {
     <section>
       <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
         <FlaskConical className="h-4 w-4 text-tiffany" />
-        Testar a Luna (sandbox)
+        Testar a Sol (sandbox)
       </h3>
       <p className="mb-2 text-xs text-medio/60">
-        Converse como se fosse o cliente e veja a Luna responder. Usa a
+        Converse como se fosse o cliente e veja a Sol responder. Usa a
         configuracao SALVA (salve antes de testar mudancas). Ambiente de teste —
         nada e enviado a clientes nem gravado.
       </p>
@@ -201,7 +201,7 @@ export function SandboxLuna() {
                     ))
                   ) : (
                     <div className="text-[11px] italic text-medio/50">
-                      (Luna nao enviou texto — {m.acao})
+                      (Sol nao enviou texto — {m.acao})
                     </div>
                   )}
                   {m.motivo && (
@@ -216,7 +216,7 @@ export function SandboxLuna() {
           {enviando && (
             <div className="flex items-center gap-1.5 text-xs text-medio/50">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Luna pensando...
+              Sol pensando...
             </div>
           )}
           <div ref={fimRef} />

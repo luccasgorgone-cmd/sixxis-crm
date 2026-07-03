@@ -448,9 +448,9 @@ function Bolha({
           {ehOut && mensagem.viaIA && (
             <span
               className="flex items-center gap-0.5 font-medium opacity-90"
-              title="Enviada automaticamente pela Luna (IA)"
+              title="Enviada automaticamente pela Sol (IA)"
             >
-              <Bot className="h-3 w-3" /> Luna ·
+              <Bot className="h-3 w-3" /> Sol ·
             </span>
           )}
           {/* Numero (instancia) por onde a mensagem entrou/saiu. */}
