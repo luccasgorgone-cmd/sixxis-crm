@@ -354,8 +354,8 @@ function Agora({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         <Chip icon={<Droplets className="h-3.5 w-3.5" />} rotulo="Umidade" valor={fmtPct(atual?.umidade ?? resumo?.umidade)} />
         <Chip icon={<Wind className="h-3.5 w-3.5" />} rotulo="Vento" valor={fmtVento(atual?.vento)} />
-        <Chip icon={<SunIcon className="h-3.5 w-3.5" />} rotulo="UV (hoje)" valor={fmtUv(uvHoje)} />
-        <Chip icon={<CloudRain className="h-3.5 w-3.5" />} rotulo="Chuva agora" valor={fmtMm(atual?.chuva)} />
+        <Chip icon={<SunIcon className="h-3.5 w-3.5" />} rotulo="UV" valor={fmtUv(uvHoje)} />
+        <Chip icon={<CloudRain className="h-3.5 w-3.5" />} rotulo="Chuva" valor={fmtMm(atual?.chuva)} />
         <div className="col-span-2 flex min-w-0 items-center overflow-hidden rounded-lg border border-black/5 bg-white px-2.5 py-1.5">
           <ChipTendencia tendencia={tendencia} />
         </div>
