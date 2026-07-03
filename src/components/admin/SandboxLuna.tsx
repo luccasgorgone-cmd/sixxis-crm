@@ -17,7 +17,14 @@ import {
 
 type Finalidade = "VENDA" | "POS_VENDA";
 type Acao = "responder" | "handoff" | "silenciar";
-type Bolha = { autor: "cliente" | "luna"; texto: string; acao?: Acao; motivo?: string };
+// cliente: uma mensagem (texto). luna: LISTA de mensagens (uma bolha por item).
+type Bolha = {
+  autor: "cliente" | "luna";
+  texto?: string;
+  mensagens?: string[];
+  acao?: Acao;
+  motivo?: string;
+};
 
 const SELO: Record<Acao, { rotulo: string; classe: string; Icone: typeof Send }> = {
   responder: {
@@ -59,7 +66,10 @@ export function SandboxLuna() {
     if (!texto || enviando) return;
     setErro(null);
     const historico = [
-      ...mensagens.map((m) => ({ autor: m.autor, texto: m.texto })),
+      ...mensagens.map((m) => ({
+        autor: m.autor,
+        texto: m.texto ?? (m.mensagens?.join("\n\n") ?? ""),
+      })),
       { autor: "cliente" as const, texto },
     ];
     setMensagens((prev) => [...prev, { autor: "cliente", texto }]);
@@ -76,11 +86,22 @@ export function SandboxLuna() {
         setErro(d?.erro ?? "Falha ao consultar a Luna.");
         return;
       }
+      const mensagensLuna: string[] = Array.isArray(d?.mensagens)
+        ? (d.mensagens as unknown[]).filter(
+            (x): x is string => typeof x === "string" && x.trim() !== "",
+          )
+        : typeof d?.texto === "string" && d.texto.trim()
+          ? [d.texto]
+          : [];
       setMensagens((prev) => [
         ...prev,
         {
           autor: "luna",
-          texto: typeof d?.texto === "string" ? d.texto : "",
+          mensagens: mensagensLuna,
+          texto:
+            typeof d?.texto === "string"
+              ? d.texto
+              : mensagensLuna.join("\n\n"),
           acao: (d?.acao as Acao) ?? "responder",
           motivo: typeof d?.motivo === "string" ? d.motivo : undefined,
         },
@@ -151,7 +172,7 @@ export function SandboxLuna() {
             mensagens.map((m, i) =>
               m.autor === "cliente" ? (
                 <div key={i} className="flex justify-end">
-                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-tiffany px-3 py-2 text-sm text-white">
+                  <div className="max-w-[80%] whitespace-pre-line rounded-2xl rounded-br-sm bg-tiffany px-3 py-2 text-sm text-white">
                     {m.texto}
                   </div>
                 </div>
@@ -168,10 +189,16 @@ export function SandboxLuna() {
                       {SELO[m.acao].rotulo}
                     </span>
                   )}
-                  {m.texto ? (
-                    <div className="max-w-[80%] rounded-2xl rounded-bl-sm border border-black/5 bg-white px-3 py-2 text-sm text-escuro">
-                      {m.texto}
-                    </div>
+                  {m.mensagens && m.mensagens.length > 0 ? (
+                    // Uma bolha por mensagem, na ordem (como no WhatsApp).
+                    m.mensagens.map((msg, k) => (
+                      <div
+                        key={k}
+                        className="max-w-[80%] whitespace-pre-line rounded-2xl rounded-bl-sm border border-black/5 bg-white px-3 py-2 text-sm text-escuro"
+                      >
+                        {msg}
+                      </div>
+                    ))
                   ) : (
                     <div className="text-[11px] italic text-medio/50">
                       (Luna nao enviou texto — {m.acao})

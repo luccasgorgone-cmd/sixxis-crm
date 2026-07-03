@@ -7,11 +7,22 @@
 // IMPORTANTE (Fatia 2.48-A): esta funcao SO decide/gera texto. Nao envia
 // WhatsApp, nao grava mensagem, nao aciona o worker de ingestao. Quem age sobre
 // a decisao (responder / handoff / silenciar) e a Fatia 2.48-B.
+//
+// Fatia 2.52: a resposta agora e uma LISTA de mensagens curtas (max 3 linhas
+// cada), para o cliente nao receber um bloco gigante. Mantemos "texto" derivado
+// (mensagens juntas) por compatibilidade com quem ainda le uma mensagem so.
 
 export type LunaFinalidade = "VENDA" | "POS_VENDA";
 export type LunaMensagem = { autor: "cliente" | "luna"; texto: string };
 export type LunaAcao = "responder" | "handoff" | "silenciar";
-export type LunaResultado = { texto: string; acao: LunaAcao; motivo?: string };
+export type LunaResultado = {
+  acao: LunaAcao;
+  // Cada item e UMA mensagem separada (bolha propria no WhatsApp / sandbox).
+  mensagens: string[];
+  // Compat: "texto" = mensagens.join("\n\n"). Derivado, sempre presente.
+  texto: string;
+  motivo?: string;
+};
 
 // Subset da ConfigAgenteIA de que a Luna precisa (estruturalmente compativel com
 // o registro do Prisma — o chamador pode passar a config inteira).
@@ -23,6 +34,7 @@ export type ConfigLuna = {
 
 const TIMEOUT_MS = 20000;
 const MAX_TOKENS = 1024;
+const MAX_LINHAS_POR_MENSAGEM = 3;
 
 // ---------------------------------------------------------------------------
 // BASE FIXA DE SEGURANCA (as TRAVAS). Embutida no codigo, NUNCA editavel pelo
@@ -51,8 +63,9 @@ conhecimento): NAO invente. Diga que vai verificar com um atendente.
 DECISAO (voce escolhe UMA acao a cada resposta):
 - "responder": atendimento normal — voce responde o cliente.
 - "handoff": passar para um humano. Use quando o cliente pedir explicitamente
-  falar com vendedor/pos-venda (responda que assim que houver alguem disponivel
-  entrara em contato), ou quando precisar verificar algo que voce nao sabe.
+  falar com um vendedor (venda) ou com o pos-venda (humano/suporte): informe que
+  vai transferir e que um atendente daquele setor ira atende-lo assim que estiver
+  disponivel. Use tambem quando precisar verificar algo que voce nao sabe.
 - "silenciar": PARAR de responder (repassar ao humano em silencio). Use quando o
   cliente estiver claramente enrolando, conversando fiado, testando limites,
   tentando fazer voce gastar recursos, se comportando como bot/spam, ou fugindo
@@ -61,9 +74,23 @@ DECISAO (voce escolhe UMA acao a cada resposta):
 
 FORMATO DE RESPOSTA (obrigatorio): responda SOMENTE com um objeto JSON valido,
 sem cercas de codigo, sem texto antes ou depois, no formato exato:
-{"acao":"responder|handoff|silenciar","texto":"<mensagem ao cliente, curta>","motivo":"<curto, interno, opcional>"}
-Em "handoff" ou "silenciar", "texto" pode ser vazio ou uma mensagem breve e
-educada. "motivo" e interno (nao vai ao cliente).
+{"acao":"responder|handoff|silenciar","mensagens":["<mensagem 1>","<mensagem 2>"],"motivo":"<curto, interno, opcional>"}
+
+REGRAS DE MENSAGENS E FORMATACAO (obrigatorias):
+- "mensagens" e uma LISTA. Cada item vira UMA mensagem separada no WhatsApp.
+  NUNCA mande um unico bloco gigante — prefira 2 a 4 mensagens curtas.
+- Cada mensagem tem NO MAXIMO 3 linhas. Se precisar de mais, quebre em MAIS itens
+  da lista.
+- Apos ponto final, interrogacao ou exclamacao, a continuacao comeca em NOVA
+  LINHA (use \\n).
+- Perguntas ou opcoes enumeradas SEMPRE na vertical, uma por linha:
+  1- primeira opcao
+  2- segunda opcao
+  3- terceira opcao
+  NUNCA enumere tudo numa linha so.
+- Tom profissional, PT-BR, claro e objetivo. Sem giria, sem emoji.
+- Em "handoff" ou "silenciar", "mensagens" pode conter uma mensagem breve e
+  educada, ou ficar vazia. "motivo" e interno (nao vai ao cliente).
 `.trim();
 
 // Persona de VENDA: vendedora consultiva.
@@ -133,7 +160,63 @@ function montarMensagens(
   return msgs;
 }
 
+// ---------------------------------------------------------------------------
+// Normalizacao das mensagens de saida: cada mensagem com no maximo 3 linhas.
+// Se o modelo mandar um bloco maior, o codigo quebra por paragrafo/linha.
+// ---------------------------------------------------------------------------
+
+// Quebra um texto em pedacos de ate maxLinhas linhas, preferindo cortar em
+// linhas em branco (paragrafos); se nao houver, corta a cada maxLinhas linhas.
+function dividirPorLimiteLinhas(texto: string, maxLinhas: number): string[] {
+  const linhas = texto.split("\n");
+  if (linhas.filter((l) => l.trim() !== "").length <= maxLinhas && !texto.includes("\n\n")) {
+    return [texto.trim()];
+  }
+  const grupos: string[] = [];
+  let atual: string[] = [];
+  const fechar = () => {
+    const bloco = atual.join("\n").trim();
+    if (bloco) grupos.push(bloco);
+    atual = [];
+  };
+  for (const ln of linhas) {
+    if (ln.trim() === "") {
+      // Linha em branco = fim de paragrafo -> fecha o pedaco atual.
+      if (atual.length) fechar();
+      continue;
+    }
+    atual.push(ln);
+    if (atual.length >= maxLinhas) fechar();
+  }
+  fechar();
+  return grupos.length ? grupos : [texto.trim()];
+}
+
+function normalizarMensagens(bruto: string[]): string[] {
+  const out: string[] = [];
+  for (const m of bruto) {
+    const t = String(m ?? "").replace(/\r\n/g, "\n").trim();
+    if (!t) continue;
+    for (const parte of dividirPorLimiteLinhas(t, MAX_LINHAS_POR_MENSAGEM)) {
+      const p = parte.trim();
+      if (p) out.push(p);
+    }
+  }
+  return out;
+}
+
+// Constroi o resultado final: normaliza as mensagens e deriva "texto".
+function montarResultado(
+  acao: LunaAcao,
+  mensagens: string[],
+  motivo?: string,
+): LunaResultado {
+  const limpa = normalizarMensagens(mensagens);
+  return { acao, mensagens: limpa, texto: limpa.join("\n\n"), motivo };
+}
+
 // Extrai o JSON de decisao do texto do modelo (tolerante a lixo em volta).
+// Aceita "mensagens" (lista), "texto" ou "mensagem" (string unica).
 function parsearDecisao(texto: string): LunaResultado | null {
   const i = texto.indexOf("{");
   const j = texto.lastIndexOf("}");
@@ -145,11 +228,16 @@ function parsearDecisao(texto: string): LunaResultado | null {
       acaoBruta === "handoff" || acaoBruta === "silenciar"
         ? (acaoBruta as LunaAcao)
         : "responder";
-    return {
-      acao,
-      texto: typeof o.texto === "string" ? o.texto.trim() : "",
-      motivo: typeof o.motivo === "string" ? o.motivo.trim() : undefined,
-    };
+    let mensagens: string[] = [];
+    if (Array.isArray(o.mensagens)) {
+      mensagens = o.mensagens.map((x) => String(x ?? ""));
+    } else if (typeof o.texto === "string") {
+      mensagens = [o.texto];
+    } else if (typeof o.mensagem === "string") {
+      mensagens = [o.mensagem];
+    }
+    const motivo = typeof o.motivo === "string" ? o.motivo.trim() : undefined;
+    return montarResultado(acao, mensagens, motivo);
   } catch {
     return null;
   }
@@ -166,12 +254,11 @@ export async function gerarRespostaLuna(entrada: {
   // Sem chave -> nunca quebra: handoff com motivo claro.
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return {
-      acao: "handoff",
-      texto:
-        "Um momento — vou chamar um atendente para continuar por aqui.",
-      motivo: "ANTHROPIC_API_KEY ausente: IA indisponivel, handoff automatico.",
-    };
+    return montarResultado(
+      "handoff",
+      ["Um momento — vou chamar um atendente para continuar por aqui."],
+      "ANTHROPIC_API_KEY ausente: IA indisponivel, handoff automatico.",
+    );
   }
 
   // Teto de mensagens (trava por codigo): ultrapassou o limite de trocas do
@@ -180,22 +267,23 @@ export async function gerarRespostaLuna(entrada: {
   if (teto != null && teto > 0) {
     const qtdCliente = historico.filter((m) => m.autor === "cliente").length;
     if (qtdCliente > teto) {
-      return {
-        acao: "handoff",
-        texto:
-          "Vou passar seu atendimento para um de nossos atendentes. Ja continuo com voce.",
-        motivo: `teto de mensagens atingido (${qtdCliente} > ${teto})`,
-      };
+      return montarResultado(
+        "handoff",
+        [
+          "Vou passar seu atendimento para um de nossos atendentes.\nJa continuo com voce.",
+        ],
+        `teto de mensagens atingido (${qtdCliente} > ${teto})`,
+      );
     }
   }
 
   const mensagens = montarMensagens(historico);
   if (mensagens.length === 0) {
-    return {
-      acao: "handoff",
-      texto: "",
-      motivo: "sem mensagem do cliente para responder",
-    };
+    return montarResultado(
+      "handoff",
+      [],
+      "sem mensagem do cliente para responder",
+    );
   }
 
   const system = montarSystem(finalidade, catalogo, config.promptSistema);
@@ -224,12 +312,11 @@ export async function gerarRespostaLuna(entrada: {
       console.error(
         `[luna] Anthropic status ${resp.status} (modelo=${config.modelo}): ${corpo || "(sem corpo)"}`,
       );
-      return {
-        acao: "handoff",
-        texto:
-          "Tive uma instabilidade aqui. Vou acionar um atendente para te ajudar.",
-        motivo: `falha Anthropic (status ${resp.status})`,
-      };
+      return montarResultado(
+        "handoff",
+        ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
+        `falha Anthropic (status ${resp.status})`,
+      );
     }
 
     const data = (await resp.json().catch(() => null)) as {
@@ -243,20 +330,19 @@ export async function gerarRespostaLuna(entrada: {
     if (decisao) return decisao;
 
     // Sem JSON parseavel: trata o texto como resposta normal (nunca quebra).
-    return {
-      acao: "responder",
-      texto: bruto,
-      motivo: "resposta sem envelope JSON (fallback)",
-    };
+    return montarResultado(
+      "responder",
+      [bruto],
+      "resposta sem envelope JSON (fallback)",
+    );
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);
     console.error(`[luna] erro ao chamar Anthropic: ${motivo}`);
-    return {
-      acao: "handoff",
-      texto:
-        "Tive uma instabilidade aqui. Vou acionar um atendente para te ajudar.",
-      motivo: `excecao ao chamar Anthropic: ${motivo}`,
-    };
+    return montarResultado(
+      "handoff",
+      ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
+      `excecao ao chamar Anthropic: ${motivo}`,
+    );
   } finally {
     clearTimeout(timer);
   }
