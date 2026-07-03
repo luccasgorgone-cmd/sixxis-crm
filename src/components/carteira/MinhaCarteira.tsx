@@ -679,8 +679,9 @@ function Kpi({
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${fundo} ${cor}`}>
         <Icone className="h-5 w-5" />
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-xl font-semibold leading-none text-escuro" title={valor}>{valor}</p>
+      <div className="min-w-0 flex-1">
+        {/* pr no valor: reserva o canto do selo "atual/periodo" p/ nao sobrepor. */}
+        <p className={`truncate text-xl font-semibold leading-none text-escuro ${tag ? "pr-12" : ""}`} title={valor}>{valor}</p>
         <p className="mt-1 truncate text-xs text-medio/60">{rotulo}</p>
         {detalhe && <p className="truncate text-[11px] text-medio/50">{detalhe}</p>}
       </div>

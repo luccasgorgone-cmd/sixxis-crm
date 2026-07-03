@@ -348,14 +348,15 @@ function Agora({
         </div>
       </div>
 
-      {/* Metricas do agora. Tendencia tem o rotulo mais longo ("Esquentando"),
-          entao ocupa 2 colunas do grid de 6 p/ caber proporcional, sem vazar. */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      {/* Metricas do agora. No mobile (2 col) os 4 chips fecham 2 linhas cheias e
+          a tendencia ocupa a linha inteira — sem "buraco". No desktop viram 6 col
+          e a tendencia (rotulo mais longo, "Esquentando") ocupa 2 col p/ caber. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         <Chip icon={<Droplets className="h-3.5 w-3.5" />} rotulo="Umidade" valor={fmtPct(atual?.umidade ?? resumo?.umidade)} />
         <Chip icon={<Wind className="h-3.5 w-3.5" />} rotulo="Vento" valor={fmtVento(atual?.vento)} />
         <Chip icon={<SunIcon className="h-3.5 w-3.5" />} rotulo="UV (hoje)" valor={fmtUv(uvHoje)} />
         <Chip icon={<CloudRain className="h-3.5 w-3.5" />} rotulo="Chuva agora" valor={fmtMm(atual?.chuva)} />
-        <div className="col-span-3 flex min-w-0 items-center overflow-hidden rounded-lg border border-black/5 bg-white px-2.5 py-1.5 sm:col-span-2">
+        <div className="col-span-2 flex min-w-0 items-center overflow-hidden rounded-lg border border-black/5 bg-white px-2.5 py-1.5">
           <ChipTendencia tendencia={tendencia} />
         </div>
       </div>
