@@ -1,7 +1,8 @@
 "use client";
 
 // Coluna central: cabecalho do contato, mensagens (bolhas) e o compositor.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   CheckCheck,
@@ -307,6 +308,83 @@ function legendaReal(conteudo: string | null): string | null {
   return t && !RE_PLACEHOLDER.test(t) ? t : null;
 }
 
+// Popover de reacao renderizado em PORTAL (document.body) com posicao fixa.
+// Assim ele NUNCA e cortado pelo overflow do container (o drawer do Kanban tem
+// rolagem propria que clipava o popover). Abre acima da ancora; se nao couber,
+// abre abaixo; e sempre preso a viewport na horizontal (os 6 emojis inteiros).
+// data-popover-reacao marca o no para o "clicar fora" ignorar cliques internos.
+function PopoverReacao({
+  anchorRef,
+  reacaoAtual,
+  onEscolher,
+  onFechar,
+}: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
+  reacaoAtual: string | null;
+  onEscolher: (emoji: string) => void;
+  onFechar: () => void;
+}) {
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const ancora = anchorRef.current;
+    const pop = popRef.current;
+    if (!ancora || !pop) return;
+    const a = ancora.getBoundingClientRect();
+    const p = pop.getBoundingClientRect();
+    const margem = 8;
+    // Horizontal: centralizado na ancora, preso a viewport (nada corta).
+    let left = a.left + a.width / 2 - p.width / 2;
+    left = Math.max(margem, Math.min(left, window.innerWidth - p.width - margem));
+    // Vertical: abre acima; se nao couber, abre abaixo.
+    let top = a.top - p.height - 6;
+    if (top < margem) top = a.bottom + 6;
+    setPos({ top, left });
+  }, [anchorRef]);
+
+  // Rolar/redimensionar a pagina desprende a posicao fixa: fecha (estilo WhatsApp).
+  useEffect(() => {
+    const fechar = () => onFechar();
+    window.addEventListener("scroll", fechar, true);
+    window.addEventListener("resize", fechar);
+    return () => {
+      window.removeEventListener("scroll", fechar, true);
+      window.removeEventListener("resize", fechar);
+    };
+  }, [onFechar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={popRef}
+      data-popover-reacao
+      style={{
+        position: "fixed",
+        top: pos?.top ?? -9999,
+        left: pos?.left ?? -9999,
+        visibility: pos ? "visible" : "hidden",
+      }}
+      className="z-50 flex items-center gap-0.5 rounded-full border border-black/10 bg-white px-1.5 py-1 shadow-lg"
+    >
+      {EMOJIS_REACAO.map((e) => (
+        <button
+          key={e}
+          type="button"
+          onClick={() => onEscolher(e)}
+          className={`flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none transition-transform hover:scale-125 ${
+            reacaoAtual === e ? "bg-tiffany/15" : "hover:bg-fundo"
+          }`}
+        >
+          {e}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 function Bolha({
   mensagem,
   ehAdmin,
@@ -335,6 +413,7 @@ function Bolha({
   const [reacaoLocal, setReacaoLocal] = useState<string | null | undefined>(undefined);
   const [pickerReacao, setPickerReacao] = useState(false);
   const [reagindo, setReagindo] = useState(false);
+  const reacaoBtnRef = useRef<HTMLButtonElement>(null);
   const reacao = reacaoLocal !== undefined ? reacaoLocal : mensagem.reacao ?? null;
   const reacaoCliente = mensagem.reacaoDeCliente ?? null;
   // Reagir a mensagens nao apagadas (o backend valida o id real do WhatsApp).
@@ -411,6 +490,7 @@ function Bolha({
       {podeReagir && (
         <div className="relative order-1 shrink-0">
           <button
+            ref={reacaoBtnRef}
             onClick={() => setPickerReacao((v) => !v)}
             disabled={reagindo}
             title="Reagir"
@@ -424,20 +504,12 @@ function Bolha({
             )}
           </button>
           {pickerReacao && (
-            <div className="absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-black/10 bg-white px-1.5 py-1 shadow-lg">
-              {EMOJIS_REACAO.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => void reagir(e)}
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none transition-transform hover:scale-125 ${
-                    reacao === e ? "bg-tiffany/15" : "hover:bg-fundo"
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
+            <PopoverReacao
+              anchorRef={reacaoBtnRef}
+              reacaoAtual={reacao}
+              onEscolher={(e) => void reagir(e)}
+              onFechar={() => setPickerReacao(false)}
+            />
           )}
         </div>
       )}
