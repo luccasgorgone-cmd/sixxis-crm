@@ -22,11 +22,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  // Transferencia em massa cruza equipes: restrita a ADMIN.
-  if (!ehAdmin(agente.papel)) {
-    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
-  }
-
   let body: { leadIds?: unknown; agenteId?: string; finalidade?: string };
   try {
     body = await req.json();
@@ -48,6 +43,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { erro: "leadIds, agenteId e finalidade sao obrigatorios" },
       { status: 400 },
+    );
+  }
+
+  // AUTORIZACAO (Fatia 2.84): liberada aos USUARIOS com escopo rigido. O executor
+  // precisa ter ACESSO a finalidade da transferencia (admin sempre). Alem disso,
+  // cada lead e validado no loop: nao-admin so transfere os PROPRIOS (dono da
+  // finalidade em questao); leads de outros agentes sao IGNORADOS (nao vazam).
+  if (!ehAdmin(agente.papel) && !temAcesso(agente, finalidade)) {
+    return NextResponse.json(
+      { erro: "voce nao tem acesso a essa finalidade" },
+      { status: 403 },
     );
   }
 
@@ -82,6 +88,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     });
     if (!lead) {
+      ignorados++;
+      continue;
+    }
+    // ESCOPO: nao-admin so transfere leads que POSSUI na finalidade em questao
+    // (dono da finalidade = ele). Leads de outros agentes sao ignorados.
+    if (!ehAdmin(agente.papel) && lead[campo] !== agente.id) {
       ignorados++;
       continue;
     }
