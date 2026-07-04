@@ -886,11 +886,15 @@ async function responderForaHorarioSePreciso(
         fuso: true,
         mensagemForaHorario: true,
         avisoForaHorarioAtivo: true,
+        mensagensAutomaticasAtivas: true,
       },
     });
     if (!config) return;
-    // Interruptor (default DESLIGADO): so envia se o dono ligou explicitamente.
-    // Registros antigos (campo null/ausente) contam como false => nao envia.
+    // Interruptor MESTRE (default DESLIGADO): com ele false, NENHUMA mensagem
+    // automatica sai. Registros antigos (null/ausente) contam como false. 2.78.
+    if (config.mensagensAutomaticasAtivas !== true) return;
+    // Interruptor do aviso de fora de horario (default DESLIGADO): so envia se o
+    // dono ligou explicitamente. Antigos = false => nao envia.
     if (config.avisoForaHorarioAtivo !== true) return;
     // Dentro do expediente: nunca envia.
     const aberto = estaAbertoAgora(

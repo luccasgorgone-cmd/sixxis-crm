@@ -848,6 +848,10 @@ model ConfiguracaoCRM {
   // aviso e enviado ate o dono ligar explicitamente. Registros antigos (sem o
   // campo) sao tratados como false na leitura (nao envia).
   avisoForaHorarioAtivo Boolean @default(false)
+  // Interruptor MESTRE de TODAS as mensagens automaticas ao cliente (Fatia 2.78).
+  // Comeca DESLIGADO: com ele false, NENHUMA mensagem automatica sai (nem o aviso
+  // de fora de horario), independentemente dos outros toggles. Antigos = false.
+  mensagensAutomaticasAtivas Boolean @default(false)
   // Logo da empresa guardada no proprio banco (sem storage externo).
   // logoData = data URL (base64) ou SVG sanitizado; logoEm versiona o cache.
   logoData           String?   @db.Text
