@@ -6,6 +6,9 @@ import { gerarRespostaOracle, type OracleMensagem } from "@/lib/oracle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Analise ampla de conversas pode levar mais que o padrao; libera ate 120s para a
+// infra nao cortar antes do TIMEOUT_MS interno do Oracle. Fatia 2.91.
+export const maxDuration = 120;
 
 const MAX_HISTORICO = 40;
 const MAX_TAM_MSG = 4000;

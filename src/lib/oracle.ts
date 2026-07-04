@@ -33,7 +33,9 @@ import {
 export type OracleMensagem = { autor: "user" | "oracle"; texto: string };
 export type OracleResultado = { mensagens: string[]; texto: string; motivo?: string };
 
-const TIMEOUT_MS = 35000;
+// 120s: analise ampla (30 dias) precisa de folga no loop de LLM + ferramentas.
+// O endpoint declara maxDuration compativel. Fatia 2.91.
+const TIMEOUT_MS = 120000;
 const MAX_TOKENS = 2048;
 const MAX_ITER_FERRAMENTA = 5;
 // Modelo do Oracle (analista): sonnet por padrao (bom raciocinio, custo sensato).
@@ -718,27 +720,37 @@ async function analisarPadroesAtendimento(
     ...(admin ? {} : { agenteId: agente.id }),
     ...(finalidadeF ? { finalidade: finalidadeF } : {}),
   };
+  // AMOSTRA os mais RECENTES (teto rapido em memoria): pega as ultimas mensagens
+  // do periodo e agrega no servidor — entrega ao LLM SO o resultado pre-digerido,
+  // nunca as mensagens cruas. Assim a analise ampla (30 dias) nao trava. 2.91.
+  const LIMITE_MSG = 600;
   const mensagens = await prisma.mensagem.findMany({
     where: {
       apagada: false,
       hora: { gte: inicio },
       ...(Object.keys(convFiltro).length ? { conversa: convFiltro } : {}),
     },
-    orderBy: [{ conversaId: "asc" }, { hora: "asc" }],
-    take: 600,
-    select: { conteudo: true, direcao: true, conversaId: true },
+    orderBy: { hora: "desc" },
+    take: LIMITE_MSG,
+    select: { conteudo: true, direcao: true, conversaId: true, hora: true },
   });
+  // Sinaliza que e uma AMOSTRA (nao processou tudo) quando bateu o teto ou o
+  // periodo e longo — para o Oracle deixar claro que sao tendencias, nao totais.
+  const amostra = mensagens.length >= LIMITE_MSG || dias > 30;
+
+  // Agrupa por conversa e ordena cronologicamente (a query veio desc).
+  const grupos = new Map<string, { conteudo: string | null; direcao: string; hora: Date }[]>();
+  for (const m of mensagens) {
+    if (!grupos.has(m.conversaId)) grupos.set(m.conversaId, []);
+    grupos.get(m.conversaId)!.push(m);
+  }
 
   // Pareia cada pergunta do CLIENTE (IN) com a proxima resposta do atendente
   // (OUT) na MESMA conversa, antes de outra pergunta. Sem OUT => sem resposta.
   type Par = { tema: string; pergunta: string; resposta: string | null };
   const pares: Par[] = [];
-  let i = 0;
-  while (i < mensagens.length) {
-    const cid = mensagens[i].conversaId;
-    let j = i;
-    while (j < mensagens.length && mensagens[j].conversaId === cid) j++;
-    const bloco = mensagens.slice(i, j); // uma conversa, cronologico
+  for (const bloco of grupos.values()) {
+    bloco.sort((a, b) => a.hora.getTime() - b.hora.getTime());
     for (let k = 0; k < bloco.length; k++) {
       if (bloco[k].direcao !== "IN") continue;
       let resposta: string | null = null;
@@ -751,14 +763,13 @@ async function analisarPadroesAtendimento(
       }
       pares.push({
         tema: temaDaMensagem(bloco[k].conteudo),
-        pergunta: (bloco[k].conteudo ?? "").slice(0, 200),
-        resposta: resposta ? resposta.slice(0, 200) : null,
+        pergunta: (bloco[k].conteudo ?? "").slice(0, 160),
+        resposta: resposta ? resposta.slice(0, 160) : null,
       });
     }
-    i = j;
   }
 
-  // Agrega por tema: ocorrencias, sem-resposta e ate 3 exemplos (pergunta+resposta).
+  // Agrega por tema: ocorrencias, sem-resposta, % e ate 2 exemplos curtos.
   const porTema = new Map<
     string,
     { ocorrencias: number; semResposta: number; exemplos: { pergunta: string; resposta: string | null }[] }
@@ -770,20 +781,32 @@ async function analisarPadroesAtendimento(
     const g = porTema.get(p.tema)!;
     g.ocorrencias++;
     if (!p.resposta) g.semResposta++;
-    // Exemplos: prioriza os que TEM resposta (para servir de modelo a IA).
-    if (g.exemplos.length < 3 && (p.resposta || g.exemplos.length < 1)) {
+    // Exemplos: prioriza os que TEM resposta (servem de modelo a IA).
+    if (g.exemplos.length < 2 && (p.resposta || g.exemplos.length < 1)) {
       g.exemplos.push({ pergunta: p.pergunta, resposta: p.resposta });
     }
   }
 
   const temas = Array.from(porTema.entries())
-    .map(([tema, v]) => ({ tema, ...v }))
+    .map(([tema, v]) => ({
+      tema,
+      ocorrencias: v.ocorrencias,
+      semResposta: v.semResposta,
+      pctSemResposta: v.ocorrencias
+        ? Math.round((v.semResposta / v.ocorrencias) * 100)
+        : 0,
+      exemplos: v.exemplos,
+    }))
     .sort((a, b) => b.ocorrencias - a.ocorrencias);
 
   return {
     escopo: admin ? "empresa" : "sua carteira",
     periodoDias: dias,
     finalidade: input.finalidade ?? "ambas",
+    amostra,
+    ...(amostra
+      ? { nota: "Amostra das mensagens mais recentes do periodo (tendencias, nao totais exatos)." }
+      : {}),
     totalPerguntasCliente: pares.length,
     perguntasSemResposta: pares.filter((p) => !p.resposta).length,
     temas,
