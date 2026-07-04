@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, UserX } from "lucide-react";
 import { BlocoCliente, type ClientePainel } from "@/components/cliente/BlocoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
+import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
@@ -118,6 +119,9 @@ export function PainelClienteInbox({
           />
 
           <BlocoProdutosInteresse leadId={leadId} />
+
+          {/* Assistencia (Local): nivel cliente, so para pos-venda. */}
+          <BlocoAssistencia leadId={leadId} />
 
           {/* Nivel negocio (so quando ha negocio da finalidade da conversa) */}
           {detalhe && negocioId && (

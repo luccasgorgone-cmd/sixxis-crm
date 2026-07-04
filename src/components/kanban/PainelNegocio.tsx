@@ -45,6 +45,7 @@ import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
+import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
 import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -395,6 +396,9 @@ export function PainelNegocio({
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
                 />
+
+                {/* Assistencia (Local): so para pos-venda; cliente continua no funil. */}
+                <BlocoAssistencia leadId={detalhe.cliente.id} />
 
                 <NegocioAcoes
                   detalhe={detalhe}

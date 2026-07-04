@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { EstadoErro } from "@/components/ui/Estado";
 import { mascararCep, mascararCpf, formatarTelefone } from "@/lib/format";
 import { buscarViaCep } from "@/lib/viacep";
+import { STATUS_ORDEM, STATUS_META } from "@/lib/assistencia";
 
 type Item = {
   id: string;
@@ -73,24 +74,6 @@ function resumoEndereco(it: {
   return [linha1, it.enderecoComplemento, linha2].filter(Boolean).join(" · ");
 }
 
-const STATUS_ORDEM = [
-  "RECEBIDO",
-  "EM_ANALISE",
-  "EM_REPARO",
-  "AGUARDANDO_PECA",
-  "PRONTO",
-  "ENTREGUE",
-] as const;
-
-const STATUS_META: Record<string, { rotulo: string; classe: string }> = {
-  RECEBIDO: { rotulo: "Recebido", classe: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
-  EM_ANALISE: { rotulo: "Em analise", classe: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
-  EM_REPARO: { rotulo: "Em reparo", classe: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
-  AGUARDANDO_PECA: { rotulo: "Aguardando peca", classe: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
-  PRONTO: { rotulo: "Pronto", classe: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300" },
-  ENTREGUE: { rotulo: "Entregue", classe: "bg-black/5 text-medio/70" },
-};
-
 const FILTROS_PERIODO = [
   { v: "", r: "Todo o periodo" },
   { v: "hoje", r: "Hoje" },
@@ -113,6 +96,13 @@ export function Local() {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [periodo, setPeriodo] = useState("");
   const [editando, setEditando] = useState<Item | "novo" | null>(null);
+  // Deep-link vindo da ficha do cliente (?item=<id>): rola ate o item e o destaca.
+  const [destaque, setDestaque] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("item");
+    if (id) setDestaque(id);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setBuscaAplicada(busca), 300);
@@ -146,6 +136,16 @@ export function Local() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Ao chegar via ?item=, rola ate o card e o destaca por alguns segundos.
+  useEffect(() => {
+    if (!destaque || itens.length === 0) return;
+    document
+      .getElementById(`local-item-${destaque}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setDestaque(null), 2600);
+    return () => clearTimeout(t);
+  }, [destaque, itens]);
 
   async function mudarStatus(item: Item, novo: string) {
     setItens((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: novo } : i)));
@@ -265,6 +265,7 @@ export function Local() {
             <ItemCard
               key={it.id}
               it={it}
+              destacado={it.id === destaque}
               onEditar={() => setEditando(it)}
               onStatus={(s) => void mudarStatus(it, s)}
               onRemover={() => void remover(it)}
@@ -290,11 +291,13 @@ export function Local() {
 
 function ItemCard({
   it,
+  destacado = false,
   onEditar,
   onStatus,
   onRemover,
 }: {
   it: Item;
+  destacado?: boolean;
   onEditar: () => void;
   onStatus: (s: string) => void;
   onRemover: () => void;
@@ -303,7 +306,12 @@ function ItemCard({
   const nomeCliente = it.leadNome ?? it.clienteNome;
   const endereco = resumoEndereco(it);
   return (
-    <div className="rounded-xl border border-black/5 bg-white p-3.5">
+    <div
+      id={`local-item-${it.id}`}
+      className={`rounded-xl border bg-white p-3.5 transition-shadow ${
+        destacado ? "border-tiffany ring-2 ring-tiffany/40" : "border-black/5"
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
