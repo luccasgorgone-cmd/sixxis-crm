@@ -19,11 +19,12 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
-import { horaCurta, rotuloDia, chaveDia, formatarTelefone } from "@/lib/format";
+import { horaCurta, rotuloDia, chaveDia } from "@/lib/format";
 
 type Chamada = {
   id: string;
   telefone: string;
+  telefoneFmt: string | null;
   tipo: string; // "voz" | "video"
   status: string; // "recebida" | "perdida" | "rejeitada"
   finalidade: string; // "VENDA" | "POS_VENDA"
@@ -283,7 +284,7 @@ function ItemChamada({ c }: { c: Chamada }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-medium text-escuro">
-            {c.leadNome?.trim() || formatarTelefone(c.telefone)}
+            {c.leadNome?.trim() || c.telefoneFmt || "Numero nao identificado"}
           </p>
           <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/60">
             {c.tipo === "video" ? <Video className="h-2.5 w-2.5" /> : <Phone className="h-2.5 w-2.5" />}
@@ -292,7 +293,7 @@ function ItemChamada({ c }: { c: Chamada }) {
         </div>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-medio/60">
           <span className={`font-medium ${info.classe}`}>{info.rotulo}</span>
-          {c.leadNome && <span>{formatarTelefone(c.telefone)}</span>}
+          {c.leadNome && c.telefoneFmt && <span>{c.telefoneFmt}</span>}
           {(c.instanciaNome || c.instanciaNumero) && (
             <span className="flex items-center gap-1">
               <Smartphone className="h-3 w-3 text-medio/40" />

@@ -752,6 +752,41 @@ async function processarChamada(
   });
   const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
 
+  // NUMERO NAO IDENTIFICAVEL: alguns eventos de chamada vem com JID mascarado
+  // (@lid) ou um id que NAO e telefone (ex.: 15 digitos). Nesses casos o numero
+  // real nao e recuperavel — NAO criamos lead/negocio fantasma. Registramos a
+  // chamada de forma honesta (sem telefone/lead) para aparecer como "Numero nao
+  // identificado". Um telefone plausivel tem 10-13 digitos e nao vem de @lid.
+  const identificavel =
+    !jid.endsWith("@lid") && telefone.length >= 10 && telefone.length <= 13;
+  if (!identificavel) {
+    try {
+      const externalId = chamada?.id ? `call-${chamada.id}` : `call-${randomUUID()}`;
+      await prisma.chamada.create({
+        data: {
+          externalId,
+          telefone: "",
+          direcao: "recebida",
+          tipo: chamada?.isVideo ? "video" : "voz",
+          status: statusChamada(chamada?.status),
+          instancia: nomeInstancia,
+          instanciaId: instancia?.id ?? null,
+          finalidade,
+          horaEm: new Date(),
+        },
+      });
+      (io ?? getIO())?.emit("chamada:nova", { agenteId: null, finalidade });
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {
+        console.warn(
+          `[chamada] falha ao registrar chamada nao identificada: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    console.log(`[chamada] numero nao identificado (${jid}) -> registrada sem lead`);
+    return;
+  }
+
   // Lead (cria se for um numero novo ligando pela 1a vez).
   const lead = await prisma.lead.upsert({
     where: { telefone },

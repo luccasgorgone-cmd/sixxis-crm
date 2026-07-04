@@ -5,7 +5,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
-import { nomeEfetivo } from "@/lib/cliente";
+import { nomeEfetivo, temNomeReal } from "@/lib/cliente";
+import { formatarTelefone } from "@/lib/format";
+import { ehTelefoneValidoBR } from "@/lib/ddd";
 import { resolverPeriodo } from "@/lib/metricas";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -85,22 +87,31 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     : [];
   const mapaInst = new Map(instancias.map((i) => [i.id, i]));
 
-  const itens = chamadas.map((c) => ({
-    id: c.id,
-    telefone: c.telefone,
-    tipo: c.tipo,
-    status: c.status,
-    finalidade: c.finalidade,
-    horaEm: c.horaEm,
-    visto: c.visto,
-    leadId: c.leadId,
-    leadNome: c.lead ? nomeEfetivo(c.lead) : null,
-    leadFoto: c.lead?.fotoUrl ?? null,
-    instanciaNome:
-      (c.instanciaId ? mapaInst.get(c.instanciaId)?.nome : null) ?? c.instancia,
-    instanciaNumero: c.instanciaId ? mapaInst.get(c.instanciaId)?.numero ?? null : null,
-    agenteNome: c.agente?.nome ?? null,
-  }));
+  const itens = chamadas.map((c) => {
+    // Nome/numero limpos: nome real do lead OU telefone formatado quando valido;
+    // nunca um id cru. Sem nenhum -> UI mostra "Numero nao identificado".
+    const leadNome = c.lead && temNomeReal(c.lead) ? nomeEfetivo(c.lead) : null;
+    const telefoneFmt = ehTelefoneValidoBR(c.telefone)
+      ? formatarTelefone(c.telefone)
+      : null;
+    return {
+      id: c.id,
+      telefone: c.telefone,
+      telefoneFmt,
+      tipo: c.tipo,
+      status: c.status,
+      finalidade: c.finalidade,
+      horaEm: c.horaEm,
+      visto: c.visto,
+      leadId: c.leadId,
+      leadNome,
+      leadFoto: c.lead?.fotoUrl ?? null,
+      instanciaNome:
+        (c.instanciaId ? mapaInst.get(c.instanciaId)?.nome : null) ?? c.instancia,
+      instanciaNumero: c.instanciaId ? mapaInst.get(c.instanciaId)?.numero ?? null : null,
+      agenteNome: c.agente?.nome ?? null,
+    };
+  });
 
   return NextResponse.json({ chamadas: itens });
 }
