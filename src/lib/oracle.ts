@@ -19,6 +19,7 @@ import {
 } from "./oracleCampanha";
 import { resolverDestinatarios, normalizarFiltro } from "./campanha";
 import { nomeEfetivo, selectClienteBasico } from "./cliente";
+import { rotuloMotivo } from "./motivosPerda";
 import { CanalEnvio, StatusCampanha, StatusDestino } from "../generated/prisma/enums";
 import { Prisma } from "../generated/prisma/client";
 import {
@@ -118,6 +119,13 @@ So chame "salvar_guia_atendimento_sol" quando o usuario CONFIRMAR (ex.: "sim, sa
 E a UNICA escrita alem do rascunho de campanha; NUNCA salve sozinho. So funciona para
 admin — se o usuario nao for admin, apenas apresente o guia (nao ofereca salvar). A
 ferramenta grava numa secao demarcada, sem apagar o resto da base; confirme ao final.
+
+DIAGNOSTICO (leitura, escopo do usuario): alem das consultas de vendas/funil/etc.,
+voce tem: "consultar_tempo_resposta" (quanto se demora a responder o cliente —
+mediana/p90, por dia/faixa horaria, % sem resposta em 24h; admin ve por agente),
+"comparar_periodos" (uma metrica na janela atual vs a anterior, com variacao %) e
+"consultar_motivos_perda" (por que os negocios sao perdidos). Use-as para responder
+"estamos demorando a responder?", "melhorou vs o periodo anterior?", "por que perdemos?".
 
 FORMATO DE RESPOSTA (obrigatorio): responda SOMENTE com um objeto JSON valido, sem
 cercas de codigo, sem texto antes ou depois, no formato exato:
@@ -879,6 +887,289 @@ async function salvarGuiaAtendimentoSol(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Fatia 2.98 — ferramentas de DIAGNOSTICO (SO LEITURA, agregacao no servidor,
+// escopo por agente, LIMIT explicito). Nunca devolvem linhas cruas ao LLM.
+// ---------------------------------------------------------------------------
+function percentilMin(arr: number[], p: number): number {
+  if (arr.length === 0) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const idx = Math.min(s.length - 1, Math.max(0, Math.floor(p * s.length)));
+  return s[idx];
+}
+function pushMap(map: Map<string, number[]>, k: string, v: number): void {
+  const a = map.get(k);
+  if (a) a.push(v);
+  else map.set(k, [v]);
+}
+const FMT_HORA_SP = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  hour12: false,
+});
+const FMT_WD_SP = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  weekday: "short",
+});
+function faixaHoraria(h: number): string {
+  if (h < 6) return "madrugada (0-6)";
+  if (h < 12) return "manha (6-12)";
+  if (h < 18) return "tarde (12-18)";
+  return "noite (18-24)";
+}
+
+// Tempo de resposta: entre a 1a mensagem IN de um bloco do cliente e a proxima OUT.
+async function consultarTempoResposta(
+  agente: SessaoAgente,
+  input: { periodo?: number; finalidade?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(180, Math.max(1, Math.round(input.periodo ?? 30)));
+  const fin = finalidadeDe(input.finalidade);
+  const inicio = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  const convFiltro: Prisma.ConversaWhereInput = {
+    ...(admin ? {} : { agenteId: agente.id }),
+    ...(fin ? { finalidade: fin } : {}),
+  };
+  const LIMITE = 5000;
+  const mensagens = await prisma.mensagem.findMany({
+    where: {
+      apagada: false,
+      hora: { gte: inicio },
+      ...(Object.keys(convFiltro).length ? { conversa: convFiltro } : {}),
+    },
+    orderBy: { hora: "desc" },
+    take: LIMITE,
+    select: {
+      direcao: true,
+      hora: true,
+      conversaId: true,
+      conversa: { select: { agenteId: true } },
+    },
+  });
+  const amostra = mensagens.length >= LIMITE;
+
+  const grupos = new Map<
+    string,
+    { direcao: string; hora: Date; agenteId: string | null }[]
+  >();
+  for (const m of mensagens) {
+    const item = { direcao: m.direcao, hora: m.hora, agenteId: m.conversa.agenteId };
+    const a = grupos.get(m.conversaId);
+    if (a) a.push(item);
+    else grupos.set(m.conversaId, [item]);
+  }
+
+  const H24 = 24 * 60 * 60 * 1000;
+  const tempos: number[] = [];
+  const porDia = new Map<string, number[]>();
+  const porFaixa = new Map<string, number[]>();
+  const porAgente = new Map<string, number[]>();
+  let blocos = 0;
+  let sem24 = 0;
+  for (const arr of grupos.values()) {
+    arr.sort((a, b) => a.hora.getTime() - b.hora.getTime());
+    for (let i = 0; i < arr.length; i++) {
+      const inicioBloco =
+        arr[i].direcao === "IN" && (i === 0 || arr[i - 1].direcao !== "IN");
+      if (!inicioBloco) continue;
+      blocos++;
+      let out: { hora: Date } | null = null;
+      for (let j = i + 1; j < arr.length; j++) {
+        if (arr[j].direcao === "OUT") {
+          out = arr[j];
+          break;
+        }
+      }
+      const respMs = out ? out.hora.getTime() - arr[i].hora.getTime() : null;
+      if (respMs == null || respMs > H24) sem24++;
+      if (respMs != null && respMs <= H24) {
+        const min = Math.round(respMs / 60000);
+        tempos.push(min);
+        const d = arr[i].hora;
+        pushMap(porDia, FMT_WD_SP.format(d), min);
+        pushMap(porFaixa, faixaHoraria(Number(FMT_HORA_SP.format(d))), min);
+        if (admin && arr[i].agenteId) pushMap(porAgente, arr[i].agenteId!, min);
+      }
+    }
+  }
+  const resumo = (a: number[]) => ({
+    medianaMin: percentilMin(a, 0.5),
+    p90Min: percentilMin(a, 0.9),
+    amostras: a.length,
+  });
+  const objDe = (m: Map<string, number[]>) =>
+    Object.fromEntries([...m].map(([k, v]) => [k, resumo(v)]));
+
+  let porAgenteArr:
+    | { agente: string; medianaMin: number; p90Min: number; amostras: number }[]
+    | undefined;
+  if (admin && porAgente.size) {
+    const ids = [...porAgente.keys()];
+    const agentes = await prisma.agente.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, nome: true },
+    });
+    const nomes = new Map(agentes.map((a) => [a.id, a.nome]));
+    porAgenteArr = [...porAgente]
+      .map(([id, v]) => ({ agente: nomes.get(id) ?? id, ...resumo(v) }))
+      .sort((a, b) => a.medianaMin - b.medianaMin);
+  }
+
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "todas",
+    unidade: "minutos",
+    ...(amostra
+      ? { amostra: true, nota: "Amostra das 5000 mensagens mais recentes (tendencias)." }
+      : {}),
+    geral: resumo(tempos),
+    blocosCliente: blocos,
+    pctSemRespostaEm24h: blocos ? Math.round((sem24 / blocos) * 100) : 0,
+    porDiaSemana: objDe(porDia),
+    porFaixaHoraria: objDe(porFaixa),
+    ...(porAgenteArr ? { porAgente: porAgenteArr } : {}),
+  };
+}
+
+// Compara uma metrica na janela atual vs a janela imediatamente anterior.
+async function compararPeriodos(
+  agente: SessaoAgente,
+  input: { metrica?: string; periodo?: number; finalidade?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(365, Math.max(1, Math.round(input.periodo ?? 30)));
+  const fin = finalidadeDe(input.finalidade);
+  const agora = Date.now();
+  const fimAtual = new Date(agora);
+  const iniAtual = new Date(agora - dias * 24 * 60 * 60 * 1000);
+  const iniAnt = new Date(agora - 2 * dias * 24 * 60 * 60 * 1000);
+  const metrica = input.metrica ?? "vendas";
+
+  async function valor(ini: Date, fim: Date): Promise<number> {
+    const bn = escopoNegocio(agente);
+    const wfin = fin ? { finalidade: fin } : {};
+    switch (metrica) {
+      case "vendas": {
+        const g = await prisma.negocio.aggregate({
+          where: { ...bn, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: ini, lt: fim } },
+          _sum: { valor: true },
+        });
+        return num(g._sum.valor);
+      }
+      case "negocios_ganhos":
+        return prisma.negocio.count({
+          where: { ...bn, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: ini, lt: fim } },
+        });
+      case "negocios_perdidos":
+        return prisma.negocio.count({
+          where: { ...bn, ...wfin, status: StatusNeg.PERDIDO, fechadoEm: { gte: ini, lt: fim } },
+        });
+      case "leads_novos":
+        return prisma.lead.count({
+          where: { ...escopoLead(agente), criadoEm: { gte: ini, lt: fim } },
+        });
+      case "mensagens_recebidas": {
+        const cf: Prisma.ConversaWhereInput = {
+          ...(admin ? {} : { agenteId: agente.id }),
+          ...(fin ? { finalidade: fin } : {}),
+        };
+        return prisma.mensagem.count({
+          where: {
+            direcao: DirecaoMsg.IN,
+            hora: { gte: ini, lt: fim },
+            ...(Object.keys(cf).length ? { conversa: cf } : {}),
+          },
+        });
+      }
+      default:
+        return 0;
+    }
+  }
+
+  const atual = await valor(iniAtual, fimAtual);
+  const anterior = await valor(iniAnt, iniAtual);
+  const variacaoPct =
+    anterior === 0 ? null : Math.round(((atual - anterior) / anterior) * 100);
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    metrica,
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "todas",
+    atual,
+    anterior,
+    variacaoPct,
+    janelaAtual: {
+      de: iniAtual.toISOString().slice(0, 10),
+      ate: fimAtual.toISOString().slice(0, 10),
+    },
+    janelaAnterior: {
+      de: iniAnt.toISOString().slice(0, 10),
+      ate: iniAtual.toISOString().slice(0, 10),
+    },
+  };
+}
+
+// Motivos de perda agregados por motivoPerda (CODE -> rotulo por extenso).
+async function consultarMotivosPerda(
+  agente: SessaoAgente,
+  input: { periodo?: number; finalidade?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(365, Math.max(1, Math.round(input.periodo ?? 90)));
+  const fin = finalidadeDe(input.finalidade);
+  const inicio = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  const where: Prisma.NegocioWhereInput = {
+    ...escopoNegocio(agente),
+    ...(fin ? { finalidade: fin } : {}),
+    status: StatusNeg.PERDIDO,
+    fechadoEm: { gte: inicio },
+  };
+  const grupos = await prisma.negocio.groupBy({
+    by: ["motivoPerda"],
+    where,
+    _count: { _all: true },
+  });
+  const total = grupos.reduce((s, g) => s + g._count._all, 0);
+  const semMotivo = grupos.find((g) => g.motivoPerda == null)?._count._all ?? 0;
+
+  const comObs = await prisma.negocio.findMany({
+    where: { ...where, motivoPerdaObs: { not: null } },
+    select: { motivoPerda: true, motivoPerdaObs: true },
+    take: 300,
+  });
+  const obsPorMotivo = new Map<string, string[]>();
+  for (const n of comObs) {
+    const k = n.motivoPerda ?? "(sem motivo)";
+    const arr = obsPorMotivo.get(k) ?? [];
+    if (arr.length < 3 && n.motivoPerdaObs) {
+      arr.push(n.motivoPerdaObs.trim().slice(0, 120));
+      obsPorMotivo.set(k, arr);
+    }
+  }
+
+  const motivos = grupos
+    .map((g) => ({
+      motivo: g.motivoPerda ? rotuloMotivo(g.motivoPerda) : "(sem motivo preenchido)",
+      code: g.motivoPerda ?? null,
+      ocorrencias: g._count._all,
+      pct: total ? Math.round((g._count._all / total) * 100) : 0,
+      exemplos: obsPorMotivo.get(g.motivoPerda ?? "(sem motivo)") ?? [],
+    }))
+    .sort((a, b) => b.ocorrencias - a.ocorrencias)
+    .slice(0, 15);
+
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "todas",
+    totalPerdidos: total,
+    semMotivoPreenchido: semMotivo,
+    motivos,
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -932,6 +1223,27 @@ async function executarFerramenta(
       case "salvar_guia_atendimento_sol":
         return JSON.stringify(
           await salvarGuiaAtendimentoSol(agente, input as { guia?: string }),
+        );
+      case "consultar_tempo_resposta":
+        return JSON.stringify(
+          await consultarTempoResposta(
+            agente,
+            input as { periodo?: number; finalidade?: string },
+          ),
+        );
+      case "comparar_periodos":
+        return JSON.stringify(
+          await compararPeriodos(
+            agente,
+            input as { metrica?: string; periodo?: number; finalidade?: string },
+          ),
+        );
+      case "consultar_motivos_perda":
+        return JSON.stringify(
+          await consultarMotivosPerda(
+            agente,
+            input as { periodo?: number; finalidade?: string },
+          ),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -1109,6 +1421,61 @@ const FERRAMENTAS = [
         guia: { type: "string", description: "Texto completo do guia de atendimento a salvar." },
       },
       required: ["guia"],
+    },
+  },
+  {
+    name: "consultar_tempo_resposta",
+    description:
+      "Tempo de resposta ao cliente (SO LEITURA, escopo do usuario). Do 1o IN de um " +
+      "bloco do cliente ate a proxima OUT: mediana e p90 gerais, por dia da semana e " +
+      "por faixa horaria, e o % de blocos SEM resposta em 24h. ADMIN recebe tambem a " +
+      "quebra por agente; nao-admin ve so os proprios numeros.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 180)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional." },
+      },
+    },
+  },
+  {
+    name: "comparar_periodos",
+    description:
+      "Compara uma metrica na janela atual vs a janela anterior de mesmo tamanho, no " +
+      "escopo do usuario. Retorna os dois valores e a variacao % (null se base zero). " +
+      "Use para dar contexto de tendencia (subiu/caiu vs periodo anterior).",
+    input_schema: {
+      type: "object",
+      properties: {
+        metrica: {
+          type: "string",
+          enum: [
+            "vendas",
+            "leads_novos",
+            "negocios_ganhos",
+            "negocios_perdidos",
+            "mensagens_recebidas",
+          ],
+        },
+        periodo: { type: "number", description: "Tamanho da janela em DIAS (max 365)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional." },
+      },
+      required: ["metrica", "periodo"],
+    },
+  },
+  {
+    name: "consultar_motivos_perda",
+    description:
+      "Motivos de PERDA dos negocios no periodo (SO LEITURA, escopo do usuario), " +
+      "agrupados por motivo (rotulo por extenso): contagem e % (top 15), total de " +
+      "perdidos, quantos estao SEM motivo preenchido, e ate 3 observacoes de exemplo " +
+      "por motivo. Use para entender por que se perde e onde melhorar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "number", description: "Janela em DIAS (padrao 90, max 365)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional." },
+      },
     },
   },
 ] as const;

@@ -44,6 +44,11 @@ const COMANDOS: { rotulo: string; pergunta: string; Icone?: LucideIcon; destaque
     pergunta:
       "Faca uma varredura completa dos atendimentos. Use as ferramentas de analise de conversas (amostrar_conversas e analisar_padroes_atendimento). Me diga: (1) como estao os atendimentos no geral; (2) o que os clientes MAIS falam e MAIS pedem; (3) as principais duvidas e objecoes; (4) quantas perguntas ficam SEM resposta e em quais temas (onde estamos falhando); (5) como as duvidas costumam ser respondidas (as boas respostas); e (6) gere um GUIA DE ATENDIMENTO acionavel para a IA (Sol): principais perguntas com as melhores respostas modelo, tom ideal, o que fazer e o que evitar. Seja completo e pratico.",
   },
+  {
+    rotulo: "Diagnostico de tempo de resposta",
+    pergunta:
+      "Use a ferramenta consultar_tempo_resposta nos ultimos 30 dias. Me diga a mediana e o p90 do tempo de resposta ao cliente, os piores dias da semana e faixas de horario, e o percentual de mensagens sem resposta em 24h. Se for admin, mostre tambem a quebra por agente. Aponte onde precisamos melhorar.",
+  },
   { rotulo: "Resumo do dia", pergunta: "Me de um resumo do dia de hoje: vendas, atendimentos e o que precisa de atencao." },
   { rotulo: "O que priorizar", pergunta: "Com base nos dados, o que devo priorizar hoje? Liste as 3 acoes mais importantes." },
   { rotulo: "Hoje", pergunta: "Como estao as vendas e os atendimentos de hoje?" },
