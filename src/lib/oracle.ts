@@ -588,6 +588,79 @@ async function buscarConversas(agente: SessaoAgente, termo: string) {
   };
 }
 
+// AMOSTRA AMPLA de conversas recentes (SO LEITURA), SEM exigir termo. Mesmo
+// escopo do Inbox: nao-admin so as proprias conversas; admin todas. Prioriza
+// conversas com DIALOGO dos dois lados (cliente + atendente) para dar exemplos de
+// pergunta -> resposta. Trechos curtos e teto de itens para nao estourar contexto.
+async function amostrarConversas(
+  agente: SessaoAgente,
+  input: { periodo?: number; limite?: number; finalidade?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(180, Math.max(1, Math.round(input.periodo ?? 30)));
+  const limite = Math.min(40, Math.max(1, Math.round(input.limite ?? 30)));
+  const finalidadeF =
+    input.finalidade === "VENDA"
+      ? Finalidade.VENDA
+      : input.finalidade === "POS_VENDA"
+        ? Finalidade.POS_VENDA
+        : null;
+  const inicio = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+
+  const conversas = await prisma.conversa.findMany({
+    where: {
+      arquivada: false,
+      ultimaMensagemEm: { gte: inicio },
+      // ESCOPO: fora do admin, so as conversas atribuidas ao proprio usuario.
+      ...(admin ? {} : { agenteId: agente.id }),
+      ...(finalidadeF ? { finalidade: finalidadeF } : {}),
+    },
+    orderBy: { ultimaMensagemEm: "desc" },
+    // Pega um excedente para priorizar as com dialogo dos dois lados.
+    take: limite * 2,
+    select: {
+      id: true,
+      finalidade: true,
+      lead: { select: selectClienteBasico },
+      mensagens: {
+        where: { apagada: false },
+        orderBy: { hora: "desc" },
+        take: 8,
+        select: { conteudo: true, direcao: true },
+      },
+    },
+  });
+
+  // Prioriza conversas que tem mensagens dos DOIS lados (pergunta -> resposta).
+  const enriquecidas = conversas.map((c) => {
+    const temIN = c.mensagens.some((m) => m.direcao === "IN");
+    const temOUT = c.mensagens.some((m) => m.direcao === "OUT");
+    return { c, doisLados: temIN && temOUT };
+  });
+  enriquecidas.sort((a, b) => Number(b.doisLados) - Number(a.doisLados));
+
+  const resultados = enriquecidas.slice(0, limite).map(({ c }) => ({
+    cliente: nomeEfetivo(c.lead),
+    finalidade: c.finalidade,
+    // Trechos em ordem CRONOLOGICA (as mensagens vieram desc): ate 6 por conversa.
+    trechos: [...c.mensagens]
+      .reverse()
+      .slice(-6)
+      .map((m) => ({
+        quem: m.direcao === "IN" ? "cliente" : "atendente",
+        texto: (m.conteudo ?? "").slice(0, 240),
+      })),
+  }));
+
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "ambas",
+    conversas: resultados.length,
+    resultados,
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -623,6 +696,13 @@ async function executarFerramenta(
       case "buscar_conversas":
         return JSON.stringify(
           await buscarConversas(agente, String((input as { termo?: string }).termo ?? "")),
+        );
+      case "amostrar_conversas":
+        return JSON.stringify(
+          await amostrarConversas(
+            agente,
+            input as { periodo?: number; limite?: number; finalidade?: string },
+          ),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -753,6 +833,22 @@ const FERRAMENTAS = [
         termo: { type: "string", description: "Palavra ou frase a procurar nas mensagens." },
       },
       required: ["termo"],
+    },
+  },
+  {
+    name: "amostrar_conversas",
+    description:
+      "Amostra ampla de conversas recentes (sem precisar de termo), no escopo do usuario " +
+      "(nao-admin so as proprias, admin todas), para analisar padroes de atendimento, duvidas " +
+      "comuns e como sao respondidas. SO LEITURA. Para cada conversa traz trechos marcando quem " +
+      "falou (cliente/atendente), priorizando dialogos com pergunta E resposta.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 180)." },
+        limite: { type: "number", description: "Maximo de conversas na amostra (padrao 30, max 40)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional; padrao ambas." },
+      },
     },
   },
 ] as const;
