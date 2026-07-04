@@ -1,5 +1,7 @@
 // Aba LOCAL (pos-venda): produtos em assistencia. GET lista (com filtros +
-// resumo por status) e POST cadastra. Permissao: ADMIN e POS_VENDA. Entidade
+// resumo por status) e POST cadastra. Permissao: quem tem acesso pos-venda
+// (ADMIN, papel POS_VENDA ou flag acessoPosVenda — inclui quem tem venda+pos).
+// Workspace COMPARTILHADO do pos-venda (nao e escopo por usuario). Entidade
 // isolada — nao entra em metricas de venda.
 import { NextResponse, type NextRequest } from "next/server";
 import { obterAgente, podePosVenda } from "@/lib/autorizacao";
