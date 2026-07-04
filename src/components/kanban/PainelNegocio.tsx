@@ -508,7 +508,7 @@ export function PainelNegocio({
 // Acoes do negocio: valor, temperatura, etapa, dono/transferencia, etiquetas,
 // produtos e fechamento (ganho/perdido).
 // ----------------------------------------------------------------------------
-function NegocioAcoes({
+export function NegocioAcoes({
   detalhe,
   ehAdmin,
   agenteIdAtual,

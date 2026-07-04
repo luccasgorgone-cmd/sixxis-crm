@@ -352,6 +352,8 @@ export function Inbox({
               <PainelClienteInbox
                 leadId={conversaAberta.leadId}
                 negocioId={conversaAberta.negocioId}
+                ehAdmin={ehAdmin}
+                agenteIdAtual={agenteIdAtual}
               />
             </aside>
           )}

@@ -4,8 +4,10 @@
 // do Kanban (sem duplicar componentes — importa e reusa).
 // NIVEL CLIENTE (sempre, por leadId): BlocoCliente (+ enderecos), produtos de
 // interesse e historico do cliente.
-// NIVEL NEGOCIO (so quando a conversa tem negocio da sua finalidade):
-// acompanhamento (nota fiscal / garantia / empresa) e notas do negocio.
+// NIVEL NEGOCIO (so quando a conversa tem negocio da sua finalidade): acoes do
+// negocio (ganho/pendente/perdido, valor, etapa, peca/produtos), acompanhamento
+// (nota fiscal / garantia / empresa) e notas do negocio. Assim o pos-venda tem
+// na CONVERSA os mesmos controles do Kanban (reusa NegocioAcoes/ModalFechamento).
 // Escopo por usuario garantido nos endpoints (/api/leads/[id], /api/negocios/[id]).
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, UserX } from "lucide-react";
@@ -16,20 +18,34 @@ import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
   BlocoRastreio,
+  NegocioAcoes,
   Notas,
 } from "@/components/kanban/PainelNegocio";
-import type { DetalheNegocio, ObservacaoOpcao } from "@/components/kanban/tipos";
+import { ModalFechamento, type DadosFechamento } from "@/components/kanban/ModalFechamento";
+import { useToast } from "@/components/ui/Toast";
+import type {
+  DetalheNegocio,
+  ObservacaoOpcao,
+  Etapa,
+  AgenteResumo,
+  EtiquetaChip,
+} from "@/components/kanban/tipos";
 
 export function PainelClienteInbox({
   leadId,
   negocioId,
   podeEditar = true,
+  ehAdmin = false,
+  agenteIdAtual = "",
 }: {
   leadId: string;
   // Negocio da finalidade da conversa (null = sem negocio -> omite nivel negocio).
   negocioId?: string | null;
   podeEditar?: boolean;
+  ehAdmin?: boolean;
+  agenteIdAtual?: string;
 }) {
+  const toast = useToast();
   const [cliente, setCliente] = useState<ClientePainel | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -57,6 +73,15 @@ export function PainelClienteInbox({
   // Nivel negocio (opcional): detalhe do negocio + presets de nota.
   const [detalhe, setDetalhe] = useState<DetalheNegocio | null>(null);
   const [presets, setPresets] = useState<ObservacaoOpcao[]>([]);
+  // Listas auxiliares para as acoes de negocio (etapas do funil, etiquetas, agentes).
+  const [etapas, setEtapas] = useState<Etapa[]>([]);
+  const [etiquetas, setEtiquetas] = useState<EtiquetaChip[]>([]);
+  const [agentes, setAgentes] = useState<AgenteResumo[]>([]);
+  // Modal de fechamento (ganho/perdido) — mesmo componente/fluxo do Kanban.
+  const [modal, setModal] = useState<{
+    tipo: "ganho" | "perdido";
+    etapaId: string;
+  } | null>(null);
 
   const carregarNegocio = useCallback(async () => {
     if (!negocioId) {
@@ -83,7 +108,59 @@ export function PainelClienteInbox({
       .then((r) => (r.ok ? r.json() : { observacoes: [] }))
       .then((d) => setPresets(d.observacoes ?? []))
       .catch(() => undefined);
-  }, [negocioId]);
+    fetch("/api/etapas")
+      .then((r) => (r.ok ? r.json() : { etapas: [] }))
+      .then((d) => setEtapas((d.etapas as Etapa[]) ?? []))
+      .catch(() => undefined);
+    fetch("/api/etiquetas")
+      .then((r) => (r.ok ? r.json() : { etiquetas: [] }))
+      .then((d) => setEtiquetas(d.etiquetas ?? []))
+      .catch(() => undefined);
+    if (ehAdmin) {
+      fetch("/api/agentes")
+        .then((r) => (r.ok ? r.json() : { agentes: [] }))
+        .then((d) => setAgentes(d.agentes ?? []))
+        .catch(() => undefined);
+    }
+  }, [negocioId, ehAdmin]);
+
+  // Etapas do funil da finalidade do negocio (para achar Ganho/Perdido e o select).
+  const etapasFunil = detalhe
+    ? etapas.filter(
+        (e) =>
+          !e.finalidade ||
+          e.finalidade === "AMBAS" ||
+          e.finalidade === detalhe.finalidade,
+      )
+    : [];
+
+  // PATCH do negocio (mesmo contrato do Kanban): salva e recarrega cliente+negocio.
+  const salvar = useCallback(
+    async (body: Record<string, unknown>): Promise<boolean> => {
+      if (!negocioId) return false;
+      try {
+        const r = await fetch(`/api/negocios/${negocioId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          await carregarNegocio();
+          void carregarCliente();
+        } else {
+          const d = await r.json().catch(() => null);
+          toast.erro(d?.erro ?? "Nao foi possivel salvar a alteracao.");
+        }
+        return r.ok;
+      } catch {
+        toast.erro("Falha de conexao ao salvar.");
+        return false;
+      }
+    },
+    [negocioId, carregarNegocio, carregarCliente, toast],
+  );
+
+  const podeAcoesNegocio = podeEditar && !!detalhe && !!negocioId;
 
   return (
     <div className="scroll-fino h-full space-y-5 overflow-y-auto bg-fundo p-4">
@@ -126,6 +203,24 @@ export function PainelClienteInbox({
           {/* Nivel negocio (so quando ha negocio da finalidade da conversa) */}
           {detalhe && negocioId && (
             <>
+              {/* Acoes do negocio: ganho/pendente/perdido, valor, etapa, dono,
+                  etiquetas e peca/produtos — os mesmos controles do Kanban. */}
+              {podeAcoesNegocio && (
+                <NegocioAcoes
+                  detalhe={detalhe}
+                  ehAdmin={ehAdmin}
+                  agenteIdAtual={agenteIdAtual}
+                  agentes={agentes}
+                  etiquetas={etiquetas}
+                  etapas={etapasFunil}
+                  negocioId={negocioId}
+                  salvar={salvar}
+                  recarregar={carregarNegocio}
+                  onAtualizado={() => void carregarCliente()}
+                  abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+                />
+              )}
+
               <BlocoAcompanhamento
                 detalhe={detalhe}
                 recarregar={carregarNegocio}
@@ -158,6 +253,26 @@ export function PainelClienteInbox({
             <HistoricoCliente leadId={leadId} />
           </div>
         </>
+      )}
+
+      {/* Fechamento (ganho/perdido) — mesmo modal e regra do Kanban. */}
+      {modal && detalhe && (
+        <ModalFechamento
+          tipo={modal.tipo}
+          valorInicial={detalhe.valor}
+          finalidade={detalhe.finalidade}
+          onConfirmar={async (dados: DadosFechamento) => {
+            // Ganho/Perdido limpam a pendencia (estados mutuamente exclusivos).
+            const ok = await salvar({
+              etapaId: modal.etapaId,
+              ...dados,
+              ...(detalhe.pendente ? { pendente: false } : {}),
+            });
+            if (!ok) throw new Error("falha");
+            setModal(null);
+          }}
+          onCancelar={() => setModal(null)}
+        />
       )}
     </div>
   );
