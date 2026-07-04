@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { previewMensagem } from "@/lib/preview";
 import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
+import { janelaDeParams } from "@/lib/metricas";
 import type { Prisma } from "@/generated/prisma/client";
 import { Finalidade } from "@/generated/prisma/enums";
 
@@ -28,6 +29,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const f = req.nextUrl.searchParams.get("finalidade");
   if (f === Finalidade.VENDA || f === Finalidade.POS_VENDA) {
     where.finalidade = f;
+  }
+
+  // Periodo opcional: filtra por QUANDO o atendimento ENTROU = conversa.criadoEm.
+  // (hoje|7d|15d|30d|custom). Combina com o escopo/finalidade (AND).
+  const janela = janelaDeParams(req.nextUrl.searchParams);
+  if (janela) {
+    where.criadoEm = { gte: janela.inicio, lte: janela.fim };
   }
 
   // Busca por CONTEUDO das mensagens (case-insensitive). Combina com o escopo

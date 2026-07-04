@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
+import { janelaDeParams } from "@/lib/metricas";
 import type { Prisma } from "@/generated/prisma/client";
 import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
 
@@ -63,6 +64,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Temperatura.
   if (temperatura && temperatura in Temperatura) {
     where.temperatura = temperatura as Temperatura;
+  }
+
+  // Periodo opcional: filtra por QUANDO o atendimento/negocio ENTROU =
+  // negocio.criadoEm (hoje|7d|15d|30d|custom). Combina com escopo/finalidade (AND).
+  const janela = janelaDeParams(sp);
+  if (janela) {
+    where.criadoEm = { gte: janela.inicio, lte: janela.fim };
   }
 
   // Filtros sobre o lead (etiqueta + busca por nome/telefone).

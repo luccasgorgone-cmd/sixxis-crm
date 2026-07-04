@@ -40,6 +40,32 @@ export function resolverPeriodo(
   return { inicio, fim };
 }
 
+// Janela de periodo a partir dos params da UI de atendimentos:
+//   ?periodo=hoje|7d|15d|30d|custom  (+ ?de=YYYY-MM-DD&ate=YYYY-MM-DD no custom)
+// Retorna null quando NAO ha filtro (periodo vazio/invalido) — o chamador nao
+// filtra. Reusa resolverPeriodo. Usado por /api/conversas e /api/negocios para
+// filtrar por QUANDO o atendimento ENTROU (data de criacao).
+export function janelaDeParams(sp: URLSearchParams): Periodo | null {
+  const periodo = sp.get("periodo")?.trim();
+  if (!periodo) return null;
+  if (periodo === "custom") {
+    const de = sp.get("de");
+    const ate = sp.get("ate");
+    if (!de || !ate) return null;
+    // Dia inteiro: do inicio do dia "de" ate o fim do dia "ate".
+    return resolverPeriodo(null, `${de}T00:00:00`, `${ate}T23:59:59`, new Date());
+  }
+  const mapa: Record<string, string> = {
+    hoje: "hoje",
+    "7d": "semana",
+    "15d": "15d",
+    "30d": "mes",
+  };
+  const preset = mapa[periodo];
+  if (!preset) return null;
+  return resolverPeriodo(preset, null, null, new Date());
+}
+
 type Escopo = { agenteId?: string; finalidade?: Finalidade };
 
 export type Metricas = {
