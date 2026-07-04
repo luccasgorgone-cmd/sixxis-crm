@@ -415,8 +415,9 @@ export async function configurarWebhook(
           headers: { "x-webhook-secret": secret },
           byEvents: false,
           base64: false,
-          // UPSERT = mensagens; UPDATE/DELETE = status e revogacoes (apagar);
-          // CALL = chamada recebida (notifica o atendente, nao atende).
+          // UPSERT = mensagens; UPDATE/DELETE = status e revogacoes (apagar).
+          // CALL ainda e assinado (o webhook recebe), mas e IGNORADO desde a
+          // fatia 2.77 — a secao de Chamadas foi removida (sem persistir nada).
           events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CALL"],
         },
       }),
