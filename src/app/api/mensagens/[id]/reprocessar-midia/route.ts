@@ -19,6 +19,14 @@ function ehMidia(tipo: TipoMsg): boolean {
   );
 }
 
+// A URL crua do WhatsApp (mmg.whatsapp.net / .enc) NAO e exibivel — so a do R2.
+// Usado para decidir se ainda precisa reprocessar (figurinhas antigas ficaram
+// com a URL crua e devem ser rebaixadas pro R2). Fatia 2.83.
+function ehUrlRenderavel(url?: string | null): boolean {
+  if (!url) return false;
+  return !/whatsapp\.net/i.test(url) && !/\.enc(\?|#|$)/i.test(url);
+}
+
 export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -35,6 +43,7 @@ export async function POST(
       id: true,
       externalId: true,
       tipo: true,
+      conteudo: true,
       mediaUrl: true,
       raw: true,
       conversa: {
@@ -50,13 +59,18 @@ export async function POST(
   if (!msg) {
     return NextResponse.json({ erro: "nao encontrada" }, { status: 404 });
   }
-  if (!ehMidia(msg.tipo)) {
+  // Figurinha antiga pode ter ficado como TipoMsg.OUTRO (antes da fatia 2.80):
+  // aceita reprocessar tambem quando o conteudo e "[figurinha]".
+  const ehFigurinha = (msg.conteudo ?? "").trim() === "[figurinha]";
+  if (!ehMidia(msg.tipo) && !ehFigurinha) {
     return NextResponse.json(
       { erro: "esta mensagem nao e de midia" },
       { status: 422 },
     );
   }
-  if (msg.mediaUrl) {
+  // Ja tem uma URL EXIBIVEL (R2): nada a fazer. Se a mediaUrl atual e a URL crua
+  // do WhatsApp (figurinhas antigas), NAO conta como pronta — segue para rebaixar.
+  if (msg.mediaUrl && ehUrlRenderavel(msg.mediaUrl)) {
     return NextResponse.json({ ok: true, mediaUrl: msg.mediaUrl, jaTinha: true });
   }
 
