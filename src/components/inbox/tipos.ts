@@ -57,6 +57,8 @@ export type MensagemItem = {
   // Reacoes (emoji) estilo WhatsApp: a nossa e a do cliente.
   reacao?: string | null;
   reacaoDeCliente?: string | null;
+  // Edicao (estilo WhatsApp): true => a bolha mostra a marca "editada".
+  editada?: boolean;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

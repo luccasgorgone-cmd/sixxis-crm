@@ -229,13 +229,31 @@ export function Inbox({
       );
     }
 
+    // Edicao de mensagem (nossa ou do cliente): atualiza o conteudo + marca editada.
+    function onEditada(evt: {
+      conversaId: string;
+      mensagemId: string;
+      conteudo: string;
+    }) {
+      if (selecionadaRef.current !== evt.conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId
+            ? { ...m, conteudo: evt.conteudo, editada: true }
+            : m,
+        ),
+      );
+    }
+
     socket.on("mensagem:nova", onNova);
     socket.on("mensagem:midia", onMidia);
     socket.on("mensagem:reacao", onReacao);
+    socket.on("mensagem:editada", onEditada);
     return () => {
       socket.off("mensagem:nova", onNova);
       socket.off("mensagem:midia", onMidia);
       socket.off("mensagem:reacao", onReacao);
+      socket.off("mensagem:editada", onEditada);
     };
   }, [carregarConversas]);
 

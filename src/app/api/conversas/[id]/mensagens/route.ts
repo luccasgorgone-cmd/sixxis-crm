@@ -50,6 +50,8 @@ export async function GET(
       // Reacoes (emoji) — nossa e a do cliente.
       reacao: true,
       reacaoDeCliente: true,
+      // Edicao (estilo WhatsApp): marca "editada" na bolha.
+      editada: true,
       // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
       instancia: true,
       instanciaId: true,

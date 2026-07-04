@@ -23,6 +23,8 @@ import {
   RefreshCw,
   Download,
   AlertTriangle,
+  Pencil,
+  X,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -423,6 +425,17 @@ function Bolha({
   const [pickerReacao, setPickerReacao] = useState(false);
   const [reagindo, setReagindo] = useState(false);
   const reacaoBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Edicao (estilo WhatsApp) — otimista. conteudoLocal/editadaLocal refletem a
+  // edicao antes do refetch; o conteudo exibido usa o local quando presente.
+  const [editando, setEditando] = useState(false);
+  const [textoEdicao, setTextoEdicao] = useState("");
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [conteudoLocal, setConteudoLocal] = useState<string | null>(null);
+  const [editadaLocal, setEditadaLocal] = useState(false);
+  const conteudoExibido = conteudoLocal !== null ? conteudoLocal : mensagem.conteudo;
+  const foiEditada = mensagem.editada === true || editadaLocal;
+
   const reacao = reacaoLocal !== undefined ? reacaoLocal : mensagem.reacao ?? null;
   const reacaoCliente = mensagem.reacaoDeCliente ?? null;
   // Reagir a mensagens nao apagadas (o backend valida o id real do WhatsApp).
@@ -484,6 +497,51 @@ function Bolha({
     }
   }
 
+  // Edicao: so mensagens NOSSAS (OUT), de TEXTO, nao apagadas e dentro da janela
+  // do WhatsApp (~15 min). O servidor tambem valida (autor/admin + tempo).
+  const JANELA_EDICAO_MS = 15 * 60 * 1000;
+  const podeEditar =
+    podeApagar &&
+    ehOut &&
+    !apagada &&
+    mensagem.tipo === "TEXTO" &&
+    Date.now() - new Date(mensagem.hora).getTime() < JANELA_EDICAO_MS;
+
+  function abrirEdicao() {
+    setTextoEdicao(conteudoExibido ?? "");
+    setEditando(true);
+  }
+
+  async function salvarEdicao() {
+    const t = textoEdicao.trim();
+    if (!t || salvandoEdicao) return;
+    if (t === (conteudoExibido ?? "").trim()) {
+      setEditando(false);
+      return;
+    }
+    setSalvandoEdicao(true);
+    try {
+      const r = await fetch(`/api/mensagens/${mensagem.id}/editar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: t }),
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok) {
+        setConteudoLocal(t);
+        setEditadaLocal(true);
+        setEditando(false);
+        toast.sucesso("Mensagem editada.");
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel editar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  }
+
   const rotuloApagada =
     apagadaPor === "CLIENTE"
       ? "Mensagem apagada pelo cliente"
@@ -525,6 +583,17 @@ function Bolha({
             />
           )}
         </div>
+      )}
+      {/* Acao editar (so na propria mensagem OUT de texto, dentro da janela) */}
+      {podeEditar && !editando && (
+        <button
+          onClick={abrirEdicao}
+          title="Editar mensagem"
+          aria-label="Editar mensagem"
+          className="order-1 shrink-0 rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-tiffany group-hover:opacity-100"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
       )}
       {/* Acao apagar (so na propria mensagem enviada) */}
       {podeRevogar && (
@@ -610,9 +679,49 @@ function Bolha({
               </span>
             )}
           </div>
+        ) : editando ? (
+          // Edicao inline (estilo WhatsApp): textarea + salvar/cancelar.
+          <div className="space-y-1.5">
+            <textarea
+              value={textoEdicao}
+              onChange={(e) => setTextoEdicao(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void salvarEdicao();
+                }
+                if (e.key === "Escape") setEditando(false);
+              }}
+              rows={2}
+              autoFocus
+              className="scroll-fino w-full resize-none rounded-lg border border-white/40 bg-white/10 px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/50 focus:border-white/70"
+            />
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => setEditando(false)}
+                disabled={salvandoEdicao}
+                title="Cancelar"
+                className="rounded-full p-1 text-white/80 hover:bg-white/15"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => void salvarEdicao()}
+                disabled={salvandoEdicao || !textoEdicao.trim()}
+                title="Salvar edicao"
+                className="rounded-full p-1 text-white hover:bg-white/15 disabled:opacity-50"
+              >
+                {salvandoEdicao ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
+          </div>
         ) : (
           <span className="whitespace-pre-wrap break-words">
-            {mensagem.conteudo}
+            {conteudoExibido}
           </span>
         )}
 
@@ -621,6 +730,10 @@ function Bolha({
             apagada ? "text-medio/40" : ehOut ? "text-white/70" : "text-medio/50"
           }`}
         >
+          {/* Marca "editada" (estilo WhatsApp). */}
+          {foiEditada && !apagada && (
+            <span className="italic opacity-80">editada</span>
+          )}
           {/* Selo interno: mensagem enviada pela Luna (IA). So a equipe ve. */}
           {ehOut && mensagem.viaIA && (
             <span

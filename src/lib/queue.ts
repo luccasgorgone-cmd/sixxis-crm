@@ -653,6 +653,87 @@ async function atualizarStatusMensagem(
   });
 }
 
+// Extrai uma EDICAO de mensagem de um evento MESSAGES_UPDATE/UPSERT (WhatsApp
+// permite editar ~15 min). Formato: protocolMessage type=14 (MESSAGE_EDIT) com
+// editedMessage (o novo conteudo) e key.id (a mensagem-alvo). Best-effort: varre
+// alguns caminhos conhecidos e retorna null se nao for uma edicao. Fatia 2.81.
+function extrairEdicao(
+  payload: EventoEvolution,
+): { id: string; texto: string } | null {
+  const data = payload?.data as Record<string, unknown> | undefined;
+  if (!data) return null;
+  const msg = data.message as Record<string, unknown> | undefined;
+  const candidatos = [
+    (msg?.editedMessage as { message?: Record<string, unknown> } | undefined)?.message
+      ?.protocolMessage,
+    msg?.protocolMessage,
+    (data.editedMessage as { message?: Record<string, unknown> } | undefined)?.message
+      ?.protocolMessage,
+  ] as (
+    | {
+        type?: number | string;
+        key?: { id?: string };
+        editedMessage?: {
+          conversation?: string;
+          extendedTextMessage?: { text?: string };
+        };
+      }
+    | undefined
+  )[];
+  for (const pm of candidatos) {
+    if (!pm) continue;
+    const ehEdit =
+      pm.type === 14 || pm.type === "MESSAGE_EDIT" || pm.type === "14";
+    const alvo = pm.key?.id;
+    const ed = pm.editedMessage;
+    if (!alvo || !ed) continue;
+    const texto =
+      (typeof ed.conversation === "string" && ed.conversation) ||
+      (typeof ed.extendedTextMessage?.text === "string" &&
+        ed.extendedTextMessage.text) ||
+      null;
+    // Aceita quando ha texto novo (o type nem sempre vem preenchido).
+    if (texto && (ehEdit || texto)) return { id: String(alvo), texto };
+  }
+  return null;
+}
+
+// Aplica uma edicao recebida do WhatsApp (eco da nossa edicao ou edicao do
+// cliente) na Mensagem correspondente (por externalId). Idempotente e best-effort:
+// nao altera se o texto ja e o mesmo; erros nao quebram a ingestao. Fatia 2.81.
+async function aplicarEdicaoRecebida(
+  externalId: string,
+  texto: string,
+  io: Server | null,
+): Promise<void> {
+  try {
+    const msg = await prisma.mensagem.findUnique({
+      where: { externalId },
+      select: { id: true, conversaId: true, conteudo: true, conteudoOriginal: true },
+    });
+    if (!msg) return;
+    if ((msg.conteudo ?? "").trim() === texto.trim()) return; // eco idempotente
+    await prisma.mensagem.update({
+      where: { id: msg.id },
+      data: {
+        conteudo: texto,
+        editada: true,
+        editadaEm: new Date(),
+        ...(msg.conteudoOriginal ? {} : { conteudoOriginal: msg.conteudo ?? "" }),
+      },
+    });
+    (io ?? getIO())?.emit("mensagem:editada", {
+      conversaId: msg.conversaId,
+      mensagemId: msg.id,
+      conteudo: texto,
+    });
+  } catch (e) {
+    console.warn(
+      `[edicao] falha ao aplicar edicao ${externalId}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 // URL "original" da midia (sub-objeto da mensagem). Pode ser criptografada/
 // efemera; usada apenas como fallback enquanto o R2 nao confirma.
 function extrairMediaUrl(message?: Record<string, unknown> | null): string | null {
@@ -1311,11 +1392,20 @@ async function processarEvento(
     if (revId) await marcarApagadaPeloCliente(revId, io);
     return;
   }
-  // Update pode ser revogacao (stub) OU atualizacao de status de entrega/leitura.
+  // Update pode ser revogacao (stub), EDICAO de mensagem, OU atualizacao de
+  // status de entrega/leitura.
   if (evt === "MESSAGES_UPDATE") {
     const revId = idRevogado(payload);
-    if (revId) await marcarApagadaPeloCliente(revId, io);
-    else await atualizarStatusMensagem(payload, io);
+    if (revId) {
+      await marcarApagadaPeloCliente(revId, io);
+      return;
+    }
+    const edicao = extrairEdicao(payload);
+    if (edicao) {
+      await aplicarEdicaoRecebida(edicao.id, edicao.texto, io);
+      return;
+    }
+    await atualizarStatusMensagem(payload, io);
     return;
   }
   // So processamos recebimento/insercao de mensagens. Demais eventos: ignora.
@@ -1325,6 +1415,14 @@ async function processarEvento(
   const revInline = idRevogado(payload);
   if (revInline) {
     await marcarApagadaPeloCliente(revInline, io);
+    return;
+  }
+
+  // Edicao que chega como upsert (protocolMessage MESSAGE_EDIT): atualiza o
+  // conteudo da mensagem-alvo e retorna (nao cria uma mensagem nova).
+  const edInline = extrairEdicao(payload);
+  if (edInline) {
+    await aplicarEdicaoRecebida(edInline.id, edInline.texto, io);
     return;
   }
 

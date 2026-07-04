@@ -408,6 +408,12 @@ model Mensagem {
   // reacaoDeCliente = a que o cliente enviou. null = sem reacao. Fatia 2.69.
   reacao          String?
   reacaoDeCliente String?
+  // Edicao de mensagem (Fatia 2.81), estilo WhatsApp. conteudo guarda o texto
+  // ATUAL; conteudoOriginal guarda o primeiro texto (auditoria). editada marca a
+  // bolha com "editada".
+  editada          Boolean     @default(false)
+  editadaEm        DateTime?
+  conteudoOriginal String?     @db.Text
   // Payload bruto da Evolution. Podado (NULL) apos RETENCAO_RAW_MESES; o conteudo
   // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
   raw         Json?

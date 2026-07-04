@@ -74,11 +74,27 @@ export function ConversaEmbed({
         ),
       );
     }
+    function onEditada(evt: {
+      conversaId: string;
+      mensagemId: string;
+      conteudo: string;
+    }) {
+      if (evt.conversaId !== conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId
+            ? { ...m, conteudo: evt.conteudo, editada: true }
+            : m,
+        ),
+      );
+    }
     socket.on("mensagem:nova", onNova);
     socket.on("mensagem:midia", onMidia);
+    socket.on("mensagem:editada", onEditada);
     return () => {
       socket.off("mensagem:nova", onNova);
       socket.off("mensagem:midia", onMidia);
+      socket.off("mensagem:editada", onEditada);
     };
   }, [conversaId]);
 

@@ -288,6 +288,40 @@ export async function revogarMensagem(
   }
 }
 
+// Edita uma mensagem JA ENVIADA (estilo WhatsApp). Evolution v2:
+// POST {BASE}/chat/updateMessage/{instance} body { number, text, key:{id,remoteJid,fromMe} }.
+// O WhatsApp permite editar por ~15 min; a validacao de tempo fica no endpoint.
+export async function editarMensagem(
+  instancia: string | null | undefined,
+  numero: string,
+  dados: { id: string; remoteJid: string; fromMe: boolean },
+  texto: string,
+): Promise<{ ok: boolean; status?: number; raw: unknown }> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  try {
+    const resp = await fetch(`${cfg.base}/chat/updateMessage/${instance}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({
+        number: numero,
+        text: texto,
+        key: { id: dados.id, remoteJid: dados.remoteJid, fromMe: dados.fromMe },
+      }),
+    });
+    const raw = await resp.json().catch(() => null);
+    return { ok: resp.ok, status: resp.status, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // Busca a URL da foto de perfil de um numero no WhatsApp.
 // POST {BASE}/chat/fetchProfilePictureUrl/{instance}  body { number }.
 // Retorna a URL ou null (sem foto / erro / config ausente) — nunca lanca.
