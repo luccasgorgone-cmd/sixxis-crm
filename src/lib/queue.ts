@@ -475,12 +475,13 @@ function mapearTipo(msgType?: string): TipoMsg {
       return TipoMsg.VIDEO;
     case "documentMessage":
       return TipoMsg.DOCUMENTO;
-    // Figurinha (sticker) recebida: o .webp renderiza como IMAGEM — mesma escolha
-    // do NOSSO envio de figurinha (gravado como IMAGEM). Assim ehMidia() baixa o
-    // arquivo pro R2 e o Thread exibe a imagem (o "[figurinha]" fica so no
-    // conteudo/placeholder, nao vira legenda). O enum TipoMsg nao tem FIGURINHA.
+    // Figurinha (sticker) recebida: NAO tratada como midia (Fatia 2.97). O
+    // download .webp da Evolution nao-oficial falha (getBase64FromMediaMessage),
+    // entao mapeamos para OUTRO -> ehMidia() = false -> o worker NAO tenta baixar
+    // pro R2 (sem falhas/logs recorrentes). A UI exibe so o texto "Figurinha"
+    // (placeholder de conteudo "[figurinha]"). Retomar a imagem apos a API oficial.
     case "stickerMessage":
-      return TipoMsg.IMAGEM;
+      return TipoMsg.OUTRO;
     default:
       return TipoMsg.OUTRO;
   }

@@ -857,13 +857,7 @@ function Bolha({
             )}
           </div>
         ) : ehFigurinha ? (
-          <Figurinha
-            mensagemId={mensagem.id}
-            mediaUrl={mediaUrl}
-            ehOut={ehOut}
-            ehAdmin={ehAdmin}
-            onRecarregada={(url) => setMediaLocal(url)}
-          />
+          <Figurinha ehOut={ehOut} />
         ) : ehContato ? (
           <CartaoContato
             nome={mensagem.contatoNome ?? "Contato"}
@@ -1101,90 +1095,19 @@ function CartaoContato({
   );
 }
 
-// Figurinha (sticker .webp) recebida. So exibe a IMAGEM quando a mediaUrl e do R2
-// (renderavel); a URL crua do WhatsApp (.enc) NAO renderiza — nesse caso mostra um
-// placeholder LIMPO (nunca imagem quebrada / pagina de erro). onError tambem cai
-// no placeholder. Admin pode reprocessar (rebaixar pro R2). Fatia 2.83.
-function Figurinha({
-  mensagemId,
-  mediaUrl,
-  ehOut,
-  ehAdmin,
-  onRecarregada,
-}: {
-  mensagemId: string;
-  mediaUrl: string | null | undefined;
-  ehOut: boolean;
-  ehAdmin: boolean;
-  onRecarregada: (url: string) => void;
-}) {
-  const toast = useToast();
-  const [erro, setErro] = useState(false);
-  const [recarregando, setRecarregando] = useState(false);
-
-  if (ehUrlRenderavel(mediaUrl) && mediaUrl && !erro) {
-    return (
-      <a href={mediaUrl} target="_blank" rel="noreferrer" className="block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={mediaUrl}
-          alt="Figurinha"
-          onError={() => setErro(true)}
-          className="max-h-40 w-auto max-w-[10rem] object-contain"
-        />
-      </a>
-    );
-  }
-
-  async function recarregar() {
-    setRecarregando(true);
-    try {
-      const r = await fetch(`/api/mensagens/${mensagemId}/reprocessar-midia`, {
-        method: "POST",
-      });
-      const d = await r.json().catch(() => null);
-      if (r.ok && d?.mediaUrl) {
-        setErro(false);
-        onRecarregada(d.mediaUrl as string);
-        toast.sucesso("Figurinha recuperada.");
-      } else {
-        toast.erro(d?.erro ?? "Nao foi possivel recuperar a figurinha.");
-      }
-    } catch {
-      toast.erro("Falha de conexao.");
-    } finally {
-      setRecarregando(false);
-    }
-  }
-
+// Figurinha (sticker) recebida: exibida APENAS como texto "Figurinha" (Fatia
+// 2.97). A imagem nao e baixada — a Evolution nao-oficial nao serve o .webp
+// (getBase64FromMediaMessage falha); retomar a exibicao apos a API oficial da
+// Meta. ehFigurinha (conteudo === "[figurinha]") decide usar este render.
+function Figurinha({ ehOut }: { ehOut: boolean }) {
   return (
-    <div className="space-y-1.5">
-      <span
-        className={`flex items-center gap-2 italic ${
-          ehOut ? "text-white/90" : "text-medio/70"
-        }`}
-      >
-        <Sticker className="h-4 w-4" /> Figurinha
-      </span>
-      {ehAdmin && (
-        <button
-          onClick={() => void recarregar()}
-          disabled={recarregando}
-          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
-            ehOut
-              ? "bg-white/15 text-white hover:bg-white/25"
-              : "bg-black/5 text-medio hover:bg-black/10"
-          } disabled:opacity-60`}
-        >
-          {recarregando ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3 w-3" />
-          )}
-          Recarregar figurinha
-        </button>
-      )}
-    </div>
+    <span
+      className={`flex items-center gap-2 italic ${
+        ehOut ? "text-white/90" : "text-medio/70"
+      }`}
+    >
+      <Sticker className="h-4 w-4" /> Figurinha
+    </span>
   );
 }
 
