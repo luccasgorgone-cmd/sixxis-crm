@@ -15,13 +15,16 @@ const OPCOES: { valor: Tema; rotulo: string; Icone: typeof Sun }[] = [
   { valor: "sistema", rotulo: "Sistema", Icone: Monitor },
 ];
 
-// Converte o valor salvo (compat: aceita 'light'/'dark' do script de boot).
+// Converte o valor salvo (compat: aceita 'light'/'dark' do script de boot). Sem
+// nada salvo (primeiro acesso), o DEFAULT e ESCURO — igual ao boot no layout.
+// Fatia 2.88.
 function lerTema(): Tema {
-  if (typeof window === "undefined") return "sistema";
+  if (typeof window === "undefined") return "escuro";
   const t = localStorage.getItem("tema");
   if (t === "dark" || t === "escuro") return "escuro";
   if (t === "light" || t === "claro") return "claro";
-  return "sistema";
+  if (t === "sistema" || t === "system") return "sistema";
+  return "escuro";
 }
 
 function aplicar(tema: Tema): void {
@@ -33,7 +36,7 @@ function aplicar(tema: Tema): void {
 }
 
 export function TemaToggle() {
-  const [tema, setTema] = useState<Tema>("sistema");
+  const [tema, setTema] = useState<Tema>("escuro");
   const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
