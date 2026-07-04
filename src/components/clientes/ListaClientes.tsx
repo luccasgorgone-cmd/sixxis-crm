@@ -45,6 +45,7 @@ import { PainelNegocio } from "@/components/kanban/PainelNegocio";
 import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
 import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
 import { ModalTransferencia } from "./ModalTransferencia";
+import { ModalEtiquetasMassa } from "./ModalEtiquetasMassa";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -148,6 +149,7 @@ export function ListaClientes({
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [envioAberto, setEnvioAberto] = useState(false);
   const [transferAberto, setTransferAberto] = useState(false);
+  const [etiquetarAberto, setEtiquetarAberto] = useState(false);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -669,6 +671,13 @@ export function ListaClientes({
               </button>
             )}
             <button
+              onClick={() => setEtiquetarAberto(true)}
+              disabled={selecionados.size === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-tiffany/40 px-3 py-1.5 text-sm font-semibold text-tiffany hover:bg-tiffany/10 disabled:opacity-50"
+            >
+              <Tag className="h-4 w-4" /> Etiquetar ({selecionados.size})
+            </button>
+            <button
               onClick={() => setEnvioAberto(true)}
               disabled={selecionados.size === 0}
               className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
@@ -862,6 +871,20 @@ export function ListaClientes({
           onFechar={() => setTransferAberto(false)}
           onConcluido={() => {
             setTransferAberto(false);
+            setSelecionados(new Set());
+            setModoSelecao(false);
+            void carregar();
+          }}
+        />
+      )}
+
+      {etiquetarAberto && (
+        <ModalEtiquetasMassa
+          leadIds={[...selecionados]}
+          etiquetas={todasEtiquetas}
+          onFechar={() => setEtiquetarAberto(false)}
+          onConcluido={() => {
+            setEtiquetarAberto(false);
             setSelecionados(new Set());
             setModoSelecao(false);
             void carregar();
