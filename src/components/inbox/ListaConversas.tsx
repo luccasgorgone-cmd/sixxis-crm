@@ -13,6 +13,10 @@ import { horarioLista } from "@/lib/format";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { EstadoErro, EstadoVazio } from "@/components/ui/Estado";
+import {
+  FiltroPeriodoEntrada,
+  type PeriodoEntrada,
+} from "@/components/ui/FiltroPeriodoEntrada";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "minhas", rotulo: "Minhas" },
@@ -35,9 +39,12 @@ export function ListaConversas({
   filtro,
   finalidade,
   mostrarFinalidade,
+  periodo,
+  contadorPeriodo,
   onBusca,
   onFiltro,
   onFinalidade,
+  onPeriodo,
   onSelecionar,
   onTentar,
 }: {
@@ -49,9 +56,12 @@ export function ListaConversas({
   filtro: Filtro;
   finalidade: Finalidade | "";
   mostrarFinalidade: boolean;
+  periodo: PeriodoEntrada;
+  contadorPeriodo?: number;
   onBusca: (v: string) => void;
   onFiltro: (f: Filtro) => void;
   onFinalidade: (f: Finalidade | "") => void;
+  onPeriodo: (v: PeriodoEntrada) => void;
   onSelecionar: (id: string) => void;
   onTentar?: () => void;
 }) {
@@ -99,6 +109,14 @@ export function ListaConversas({
               {f.rotulo}
             </button>
           ))}
+        </div>
+        {/* Periodo por entrada do atendimento (quando a conversa entrou). */}
+        <div className="mt-2">
+          <FiltroPeriodoEntrada
+            valor={periodo}
+            onChange={onPeriodo}
+            contador={contadorPeriodo}
+          />
         </div>
       </div>
 

@@ -24,6 +24,11 @@ import { PainelNegocio } from "./PainelNegocio";
 import { EstadoErro } from "@/components/ui/Estado";
 import { BannerAviso } from "@/components/ui/Banner";
 import { useToast } from "@/components/ui/Toast";
+import {
+  paramsPeriodo,
+  PERIODO_TODOS,
+  type PeriodoEntrada,
+} from "@/components/ui/FiltroPeriodoEntrada";
 import { normalizarTexto } from "@/lib/format";
 import type {
   Etapa,
@@ -89,6 +94,8 @@ export function Kanban({
     ehAdmin ? "todos" : "meus",
   );
   const [agenteId, setAgenteId] = useState("");
+  // Filtro por entrada do atendimento (quando o negocio foi criado).
+  const [periodo, setPeriodo] = useState<PeriodoEntrada>(PERIODO_TODOS);
   // Default: a primeira finalidade acessivel (evita pedir um funil sem acesso).
   const [finalidade, setFinalidade] = useState<Finalidade>(finalidadesEfetivas[0]);
 
@@ -153,8 +160,10 @@ export function Kanban({
       p.set("filtro", filtroDono);
       if (filtroDono === "todos" && agenteId) p.set("agenteId", agenteId);
     }
+    // Periodo por entrada (negocio.criadoEm): hoje|7d|15d|30d|custom.
+    for (const [k, v] of Object.entries(paramsPeriodo(periodo))) p.set(k, v);
     return p.toString();
-  }, [finalidade, ehAdmin, filtroDono, agenteId]);
+  }, [finalidade, ehAdmin, filtroDono, agenteId, periodo]);
 
   const carregar = useCallback(async () => {
     try {
@@ -374,6 +383,13 @@ export function Kanban({
     return out;
   }, [colunas, buscaAplicada, temperatura, etiquetaId, telsConteudo]);
 
+  // Total de cards carregados (ja filtrados por periodo/finalidade no servidor)
+  // — contador do periodo mostrado na barra de filtros.
+  const totalCards = useMemo(
+    () => Object.values(colunas).reduce((s, c) => s + c.length, 0),
+    [colunas],
+  );
+
   const temFiltro = Boolean(buscaAplicada.trim() || temperatura || etiquetaId);
   const vazioReal =
     !carregando &&
@@ -448,11 +464,14 @@ export function Kanban({
         etiquetas={etiquetas}
         agentes={agentes}
         mostrarTemperatura={finalidade !== "POS_VENDA"}
+        periodo={periodo}
+        contadorPeriodo={totalCards}
         onBusca={setBusca}
         onEtiqueta={setEtiquetaId}
         onTemperatura={setTemperatura}
         onFiltroDono={setFiltroDono}
         onAgente={setAgenteId}
+        onPeriodo={setPeriodo}
       />
 
       {semColaboradorAtivo && (

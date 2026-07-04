@@ -10,6 +10,10 @@ import type {
   FiltroDono,
 } from "./tipos";
 import { TEMPERATURA_INFO } from "./tipos";
+import {
+  FiltroPeriodoEntrada,
+  type PeriodoEntrada,
+} from "@/components/ui/FiltroPeriodoEntrada";
 
 const DONOS: { chave: FiltroDono; rotulo: string }[] = [
   { chave: "meus", rotulo: "Meus" },
@@ -27,11 +31,14 @@ export function BarraFiltros({
   etiquetas,
   agentes,
   mostrarTemperatura = true,
+  periodo,
+  contadorPeriodo,
   onBusca,
   onEtiqueta,
   onTemperatura,
   onFiltroDono,
   onAgente,
+  onPeriodo,
 }: {
   ehAdmin: boolean;
   busca: string;
@@ -43,11 +50,14 @@ export function BarraFiltros({
   agentes: AgenteResumo[];
   // Pos-venda nao usa temperatura -> esconde o filtro.
   mostrarTemperatura?: boolean;
+  periodo: PeriodoEntrada;
+  contadorPeriodo?: number;
   onBusca: (v: string) => void;
   onEtiqueta: (v: string) => void;
   onTemperatura: (v: string) => void;
   onFiltroDono: (v: FiltroDono) => void;
   onAgente: (v: string) => void;
+  onPeriodo: (v: PeriodoEntrada) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-black/5 bg-white px-4 py-2.5">
@@ -88,6 +98,13 @@ export function BarraFiltros({
           ))}
         </select>
       )}
+
+      {/* Periodo por entrada do atendimento (mesma UX do Inbox). */}
+      <FiltroPeriodoEntrada
+        valor={periodo}
+        onChange={onPeriodo}
+        contador={contadorPeriodo}
+      />
 
       {ehAdmin && (
         <>

@@ -10,6 +10,11 @@ import { normalizarTexto } from "@/lib/format";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
 import { PainelClienteInbox } from "./PainelClienteInbox";
+import {
+  paramsPeriodo,
+  PERIODO_TODOS,
+  type PeriodoEntrada,
+} from "@/components/ui/FiltroPeriodoEntrada";
 import type {
   ConversaItem,
   MensagemItem,
@@ -38,6 +43,8 @@ export function Inbox({
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  // Filtro por entrada do atendimento (conversa.criadoEm).
+  const [periodo, setPeriodo] = useState<PeriodoEntrada>(PERIODO_TODOS);
 
   // Debounce da busca (~250ms).
   useEffect(() => {
@@ -53,8 +60,12 @@ export function Inbox({
 
   const carregarConversas = useCallback(async () => {
     try {
-      const qs = finalidade ? `?finalidade=${finalidade}` : "";
-      const r = await fetch(`/api/conversas${qs}`);
+      const p = new URLSearchParams();
+      if (finalidade) p.set("finalidade", finalidade);
+      // Periodo por entrada (conversa.criadoEm): hoje|7d|15d|30d|custom.
+      for (const [k, v] of Object.entries(paramsPeriodo(periodo))) p.set(k, v);
+      const qs = p.toString();
+      const r = await fetch(`/api/conversas${qs ? `?${qs}` : ""}`);
       if (!r.ok) throw new Error();
       const d = await r.json();
       setConversas(d.conversas as ConversaItem[]);
@@ -64,7 +75,7 @@ export function Inbox({
     } finally {
       setCarregandoLista(false);
     }
-  }, [finalidade]);
+  }, [finalidade, periodo]);
 
   useEffect(() => {
     void carregarConversas();
@@ -260,6 +271,7 @@ export function Inbox({
     let cancelado = false;
     const qs = new URLSearchParams({ texto: q });
     if (finalidade) qs.set("finalidade", finalidade);
+    for (const [k, v] of Object.entries(paramsPeriodo(periodo))) qs.set(k, v);
     fetch(`/api/conversas?${qs.toString()}`)
       .then((r) => (r.ok ? r.json() : { conversas: [] }))
       .then((d) => {
@@ -271,7 +283,7 @@ export function Inbox({
     return () => {
       cancelado = true;
     };
-  }, [buscaAplicada, finalidade]);
+  }, [buscaAplicada, finalidade, periodo]);
 
   // Aplica busca (nome/telefone local, sem acento) + filtro. Ao buscar, une os
   // resultados por CONTEUDO (backend) — dedup por id, preservando o trecho.
@@ -324,9 +336,12 @@ export function Inbox({
         filtro={filtro}
         finalidade={finalidade}
         mostrarFinalidade={ehAdmin}
+        periodo={periodo}
+        contadorPeriodo={conversas.length}
         onBusca={setBusca}
         onFiltro={setFiltro}
         onFinalidade={setFinalidade}
+        onPeriodo={setPeriodo}
         onSelecionar={abrirConversa}
         onTentar={() => void carregarConversas()}
       />
