@@ -39,6 +39,7 @@ export async function GET(): Promise<NextResponse> {
       fuso: config.fuso,
       horarios,
       mensagemForaHorario: config.mensagemForaHorario,
+      avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
       temLogo: Boolean(config.logoData),
       logoEm: config.logoEm?.getTime() ?? 0,
       temFavicon: Boolean(config.faviconData),
@@ -58,6 +59,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     fuso?: string;
     horarios?: unknown;
     mensagemForaHorario?: string;
+    avisoForaHorarioAtivo?: boolean;
     logoData?: unknown;
     logoMime?: unknown;
     // Sinal explicito para remover a logo atual.
@@ -91,6 +93,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         typeof body.mensagemForaHorario === "string"
           ? body.mensagemForaHorario.trim() || null
           : null;
+    }
+    if (body.avisoForaHorarioAtivo !== undefined) {
+      data.avisoForaHorarioAtivo = body.avisoForaHorarioAtivo === true;
     }
 
     // Logo: remover, ou validar/sanitizar e salvar com nova versao (logoEm).
@@ -159,8 +164,11 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         fuso: config.fuso,
         horarios,
         mensagemForaHorario: config.mensagemForaHorario,
+        avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
         temLogo: Boolean(config.logoData),
         logoEm: config.logoEm?.getTime() ?? 0,
+        temFavicon: Boolean(config.faviconData),
+        faviconEm: config.faviconEm?.getTime() ?? 0,
       },
       abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
     });

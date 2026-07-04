@@ -18,6 +18,7 @@ type Config = {
   fuso: string;
   horarios: DiaHorario[];
   mensagemForaHorario: string | null;
+  avisoForaHorarioAtivo: boolean;
   temLogo: boolean;
   logoEm: number;
   temFavicon: boolean;
@@ -302,6 +303,30 @@ export function GeralAdmin() {
           </div>
         </div>
 
+        {/* Interruptor do aviso automatico fora do horario (default DESLIGADO). */}
+        <div className="rounded-xl border border-black/5 bg-white p-4">
+          <label className="flex cursor-pointer items-start justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-escuro">
+                Enviar aviso automatico fora do horario
+              </span>
+              <span className="mt-0.5 block text-xs text-medio/60">
+                Quando ligado, clientes que escreverem fora do expediente recebem
+                uma resposta automatica. Desligado, nada e enviado
+                automaticamente.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={config.avisoForaHorarioAtivo}
+              onChange={(e) =>
+                setConfig({ ...config, avisoForaHorarioAtivo: e.target.checked })
+              }
+              className="mt-0.5 h-5 w-5 shrink-0 accent-tiffany"
+            />
+          </label>
+        </div>
+
         <div>
           <label className="mb-1 block text-sm font-medium text-escuro">
             Mensagem de fora do horario
@@ -315,6 +340,12 @@ export function GeralAdmin() {
             placeholder="Ex.: Nosso atendimento e de seg a sex, 9h as 18h. Retornamos em breve."
             className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           />
+          {!config.avisoForaHorarioAtivo && (
+            <p className="mt-1 text-xs text-medio/50">
+              O aviso automatico esta desligado — esta mensagem so e usada quando
+              o interruptor acima for ligado.
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
