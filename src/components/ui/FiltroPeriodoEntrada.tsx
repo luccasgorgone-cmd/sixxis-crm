@@ -74,7 +74,7 @@ export function FiltroPeriodoEntrada({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setAberto((a) => !a)}
-        className={`flex w-full items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+        className={`flex w-full items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
           ativo
             ? "border-tiffany/40 bg-tiffany/10 text-tiffany"
             : "border-black/10 bg-white text-medio/80 hover:bg-black/5 dark:bg-white/5"
@@ -86,7 +86,7 @@ export function FiltroPeriodoEntrada({
           <span className="shrink-0 opacity-70">· {contador}</span>
         )}
         <ChevronDown
-          className={`ml-auto h-3.5 w-3.5 shrink-0 transition-transform ${
+          className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
             aberto ? "rotate-180" : ""
           }`}
         />
@@ -100,14 +100,14 @@ export function FiltroPeriodoEntrada({
               <button
                 key={o.v || "todos"}
                 onClick={() => escolher(o.v)}
-                className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium transition-colors ${
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium transition-colors ${
                   sel
                     ? "bg-tiffany/10 text-tiffany"
                     : "text-medio/80 hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 {o.r}
-                {sel && <Check className="h-3.5 w-3.5 shrink-0" />}
+                {sel && <Check className="h-4 w-4 shrink-0" />}
               </button>
             );
           })}
