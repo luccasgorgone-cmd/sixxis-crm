@@ -56,7 +56,7 @@ export function BarraFiltros({
         <input
           value={busca}
           onChange={(e) => onBusca(e.target.value)}
-          placeholder="Buscar cliente ou telefone"
+          placeholder="Buscar cliente, telefone ou mensagem"
           className="w-full bg-transparent py-2 text-sm outline-none"
         />
       </div>

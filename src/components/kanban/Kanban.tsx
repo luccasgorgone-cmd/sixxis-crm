@@ -93,6 +93,38 @@ export function Kanban({
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Busca por CONTEUDO das conversas (escopada). Reusa GET /api/conversas?texto=
+  // e coleta os telefones dos leads que bateram — o filtro casa os cards por
+  // telefone (mesmo campo cru do lead). Cancela requisicoes obsoletas.
+  const [telsConteudo, setTelsConteudo] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    const q = buscaAplicada.trim();
+    if (!q) {
+      setTelsConteudo(null);
+      return;
+    }
+    let cancelado = false;
+    const qs = new URLSearchParams({ texto: q });
+    if (finalidade) qs.set("finalidade", finalidade);
+    fetch(`/api/conversas?${qs.toString()}`)
+      .then((r) => (r.ok ? r.json() : { conversas: [] }))
+      .then((d) => {
+        if (cancelado) return;
+        const tels = new Set<string>(
+          (d.conversas ?? []).map((c: { leadTelefone?: string }) =>
+            (c.leadTelefone ?? "").replace(/\D/g, ""),
+          ),
+        );
+        setTelsConteudo(tels);
+      })
+      .catch(() => {
+        if (!cancelado) setTelsConteudo(new Set());
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [buscaAplicada, finalidade]);
+
   // Pos-venda nao usa temperatura: limpa o filtro ao entrar (o select some, entao
   // um filtro remanescente esconderia cards sem o usuario poder limpar).
   useEffect(() => {
@@ -317,15 +349,17 @@ export function Kanban({
         if (q) {
           const nome = normalizarTexto(c.leadNome ?? "");
           const tel = c.leadTelefone.replace(/\D/g, "");
-          if (!nome.includes(q) && !(qDig.length > 0 && tel.includes(qDig))) {
-            return false;
-          }
+          const casaNome = nome.includes(q);
+          const casaTel = qDig.length > 0 && tel.includes(qDig);
+          // Tambem casa por CONTEUDO das conversas (telefone no conjunto).
+          const casaConteudo = telsConteudo?.has(tel) ?? false;
+          if (!casaNome && !casaTel && !casaConteudo) return false;
         }
         return true;
       });
     }
     return out;
-  }, [colunas, buscaAplicada, temperatura, etiquetaId]);
+  }, [colunas, buscaAplicada, temperatura, etiquetaId, telsConteudo]);
 
   const temFiltro = Boolean(buscaAplicada.trim() || temperatura || etiquetaId);
   const vazioReal =
