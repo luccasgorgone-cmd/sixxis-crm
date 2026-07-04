@@ -401,7 +401,11 @@ function Bolha({
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
-  const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo);
+  // Figurinha antiga (recebida como OUTRO) com mediaUrl: tratar como midia para
+  // renderizar a imagem (novas figurinhas ja chegam como IMAGEM — fatia 2.80).
+  const ehFigurinhaComMidia =
+    (mensagem.conteudo ?? "").trim() === "[figurinha]" && !!mensagem.mediaUrl;
+  const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo) || ehFigurinhaComMidia;
   const legenda = legendaReal(mensagem.conteudo);
 
   // Estado local de apagamento (otimista) + expandir original (admin).
@@ -658,6 +662,9 @@ function Midia({
   const toast = useToast();
   const [recarregando, setRecarregando] = useState(false);
   const IconeMidia = ICONE_MIDIA[mensagem.tipo];
+  // Figurinhas ANTIGAS (recebidas antes da fatia 2.80) foram gravadas como OUTRO,
+  // mas tem mediaUrl e conteudo "[figurinha]". Renderiza como imagem tambem.
+  const ehFigurinha = (mensagem.conteudo ?? "").trim() === "[figurinha]";
 
   async function recarregar() {
     setRecarregando(true);
@@ -680,7 +687,7 @@ function Midia({
   }
 
   if (mediaUrl) {
-    if (mensagem.tipo === "IMAGEM") {
+    if (mensagem.tipo === "IMAGEM" || ehFigurinha) {
       return (
         <a href={mediaUrl} target="_blank" rel="noreferrer" className="block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
