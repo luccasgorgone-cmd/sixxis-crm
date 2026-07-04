@@ -18,6 +18,7 @@ import {
   Undo2,
   Smile,
   Sticker,
+  FileText,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorEmoji } from "./SeletorEmoji";
@@ -131,7 +132,77 @@ export function Compositor({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const arquivoAudioRef = useRef<HTMLInputElement>(null);
+
+  // ---- Anexo GERAL de arquivo (clipe): qualquer tipo (imagem/video/pdf/doc/audio).
+  // Separado da gravacao de voz (microfone), que continua no seu proprio botao.
+  const [arquivoSel, setArquivoSel] = useState<File | null>(null);
+  const [arquivoPreview, setArquivoPreview] = useState<string | null>(null);
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const arquivoRef = useRef<HTMLInputElement>(null);
+  // Limites do WhatsApp: ~16MB midia (imagem/video/audio), ~100MB documento.
+  const LIMITE_MIDIA = 16 * 1024 * 1024;
+  const LIMITE_DOC = 100 * 1024 * 1024;
+
+  function tamanhoLegivel(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function descartarArquivo() {
+    setArquivoSel(null);
+    setArquivoPreview((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return null;
+    });
+  }
+
+  function anexarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    const ehMidia = /^(image|video|audio)\//.test(f.type);
+    const limite = ehMidia ? LIMITE_MIDIA : LIMITE_DOC;
+    if (f.size > limite) {
+      setErro(`Arquivo muito grande (max ${ehMidia ? "16MB" : "100MB"}).`);
+      return;
+    }
+    setErro(null);
+    setArquivoSel(f);
+    setArquivoPreview((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return f.type.startsWith("image/") ? URL.createObjectURL(f) : null;
+    });
+  }
+
+  async function enviarArquivoMsg() {
+    if (!arquivoSel || enviandoArquivo) return;
+    setEnviandoArquivo(true);
+    setErro(null);
+    try {
+      const fd = new FormData();
+      fd.append("conversaId", conversaId);
+      if (instanciaSel) fd.append("instanciaId", instanciaSel);
+      fd.append("arquivo", arquivoSel, arquivoSel.name);
+      const r = await fetch("/api/mensagens/enviar-arquivo", {
+        method: "POST",
+        body: fd,
+      });
+      const d = await r.json().catch(() => null);
+      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      if (!r.ok) {
+        setErro(
+          d?.erro ??
+            "Falha ao enviar o arquivo. Verifique a conexao com o WhatsApp.",
+        );
+      }
+      descartarArquivo();
+    } catch {
+      setErro("Nao foi possivel enviar o arquivo agora.");
+    } finally {
+      setEnviandoArquivo(false);
+    }
+  }
 
   function pararTimer() {
     if (timerRef.current) {
@@ -193,12 +264,6 @@ export function Compositor({
     setGravando(false);
   }
 
-  function anexarAudio(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) definirAudio(f);
-    e.target.value = "";
-  }
-
   async function enviarAudioMsg() {
     if (!audioBlob || enviandoAudio) return;
     setEnviandoAudio(true);
@@ -231,6 +296,10 @@ export function Compositor({
     return () => {
       pararTimer();
       setAudioUrl((u) => {
+        if (u) URL.revokeObjectURL(u);
+        return null;
+      });
+      setArquivoPreview((u) => {
         if (u) URL.revokeObjectURL(u);
         return null;
       });
@@ -748,7 +817,56 @@ export function Compositor({
         </div>
       )}
 
-      {/* Preview do audio gravado/anexado: tocar, descartar ou enviar. */}
+      {/* Preview do ARQUIVO anexado (clipe): nome, tamanho e miniatura (imagem).
+          Enviar ou descartar. Aceita qualquer tipo (imagem/video/pdf/doc/audio). */}
+      {arquivoSel && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo p-2">
+          {arquivoPreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={arquivoPreview}
+              alt={arquivoSel.name}
+              className="h-12 w-12 shrink-0 rounded object-cover"
+            />
+          ) : (
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-black/5 text-medio/70">
+              <FileText className="h-6 w-6" />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-escuro">
+              {arquivoSel.name}
+            </p>
+            <p className="text-xs text-medio/60">
+              {tamanhoLegivel(arquivoSel.size)}
+              {arquivoSel.type ? ` · ${arquivoSel.type}` : ""}
+            </p>
+          </div>
+          <button
+            onClick={descartarArquivo}
+            disabled={enviandoArquivo}
+            title="Descartar arquivo"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio hover:bg-black/5 hover:text-erro"
+          >
+            <Trash2 className="h-4.5 w-4.5" />
+          </button>
+          <button
+            onClick={() => void enviarArquivoMsg()}
+            disabled={enviandoArquivo}
+            title="Enviar arquivo"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-tiffany px-3 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+          >
+            {enviandoArquivo ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Enviar
+          </button>
+        </div>
+      )}
+
+      {/* Preview do audio gravado (microfone): tocar, descartar ou enviar. */}
       {audioBlob && audioUrl && !gravando && (
         <div className="mb-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo p-2">
           <audio src={audioUrl} controls className="h-9 min-w-0 flex-1" />
@@ -776,11 +894,11 @@ export function Compositor({
         </div>
       )}
 
+      {/* Anexo geral: sem accept => a janela do sistema abre em "Todos os Arquivos". */}
       <input
-        ref={arquivoAudioRef}
+        ref={arquivoRef}
         type="file"
-        accept="audio/*"
-        onChange={anexarAudio}
+        onChange={anexarArquivo}
         className="hidden"
       />
 
@@ -868,9 +986,9 @@ export function Compositor({
             <Mic className="h-5 w-5" />
           </button>
           <button
-            onClick={() => arquivoAudioRef.current?.click()}
-            title="Anexar audio"
-            aria-label="Anexar audio"
+            onClick={() => arquivoRef.current?.click()}
+            title="Anexar arquivo"
+            aria-label="Anexar arquivo"
             className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
           >
             <Paperclip className="h-5 w-5" />
