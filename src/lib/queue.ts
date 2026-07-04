@@ -414,6 +414,49 @@ function mapearTipo(msgType?: string): TipoMsg {
   }
 }
 
+// Telefone do vCard (primeira linha TEL). Fatia 2.85.
+function telefoneDoVcard(vcard?: string | null): string | null {
+  if (!vcard) return null;
+  const m = vcard.match(/TEL[^:\r\n]*:([^\r\n]+)/i);
+  return m ? m[1].trim() || null : null;
+}
+
+// Extrai um CONTATO compartilhado (contactMessage/contactsArrayMessage) em dados
+// estruturados (nome + telefone + vCard cru). Varios contatos: usa o 1o para o
+// card e concatena os vCards. Retorna null se nao for contato. Fatia 2.85.
+function extrairContato(
+  message?: Record<string, unknown> | null,
+): { nome: string; telefone: string | null; vcard: string } | null {
+  if (!message) return null;
+  const m = message as Record<string, unknown>;
+  const single = m["contactMessage"] as
+    | { displayName?: string; vcard?: string }
+    | undefined;
+  if (single && (single.vcard || single.displayName)) {
+    return {
+      nome: single.displayName?.trim() || "Contato",
+      telefone: telefoneDoVcard(single.vcard),
+      vcard: single.vcard ?? "",
+    };
+  }
+  const arr = m["contactsArrayMessage"] as
+    | { contacts?: { displayName?: string; vcard?: string }[] }
+    | undefined;
+  if (arr?.contacts?.length) {
+    const c0 = arr.contacts[0];
+    const vcards = arr.contacts
+      .map((c) => c.vcard)
+      .filter((v): v is string => !!v)
+      .join("\n");
+    return {
+      nome: c0.displayName?.trim() || "Contato",
+      telefone: telefoneDoVcard(c0.vcard),
+      vcard: vcards,
+    };
+  }
+  return null;
+}
+
 // Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
 // tipos sem texto (figurinha/localizacao/contato). Captura o maximo de info.
 function extrairConteudo(
@@ -1502,6 +1545,8 @@ async function processarEvento(
   const tipo = mapearTipo(data?.messageType);
   const conteudo = extrairConteudo(data?.message);
   const transcricao = extrairTranscricao(data);
+  // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
+  const contatoInfo = extrairContato(data?.message);
   // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
   // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
   // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
@@ -1625,6 +1670,13 @@ async function processarEvento(
         instanciaId: instancia?.id ?? null,
         ...(transcricao ? { transcricao } : {}),
         ...(mediaUrlOriginal ? { mediaUrl: mediaUrlOriginal } : {}),
+        ...(contatoInfo
+          ? {
+              contatoNome: contatoInfo.nome,
+              contatoTelefone: contatoInfo.telefone,
+              contatoVcard: contatoInfo.vcard || null,
+            }
+          : {}),
         raw: payload as unknown as Prisma.InputJsonValue,
         ...(hora ? { hora } : {}),
       },

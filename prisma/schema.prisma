@@ -414,6 +414,11 @@ model Mensagem {
   editada          Boolean     @default(false)
   editadaEm        DateTime?
   conteudoOriginal String?     @db.Text
+  // Contato compartilhado (Fatia 2.85): dados estruturados do vCard (tipo=OUTRO,
+  // conteudo "[contato] Nome"). Renderiza como card no thread.
+  contatoNome      String?
+  contatoTelefone  String?
+  contatoVcard     String?     @db.Text
   // Payload bruto da Evolution. Podado (NULL) apos RETENCAO_RAW_MESES; o conteudo
   // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
   raw         Json?

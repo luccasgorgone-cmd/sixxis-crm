@@ -169,6 +169,50 @@ export async function enviarFigurinha(
   }
 }
 
+// Envia um CONTATO (vCard) por uma instancia. Evolution v2:
+// POST {BASE}/message/sendContact/{instance} body { number, contact:[{fullName,wuid,phoneNumber}] }.
+// Se o endpoint nao existir/falhar, o chamador degrada para texto formatado.
+export async function enviarContato(
+  numero: string,
+  instancia: string | null | undefined,
+  contato: { nome: string; telefone: string },
+): Promise<ResultadoEnvio> {
+  const cfg = baseEKey();
+  const instance = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!cfg || !instance) {
+    return { ok: false, raw: { erro: "config Evolution ausente" } };
+  }
+  const digitos = contato.telefone.replace(/\D/g, "");
+  try {
+    const resp = await fetch(`${cfg.base}/message/sendContact/${instance}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: cfg.apikey },
+      body: JSON.stringify({
+        number: numero,
+        contact: [
+          {
+            fullName: contato.nome,
+            wuid: digitos,
+            phoneNumber: contato.telefone,
+          },
+        ],
+      }),
+    });
+    const raw: unknown = await resp.json().catch(() => null);
+    if (!resp.ok) return { ok: false, status: resp.status, raw };
+    const externalId =
+      typeof raw === "object" && raw !== null
+        ? (raw as { key?: { id?: string } }).key?.id
+        : undefined;
+    return { ok: true, externalId, raw };
+  } catch (erro) {
+    return {
+      ok: false,
+      raw: { erro: erro instanceof Error ? erro.message : String(erro) },
+    };
+  }
+}
+
 // POST {BASE}/message/sendReaction/{INSTANCE} body { key, reaction }. Reage a uma
 // mensagem (emoji). reaction "" remove a reacao (toggle, como no WhatsApp). O key
 // identifica a mensagem alvo: { id: externalId, remoteJid, fromMe }.

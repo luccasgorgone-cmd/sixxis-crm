@@ -59,6 +59,9 @@ export type MensagemItem = {
   reacaoDeCliente?: string | null;
   // Edicao (estilo WhatsApp): true => a bolha mostra a marca "editada".
   editada?: boolean;
+  // Contato compartilhado (card no thread): nome + telefone do vCard.
+  contatoNome?: string | null;
+  contatoTelefone?: string | null;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

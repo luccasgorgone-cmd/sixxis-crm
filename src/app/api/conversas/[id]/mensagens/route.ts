@@ -52,6 +52,9 @@ export async function GET(
       reacaoDeCliente: true,
       // Edicao (estilo WhatsApp): marca "editada" na bolha.
       editada: true,
+      // Contato compartilhado (card no thread).
+      contatoNome: true,
+      contatoTelefone: true,
       // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
       instancia: true,
       instanciaId: true,

@@ -26,6 +26,7 @@ import {
   Pencil,
   X,
   Sticker,
+  Copy,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -417,6 +418,8 @@ function Bolha({
   // a mediaUrl for do R2 (renderavel) — senao mostra um placeholder limpo, nunca
   // a URL crua do WhatsApp (que quebra). Fatia 2.83.
   const ehFigurinha = (mensagem.conteudo ?? "").trim() === "[figurinha]";
+  // Contato compartilhado (vCard): renderiza como CARD. Fatia 2.85.
+  const ehContato = !!mensagem.contatoNome;
   const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo) && !ehFigurinha;
   const legenda = legendaReal(mensagem.conteudo);
 
@@ -682,6 +685,12 @@ function Bolha({
             ehAdmin={ehAdmin}
             onRecarregada={(url) => setMediaLocal(url)}
           />
+        ) : ehContato ? (
+          <CartaoContato
+            nome={mensagem.contatoNome ?? "Contato"}
+            telefone={mensagem.contatoTelefone ?? null}
+            ehOut={ehOut}
+          />
         ) : ehTipoMidia ? (
           <div className="space-y-1">
             <Midia
@@ -771,6 +780,61 @@ function Bolha({
           {ehOut && !apagada && <StatusEnvio status={mensagem.statusEnvio} />}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Card de CONTATO compartilhado (vCard). Avatar com inicial, nome e telefone,
+// com acao de COPIAR o numero. Estilo WhatsApp. Fatia 2.85.
+function CartaoContato({
+  nome,
+  telefone,
+  ehOut,
+}: {
+  nome: string;
+  telefone: string | null;
+  ehOut: boolean;
+}) {
+  const toast = useToast();
+  const inicial = (nome.trim()[0] ?? "?").toUpperCase();
+  async function copiar() {
+    if (!telefone) return;
+    try {
+      await navigator.clipboard.writeText(telefone);
+      toast.sucesso("Numero copiado.");
+    } catch {
+      toast.erro("Nao foi possivel copiar.");
+    }
+  }
+  return (
+    <div className="min-w-56 space-y-1.5">
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+            ehOut ? "bg-white/20 text-white" : "bg-tiffany/15 text-tiffany"
+          }`}
+        >
+          {inicial}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{nome}</p>
+          {telefone && (
+            <p className={`truncate text-xs ${ehOut ? "text-white/80" : "text-medio/70"}`}>
+              {formatarTelefone(telefone)}
+            </p>
+          )}
+        </div>
+      </div>
+      {telefone && (
+        <button
+          onClick={() => void copiar()}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${
+            ehOut ? "bg-white/15 text-white hover:bg-white/25" : "bg-black/5 text-medio hover:bg-black/10"
+          }`}
+        >
+          <Copy className="h-3.5 w-3.5" /> Copiar numero
+        </button>
+      )}
     </div>
   );
 }

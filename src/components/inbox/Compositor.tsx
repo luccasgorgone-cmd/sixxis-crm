@@ -19,11 +19,13 @@ import {
   Smile,
   Sticker,
   FileText,
+  Contact,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorEmoji } from "./SeletorEmoji";
 import { SeletorFigurinha } from "./SeletorFigurinha";
 import { SeletorProduto, mensagemProduto } from "@/components/loja/SeletorProduto";
+import { ModalEnviarContato } from "./ModalEnviarContato";
 import type { ProdutoLoja } from "@/components/loja/tipos";
 import {
   detectarVariaveis,
@@ -98,6 +100,7 @@ export function Compositor({
   const [mostrar, setMostrar] = useState(false);
   const [busca, setBusca] = useState("");
   const [seletorProduto, setSeletorProduto] = useState(false);
+  const [contatoAberto, setContatoAberto] = useState(false);
   const [mostrarEmojis, setMostrarEmojis] = useState(false);
   const [mostrarFigurinhas, setMostrarFigurinhas] = useState(false);
   const [figurinhas, setFigurinhas] = useState<
@@ -824,6 +827,15 @@ export function Compositor({
         />
       )}
 
+      {contatoAberto && (
+        <ModalEnviarContato
+          conversaId={conversaId}
+          instanciaId={instanciaSel}
+          onEnviada={onEnviada}
+          onFechar={() => setContatoAberto(false)}
+        />
+      )}
+
       {mostrarEmojis && (
         <SeletorEmoji
           onEscolher={inserirEmoji}
@@ -1068,6 +1080,14 @@ export function Compositor({
             className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
           >
             <Package className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setContatoAberto(true)}
+            title="Enviar contato"
+            aria-label="Enviar contato"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-medio transition-colors hover:bg-black/5"
+          >
+            <Contact className="h-5 w-5" />
           </button>
           <button
             onClick={() => void iniciarGravacao()}
