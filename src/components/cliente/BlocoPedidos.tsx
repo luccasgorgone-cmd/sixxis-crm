@@ -80,8 +80,8 @@ export function BlocoPedidos({
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-escuro">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="whitespace-nowrap text-sm font-semibold text-escuro">
                         {p.total != null ? formatarBRL(p.total) : "—"}
                       </span>
                       <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/60">
@@ -106,7 +106,9 @@ export function BlocoPedidos({
                             <span className="min-w-0 truncate text-escuro">
                               {it.quantidade}x {it.descricao}
                             </span>
-                            <span className="shrink-0 text-medio/60">{formatarBRL(it.subtotal)}</span>
+                            <span className="shrink-0 whitespace-nowrap text-medio/60">
+                              {formatarBRL(it.subtotal)}
+                            </span>
                           </div>
                         ))}
                       </div>

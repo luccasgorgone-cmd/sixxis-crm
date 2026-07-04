@@ -244,8 +244,8 @@ export function ModalFechamento({
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <label className="flex items-center gap-1 text-xs text-medio/60">
+                    <div className="mt-2 flex items-end gap-2">
+                      <label className="flex shrink-0 flex-col gap-0.5 text-xs text-medio/60">
                         Qtd
                         <input
                           type="number"
@@ -260,10 +260,10 @@ export function ModalFechamento({
                               ),
                             )
                           }
-                          className="campo w-16"
+                          className="campo w-14"
                         />
                       </label>
-                      <label className="flex flex-1 items-center gap-1 text-xs text-medio/60">
+                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs text-medio/60">
                         Unitario
                         <input
                           type="number"
@@ -283,7 +283,7 @@ export function ModalFechamento({
                           className="campo w-full"
                         />
                       </label>
-                      <span className="w-24 shrink-0 text-right text-sm font-medium text-escuro">
+                      <span className="shrink-0 whitespace-nowrap pb-2 text-right text-sm font-medium text-escuro">
                         {formatarBRL(it.quantidade * it.valorUnitario)}
                       </span>
                     </div>
@@ -298,13 +298,15 @@ export function ModalFechamento({
               </div>
 
               {itens.length > 0 ? (
-                <div className="space-y-2 rounded-lg bg-fundo p-3">
-                  <div className="flex items-center justify-between text-sm text-medio/70">
+                <div className="space-y-2 rounded-lg border border-black/5 bg-fundo p-3">
+                  <div className="flex items-center justify-between gap-2 text-sm text-medio/70">
                     <span>Produtos</span>
-                    <span className="font-medium text-escuro">{formatarBRL(produtos)}</span>
+                    <span className="whitespace-nowrap font-medium text-escuro">
+                      {formatarBRL(produtos)}
+                    </span>
                   </div>
                   <label className="flex items-center justify-between gap-2 text-sm text-medio/70">
-                    <span>Frete</span>
+                    <span className="shrink-0">Frete</span>
                     <input
                       type="number"
                       min="0"
@@ -315,9 +317,11 @@ export function ModalFechamento({
                       className="campo w-28 text-right"
                     />
                   </label>
-                  <div className="flex items-center justify-between border-t border-black/10 pt-2 text-sm font-semibold text-escuro">
-                    <span>Total</span>
-                    <span className="text-tiffany">{formatarBRL(total)}</span>
+                  <div className="flex items-center justify-between gap-2 border-t border-black/10 pt-2">
+                    <span className="text-sm font-semibold text-escuro">Total</span>
+                    <span className="whitespace-nowrap text-base font-bold text-tiffany">
+                      {formatarBRL(total)}
+                    </span>
                   </div>
                 </div>
               ) : (
