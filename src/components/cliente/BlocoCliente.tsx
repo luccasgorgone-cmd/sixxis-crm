@@ -130,6 +130,7 @@ export function BlocoCliente({
             telefone={cliente.telefone}
             fotoUrl={foto}
             tamanho={52}
+            expandivel
           />
           {podeEditar && (
             <button

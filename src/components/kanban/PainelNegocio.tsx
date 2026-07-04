@@ -235,6 +235,7 @@ export function PainelNegocio({
                 telefone={detalhe?.cliente.telefone ?? ""}
                 fotoUrl={detalhe?.cliente.fotoUrl ?? null}
                 tamanho={40}
+                expandivel
               />
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">

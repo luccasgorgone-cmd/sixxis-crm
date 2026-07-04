@@ -160,6 +160,7 @@ export function Thread({
             telefone={conversa.leadTelefone}
             fotoUrl={conversa.leadFoto}
             tamanho={36}
+            expandivel
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
