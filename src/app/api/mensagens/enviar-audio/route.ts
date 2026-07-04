@@ -72,7 +72,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       where: {
         id: instanciaIdEscolhida,
         ativo: true,
-        finalidade: conversa.finalidade,
+        // Mesma finalidade OU a instancia que a conversa ja usa (numero do cliente
+        // sempre valido, mesmo apos mover finalidade). Fatia 2.84.
+        OR: [
+          { finalidade: conversa.finalidade },
+          ...(conversa.instanciaId ? [{ id: conversa.instanciaId }] : []),
+        ],
       },
       select: { id: true, instanciaEvolution: true },
     });
