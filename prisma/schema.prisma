@@ -1103,6 +1103,10 @@ model Parceiro {
 // audio; atender por voz exige a API oficial da Meta. Por isso o CRM apenas
 // registra/organiza; nao atende no sistema. Nao entra em metricas de venda.
 // ---------------------------------------------------------------------------
+// Chamada: seccao REMOVIDA da UI na fatia 2.77 (Evolution nao transmite audio/
+// video). Tabela MANTIDA sem uso (zero DROP) — nenhum codigo escreve/le mais.
+// As relacoes Lead.chamadas / Agente.chamadas ficam preservadas. Reavaliar com a
+// API oficial da Meta.
 model Chamada {
   id          String     @id @default(cuid())
   // Id da chamada na Evolution (quando houver) — dedup idempotente entre restarts.
