@@ -98,11 +98,18 @@ function dataCurta(iso: string | null): string {
 export function ListaClientes({
   papel,
   agenteIdAtual,
+  acessoVenda = false,
+  acessoPosVenda = false,
 }: {
   papel: string;
   agenteIdAtual: string;
+  acessoVenda?: boolean;
+  acessoPosVenda?: boolean;
 }) {
   const ehAdmin = papel === "ADMIN";
+  // Garantia e conceito de POS-VENDA: filtro so aparece para quem tem esse acesso
+  // (ou admin). Quem tem os dois acessos ve venda + pos-venda combinados.
+  const podePosVenda = ehAdmin || acessoPosVenda;
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -754,12 +761,13 @@ export function ListaClientes({
           <option value="manual">Cadastro manual</option>
           <option value="site">Site</option>
         </select>
-        <select value={garantiaF} onChange={(e) => setGarantiaF(e.target.value)} className="campo">
-          <option value="">Garantia: todas</option>
-          <option value="sim">Com garantia</option>
-          <option value="nao">Sem garantia</option>
-          <option value="nao_definido">Nao definido</option>
-        </select>
+        {podePosVenda && (
+          <select value={garantiaF} onChange={(e) => setGarantiaF(e.target.value)} className="campo">
+            <option value="">Garantia: todas</option>
+            <option value="sim">Com garantia</option>
+            <option value="nao">Sem garantia</option>
+          </select>
+        )}
         <select value={segmentoF} onChange={(e) => setSegmentoF(e.target.value)} className="campo">
           <option value="">Segmento: todos</option>
           <option value="VAREJO">Varejo</option>

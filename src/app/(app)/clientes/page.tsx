@@ -12,6 +12,8 @@ export default async function ClientesPage() {
       <ListaClientes
         papel={session.user.papel}
         agenteIdAtual={session.user.id}
+        acessoVenda={session.user.acessoVenda}
+        acessoPosVenda={session.user.acessoPosVenda}
       />
     </div>
   );
