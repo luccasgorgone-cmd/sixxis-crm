@@ -661,6 +661,121 @@ async function amostrarConversas(
   };
 }
 
+// PADROES DE ATENDIMENTO (SO LEITURA, escopado): agrega as conversas do periodo,
+// agrupa as DUVIDAS dos clientes por tema (preco/garantia/entrega/NF/etc.), pareia
+// cada pergunta com a resposta do atendente que veio a seguir, e aponta perguntas
+// SEM resposta. Sem inventar — so o que os dados mostram. Teto de itens/tamanho.
+const TEMAS_ATENDIMENTO: { tema: string; termos: string[] }[] = [
+  { tema: "preco/desconto", termos: ["preço", "preco", "valor", "quanto custa", "quanto e", "desconto", "caro"] },
+  { tema: "garantia", termos: ["garantia", "garantido", "defeito", "quebrou", "parou de funcionar"] },
+  { tema: "entrega/frete", termos: ["entrega", "frete", "chega", "envio", "enviar", "correio", "transportadora", "quando chega"] },
+  { tema: "nota fiscal", termos: ["nota fiscal", "nota", "nf", "cupom fiscal"] },
+  { tema: "troca/devolucao", termos: ["troca", "trocar", "devolução", "devolucao", "devolver", "arrependi"] },
+  { tema: "pagamento", termos: ["pagamento", "pix", "cartão", "cartao", "parcel", "boleto", "a vista"] },
+  { tema: "estoque/disponibilidade", termos: ["estoque", "disponível", "disponivel", "tem esse", "tem o", "tem em"] },
+  { tema: "produto/especificacao", termos: ["voltagem", "110", "220", "medida", "tamanho", "cor", "modelo", "especifica", "funciona", "serve"] },
+  { tema: "status do pedido", termos: ["pedido", "rastreio", "codigo de rastreio", "código de rastreio", "onde esta", "onde está", "cade", "cadê"] },
+];
+
+function temaDaMensagem(texto: string | null): string {
+  const t = (texto ?? "").toLowerCase();
+  if (!t.trim()) return "outros";
+  for (const { tema, termos } of TEMAS_ATENDIMENTO) {
+    if (termos.some((k) => t.includes(k))) return tema;
+  }
+  return "outros";
+}
+
+async function analisarPadroesAtendimento(
+  agente: SessaoAgente,
+  input: { periodo?: number; finalidade?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(180, Math.max(1, Math.round(input.periodo ?? 30)));
+  const finalidadeF =
+    input.finalidade === "VENDA"
+      ? Finalidade.VENDA
+      : input.finalidade === "POS_VENDA"
+        ? Finalidade.POS_VENDA
+        : null;
+  const inicio = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+
+  const convFiltro: Prisma.ConversaWhereInput = {
+    ...(admin ? {} : { agenteId: agente.id }),
+    ...(finalidadeF ? { finalidade: finalidadeF } : {}),
+  };
+  const mensagens = await prisma.mensagem.findMany({
+    where: {
+      apagada: false,
+      hora: { gte: inicio },
+      ...(Object.keys(convFiltro).length ? { conversa: convFiltro } : {}),
+    },
+    orderBy: [{ conversaId: "asc" }, { hora: "asc" }],
+    take: 600,
+    select: { conteudo: true, direcao: true, conversaId: true },
+  });
+
+  // Pareia cada pergunta do CLIENTE (IN) com a proxima resposta do atendente
+  // (OUT) na MESMA conversa, antes de outra pergunta. Sem OUT => sem resposta.
+  type Par = { tema: string; pergunta: string; resposta: string | null };
+  const pares: Par[] = [];
+  let i = 0;
+  while (i < mensagens.length) {
+    const cid = mensagens[i].conversaId;
+    let j = i;
+    while (j < mensagens.length && mensagens[j].conversaId === cid) j++;
+    const bloco = mensagens.slice(i, j); // uma conversa, cronologico
+    for (let k = 0; k < bloco.length; k++) {
+      if (bloco[k].direcao !== "IN") continue;
+      let resposta: string | null = null;
+      for (let n = k + 1; n < bloco.length; n++) {
+        if (bloco[n].direcao === "IN") break;
+        if (bloco[n].direcao === "OUT") {
+          resposta = bloco[n].conteudo ?? null;
+          break;
+        }
+      }
+      pares.push({
+        tema: temaDaMensagem(bloco[k].conteudo),
+        pergunta: (bloco[k].conteudo ?? "").slice(0, 200),
+        resposta: resposta ? resposta.slice(0, 200) : null,
+      });
+    }
+    i = j;
+  }
+
+  // Agrega por tema: ocorrencias, sem-resposta e ate 3 exemplos (pergunta+resposta).
+  const porTema = new Map<
+    string,
+    { ocorrencias: number; semResposta: number; exemplos: { pergunta: string; resposta: string | null }[] }
+  >();
+  for (const p of pares) {
+    if (!porTema.has(p.tema)) {
+      porTema.set(p.tema, { ocorrencias: 0, semResposta: 0, exemplos: [] });
+    }
+    const g = porTema.get(p.tema)!;
+    g.ocorrencias++;
+    if (!p.resposta) g.semResposta++;
+    // Exemplos: prioriza os que TEM resposta (para servir de modelo a IA).
+    if (g.exemplos.length < 3 && (p.resposta || g.exemplos.length < 1)) {
+      g.exemplos.push({ pergunta: p.pergunta, resposta: p.resposta });
+    }
+  }
+
+  const temas = Array.from(porTema.entries())
+    .map(([tema, v]) => ({ tema, ...v }))
+    .sort((a, b) => b.ocorrencias - a.ocorrencias);
+
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "ambas",
+    totalPerguntasCliente: pares.length,
+    perguntasSemResposta: pares.filter((p) => !p.resposta).length,
+    temas,
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -702,6 +817,13 @@ async function executarFerramenta(
           await amostrarConversas(
             agente,
             input as { periodo?: number; limite?: number; finalidade?: string },
+          ),
+        );
+      case "analisar_padroes_atendimento":
+        return JSON.stringify(
+          await analisarPadroesAtendimento(
+            agente,
+            input as { periodo?: number; finalidade?: string },
           ),
         );
       default:
@@ -847,6 +969,22 @@ const FERRAMENTAS = [
       properties: {
         periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 180)." },
         limite: { type: "number", description: "Maximo de conversas na amostra (padrao 30, max 40)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional; padrao ambas." },
+      },
+    },
+  },
+  {
+    name: "analisar_padroes_atendimento",
+    description:
+      "Analisa os PADROES de atendimento no periodo, no escopo do usuario (nao-admin so as " +
+      "proprias conversas). SO LEITURA. Agrupa as DUVIDAS dos clientes por tema (preco, garantia, " +
+      "entrega, nota fiscal, produto, etc.), pareia cada pergunta com a resposta do atendente que " +
+      "veio a seguir e aponta perguntas SEM resposta. Use para ver as duvidas mais comuns, as " +
+      "respostas tipicas e onde o atendimento falha. Nao inventa — so o que os dados mostram.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 180)." },
         finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional; padrao ambas." },
       },
     },
