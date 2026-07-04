@@ -415,6 +415,10 @@ export async function gerarRespostaLuna(entrada: {
   historico: LunaMensagem[];
   config: ConfigLuna;
   catalogo: string;
+  // Total de mensagens do CLIENTE na conversa inteira (Fatia 2.98): o teto usa
+  // esta contagem quando fornecida (o historico so tem as ultimas 15, entao
+  // contar nele nunca disparava com teto >= 15). Fallback: contar no historico.
+  totalMensagensCliente?: number;
 }): Promise<LunaResultado> {
   const { finalidade, historico, config, catalogo } = entrada;
 
@@ -432,7 +436,11 @@ export async function gerarRespostaLuna(entrada: {
   // cliente -> handoff para humano, sem chamar a IA.
   const teto = config.maxMensagensAntesHandoff;
   if (teto != null && teto > 0) {
-    const qtdCliente = historico.filter((m) => m.autor === "cliente").length;
+    // Contagem TOTAL do cliente (conversa inteira) quando fornecida; senao o
+    // fallback antigo (historico, ate 15). Fatia 2.98.
+    const qtdCliente =
+      entrada.totalMensagensCliente ??
+      historico.filter((m) => m.autor === "cliente").length;
     if (qtdCliente > teto) {
       return montarResultado(
         "handoff",

@@ -1230,11 +1230,19 @@ async function executarRespostaLuna(
   if (historico.length === 0) return;
   if (historico[historico.length - 1].autor !== "cliente") return;
 
+  // Total de mensagens do cliente na conversa INTEIRA para o teto (Fatia 2.98):
+  // o historico so traz as ultimas 15, entao contar nele nunca disparava o teto
+  // com maxMensagensAntesHandoff >= 15.
+  const totalMensagensCliente = await prisma.mensagem.count({
+    where: { conversaId: conversa.id, direcao: DirecaoMsg.IN },
+  });
+
   const finLuna: LunaFinalidade =
     finalidade === Finalidade.POS_VENDA ? "POS_VENDA" : "VENDA";
   const resultado = await gerarRespostaLuna({
     finalidade: finLuna,
     historico,
+    totalMensagensCliente,
     config: {
       modelo: cfg.modelo,
       promptSistema: cfg.promptSistema,
@@ -1309,13 +1317,25 @@ async function tratarHandoffLuna(
     return;
   }
 
+  // Ultima mensagem do cliente para dar CONTEXTO ao atendente (Fatia 2.98).
+  const ultimaCliente = await prisma.mensagem.findFirst({
+    where: { conversaId: conversa.id, direcao: DirecaoMsg.IN },
+    orderBy: { hora: "desc" },
+    select: { conteudo: true, transcricao: true },
+  });
+  const trechoCliente = (ultimaCliente?.transcricao ?? ultimaCliente?.conteudo ?? "")
+    .trim()
+    .slice(0, 200);
+
   await prisma.lembrete.create({
     data: {
       leadId: lead.id,
       agenteId,
       finalidade,
       dataHora: new Date(),
-      nota: "Cliente pediu atendimento humano via Sol — retornar.",
+      nota: `Sol transferiu ao humano.${
+        trechoCliente ? ` Ultima mensagem do cliente: '${trechoCliente}'` : ""
+      }`,
       status: StatusLembrete.PENDENTE,
     },
   });
@@ -1324,7 +1344,9 @@ async function tratarHandoffLuna(
     agenteId,
     tipo: "LEMBRETE",
     titulo: "Cliente pediu atendimento humano",
-    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Sol).`,
+    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Sol).${
+      trechoCliente ? ` Ultima mensagem: '${trechoCliente}'` : ""
+    }`,
     link: "/inbox",
     leadId: lead.id,
   });
