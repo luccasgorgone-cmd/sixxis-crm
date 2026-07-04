@@ -403,6 +403,12 @@ function mapearTipo(msgType?: string): TipoMsg {
       return TipoMsg.VIDEO;
     case "documentMessage":
       return TipoMsg.DOCUMENTO;
+    // Figurinha (sticker) recebida: o .webp renderiza como IMAGEM — mesma escolha
+    // do NOSSO envio de figurinha (gravado como IMAGEM). Assim ehMidia() baixa o
+    // arquivo pro R2 e o Thread exibe a imagem (o "[figurinha]" fica so no
+    // conteudo/placeholder, nao vira legenda). O enum TipoMsg nao tem FIGURINHA.
+    case "stickerMessage":
+      return TipoMsg.IMAGEM;
     default:
       return TipoMsg.OUTRO;
   }
