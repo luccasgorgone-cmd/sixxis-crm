@@ -64,11 +64,13 @@ relacoes uteis (estado quente x sua base; funil parado x metas; ticket x segment
 e traga a conexao + uma recomendacao acionavel. So conecte o que os dados mostram.
 
 TRAVAS DE SEGURANCA (fixas, inviolaveis):
-- SO LEITURA, com UMA excecao controlada: voce PODE preparar um RASCUNHO de
-  campanha (ferramenta "criar_rascunho_campanha") QUANDO o usuario confirmar.
-  Voce NUNCA dispara a campanha — o disparo e SEMPRE acao manual do usuario na aba
-  Campanhas. Nenhuma outra escrita: nada de mover negocio, editar cliente, excluir
-  dados. Para outras acoes, explique que ficam como sugestao para aprovacao.
+- SO LEITURA, com DUAS excecoes controladas, ambas SO com confirmacao explicita do
+  usuario: (1) preparar um RASCUNHO de campanha ("criar_rascunho_campanha") — voce
+  NUNCA dispara, o disparo e acao manual na aba Campanhas; (2) salvar o guia de
+  atendimento na base da Sol ("salvar_guia_atendimento_sol"), SO para ADMIN e SO
+  apos o "sim" do usuario (grava em secao demarcada, preserva o resto da base).
+  Nenhuma outra escrita: nada de mover negocio, editar cliente, excluir dados. Para
+  outras acoes, explique que ficam como sugestao para aprovacao.
 - ESCOPO DO USUARIO: os dados que voce recebe das ferramentas JA vem filtrados
   pelo escopo do usuario logado. NUNCA tente burlar isso, NUNCA peca nem exponha
   dados de OUTRO usuario. Se perguntarem dados de outra pessoa e o usuario nao for
@@ -110,6 +112,12 @@ gere um guia acionavel a partir das conversas reais: (1) principais perguntas do
 clientes; (2) as melhores respostas observadas (exemplos reais, anonimizando dados
 sensiveis); (3) tom de voz; (4) o que fazer e o que evitar; (5) lacunas (perguntas que
 ficam sem resposta). Baseie-se SO no que os dados mostram.
+SALVAR NA SOL (so ADMIN): depois de mostrar o guia, OFERECA salva-lo na base de
+conhecimento da Sol ("Quer que eu salve este guia na base de conhecimento da Sol?").
+So chame "salvar_guia_atendimento_sol" quando o usuario CONFIRMAR (ex.: "sim, salva").
+E a UNICA escrita alem do rascunho de campanha; NUNCA salve sozinho. So funciona para
+admin — se o usuario nao for admin, apenas apresente o guia (nao ofereca salvar). A
+ferramenta grava numa secao demarcada, sem apagar o resto da base; confirme ao final.
 
 FORMATO DE RESPOSTA (obrigatorio): responda SOMENTE com um objeto JSON valido, sem
 cercas de codigo, sem texto antes ou depois, no formato exato:
@@ -813,6 +821,53 @@ async function analisarPadroesAtendimento(
   };
 }
 
+// SALVA o guia de atendimento na base de conhecimento da Sol (ConfigAgenteIA).
+// A UNICA escrita alem do rascunho de campanha: SO ADMIN (base global) e SO com
+// confirmacao explicita do usuario (o Oracle so chama quando o dono confirma).
+// Preserva o resto da base: grava numa SECAO DEMARCADA — se ja existir, substitui
+// SO ela; senao, acrescenta ao final. Rodar de novo atualiza so o guia. 2.91.
+const GUIA_INICIO = "=== GUIA DE ATENDIMENTO (Oracle) ===";
+const GUIA_FIM = "=== FIM DO GUIA ===";
+
+async function salvarGuiaAtendimentoSol(
+  agente: SessaoAgente,
+  input: { guia?: string },
+) {
+  if (!ehAdmin(agente.papel)) {
+    return { erro: "apenas administradores podem salvar na base da Sol" };
+  }
+  const guia = String(input.guia ?? "").trim();
+  if (!guia) return { erro: "guia vazio — gere o guia antes de salvar" };
+
+  const existente = await prisma.configAgenteIA.findFirst({
+    select: { id: true, baseConhecimento: true },
+  });
+  const base = existente?.baseConhecimento ?? "";
+  const secao = `${GUIA_INICIO}\n${guia}\n${GUIA_FIM}`;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`${esc(GUIA_INICIO)}[\\s\\S]*?${esc(GUIA_FIM)}`);
+  const novo = re.test(base)
+    ? base.replace(re, secao)
+    : base.trim()
+      ? `${base.trim()}\n\n${secao}`
+      : secao;
+
+  if (existente) {
+    await prisma.configAgenteIA.update({
+      where: { id: existente.id },
+      data: { baseConhecimento: novo },
+    });
+  } else {
+    // Cria a config (ativo=false por padrao: NAO acorda a Sol).
+    await prisma.configAgenteIA.create({ data: { baseConhecimento: novo } });
+  }
+  return {
+    ok: true,
+    mensagem:
+      "Guia salvo na base de conhecimento da Sol (secao demarcada; o restante da base foi preservado).",
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -862,6 +917,10 @@ async function executarFerramenta(
             agente,
             input as { periodo?: number; finalidade?: string },
           ),
+        );
+      case "salvar_guia_atendimento_sol":
+        return JSON.stringify(
+          await salvarGuiaAtendimentoSol(agente, input as { guia?: string }),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -1024,6 +1083,21 @@ const FERRAMENTAS = [
         periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 180)." },
         finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional; padrao ambas." },
       },
+    },
+  },
+  {
+    name: "salvar_guia_atendimento_sol",
+    description:
+      "SALVA um guia de atendimento na base de conhecimento da IA (Sol). ESCRITA — a UNICA " +
+      "alem do rascunho de campanha. SO ADMIN. Chame SOMENTE quando o usuario CONFIRMAR " +
+      "explicitamente (ex.: 'sim, salva na Sol'); NUNCA salve sozinho. Grava numa secao " +
+      "demarcada, preservando o resto da base; rodar de novo ATUALIZA so a secao.",
+    input_schema: {
+      type: "object",
+      properties: {
+        guia: { type: "string", description: "Texto completo do guia de atendimento a salvar." },
+      },
+      required: ["guia"],
     },
   },
 ] as const;
