@@ -286,10 +286,16 @@ export async function baixarMidiaBase64(
         body: JSON.stringify({ message: mensagem, convertToMp4: false }),
       },
     );
+    // Chaves de 1o nivel do message (revela o tipo/envelope: stickerMessage,
+    // ephemeralMessage, viewOnceMessage...). Ajuda a diagnosticar falhas. 2.95.
+    const tiposMsg =
+      mensagem?.message && typeof mensagem.message === "object"
+        ? Object.keys(mensagem.message as Record<string, unknown>).join(",")
+        : "(sem message)";
     if (!resp.ok) {
-      const corpo = (await resp.text().catch(() => "")).slice(0, 300);
+      const corpo = (await resp.text().catch(() => "")).slice(0, 1000);
       console.warn(
-        `[midia] getBase64 status ${resp.status}: ${corpo || "(sem corpo)"}`,
+        `[midia] getBase64 FALHOU status ${resp.status} tipos=[${tiposMsg}] corpo=${corpo || "(sem corpo)"}`,
       );
       return null;
     }
@@ -299,7 +305,7 @@ export async function baixarMidiaBase64(
     } | null;
     if (!raw?.base64) {
       console.warn(
-        `[midia] getBase64 sem base64 (mimetype=${raw?.mimetype ?? "?"})`,
+        `[midia] getBase64 sem base64 tipos=[${tiposMsg}] mimetype=${raw?.mimetype ?? "?"}`,
       );
       return null;
     }

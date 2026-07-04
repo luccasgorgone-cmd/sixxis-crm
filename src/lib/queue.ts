@@ -390,6 +390,78 @@ type EventoEvolution = {
 };
 
 // Mapeia o messageType da Evolution para o enum TipoMsg do dominio.
+// Envelopes do WhatsApp que embrulham o message real (ephemeral/view-once/doc com
+// legenda). O conteudo verdadeiro (sticker/imagem/etc.) fica em `.message`. 2.95.
+const WRAPPERS_MSG = [
+  "ephemeralMessage",
+  "viewOnceMessage",
+  "viewOnceMessageV2",
+  "viewOnceMessageV2Extension",
+  "documentWithCaptionMessage",
+] as const;
+
+// Desembrulha o message real de dentro dos envelopes (recursivo, ate 2 niveis).
+// Mensagem SEM envelope volta intacta. Nunca lanca. Fatia 2.95.
+function desembrulharMessage(
+  message?: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  let m: Record<string, unknown> | null = message ?? null;
+  for (let i = 0; i < 2 && m && typeof m === "object"; i++) {
+    let achou = false;
+    for (const w of WRAPPERS_MSG) {
+      const env = m[w] as { message?: unknown } | undefined;
+      const interno = env?.message;
+      if (interno && typeof interno === "object") {
+        m = interno as Record<string, unknown>;
+        achou = true;
+        break;
+      }
+    }
+    if (!achou) break;
+  }
+  return m;
+}
+
+// Chave principal (tipo) de um message ja DESEMBRULHADO.
+function chavePrincipalMessage(
+  message?: Record<string, unknown> | null,
+): string | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  for (const k of [
+    "conversation",
+    "extendedTextMessage",
+    "imageMessage",
+    "videoMessage",
+    "audioMessage",
+    "documentMessage",
+    "stickerMessage",
+    "contactMessage",
+    "contactsArrayMessage",
+    "locationMessage",
+  ]) {
+    if (message[k] != null) return k;
+  }
+  return undefined;
+}
+
+// messageType EFETIVO: para mensagens normais, o proprio messageType (comportamento
+// identico); so quando vem um ENVELOPE, deriva o tipo do message desembrulhado.
+function tipoEfetivoMensagem(data?: {
+  messageType?: string;
+  message?: Record<string, unknown> | null;
+}): string | undefined {
+  const bruto = data?.messageType;
+  if (bruto && !WRAPPERS_MSG.includes(bruto as (typeof WRAPPERS_MSG)[number])) {
+    return bruto;
+  }
+  return chavePrincipalMessage(desembrulharMessage(data?.message)) ?? bruto;
+}
+
+// True se o message DESEMBRULHADO for uma figurinha (independe do messageType).
+function ehStickerMessage(message?: Record<string, unknown> | null): boolean {
+  return !!desembrulharMessage(message)?.["stickerMessage"];
+}
+
 function mapearTipo(msgType?: string): TipoMsg {
   switch (msgType) {
     case "conversation":
@@ -1332,8 +1404,11 @@ async function processarMensagemGrupo(
 
   const fromMe = data?.key?.fromMe === true;
   const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
-  const tipo = mapearTipo(data?.messageType);
-  const conteudo = extrairConteudo(data?.message);
+  // Desembrulha envelopes (ephemeral/view-once/doc-com-legenda) antes de mapear
+  // tipo/conteudo — mensagens normais ficam identicas. Fatia 2.95.
+  const msgDesemb = desembrulharMessage(data?.message);
+  const tipo = mapearTipo(tipoEfetivoMensagem(data));
+  const conteudo = extrairConteudo(msgDesemb);
   const ts = data?.messageTimestamp;
   const hora = ts ? new Date(Number(ts) * 1000) : new Date();
   const nomeInstancia = payload?.instance ?? "sixxis-wa1";
@@ -1574,8 +1649,10 @@ async function processarEvento(
     return;
   }
 
-  const tipo = mapearTipo(data?.messageType);
-  const conteudo = extrairConteudo(data?.message);
+  // Desembrulha envelopes antes de mapear tipo/conteudo/midia. Fatia 2.95.
+  const msgDesemb = desembrulharMessage(data?.message);
+  const tipo = mapearTipo(tipoEfetivoMensagem(data));
+  const conteudo = extrairConteudo(msgDesemb);
   const transcricao = extrairTranscricao(data);
   // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
   const contatoInfo = extrairContato(data?.message);
@@ -1593,8 +1670,10 @@ async function processarEvento(
   // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
   // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
   // fallback atual da URL crua (substituida pelo R2 em seguida). Fatia 2.83.
-  const ehSticker = data?.messageType === "stickerMessage";
-  const mediaUrlOriginal = ehSticker ? null : extrairMediaUrl(data?.message);
+  // Sticker detectado no message DESEMBRULHADO (independe do messageType, que com
+  // envelope nao vem "stickerMessage"). Sticker NUNCA grava URL crua. Fatia 2.95.
+  const ehSticker = ehStickerMessage(data?.message);
+  const mediaUrlOriginal = ehSticker ? null : extrairMediaUrl(msgDesemb);
   const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
 
   // IDEMPOTENCIA: a Evolution reenvia eventos. Se a mensagem ja existe,
