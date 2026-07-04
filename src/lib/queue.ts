@@ -1542,8 +1542,13 @@ async function processarEvento(
       );
     }
 
-    // Atualiza a conversa: ultima atividade sempre; nao lidas so na ENTRADA.
-    // (mensagens OUT vindas do proprio celular nao contam como nao lidas.)
+    // Contato BLOQUEADO (Fatia 2.81): a mensagem e REGISTRADA (acima), mas o
+    // atendimento e silenciado — sem badge de nao lida, sem roteamento/rankeamento
+    // e sem resposta automatica (Luna/fora-horario). Nao envia NADA ao cliente.
+    const silenciar = lead.bloqueado === true;
+
+    // Atualiza a conversa: ultima atividade sempre; nao lidas so na ENTRADA
+    // (e nunca quando o contato esta bloqueado — silencia o badge).
     const conversaAtualizada = await prisma.conversa.update({
       where: { id: conversa.id },
       data: {
@@ -1552,7 +1557,7 @@ async function processarEvento(
         // (responde-se por padrao pelo numero que o cliente usou por ultimo).
         ...(direcao === DirecaoMsg.IN
           ? {
-              naoLidas: { increment: 1 },
+              ...(silenciar ? {} : { naoLidas: { increment: 1 } }),
               instancia: nomeInstancia,
               instanciaId: instancia?.id ?? null,
             }
@@ -1579,6 +1584,13 @@ async function processarEvento(
       naoLidas: conversaAtualizada.naoLidas,
       ultimaMensagemEm: mensagem.hora,
     });
+
+    // Contato bloqueado: para por aqui (registrou + emitiu). NAO roteia, NAO
+    // rankeia e NAO responde. Silencioso e best-effort (nao quebra a ingestao).
+    if (silenciar) {
+      console.log(`[ingest] ${telefone} bloqueado -> silenciado (sem roteio/resposta)`);
+      return;
+    }
 
     // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente).
     // Registra HistoricoNegocio(CRIACAO) e emite evento.

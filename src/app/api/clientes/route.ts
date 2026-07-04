@@ -33,6 +33,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // Clientes ARQUIVADOS (excluidos com historico) somem da lista por padrao.
   where.arquivado = false;
+  // Clientes BLOQUEADOS somem por padrao; admin pode ver com ?mostrarBloqueados=1.
+  if (!(admin && sp.get("mostrarBloqueados") === "1")) {
+    where.bloqueado = false;
+  }
 
   // Escopo por dono.
   if (admin) {
@@ -124,6 +128,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donoId: true,
       donoPosVendaId: true,
       criadoEm: true,
+      bloqueado: true,
       garantia: true,
       segmento: true,
       origem: true,
@@ -191,6 +196,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     origem: string | null;
     anuncioTitulo: string | null;
     anuncioUrl: string | null;
+    bloqueado: boolean;
   };
 
   // Filtros de localizacao (endereco principal ou primeiro). cidade = contains.
@@ -282,6 +288,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       origem: l.origem,
       anuncioTitulo: l.anuncioTitulo,
       anuncioUrl: l.anuncioUrl,
+      bloqueado: l.bloqueado,
     });
   }
 

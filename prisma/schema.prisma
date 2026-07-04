@@ -254,6 +254,12 @@ model Lead {
   // vendas e evitando erro de FK. Cliente SEM historico e apagado de fato.
   arquivado      Boolean        @default(false)
   arquivadoEm    DateTime?
+  // Bloqueio (Fatia 2.81): admin bloqueia um contato. A ingestao registra a
+  // mensagem mas NAO notifica/roteia/rankeia e NAO responde (Luna/fora-horario)
+  // — silencia. Some da lista principal (com filtro "mostrar bloqueados").
+  bloqueado      Boolean        @default(false)
+  bloqueadoEm    DateTime?
+  bloqueadoPor   String?
   empresaFaturadaId String?
   empresaFaturada   EmpresaFaturada? @relation(fields: [empresaFaturadaId], references: [id], onDelete: SetNull)
   donoId         String?

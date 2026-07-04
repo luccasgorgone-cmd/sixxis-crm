@@ -26,6 +26,7 @@ import {
   Repeat,
   CheckSquare,
   Trash2,
+  Ban,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -48,6 +49,7 @@ import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
 import { ModalTransferencia } from "./ModalTransferencia";
 import { ModalEtiquetasMassa } from "./ModalEtiquetasMassa";
 import { ModalExcluirClientes } from "./ModalExcluirClientes";
+import { ModalBloquear } from "./ModalBloquear";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -74,6 +76,7 @@ type Cliente = {
   origem: string | null;
   anuncioTitulo: string | null;
   anuncioUrl: string | null;
+  bloqueado: boolean;
 };
 
 type EmpresaOpcao = { id: string; nome: string };
@@ -154,6 +157,13 @@ export function ListaClientes({
   const [etiquetarAberto, setEtiquetarAberto] = useState(false);
   // Exclusao (admin): lista de leadIds a excluir (null = fechado).
   const [excluirIds, setExcluirIds] = useState<string[] | null>(null);
+  // Bloqueio (admin): alvo do modal + toggle de mostrar bloqueados.
+  const [bloquearAlvo, setBloquearAlvo] = useState<{
+    leadId: string;
+    nome: string;
+    bloqueado: boolean;
+  } | null>(null);
+  const [mostrarBloqueados, setMostrarBloqueados] = useState(false);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -227,6 +237,7 @@ export function ListaClientes({
       if (rastreioF) p.set("rastreio", rastreioF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
+      if (ehAdmin && mostrarBloqueados) p.set("mostrarBloqueados", "1");
       if (periodo.preset === "custom") {
         p.set("inicio", `${periodo.inicio}T00:00:00`);
         p.set("fim", `${periodo.fim}T23:59:59`);
@@ -241,7 +252,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo]);
+  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo, mostrarBloqueados]);
 
   useEffect(() => {
     void carregar();
@@ -349,7 +360,14 @@ export function ListaClientes({
         <div className="flex items-center gap-2.5">
           <AvatarCliente nome={c.nome} telefone={c.telefone} fotoUrl={c.fotoUrl} tamanho={32} />
           <div className="min-w-0">
-            <p className="truncate font-medium text-escuro">{c.nome}</p>
+            <p className="flex items-center gap-1.5 truncate font-medium text-escuro">
+              <span className="truncate">{c.nome}</span>
+              {c.bloqueado && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-erro/10 px-1.5 py-0.5 text-[10px] font-semibold text-erro">
+                  <Ban className="h-2.5 w-2.5" /> Bloqueado
+                </span>
+              )}
+            </p>
             <p className="truncate text-xs text-medio/60">
               {formatarTelefone(c.telefone)}
             </p>
@@ -582,6 +600,21 @@ export function ListaClientes({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setBloquearAlvo({ leadId: c.leadId, nome: c.nome, bloqueado: c.bloqueado });
+              }}
+              title={c.bloqueado ? "Desbloquear contato" : "Bloquear contato"}
+              aria-label={c.bloqueado ? "Desbloquear contato" : "Bloquear contato"}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 ${
+                c.bloqueado ? "text-erro" : "text-medio/70 hover:text-erro"
+              }`}
+            >
+              <Ban className="h-4 w-4" />
+            </button>
+          )}
+          {ehAdmin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 setExcluirIds([c.leadId]);
               }}
               title="Excluir cliente"
@@ -633,6 +666,19 @@ export function ListaClientes({
                 </option>
               ))}
             </select>
+          )}
+          {ehAdmin && (
+            <button
+              onClick={() => setMostrarBloqueados((v) => !v)}
+              title="Mostrar/ocultar contatos bloqueados"
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                mostrarBloqueados
+                  ? "border-erro/40 bg-erro/10 text-erro"
+                  : "border-black/10 text-medio hover:bg-black/5"
+              }`}
+            >
+              <Ban className="h-4 w-4" /> Bloqueados
+            </button>
           )}
           <button
             onClick={() => {
@@ -928,6 +974,19 @@ export function ListaClientes({
             setExcluirIds(null);
             setSelecionados(new Set());
             setModoSelecao(false);
+            void carregar();
+          }}
+        />
+      )}
+
+      {bloquearAlvo && (
+        <ModalBloquear
+          leadId={bloquearAlvo.leadId}
+          nome={bloquearAlvo.nome}
+          bloqueado={bloquearAlvo.bloqueado}
+          onFechar={() => setBloquearAlvo(null)}
+          onConcluido={() => {
+            setBloquearAlvo(null);
             void carregar();
           }}
         />
