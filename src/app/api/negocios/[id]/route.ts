@@ -115,10 +115,19 @@ export async function GET(
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
-  // Conversa do lead (aberta mais recente) para embutir no painel.
+  // Conversa a embutir no painel: a MESMA que o Inbox mostra — a conversa ATIVA
+  // (arquivada = false) da FINALIDADE do negocio. Sem esses filtros, o findFirst
+  // podia pegar uma conversa arquivada antiga (ou a de outra finalidade), que nao
+  // tem as mensagens OUT do atendente enviadas na conversa ativa — por isso as
+  // mensagens do atendente "sumiam" no Kanban. @@unique([leadId, finalidade]) em
+  // arquivada=false garante no maximo uma; fica deterministico e igual ao Inbox.
   const conversa = await prisma.conversa.findFirst({
-    where: { leadId: negocio.lead.id },
-    orderBy: [{ status: "asc" }, { ultimaMensagemEm: "desc" }],
+    where: {
+      leadId: negocio.lead.id,
+      finalidade: negocio.finalidade,
+      arquivada: false,
+    },
+    orderBy: [{ ultimaMensagemEm: "desc" }, { criadoEm: "desc" }],
     select: { id: true, atendidoPor: true },
   });
 
