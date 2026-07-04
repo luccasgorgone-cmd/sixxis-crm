@@ -20,6 +20,7 @@ import {
   Sticker,
   FileText,
   Contact,
+  AlertTriangle,
 } from "lucide-react";
 import type { MensagemItem } from "./tipos";
 import { SeletorEmoji } from "./SeletorEmoji";
@@ -103,6 +104,21 @@ export function Compositor({
     setInstanciaSel(instanciaRespostaId ?? instanciaIdAtual ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaId, instanciaRespostaId]);
+
+  // Confirmacao ao responder por numero DIFERENTE do ultimo que o cliente usou
+  // (Fatia 2.89-B). Pergunta uma vez por escolha; nao repergunta a cada mensagem.
+  const [numeroConfirmado, setNumeroConfirmado] = useState(false);
+  const [confirmandoNumero, setConfirmandoNumero] = useState(false);
+  useEffect(() => {
+    setNumeroConfirmado(false);
+    setConfirmandoNumero(false);
+  }, [conversaId, instanciaSel]);
+
+  function rotuloInstancia(id: string | null): string {
+    if (!id) return "numero padrao";
+    const i = instancias.find((x) => x.id === id);
+    return i ? `${i.nome}${i.numero ? ` (${i.numero})` : ""}` : "outro numero";
+  }
 
   // Troca de conversa: descarta anexos/audio pendentes (nao envia para a conversa
   // errada — o compositor nao remonta ao trocar de conversa). Fatia 2.85.
@@ -644,7 +660,24 @@ export function Compositor({
     return t || "Mensagem";
   }
 
-  async function enviar() {
+  // Gate de envio: se o numero escolhido diverge do ultimo do cliente e ainda nao
+  // foi confirmado, pede confirmacao (2.89-B); senao envia direto.
+  function enviar() {
+    const valor = texto.trim();
+    if (!valor || enviando) return;
+    const divergente =
+      !!instanciaSel &&
+      !!instanciaIdAtual &&
+      instanciaSel !== instanciaIdAtual &&
+      !numeroConfirmado;
+    if (divergente) {
+      setConfirmandoNumero(true);
+      return;
+    }
+    void enviarAgora(instanciaSel);
+  }
+
+  async function enviarAgora(instanciaEnvio: string | null) {
     const valor = texto.trim();
     if (!valor || enviando) return;
     setEnviando(true);
@@ -656,7 +689,7 @@ export function Compositor({
         body: JSON.stringify({
           conversaId,
           texto: valor,
-          ...(instanciaSel ? { instanciaId: instanciaSel } : {}),
+          ...(instanciaEnvio ? { instanciaId: instanciaEnvio } : {}),
           ...(respondendoA ? { respostaAId: respondendoA.id } : {}),
         }),
       });
@@ -871,6 +904,59 @@ export function Compositor({
           onEnviada={onEnviada}
           onFechar={() => setContatoAberto(false)}
         />
+      )}
+
+      {/* Confirmacao: responder por numero diferente do que o cliente usou. */}
+      {confirmandoNumero && (
+        <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="modal-in w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <h3 className="text-sm font-semibold text-escuro">
+                Responder por numero diferente?
+              </h3>
+            </div>
+            <p className="text-sm text-medio/80">
+              Voce esta respondendo por um numero diferente do que o cliente usou
+              (<strong className="text-escuro">{rotuloInstancia(instanciaSel)}</strong>{" "}
+              em vez de{" "}
+              <strong className="text-escuro">
+                {rotuloInstancia(instanciaIdAtual ?? null)}
+              </strong>
+              ). O cliente pode receber em outra conversa.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  const numeroCliente = instanciaIdAtual ?? null;
+                  setInstanciaSel(numeroCliente);
+                  setNumeroConfirmado(true);
+                  setConfirmandoNumero(false);
+                  void enviarAgora(numeroCliente);
+                }}
+                className="rounded-lg bg-tiffany px-4 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro"
+              >
+                Responder por {rotuloInstancia(instanciaIdAtual ?? null)}
+              </button>
+              <button
+                onClick={() => {
+                  setNumeroConfirmado(true);
+                  setConfirmandoNumero(false);
+                  void enviarAgora(instanciaSel);
+                }}
+                className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium text-medio hover:bg-black/5"
+              >
+                Sim, usar {rotuloInstancia(instanciaSel)}
+              </button>
+              <button
+                onClick={() => setConfirmandoNumero(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-medio/60 hover:bg-black/5"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {mostrarEmojis && (
