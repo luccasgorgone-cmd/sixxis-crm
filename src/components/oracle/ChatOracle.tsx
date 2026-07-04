@@ -258,7 +258,7 @@ export function ChatOracle({ papel }: { papel: string }) {
             mensagens.map((m, i) =>
               m.autor === "user" ? (
                 <div key={i} className="flex justify-end">
-                  <div className="max-w-[85%] whitespace-pre-line rounded-2xl rounded-br-sm bg-tiffany px-4 py-2.5 text-sm text-white">
+                  <div className="max-w-[85%] whitespace-pre-line break-words rounded-2xl rounded-br-sm bg-tiffany px-4 py-2.5 text-sm text-white">
                     {m.texto}
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export function ChatOracle({ papel }: { papel: string }) {
                     m.mensagens.map((bloco, k) => (
                       <div
                         key={k}
-                        className="max-w-[92%] rounded-2xl rounded-bl-sm border border-black/5 bg-white px-4 py-3 text-sm text-escuro"
+                        className="max-w-[92%] break-words rounded-2xl rounded-bl-sm border border-black/5 bg-white px-4 py-3 text-sm text-escuro"
                       >
                         <Bloco texto={bloco} />
                       </div>

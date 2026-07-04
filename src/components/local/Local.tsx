@@ -271,7 +271,7 @@ function ItemCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-semibold text-escuro">{it.descricaoProduto}</p>
+            <p className="break-words text-sm font-semibold text-escuro">{it.descricaoProduto}</p>
             {it.modelo && (
               <span className="rounded bg-black/5 px-1.5 py-0.5 text-[11px] font-medium text-medio/70">
                 {it.modelo}
@@ -285,11 +285,18 @@ function ItemCard({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-medio/60">
             {it.leadId ? (
-              <Link href={`/inbox?lead=${it.leadId}`} className="flex items-center gap-1 text-tiffany hover:underline">
-                <User className="h-3 w-3" /> {it.leadNome ?? "Cliente"}
+              <Link
+                href={`/inbox?lead=${it.leadId}`}
+                className="flex max-w-[12rem] items-center gap-1 text-tiffany hover:underline"
+              >
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate">{it.leadNome ?? "Cliente"}</span>
               </Link>
             ) : it.leadNome ? (
-              <span className="flex items-center gap-1"><User className="h-3 w-3 text-medio/40" /> {it.leadNome}</span>
+              <span className="flex max-w-[12rem] items-center gap-1">
+                <User className="h-3 w-3 shrink-0 text-medio/40" />
+                <span className="truncate">{it.leadNome}</span>
+              </span>
             ) : null}
             {it.numeroSerie && <span>Serie: {it.numeroSerie}</span>}
             {it.localizacao && (

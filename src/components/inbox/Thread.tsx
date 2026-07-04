@@ -402,7 +402,11 @@ function Bolha({
       : "Mensagem apagada";
 
   return (
-    <div className={`group flex items-center gap-1.5 ${ehOut ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`group flex items-center gap-1.5 ${ehOut ? "justify-end" : "justify-start"} ${
+        reacao || reacaoCliente ? "mb-2.5" : ""
+      }`}
+    >
       {/* Acoes auxiliares (reagir / apagar) — aparecem no hover. */}
       {podeReagir && (
         <div className="relative order-1 shrink-0">
