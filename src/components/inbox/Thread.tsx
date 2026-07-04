@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Pencil,
   X,
+  Sticker,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -311,6 +312,14 @@ function legendaReal(conteudo: string | null): string | null {
   return t && !RE_PLACEHOLDER.test(t) ? t : null;
 }
 
+// A URL CRUA do WhatsApp (mmg.whatsapp.net / .enc) e criptografada/temporaria e
+// NAO renderiza no browser — so a URL do R2 e exibivel. Usado para nunca tentar
+// carregar a URL crua (evita imagem quebrada / pagina de erro). Fatia 2.83.
+function ehUrlRenderavel(url?: string | null): boolean {
+  if (!url) return false;
+  return !/whatsapp\.net/i.test(url) && !/\.enc(\?|#|$)/i.test(url);
+}
+
 // Popover de reacao renderizado em PORTAL (document.body) com posicao fixa.
 // Assim ele NUNCA e cortado pelo overflow do container (o drawer do Kanban tem
 // rolagem propria que clipava o popover). Abre acima da ancora; se nao couber,
@@ -403,11 +412,12 @@ function Bolha({
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
-  // Figurinha antiga (recebida como OUTRO) com mediaUrl: tratar como midia para
-  // renderizar a imagem (novas figurinhas ja chegam como IMAGEM — fatia 2.80).
-  const ehFigurinhaComMidia =
-    (mensagem.conteudo ?? "").trim() === "[figurinha]" && !!mensagem.mediaUrl;
-  const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo) || ehFigurinhaComMidia;
+  // Figurinha: identificada pelo placeholder "[figurinha]" (nova = IMAGEM; antiga
+  // = OUTRO). Tem tratamento PROPRIO (componente Figurinha): so exibe a imagem se
+  // a mediaUrl for do R2 (renderavel) — senao mostra um placeholder limpo, nunca
+  // a URL crua do WhatsApp (que quebra). Fatia 2.83.
+  const ehFigurinha = (mensagem.conteudo ?? "").trim() === "[figurinha]";
+  const ehTipoMidia = TIPOS_MIDIA.has(mensagem.tipo) && !ehFigurinha;
   const legenda = legendaReal(mensagem.conteudo);
 
   // Estado local de apagamento (otimista) + expandir original (admin).
@@ -664,6 +674,14 @@ function Bolha({
               </div>
             )}
           </div>
+        ) : ehFigurinha ? (
+          <Figurinha
+            mensagemId={mensagem.id}
+            mediaUrl={mediaUrl}
+            ehOut={ehOut}
+            ehAdmin={ehAdmin}
+            onRecarregada={(url) => setMediaLocal(url)}
+          />
         ) : ehTipoMidia ? (
           <div className="space-y-1">
             <Midia
@@ -757,6 +775,93 @@ function Bolha({
   );
 }
 
+// Figurinha (sticker .webp) recebida. So exibe a IMAGEM quando a mediaUrl e do R2
+// (renderavel); a URL crua do WhatsApp (.enc) NAO renderiza — nesse caso mostra um
+// placeholder LIMPO (nunca imagem quebrada / pagina de erro). onError tambem cai
+// no placeholder. Admin pode reprocessar (rebaixar pro R2). Fatia 2.83.
+function Figurinha({
+  mensagemId,
+  mediaUrl,
+  ehOut,
+  ehAdmin,
+  onRecarregada,
+}: {
+  mensagemId: string;
+  mediaUrl: string | null | undefined;
+  ehOut: boolean;
+  ehAdmin: boolean;
+  onRecarregada: (url: string) => void;
+}) {
+  const toast = useToast();
+  const [erro, setErro] = useState(false);
+  const [recarregando, setRecarregando] = useState(false);
+
+  if (ehUrlRenderavel(mediaUrl) && mediaUrl && !erro) {
+    return (
+      <a href={mediaUrl} target="_blank" rel="noreferrer" className="block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={mediaUrl}
+          alt="Figurinha"
+          onError={() => setErro(true)}
+          className="max-h-40 w-auto max-w-[10rem] object-contain"
+        />
+      </a>
+    );
+  }
+
+  async function recarregar() {
+    setRecarregando(true);
+    try {
+      const r = await fetch(`/api/mensagens/${mensagemId}/reprocessar-midia`, {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.mediaUrl) {
+        setErro(false);
+        onRecarregada(d.mediaUrl as string);
+        toast.sucesso("Figurinha recuperada.");
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel recuperar a figurinha.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRecarregando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <span
+        className={`flex items-center gap-2 italic ${
+          ehOut ? "text-white/90" : "text-medio/70"
+        }`}
+      >
+        <Sticker className="h-4 w-4" /> Figurinha
+      </span>
+      {ehAdmin && (
+        <button
+          onClick={() => void recarregar()}
+          disabled={recarregando}
+          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
+            ehOut
+              ? "bg-white/15 text-white hover:bg-white/25"
+              : "bg-black/5 text-medio hover:bg-black/10"
+          } disabled:opacity-60`}
+        >
+          {recarregando ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Recarregar figurinha
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Renderiza a midia exibivel (R2) por tipo. Sem mediaUrl: mostra placeholder e,
 // para ADMIN, o botao "Recarregar midia" (reprocessa download+upload).
 function Midia({
@@ -775,9 +880,6 @@ function Midia({
   const toast = useToast();
   const [recarregando, setRecarregando] = useState(false);
   const IconeMidia = ICONE_MIDIA[mensagem.tipo];
-  // Figurinhas ANTIGAS (recebidas antes da fatia 2.80) foram gravadas como OUTRO,
-  // mas tem mediaUrl e conteudo "[figurinha]". Renderiza como imagem tambem.
-  const ehFigurinha = (mensagem.conteudo ?? "").trim() === "[figurinha]";
 
   async function recarregar() {
     setRecarregando(true);
@@ -800,7 +902,7 @@ function Midia({
   }
 
   if (mediaUrl) {
-    if (mensagem.tipo === "IMAGEM" || ehFigurinha) {
+    if (mensagem.tipo === "IMAGEM") {
       return (
         <a href={mediaUrl} target="_blank" rel="noreferrer" className="block">
           {/* eslint-disable-next-line @next/next/no-img-element */}

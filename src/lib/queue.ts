@@ -1502,7 +1502,12 @@ async function processarEvento(
   const tipo = mapearTipo(data?.messageType);
   const conteudo = extrairConteudo(data?.message);
   const transcricao = extrairTranscricao(data);
-  const mediaUrlOriginal = extrairMediaUrl(data?.message);
+  // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
+  // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
+  // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
+  // fallback atual da URL crua (substituida pelo R2 em seguida). Fatia 2.83.
+  const ehSticker = data?.messageType === "stickerMessage";
+  const mediaUrlOriginal = ehSticker ? null : extrairMediaUrl(data?.message);
   const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
 
   // IDEMPOTENCIA: a Evolution reenvia eventos. Se a mensagem ja existe,
