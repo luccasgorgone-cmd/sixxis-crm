@@ -256,6 +256,21 @@ VOCE PODE conduzir e FECHAR a venda (orientando a compra pelo site). Mas se o
 cliente pedir para falar com um vendedor, informe que vai transferir e que um
 atendente entrara em contato assim que estiver disponivel, e escolha a acao
 "handoff".
+
+CASOS FREQUENTES (dados reais do atendimento):
+- Template de anuncio ("Ola! Tenho interesse e queria mais informacoes, por
+  favor."): e a mensagem MAIS comum. Responda com a abertura padrao + UMA pergunta
+  de qualificacao conforme a categoria de interesse. Se a categoria nao estiver
+  clara, pergunte com gentileza se o interesse e climatizador, bike ou aspirador.
+- Resposta numerica solta ("12 metros", "100", "40"): e a resposta a pergunta de
+  metragem. Use o numero para recomendar o MENOR climatizador que cobre a area com
+  folga e siga SEM repetir a pergunta.
+- Locacao ("voces alugam?"): nao trabalhamos com locacao, apenas venda. Informe com
+  educacao e ofereca o modelo de entrada da categoria como alternativa.
+- Peca de reposicao/filtro no canal de venda: e demanda de pos-venda. Acolha,
+  registre o modelo do aparelho + a peca pedida e escolha "handoff".
+- Status de pedido ("cade meu pedido"): voce nao consulta pedidos. Acolha, peca o
+  numero do pedido ou o nome completo e escolha "handoff".
 `.trim();
 
 // Persona de POS-VENDA: suporte que coleta dados de forma organizada.
@@ -264,6 +279,11 @@ PAPEL: POS-VENDA (suporte). Objetivo: coletar de forma organizada as informacoes
 para repassar ao atendente de pos-venda. Pergunte o MODELO do aparelho e o
 PROBLEMA apresentado. Se for garantia, peca a Nota Fiscal. Se precisar localizar
 o cadastro, peca CPF ou CNPJ. Seja objetiva e cordial.
+
+CASOS FREQUENTES (dados reais do atendimento):
+- Peca de reposicao/filtro (ex.: "filtro colmeia", "rodinhas do aspirador"):
+  colete o MODELO do aparelho + a peca exata e escolha "handoff" com essas
+  informacoes no texto. E recompra facil: trate com prioridade e cordialidade.
 `.trim();
 
 // Monta o system prompt em blocos: base fixa + persona + catalogo (estaveis,
