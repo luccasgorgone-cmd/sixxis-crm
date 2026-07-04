@@ -1065,7 +1065,8 @@ async function responderComLunaSePreciso(
     if (lunaAgendada.has(conversa.id)) return true;
     const seg = await prisma.configAgenteIA
       .findFirst({ select: { segundosAntesDeResponder: true } })
-      .then((c) => c?.segundosAntesDeResponder ?? 7);
+      // Ritmo humano (Fatia 2.92): ~5s de espera antes da 1a mensagem (era 7).
+      .then((c) => c?.segundosAntesDeResponder ?? 5);
     const espera = Math.max(0, Math.min(60, seg)) * 1000;
     const timer = setTimeout(() => {
       lunaAgendada.delete(conversa.id);
@@ -1236,10 +1237,17 @@ async function enviarMensagensLuna(
   mensagens: string[],
   io: Server | null,
 ): Promise<void> {
+  // Ritmo humano (Fatia 2.92): ~3s entre cada bolha subsequente (era 1,5s).
+  // Configuravel em ConfigAgenteIA.segundosEntreMensagens; default 3. Limitado a
+  // [0, 30]s para nunca travar a fila.
+  const segEntre = await prisma.configAgenteIA
+    .findFirst({ select: { segundosEntreMensagens: true } })
+    .then((c) => c?.segundosEntreMensagens ?? 3);
+  const intervaloMs = Math.max(0, Math.min(30, segEntre)) * 1000;
   for (let i = 0; i < mensagens.length; i++) {
     const texto = mensagens[i];
     if (!texto?.trim()) continue;
-    if (i > 0) await esperar(1500); // intervalo natural entre bolhas
+    if (i > 0) await esperar(intervaloMs); // intervalo natural entre bolhas
 
     const r = await enviarTexto(telefone, texto, conversa.instancia);
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;

@@ -914,6 +914,9 @@ model ConfigAgenteIA {
   // Comportamento.
   saudacaoAutomatica       String? @db.Text
   segundosAntesDeResponder Int?
+  // Intervalo (segundos) entre cada mensagem quando a Sol responde em varias
+  // bolhas — ritmo humano. Default de leitura 3. Fatia 2.92.
+  segundosEntreMensagens   Int?
   // Handoff (passar para humano).
   maxMensagensAntesHandoff Int?
   mensagemHandoff          String? @db.Text

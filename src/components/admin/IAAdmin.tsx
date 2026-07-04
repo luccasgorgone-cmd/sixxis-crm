@@ -34,6 +34,7 @@ type Config = {
   horarios: DiaHorario[];
   saudacaoAutomatica: string | null;
   segundosAntesDeResponder: number | null;
+  segundosEntreMensagens: number | null;
   maxMensagensAntesHandoff: number | null;
   mensagemHandoff: string | null;
   handoffSeClientePedir: boolean;
@@ -251,7 +252,7 @@ export function IAAdmin() {
             />
             <InfoCard
               rotulo="Ritmo"
-              valor={`${c.segundosAntesDeResponder ?? 7}s antes de responder`}
+              valor={`${c.segundosAntesDeResponder ?? 5}s antes · ${c.segundosEntreMensagens ?? 3}s entre`}
             />
             <InfoCard
               rotulo="Estado agora"
@@ -413,11 +414,24 @@ export function IAAdmin() {
             <CampoNumero
               valor={c.segundosAntesDeResponder}
               onChange={(v) => set({ segundosAntesDeResponder: v })}
+              placeholder="Ex.: 5"
+              sufixo="segundos"
+            />
+            <p className="mt-1 text-xs text-medio/50">
+              Espera antes da 1a mensagem, para parecer mais natural (padrao 5s).
+            </p>
+          </Cartao>
+          <Cartao>
+            <Rotulo>Segundos entre mensagens</Rotulo>
+            <CampoNumero
+              valor={c.segundosEntreMensagens}
+              onChange={(v) => set({ segundosEntreMensagens: v })}
               placeholder="Ex.: 3"
               sufixo="segundos"
             />
             <p className="mt-1 text-xs text-medio/50">
-              Pequena espera para parecer mais natural.
+              Intervalo entre cada bolha quando responde em varias mensagens
+              (padrao 3s).
             </p>
           </Cartao>
         </Secao>

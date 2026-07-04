@@ -103,6 +103,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     if (body.segundosAntesDeResponder !== undefined) {
       data.segundosAntesDeResponder = inteiroOuNull(body.segundosAntesDeResponder);
     }
+    if (body.segundosEntreMensagens !== undefined) {
+      data.segundosEntreMensagens = inteiroOuNull(body.segundosEntreMensagens);
+    }
     if (body.maxMensagensAntesHandoff !== undefined) {
       data.maxMensagensAntesHandoff = inteiroOuNull(body.maxMensagensAntesHandoff);
     }
