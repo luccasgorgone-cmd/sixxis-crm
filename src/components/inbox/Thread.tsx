@@ -2,6 +2,7 @@
 
 // Coluna central: cabecalho do contato, mensagens (bolhas) e o compositor.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useClickFora } from "@/lib/useClickFora";
 import {
@@ -29,8 +30,9 @@ import {
   Copy,
   Reply,
   Forward,
+  MessageCircle,
 } from "lucide-react";
-import type { ConversaItem, MensagemItem } from "./tipos";
+import type { ConversaItem, MensagemItem, Finalidade } from "./tipos";
 import { Compositor } from "./Compositor";
 import { useToast } from "@/components/ui/Toast";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
@@ -269,6 +271,7 @@ export function Thread({
             onEncaminhar={setEncaminhando}
             onIrParaMensagem={irParaMensagem}
             onReenviar={somenteLeitura ? undefined : reenviar}
+            finalidade={conversa.finalidade}
           />
         )}
         <div ref={fimRef} />
@@ -312,6 +315,7 @@ function ListaMensagens({
   onEncaminhar,
   onIrParaMensagem,
   onReenviar,
+  finalidade,
 }: {
   mensagens: MensagemItem[];
   ehAdmin: boolean;
@@ -320,6 +324,7 @@ function ListaMensagens({
   onEncaminhar?: (m: MensagemItem) => void;
   onIrParaMensagem?: (id: string) => void;
   onReenviar?: (m: MensagemItem) => void;
+  finalidade?: Finalidade;
 }) {
   const blocos: { dia: string; itens: MensagemItem[] }[] = [];
   let chaveAtual = "";
@@ -352,6 +357,7 @@ function ListaMensagens({
               onEncaminhar={onEncaminhar}
               onIrParaMensagem={onIrParaMensagem}
               onReenviar={onReenviar}
+              finalidade={finalidade}
             />
           ))}
         </div>
@@ -485,6 +491,7 @@ function Bolha({
   onEncaminhar,
   onIrParaMensagem,
   onReenviar,
+  finalidade,
 }: {
   mensagem: MensagemItem;
   ehAdmin: boolean;
@@ -493,6 +500,7 @@ function Bolha({
   onEncaminhar?: (m: MensagemItem) => void;
   onIrParaMensagem?: (id: string) => void;
   onReenviar?: (m: MensagemItem) => void;
+  finalidade?: Finalidade;
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
@@ -861,6 +869,7 @@ function Bolha({
             nome={mensagem.contatoNome ?? "Contato"}
             telefone={mensagem.contatoTelefone ?? null}
             ehOut={ehOut}
+            finalidade={finalidade}
           />
         ) : ehTipoMidia ? (
           <div className="space-y-1">
@@ -977,13 +986,18 @@ function CartaoContato({
   nome,
   telefone,
   ehOut,
+  finalidade,
 }: {
   nome: string;
   telefone: string | null;
   ehOut: boolean;
+  finalidade?: Finalidade;
 }) {
   const toast = useToast();
+  const router = useRouter();
+  const [conversando, setConversando] = useState(false);
   const inicial = (nome.trim()[0] ?? "?").toUpperCase();
+
   async function copiar() {
     if (!telefone) return;
     try {
@@ -993,6 +1007,51 @@ function CartaoContato({
       toast.erro("Nao foi possivel copiar.");
     }
   }
+
+  // Cadastra/encontra o lead e abre a conversa no Inbox (na finalidade atual).
+  // Nao "assume" cliente de outro colaborador (409 -> usa o existente; iniciar
+  // 404 -> pertence a outro). Nenhum disparo ao numero. Fatia 2.96.
+  async function conversar() {
+    if (!telefone || conversando) return;
+    setConversando(true);
+    const fin = finalidade ?? "VENDA";
+    try {
+      const rl = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome, telefone, finalidade: fin }),
+      });
+      const dl = await rl.json().catch(() => null);
+      let leadId: string | null = null;
+      if (rl.ok && dl?.leadId) {
+        leadId = dl.leadId;
+      } else if (rl.status === 409 && dl?.leadId) {
+        // Telefone ja cadastrado: usa o lead existente (sem assumir/roubar).
+        leadId = dl.leadId;
+      } else {
+        toast.erro(dl?.erro ?? "Nao foi possivel cadastrar o contato.");
+        return;
+      }
+      const ri = await fetch("/api/conversas/iniciar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, finalidade: fin }),
+      });
+      if (ri.ok) {
+        router.push(`/inbox?lead=${leadId}`);
+      } else if (ri.status === 404) {
+        toast.erro("Cliente pertence a outro colaborador.");
+      } else {
+        const di = await ri.json().catch(() => null);
+        toast.erro(di?.erro ?? "Nao foi possivel abrir a conversa.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setConversando(false);
+    }
+  }
+
   return (
     <div className="min-w-56 space-y-1.5">
       <div className="flex items-center gap-2.5">
@@ -1020,6 +1079,22 @@ function CartaoContato({
           }`}
         >
           <Copy className="h-3.5 w-3.5" /> Copiar numero
+        </button>
+      )}
+      {telefone && (
+        <button
+          onClick={() => void conversar()}
+          disabled={conversando}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+            ehOut ? "bg-white/15 text-white hover:bg-white/25" : "bg-black/5 text-medio hover:bg-black/10"
+          }`}
+        >
+          {conversando ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <MessageCircle className="h-3.5 w-3.5" />
+          )}
+          Conversar
         </button>
       )}
     </div>

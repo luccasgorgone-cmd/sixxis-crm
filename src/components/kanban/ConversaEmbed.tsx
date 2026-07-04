@@ -10,6 +10,7 @@ import type {
   ConversaItem,
   EventoMensagemNova,
   EventoMidia,
+  Finalidade,
 } from "@/components/inbox/tipos";
 
 export function ConversaEmbed({
@@ -27,6 +28,9 @@ export function ConversaEmbed({
 }) {
   const [mensagens, setMensagens] = useState<MensagemItem[]>([]);
   const [carregando, setCarregando] = useState(true);
+  // Finalidade da conversa (vem do endpoint de mensagens): usada pelo card de
+  // contato para abrir/criar a conversa no funil certo. Fatia 2.96.
+  const [finalidade, setFinalidade] = useState<Finalidade | undefined>(undefined);
 
   useEffect(() => {
     let vivo = true;
@@ -34,7 +38,10 @@ export function ConversaEmbed({
     fetch(`/api/conversas/${conversaId}/mensagens`)
       .then((r) => (r.ok ? r.json() : { mensagens: [] }))
       .then((d) => {
-        if (vivo) setMensagens(d.mensagens ?? []);
+        if (vivo) {
+          setMensagens(d.mensagens ?? []);
+          setFinalidade(d.conversa?.finalidade);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -107,6 +114,7 @@ export function ConversaEmbed({
     ultimaMensagemPreview: null,
     ultimaMensagemEm: null,
     agenteId: null,
+    finalidade,
   };
 
   function aoEnviada(msg: MensagemItem) {
