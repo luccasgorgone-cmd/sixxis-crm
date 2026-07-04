@@ -6,6 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin, escopoLeadWhere } from "@/lib/autorizacao";
 import { garantirConversaUnificada } from "@/lib/conversa";
+import { garantirNegocioParaLead } from "@/lib/negocio";
 import { campoDono } from "@/lib/dono";
 import { Finalidade } from "@/generated/prisma/enums";
 
@@ -85,8 +86,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
   }
 
+  // Garante um negocio ABERTO na finalidade da conversa (idempotente): sem isso,
+  // conversas criadas manualmente nasciam SEM negocio e o painel do Inbox ficava
+  // incompleto (faltavam os blocos de nivel negocio). Nao duplica e respeita a
+  // reabertura de "lead perdido que volta". Fatia 2.86.
+  const negocioId = await garantirNegocioParaLead(leadId, finalidade);
+
   return NextResponse.json({
     conversaId: conversa.id,
+    negocioId,
     finalidade,
     criada: !antes,
   });

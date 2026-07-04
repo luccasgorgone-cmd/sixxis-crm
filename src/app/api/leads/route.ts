@@ -11,6 +11,7 @@ import { registrarAtividade } from "@/lib/atividade";
 import { normalizarTelefoneBR } from "@/lib/phone";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { espelharDonoNasConversas } from "@/lib/dono";
+import { garantirNegocioParaLead } from "@/lib/negocio";
 import { nomeEfetivo } from "@/lib/cliente";
 import { parseDataNascimento } from "@/lib/format";
 import { Finalidade, AtividadeTipo, Segmento } from "@/generated/prisma/enums";
@@ -155,6 +156,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       data: { [campo]: donoId, aceitaContato: true },
     });
     await espelharDonoNasConversas(prisma, existente.id, finalidade, donoId);
+    // Garante um negocio ABERTO na finalidade (idempotente) para o painel ficar
+    // completo tambem ao vincular. Fatia 2.86.
+    await garantirNegocioParaLead(existente.id, finalidade);
     await registrarAtividade({
       leadId: existente.id,
       agenteId: agente.id,
@@ -183,6 +187,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         : {}),
     },
   });
+
+  // Garante um negocio ABERTO na finalidade escolhida (idempotente): assim o
+  // painel do Inbox ja nasce completo ao abrir a conversa do cliente manual, sem
+  // depender do 1o contato real. Nao duplica. Fatia 2.86.
+  await garantirNegocioParaLead(lead.id, finalidade);
 
   await registrarAtividade({
     leadId: lead.id,
