@@ -107,6 +107,13 @@ export function Thread({
     fimRef.current?.scrollIntoView({ block: "end" });
   }, [mensagens, carregando]);
 
+  // Troca de conversa: limpa o alvo de resposta/encaminhamento (nao vaza entre
+  // conversas — o Thread nao remonta ao trocar de conversa no Inbox). Fatia 2.85.
+  useEffect(() => {
+    setRespondendoA(null);
+    setEncaminhando(null);
+  }, [conversa.id]);
+
   const nome = conversa.leadNome?.trim() || conversa.leadTelefone;
 
   // Selo IA/Humano e botao excluir: unicos deste cabecalho (nao existem na barra

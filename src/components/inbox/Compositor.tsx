@@ -93,6 +93,15 @@ export function Compositor({
   useEffect(() => {
     setInstanciaSel(instanciaIdAtual ?? null);
   }, [instanciaIdAtual, conversaId]);
+
+  // Troca de conversa: descarta anexos/audio pendentes (nao envia para a conversa
+  // errada — o compositor nao remonta ao trocar de conversa). Fatia 2.85.
+  useEffect(() => {
+    limparFila();
+    descartarAudio();
+    // limparFila/descartarAudio sao estaveis (declaracoes); dependem so do id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaId]);
   useEffect(() => {
     const qs = finalidade ? `?finalidade=${finalidade}` : "";
     fetch(`/api/instancias${qs}`)
