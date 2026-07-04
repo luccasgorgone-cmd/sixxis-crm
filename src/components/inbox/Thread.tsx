@@ -3,6 +3,7 @@
 // Coluna central: cabecalho do contato, mensagens (bolhas) e o compositor.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useClickFora } from "@/lib/useClickFora";
 import {
   Check,
   CheckCheck,
@@ -353,6 +354,10 @@ function PopoverReacao({
       window.removeEventListener("resize", fechar);
     };
   }, [onFechar]);
+
+  // Clicar fora do popover (na conversa, em outra bolha, etc.) fecha. O proprio
+  // botao-gatilho e ignorado para poder alternar sem reabrir.
+  useClickFora(onFechar, true, [popRef, anchorRef]);
 
   if (typeof document === "undefined") return null;
 

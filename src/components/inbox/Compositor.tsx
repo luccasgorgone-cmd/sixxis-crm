@@ -71,6 +71,9 @@ export function Compositor({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Botoes-gatilho dos seletores: ignorados no clique-fora (alternar sem reabrir).
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
+  const figurinhaBtnRef = useRef<HTMLButtonElement>(null);
 
   // Numero de envio: as instancias ativas da finalidade da conversa. O padrao e
   // o numero que o cliente usou por ultimo (instanciaIdAtual); o atendente pode
@@ -277,9 +280,19 @@ export function Compositor({
     }, 0);
   }
 
+  // Fecha todos os popovers de selecao (para nao deixar dois abertos juntos).
+  function fecharSeletores() {
+    setMostrar(false);
+    setMostrarEmojis(false);
+    setMostrarFigurinhas(false);
+    setMostrarTons(false);
+  }
+
   // Abre o painel de figurinhas (carrega sob demanda na 1a vez).
   function abrirFigurinhas() {
-    setMostrarFigurinhas((v) => !v);
+    const abrir = !mostrarFigurinhas;
+    fecharSeletores();
+    setMostrarFigurinhas(abrir);
     if (!figurinhasCarregadas) {
       setFigurinhasCarregadas(true);
       fetch("/api/figurinhas")
@@ -698,6 +711,7 @@ export function Compositor({
         <SeletorEmoji
           onEscolher={inserirEmoji}
           onFechar={() => setMostrarEmojis(false)}
+          anchorRef={emojiBtnRef}
         />
       )}
 
@@ -709,6 +723,7 @@ export function Compositor({
           onEscolher={(id) => void enviarFigurinhaMsg(id)}
           onFavoritar={(id) => void favoritarFigurinha(id)}
           onFechar={() => setMostrarFigurinhas(false)}
+          anchorRef={figurinhaBtnRef}
         />
       )}
 
@@ -791,7 +806,9 @@ export function Compositor({
         <div className="grid shrink-0 grid-cols-2 gap-1">
           <button
             onClick={() => {
-              setMostrar((v) => !v);
+              const abrir = !mostrar;
+              fecharSeletores();
+              setMostrar(abrir);
               setBusca("");
             }}
             title="Respostas rapidas"
@@ -805,8 +822,11 @@ export function Compositor({
             <Zap className="h-5 w-5" />
           </button>
           <button
+            ref={emojiBtnRef}
             onClick={() => {
-              setMostrarEmojis((v) => !v);
+              const abrir = !mostrarEmojis;
+              fecharSeletores();
+              setMostrarEmojis(abrir);
             }}
             title="Emojis"
             aria-label="Emojis"
@@ -819,6 +839,7 @@ export function Compositor({
             <Smile className="h-5 w-5" />
           </button>
           <button
+            ref={figurinhaBtnRef}
             onClick={abrirFigurinhas}
             title="Figurinhas"
             aria-label="Figurinhas"
@@ -869,7 +890,11 @@ export function Compositor({
         <div className="flex shrink-0 flex-col gap-1">
           {tons.length > 0 && (
             <button
-              onClick={() => setMostrarTons((v) => !v)}
+              onClick={() => {
+                const abrir = !mostrarTons;
+                fecharSeletores();
+                setMostrarTons(abrir);
+              }}
               disabled={!texto.trim() || reescrevendo}
               title="Reescrever com IA"
               aria-label="Reescrever com IA"

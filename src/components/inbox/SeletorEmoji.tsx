@@ -3,7 +3,9 @@
 // Seletor de emojis do compositor: grade curada de emojis Unicode por categoria
 // (sem dependencia externa). Clicar chama onEscolher — o WhatsApp renderiza os
 // emojis nativamente, entao no backend e apenas texto.
+import { useRef, type RefObject } from "react";
 import { X } from "lucide-react";
+import { useClickFora } from "@/lib/useClickFora";
 
 const EMOJIS: { cat: string; itens: string[] }[] = [
   {
@@ -47,12 +49,21 @@ const EMOJIS: { cat: string; itens: string[] }[] = [
 export function SeletorEmoji({
   onEscolher,
   onFechar,
+  anchorRef,
 }: {
   onEscolher: (emoji: string) => void;
   onFechar: () => void;
+  // Botao-gatilho: ignorado no clique-fora para permitir alternar sem reabrir.
+  anchorRef?: RefObject<HTMLElement | null>;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useClickFora(onFechar, true, anchorRef ? [rootRef, anchorRef] : [rootRef]);
+
   return (
-    <div className="absolute bottom-full left-3 z-20 mb-1 w-72 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg">
+    <div
+      ref={rootRef}
+      className="absolute bottom-full left-3 z-20 mb-1 w-72 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg"
+    >
       <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
           Emojis
