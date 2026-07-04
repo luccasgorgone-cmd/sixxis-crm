@@ -27,6 +27,8 @@ import {
   X,
   Sticker,
   Copy,
+  Reply,
+  Forward,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem } from "./tipos";
 import { Compositor } from "./Compositor";
@@ -66,6 +68,20 @@ export function Thread({
   const toast = useToast();
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  // Reply: mensagem sendo respondida (citada no compositor). Fatia 2.85.
+  const [respondendoA, setRespondendoA] = useState<MensagemItem | null>(null);
+  // Forward: mensagem sendo encaminhada (abre o seletor de conversa).
+  const [encaminhando, setEncaminhando] = useState<MensagemItem | null>(null);
+
+  // Rola ate a mensagem citada (clique na citacao), destacando-a brevemente.
+  function irParaMensagem(id: string) {
+    const el = document.getElementById(`msg-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-tiffany/50");
+      setTimeout(() => el.classList.remove("ring-2", "ring-tiffany/50"), 1600);
+    }
+  }
 
   async function excluirConversa() {
     setExcluindo(true);
@@ -221,6 +237,9 @@ export function Thread({
             mensagens={mensagens}
             ehAdmin={ehAdmin}
             podeApagar={!somenteLeitura}
+            onResponder={somenteLeitura ? undefined : setRespondendoA}
+            onEncaminhar={setEncaminhando}
+            onIrParaMensagem={irParaMensagem}
           />
         )}
         <div ref={fimRef} />
@@ -240,6 +259,15 @@ export function Thread({
           lead={{
             nomeEfetivo: conversa.leadNome?.trim() || conversa.leadTelefone,
           }}
+          respondendoA={respondendoA}
+          onCancelarResposta={() => setRespondendoA(null)}
+        />
+      )}
+
+      {encaminhando && (
+        <ModalEncaminhar
+          mensagemId={encaminhando.id}
+          onFechar={() => setEncaminhando(null)}
         />
       )}
     </div>
@@ -250,10 +278,16 @@ function ListaMensagens({
   mensagens,
   ehAdmin,
   podeApagar,
+  onResponder,
+  onEncaminhar,
+  onIrParaMensagem,
 }: {
   mensagens: MensagemItem[];
   ehAdmin: boolean;
   podeApagar: boolean;
+  onResponder?: (m: MensagemItem) => void;
+  onEncaminhar?: (m: MensagemItem) => void;
+  onIrParaMensagem?: (id: string) => void;
 }) {
   const blocos: { dia: string; itens: MensagemItem[] }[] = [];
   let chaveAtual = "";
@@ -277,7 +311,15 @@ function ListaMensagens({
             </span>
           </div>
           {bloco.itens.map((m) => (
-            <Bolha key={m.id} mensagem={m} ehAdmin={ehAdmin} podeApagar={podeApagar} />
+            <Bolha
+              key={m.id}
+              mensagem={m}
+              ehAdmin={ehAdmin}
+              podeApagar={podeApagar}
+              onResponder={onResponder}
+              onEncaminhar={onEncaminhar}
+              onIrParaMensagem={onIrParaMensagem}
+            />
           ))}
         </div>
       ))}
@@ -406,10 +448,16 @@ function Bolha({
   mensagem,
   ehAdmin,
   podeApagar,
+  onResponder,
+  onEncaminhar,
+  onIrParaMensagem,
 }: {
   mensagem: MensagemItem;
   ehAdmin: boolean;
   podeApagar: boolean;
+  onResponder?: (m: MensagemItem) => void;
+  onEncaminhar?: (m: MensagemItem) => void;
+  onIrParaMensagem?: (id: string) => void;
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
@@ -560,69 +608,127 @@ function Bolha({
       ? "Mensagem apagada pelo cliente"
       : "Mensagem apagada";
 
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(conteudoExibido ?? "");
+      toast.sucesso("Mensagem copiada.");
+    } catch {
+      toast.erro("Nao foi possivel copiar.");
+    }
+  }
+
+  // Preview curto de uma mensagem citada (reply).
+  function previewCitada(c: NonNullable<MensagemItem["citada"]>): string {
+    if (c.contatoNome) return `Contato: ${c.contatoNome}`;
+    const t = (c.conteudo ?? "").trim();
+    if (c.tipo === "IMAGEM") return t && !t.startsWith("[") ? t : "Imagem";
+    if (c.tipo === "VIDEO") return "Video";
+    if (c.tipo === "AUDIO") return "Audio";
+    if (c.tipo === "DOCUMENTO") return t || "Documento";
+    return t || "Mensagem";
+  }
+
+  const podeCopiar = !apagada && (mensagem.tipo === "TEXTO" || !!legenda);
+
   return (
     <div
-      className={`group flex items-center gap-1.5 ${ehOut ? "justify-end" : "justify-start"} ${
+      id={`msg-${mensagem.id}`}
+      className={`group flex items-center gap-1.5 rounded-lg transition-shadow ${ehOut ? "justify-end" : "justify-start"} ${
         reacao || reacaoCliente ? "mb-2.5" : ""
       }`}
     >
-      {/* Acoes auxiliares (reagir / apagar) — aparecem no hover. O botao de
-          reagir fica sempre no lado INTERNO da bolha (voltado ao centro da
-          conversa): a DIREITA na mensagem do cliente (IN, order-3, apos a bolha)
-          e a ESQUERDA na nossa (OUT, order-1, antes da bolha). Assim o popover
-          (portal com clamp) abre para dentro e nunca e cortado. */}
-      {podeReagir && (
-        <div className={`relative shrink-0 ${ehOut ? "order-1" : "order-3"}`}>
-          <button
-            ref={reacaoBtnRef}
-            onClick={() => setPickerReacao((v) => !v)}
-            disabled={reagindo}
-            title="Reagir"
-            aria-label="Reagir"
-            className="rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-tiffany group-hover:opacity-100"
-          >
-            {reagindo ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Smile className="h-3.5 w-3.5" />
-            )}
-          </button>
-          {pickerReacao && (
-            <PopoverReacao
-              anchorRef={reacaoBtnRef}
-              reacaoAtual={reacao}
-              onEscolher={(e) => void reagir(e)}
-              onFechar={() => setPickerReacao(false)}
-            />
+      {/* Cluster de acoes (estilo WhatsApp) — aparece no hover, no lado INTERNO
+          da bolha (voltado ao centro): a ESQUERDA na nossa (OUT, order-1) e a
+          DIREITA na do cliente (IN, order-3). Responder, Encaminhar, Copiar,
+          Reagir e — so nas nossas — Editar (na janela) e Apagar. */}
+      {!apagada && !editando && (
+        <div
+          className={`flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 ${
+            ehOut ? "order-1" : "order-3"
+          }`}
+        >
+          {onResponder && (
+            <button
+              onClick={() => onResponder(mensagem)}
+              title="Responder"
+              aria-label="Responder"
+              className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-tiffany"
+            >
+              <Reply className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {onEncaminhar && (
+            <button
+              onClick={() => onEncaminhar(mensagem)}
+              title="Encaminhar"
+              aria-label="Encaminhar"
+              className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-tiffany"
+            >
+              <Forward className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {podeCopiar && (
+            <button
+              onClick={() => void copiar()}
+              title="Copiar"
+              aria-label="Copiar"
+              className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-tiffany"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {podeReagir && (
+            <div className="relative">
+              <button
+                ref={reacaoBtnRef}
+                onClick={() => setPickerReacao((v) => !v)}
+                disabled={reagindo}
+                title="Reagir"
+                aria-label="Reagir"
+                className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-tiffany"
+              >
+                {reagindo ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Smile className="h-3.5 w-3.5" />
+                )}
+              </button>
+              {pickerReacao && (
+                <PopoverReacao
+                  anchorRef={reacaoBtnRef}
+                  reacaoAtual={reacao}
+                  onEscolher={(e) => void reagir(e)}
+                  onFechar={() => setPickerReacao(false)}
+                />
+              )}
+            </div>
+          )}
+          {podeEditar && (
+            <button
+              onClick={abrirEdicao}
+              title="Editar mensagem"
+              aria-label="Editar mensagem"
+              className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-tiffany"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {podeRevogar && (
+            <button
+              onClick={() => void apagar()}
+              disabled={apagando}
+              title="Apagar para todos"
+              aria-label="Apagar para todos"
+              className="rounded-full p-1 text-medio/40 hover:bg-black/5 hover:text-erro"
+            >
+              {apagando ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </button>
           )}
         </div>
-      )}
-      {/* Acao editar (so na propria mensagem OUT de texto, dentro da janela) */}
-      {podeEditar && !editando && (
-        <button
-          onClick={abrirEdicao}
-          title="Editar mensagem"
-          aria-label="Editar mensagem"
-          className="order-1 shrink-0 rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-tiffany group-hover:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      )}
-      {/* Acao apagar (so na propria mensagem enviada) */}
-      {podeRevogar && (
-        <button
-          onClick={() => void apagar()}
-          disabled={apagando}
-          title="Apagar para todos"
-          aria-label="Apagar para todos"
-          className="order-1 shrink-0 rounded-full p-1 text-medio/40 opacity-0 transition-opacity hover:bg-black/5 hover:text-erro group-hover:opacity-100"
-        >
-          {apagando ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="h-3.5 w-3.5" />
-          )}
-        </button>
       )}
 
       <div
@@ -644,6 +750,36 @@ function Bolha({
           >
             {reacaoCliente && <span title="Reacao do cliente">{reacaoCliente}</span>}
             {reacao && <span title="Sua reacao">{reacao}</span>}
+          </span>
+        )}
+        {/* Citacao (reply): preview da mensagem respondida, clicavel. */}
+        {mensagem.citada && (
+          <button
+            onClick={() => onIrParaMensagem?.(mensagem.citada!.id)}
+            className={`mb-1 flex w-full items-stretch gap-2 overflow-hidden rounded-md border-l-2 py-1 pl-2 pr-2 text-left text-xs ${
+              ehOut
+                ? "border-white/70 bg-white/15 text-white/90"
+                : "border-tiffany bg-black/[0.04] text-medio/80"
+            }`}
+          >
+            <span className="truncate">
+              <span className="font-semibold">
+                {mensagem.citada.direcao === "OUT" ? "Voce" : "Cliente"}
+              </span>
+              <span className="ml-1 opacity-80">
+                {previewCitada(mensagem.citada)}
+              </span>
+            </span>
+          </button>
+        )}
+        {/* Marca "Encaminhada" (forward). */}
+        {mensagem.encaminhada && !apagada && (
+          <span
+            className={`mb-0.5 flex items-center gap-1 text-[11px] italic ${
+              ehOut ? "text-white/70" : "text-medio/50"
+            }`}
+          >
+            <Forward className="h-3 w-3" /> Encaminhada
           </span>
         )}
         {apagada ? (
@@ -1067,6 +1203,109 @@ function SkeletonThread() {
           <div className={`skeleton h-10 ${w} rounded-xl`} />
         </div>
       ))}
+    </div>
+  );
+}
+
+// Seletor de conversa para ENCAMINHAR (forward): lista as conversas do usuario,
+// busca por nome/telefone, e reenvia o conteudo ao destino escolhido. Fatia 2.85.
+function ModalEncaminhar({
+  mensagemId,
+  onFechar,
+}: {
+  mensagemId: string;
+  onFechar: () => void;
+}) {
+  const toast = useToast();
+  const [conversas, setConversas] = useState<
+    { id: string; leadNome: string | null; leadTelefone: string; leadFoto: string | null }[]
+  >([]);
+  const [busca, setBusca] = useState("");
+  const [enviando, setEnviando] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/conversas")
+      .then((r) => (r.ok ? r.json() : { conversas: [] }))
+      .then((d) => setConversas(d.conversas ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  async function encaminhar(conversaDestinoId: string) {
+    setEnviando(conversaDestinoId);
+    try {
+      const r = await fetch("/api/mensagens/encaminhar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensagemId, conversaDestinoId }),
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok) {
+        toast.sucesso("Mensagem encaminhada.");
+        onFechar();
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel encaminhar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  const q = busca.trim().toLowerCase();
+  const qd = busca.replace(/\D/g, "");
+  const filtradas = conversas.filter((c) => {
+    if (!q && !qd) return true;
+    const nome = (c.leadNome ?? "").toLowerCase();
+    const tel = c.leadTelefone.replace(/\D/g, "");
+    return nome.includes(q) || (qd.length > 0 && tel.includes(qd));
+  });
+
+  return (
+    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="modal-in flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-escuro">
+            <Forward className="h-4 w-4 text-tiffany" /> Encaminhar para
+          </h3>
+          <button onClick={onFechar} className="rounded-lg p-1 text-medio/60 hover:bg-black/5">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="border-b border-black/5 p-3">
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar conversa"
+            className="w-full rounded-lg border border-black/10 bg-fundo px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+        </div>
+        <div className="scroll-fino min-h-0 flex-1 overflow-y-auto">
+          {filtradas.length === 0 ? (
+            <p className="p-4 text-center text-sm text-medio/50">Nenhuma conversa.</p>
+          ) : (
+            filtradas.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => void encaminhar(c.id)}
+                disabled={enviando !== null}
+                className="flex w-full items-center gap-3 border-b border-black/5 px-3 py-2.5 text-left transition-colors hover:bg-fundo disabled:opacity-60"
+              >
+                <AvatarCliente
+                  nome={c.leadNome}
+                  telefone={c.leadTelefone}
+                  fotoUrl={c.leadFoto}
+                  tamanho={36}
+                />
+                <span className="min-w-0 flex-1 truncate text-sm text-escuro">
+                  {c.leadNome?.trim() || formatarTelefone(c.leadTelefone)}
+                </span>
+                {enviando === c.id && <Loader2 className="h-4 w-4 animate-spin text-tiffany" />}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

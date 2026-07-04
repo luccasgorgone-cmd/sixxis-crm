@@ -25,7 +25,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const agenteId = session.user.id;
 
-  let body: { conversaId?: string; texto?: string; instanciaId?: string };
+  let body: {
+    conversaId?: string;
+    texto?: string;
+    instanciaId?: string;
+    respostaAId?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -92,8 +97,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Reply (Fatia 2.85): se responde a uma mensagem DESTA conversa, monta o quoted
+  // (key da Evolution) para o WhatsApp exibir como resposta, e guarda respostaAId.
+  const respostaAId = body?.respostaAId ? String(body.respostaAId) : null;
+  let quoted:
+    | { id: string; remoteJid: string; fromMe: boolean }
+    | undefined;
+  if (respostaAId) {
+    const citada = await prisma.mensagem.findUnique({
+      where: { id: respostaAId },
+      select: { externalId: true, direcao: true, conversaId: true },
+    });
+    if (
+      citada &&
+      citada.conversaId === conversa.id &&
+      citada.externalId &&
+      !citada.externalId.startsWith("out-")
+    ) {
+      quoted = {
+        id: citada.externalId,
+        remoteJid: `${numero}@s.whatsapp.net`,
+        fromMe: citada.direcao === DirecaoMsg.OUT,
+      };
+    }
+  }
+
   // Chama a Evolution. Se falhar, ainda gravamos a mensagem com status ERRO.
-  const resultado = await enviarTexto(numero, texto, instanciaEvolution);
+  const resultado = await enviarTexto(numero, texto, instanciaEvolution, quoted);
   const status: StatusEnvio = resultado.ok
     ? StatusEnvio.ENVIADA
     : StatusEnvio.ERRO;
@@ -115,6 +145,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         lida: true,
         raw: (resultado.raw ?? {}) as Prisma.InputJsonValue,
         hora: agora,
+        ...(respostaAId ? { respostaAId } : {}),
       },
     });
   } catch (erro) {

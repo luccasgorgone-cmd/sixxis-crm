@@ -419,11 +419,14 @@ model Mensagem {
   contatoNome      String?
   contatoTelefone  String?
   contatoVcard     String?     @db.Text
+  // Reply (Fatia 2.85): id da Mensagem CITADA (respondida), estilo WhatsApp.
+  respostaAId      String?
   // Payload bruto da Evolution. Podado (NULL) apos RETENCAO_RAW_MESES; o conteudo
   // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
   raw         Json?
   hora        DateTime     @default(now())
 
+  @@index([respostaAId])
   @@index([conversaId, hora])
   @@index([conversaId, direcao])
 }

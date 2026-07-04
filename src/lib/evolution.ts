@@ -20,6 +20,8 @@ export async function enviarTexto(
   numero: string,
   texto: string,
   instancia?: string | null,
+  // Reply (Fatia 2.85): cita a mensagem respondida (key da Evolution).
+  quoted?: { id: string; remoteJid: string; fromMe: boolean },
 ): Promise<ResultadoEnvio> {
   const cfg = baseEKey();
   const instance = instancia || process.env.EVOLUTION_INSTANCE;
@@ -32,7 +34,21 @@ export async function enviarTexto(
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
-      body: JSON.stringify({ number: numero, text: texto }),
+      body: JSON.stringify({
+        number: numero,
+        text: texto,
+        ...(quoted
+          ? {
+              quoted: {
+                key: {
+                  id: quoted.id,
+                  remoteJid: quoted.remoteJid,
+                  fromMe: quoted.fromMe,
+                },
+              },
+            }
+          : {}),
+      }),
     });
     const raw: unknown = await resp.json().catch(() => null);
     if (!resp.ok) return { ok: false, status: resp.status, raw };

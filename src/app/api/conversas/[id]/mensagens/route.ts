@@ -55,11 +55,31 @@ export async function GET(
       // Contato compartilhado (card no thread).
       contatoNome: true,
       contatoTelefone: true,
+      // Reply (mensagem citada) — preview montado abaixo.
+      respostaAId: true,
       // Numero (instancia) por onde a mensagem entrou/saiu (conversa unificada).
       instancia: true,
       instanciaId: true,
     },
   });
+
+  // Preview das mensagens CITADAS (reply): 1 consulta extra pelas ids citadas.
+  const respIds = Array.from(
+    new Set(mensagens.map((m) => m.respostaAId).filter((v): v is string => !!v)),
+  );
+  const citadas = respIds.length
+    ? await prisma.mensagem.findMany({
+        where: { id: { in: respIds } },
+        select: {
+          id: true,
+          direcao: true,
+          tipo: true,
+          conteudo: true,
+          contatoNome: true,
+        },
+      })
+    : [];
+  const mapaCitada = new Map(citadas.map((c) => [c.id, c]));
 
   // Rotulo curto do numero de origem de cada mensagem (nome cadastrado da
   // instancia, com fallback para o identificador da Evolution).
@@ -75,6 +95,8 @@ export async function GET(
   const mapaInstancia = new Map(instancias.map((i) => [i.id, i.nome]));
   const mensagensComRotulo = mensagens.map((m) => ({
     ...m,
+    // Mensagem citada (reply): preview para renderizar a citacao na bolha.
+    citada: m.respostaAId ? (mapaCitada.get(m.respostaAId) ?? null) : null,
     instanciaRotulo:
       (m.instanciaId ? mapaInstancia.get(m.instanciaId) : null) ??
       m.instancia ??

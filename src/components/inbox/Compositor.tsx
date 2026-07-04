@@ -60,6 +60,8 @@ export function Compositor({
   finalidade,
   instanciaIdAtual,
   lead,
+  respondendoA,
+  onCancelarResposta,
 }: {
   conversaId: string;
   onEnviada: (msg: MensagemItem) => void;
@@ -67,6 +69,9 @@ export function Compositor({
   finalidade?: "VENDA" | "POS_VENDA";
   instanciaIdAtual?: string | null;
   lead?: LeadModelo | null;
+  // Reply (Fatia 2.85): mensagem sendo respondida (citada) + cancelar.
+  respondendoA?: MensagemItem | null;
+  onCancelarResposta?: () => void;
 }) {
   const agente = useAgente();
   const ctxAgente = agente ? { nome: agente.nome } : null;
@@ -609,6 +614,17 @@ export function Compositor({
     });
   }
 
+  // Preview curto da mensagem sendo respondida (reply).
+  function previewResposta(m: MensagemItem): string {
+    if (m.contatoNome) return `Contato: ${m.contatoNome}`;
+    const t = (m.conteudo ?? "").trim();
+    if (m.tipo === "IMAGEM") return t && !t.startsWith("[") ? t : "Imagem";
+    if (m.tipo === "VIDEO") return "Video";
+    if (m.tipo === "AUDIO") return "Audio";
+    if (m.tipo === "DOCUMENTO") return t || "Documento";
+    return t || "Mensagem";
+  }
+
   async function enviar() {
     const valor = texto.trim();
     if (!valor || enviando) return;
@@ -622,6 +638,7 @@ export function Compositor({
           conversaId,
           texto: valor,
           ...(instanciaSel ? { instanciaId: instanciaSel } : {}),
+          ...(respondendoA ? { respostaAId: respondendoA.id } : {}),
         }),
       });
       const d = await r.json().catch(() => null);
@@ -631,6 +648,7 @@ export function Compositor({
       }
       setTexto("");
       setTextoAnterior(null);
+      onCancelarResposta?.();
       ref.current?.focus();
     } catch {
       setErro("Nao foi possivel enviar agora.");
@@ -1005,6 +1023,27 @@ export function Compositor({
         onChange={anexarArquivos}
         className="hidden"
       />
+
+      {/* Barra de resposta (reply) estilo WhatsApp: preview da citada + cancelar. */}
+      {respondendoA && (
+        <div className="mb-2 flex items-start gap-2 rounded-lg border-l-2 border-tiffany bg-tiffany/[0.06] px-2.5 py-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-tiffany">
+              Respondendo {respondendoA.direcao === "OUT" ? "voce" : "o cliente"}
+            </p>
+            <p className="truncate text-xs text-medio/70">
+              {previewResposta(respondendoA)}
+            </p>
+          </div>
+          <button
+            onClick={onCancelarResposta}
+            title="Cancelar resposta"
+            className="rounded-lg p-1 text-medio/60 hover:bg-black/5 hover:text-erro"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {gravando ? (

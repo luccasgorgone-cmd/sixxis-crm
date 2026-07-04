@@ -62,6 +62,17 @@ export type MensagemItem = {
   // Contato compartilhado (card no thread): nome + telefone do vCard.
   contatoNome?: string | null;
   contatoTelefone?: string | null;
+  // Reply (estilo WhatsApp): id da citada + preview da mensagem citada.
+  respostaAId?: string | null;
+  citada?: {
+    id: string;
+    direcao: Direcao;
+    tipo: TipoMensagem;
+    conteudo: string | null;
+    contatoNome?: string | null;
+  } | null;
+  // Marca visual "Encaminhada" na bolha (forward).
+  encaminhada?: boolean;
 };
 
 // Payload emitido pelo servidor no evento "mensagem:nova".

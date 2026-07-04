@@ -457,6 +457,26 @@ function extrairContato(
   return null;
 }
 
+// Reply recebido: id (stanzaId) da mensagem CITADA no contextInfo. Fatia 2.85.
+function extrairStanzaCitada(
+  message?: Record<string, unknown> | null,
+): string | null {
+  if (!message) return null;
+  const m = message as Record<string, { contextInfo?: { stanzaId?: string } }>;
+  for (const chave of [
+    "extendedTextMessage",
+    "imageMessage",
+    "videoMessage",
+    "documentMessage",
+    "audioMessage",
+    "stickerMessage",
+  ]) {
+    const stanza = m[chave]?.contextInfo?.stanzaId;
+    if (stanza) return String(stanza);
+  }
+  return null;
+}
+
 // Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
 // tipos sem texto (figurinha/localizacao/contato). Captura o maximo de info.
 function extrairConteudo(
@@ -1547,6 +1567,16 @@ async function processarEvento(
   const transcricao = extrairTranscricao(data);
   // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
   const contatoInfo = extrairContato(data?.message);
+  // Reply: se cita uma mensagem que temos, vincula por externalId (best-effort).
+  const stanzaCitada = extrairStanzaCitada(data?.message);
+  const respostaAId = stanzaCitada
+    ? (
+        await prisma.mensagem.findUnique({
+          where: { externalId: stanzaCitada },
+          select: { id: true },
+        })
+      )?.id ?? null
+    : null;
   // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
   // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
   // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
@@ -1677,6 +1707,7 @@ async function processarEvento(
               contatoVcard: contatoInfo.vcard || null,
             }
           : {}),
+        ...(respostaAId ? { respostaAId } : {}),
         raw: payload as unknown as Prisma.InputJsonValue,
         ...(hora ? { hora } : {}),
       },
