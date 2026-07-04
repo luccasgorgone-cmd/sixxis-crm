@@ -891,9 +891,17 @@ async function responderForaHorarioSePreciso(
 ): Promise<void> {
   try {
     const config = await prisma.configuracaoCRM.findFirst({
-      select: { horarios: true, fuso: true, mensagemForaHorario: true },
+      select: {
+        horarios: true,
+        fuso: true,
+        mensagemForaHorario: true,
+        avisoForaHorarioAtivo: true,
+      },
     });
     if (!config) return;
+    // Interruptor (default DESLIGADO): so envia se o dono ligou explicitamente.
+    // Registros antigos (campo null/ausente) contam como false => nao envia.
+    if (config.avisoForaHorarioAtivo !== true) return;
     // Dentro do expediente: nunca envia.
     const aberto = estaAbertoAgora(
       normalizarHorarios(config.horarios),

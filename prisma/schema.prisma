@@ -815,6 +815,10 @@ model ConfiguracaoCRM {
   fuso               String   @default("America/Sao_Paulo")
   horarios           Json?
   mensagemForaHorario String?
+  // Interruptor do aviso automatico de FORA DE HORARIO. Comeca DESLIGADO: nenhum
+  // aviso e enviado ate o dono ligar explicitamente. Registros antigos (sem o
+  // campo) sao tratados como false na leitura (nao envia).
+  avisoForaHorarioAtivo Boolean @default(false)
   // Logo da empresa guardada no proprio banco (sem storage externo).
   // logoData = data URL (base64) ou SVG sanitizado; logoEm versiona o cache.
   logoData           String?   @db.Text
