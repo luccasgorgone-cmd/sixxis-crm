@@ -10,6 +10,13 @@ import { EstadoErro } from "@/components/ui/Estado";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { formatarBRL } from "@/lib/format";
+import { CATEGORIAS_PRODUTO } from "@/lib/classificar-produto";
+
+// Categorias canonicas da Sol para o catalogo (exclui "Nao classificado" — item
+// de catalogo tem categoria real; vazio = sem categoria).
+const CATEGORIAS_CATALOGO = CATEGORIAS_PRODUTO.filter(
+  (c) => c !== "Nao classificado",
+);
 
 type Item = {
   id: string;
@@ -235,7 +242,18 @@ function ModalCatalogo({
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-medio/70">Categoria</span>
-              <input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="campo w-full" placeholder="Ex.: Climatizadores" />
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="campo w-full">
+                <option value="">Sem categoria</option>
+                {CATEGORIAS_CATALOGO.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                {/* Preserva um valor legado fora do conjunto (ate ser reeditado). */}
+                {categoria && !CATEGORIAS_CATALOGO.includes(categoria as (typeof CATEGORIAS_CATALOGO)[number]) && (
+                  <option value={categoria}>{categoria} (antiga)</option>
+                )}
+              </select>
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-medio/70">Modelo</span>
