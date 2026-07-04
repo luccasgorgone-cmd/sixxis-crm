@@ -491,9 +491,13 @@ function Bolha({
         reacao || reacaoCliente ? "mb-2.5" : ""
       }`}
     >
-      {/* Acoes auxiliares (reagir / apagar) — aparecem no hover. */}
+      {/* Acoes auxiliares (reagir / apagar) — aparecem no hover. O botao de
+          reagir fica sempre no lado INTERNO da bolha (voltado ao centro da
+          conversa): a DIREITA na mensagem do cliente (IN, order-3, apos a bolha)
+          e a ESQUERDA na nossa (OUT, order-1, antes da bolha). Assim o popover
+          (portal com clamp) abre para dentro e nunca e cortado. */}
       {podeReagir && (
-        <div className="relative order-1 shrink-0">
+        <div className={`relative shrink-0 ${ehOut ? "order-1" : "order-3"}`}>
           <button
             ref={reacaoBtnRef}
             onClick={() => setPickerReacao((v) => !v)}
