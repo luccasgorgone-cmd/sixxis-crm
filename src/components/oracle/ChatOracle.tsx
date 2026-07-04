@@ -22,11 +22,20 @@ import {
   LayoutGrid,
   Trash2,
   Zap,
+  ScanLine,
   type LucideIcon,
 } from "lucide-react";
 
 // Comandos rapidos (chips acima do compositor): atalhos de periodo e acoes.
-const COMANDOS: { rotulo: string; pergunta: string }[] = [
+// `Icone`/`destaque` opcionais dao enfase a um atalho especial (ex.: varredura).
+const COMANDOS: { rotulo: string; pergunta: string; Icone?: LucideIcon; destaque?: boolean }[] = [
+  {
+    rotulo: "Varredura de atendimentos",
+    Icone: ScanLine,
+    destaque: true,
+    pergunta:
+      "Faca uma varredura completa dos atendimentos. Use as ferramentas de analise de conversas (amostrar_conversas e analisar_padroes_atendimento). Me diga: (1) como estao os atendimentos no geral; (2) o que os clientes MAIS falam e MAIS pedem; (3) as principais duvidas e objecoes; (4) quantas perguntas ficam SEM resposta e em quais temas (onde estamos falhando); (5) como as duvidas costumam ser respondidas (as boas respostas); e (6) gere um GUIA DE ATENDIMENTO acionavel para a IA (Sol): principais perguntas com as melhores respostas modelo, tom ideal, o que fazer e o que evitar. Seja completo e pratico.",
+  },
   { rotulo: "Resumo do dia", pergunta: "Me de um resumo do dia de hoje: vendas, atendimentos e o que precisa de atencao." },
   { rotulo: "O que priorizar", pergunta: "Com base nos dados, o que devo priorizar hoje? Liste as 3 acoes mais importantes." },
   { rotulo: "Hoje", pergunta: "Como estao as vendas e os atendimentos de hoje?" },
@@ -311,8 +320,13 @@ export function ChatOracle({ papel }: { papel: string }) {
               key={c.rotulo}
               onClick={() => void perguntar(c.pergunta)}
               disabled={enviando}
-              className="shrink-0 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-50"
+              className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                c.destaque
+                  ? "border-tiffany/50 bg-tiffany/10 text-tiffany hover:bg-tiffany/15"
+                  : "border-black/10 bg-white text-medio hover:border-tiffany hover:text-tiffany"
+              }`}
             >
+              {c.Icone && <c.Icone className="h-3.5 w-3.5 shrink-0" />}
               {c.rotulo}
             </button>
           ))}
