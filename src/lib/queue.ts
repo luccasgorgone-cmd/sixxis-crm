@@ -1088,6 +1088,26 @@ async function humanoAtivoNaConversa(conversaId: string): Promise<boolean> {
   return !!ultimaOut && ultimaOut.viaIA !== true;
 }
 
+// Telemetria da Sol (Fatia 2.98): grava um SolEvento por decisao. Best-effort —
+// NUNCA quebra o fluxo de envio (try/catch com log).
+async function gravarSolEvento(
+  conversaId: string,
+  leadId: string,
+  acao: string,
+  motivo?: string | null,
+  modelo?: string | null,
+): Promise<void> {
+  try {
+    await prisma.solEvento.create({
+      data: { conversaId, leadId, acao, motivo: motivo ?? null, modelo: modelo ?? null },
+    });
+  } catch (e) {
+    console.warn(
+      `[luna] falha ao gravar SolEvento: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 async function responderComLunaSePreciso(
   conversa: ConvLuna,
   telefone: string,
@@ -1150,6 +1170,7 @@ async function responderComLunaSePreciso(
     // (return "assumido" = nao dispara nem Sol nem aviso fixo). Fatia 2.98.
     if (await humanoAtivoNaConversa(conversa.id)) {
       console.log(`[luna] humano ativo na conversa ${telefone}`);
+      await gravarSolEvento(conversa.id, lead.id, "colisao_humano");
       return true;
     }
 
@@ -1203,6 +1224,7 @@ async function executarRespostaLuna(
   // (o humano ja assumiu). Re-checa no disparo (pode ter mudado no intervalo). 2.98.
   if (await humanoAtivoNaConversa(conversa.id)) {
     console.log(`[luna] humano ativo na conversa ${telefone}`);
+    await gravarSolEvento(conversa.id, lead.id, "colisao_humano");
     return;
   }
 
@@ -1253,6 +1275,16 @@ async function executarRespostaLuna(
     },
     catalogo: cfg.baseConhecimento ?? "",
   });
+
+  // Telemetria (Fatia 2.98): registra a decisao do motor (responder/handoff/
+  // silenciar) com o motivo interno e o modelo. Best-effort.
+  await gravarSolEvento(
+    conversa.id,
+    lead.id,
+    resultado.acao,
+    resultado.motivo,
+    cfg.modelo,
+  );
 
   // Silenciar (abuso/fora do escopo): nao responde e NAO cria lembrete. So loga.
   if (resultado.acao === "silenciar") {

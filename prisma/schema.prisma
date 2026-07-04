@@ -1211,3 +1211,19 @@ model OracleComando {
 
   @@index([agenteId, criadoEm])
 }
+
+// Telemetria da Sol (Fatia 2.98): um evento por decisao do motor
+// (responder/handoff/silenciar) e por colisao com humano. Baseline pre-go-live;
+// sem UI ainda. Best-effort na gravacao (nunca quebra o envio).
+model SolEvento {
+  id         String   @id @default(cuid())
+  conversaId String
+  leadId     String
+  acao       String
+  motivo     String?  @db.Text
+  modelo     String?
+  criadoEm   DateTime @default(now())
+
+  @@index([criadoEm])
+  @@index([conversaId])
+}
