@@ -1076,6 +1076,18 @@ const lunaAgendada = new Map<string, ReturnType<typeof setTimeout>>();
 // (agendou resposta) — nesse caso o worker NAO envia o aviso fixo de fora-horario.
 // Retorna false quando a Luna nao atua (inativa, dentro do horario, ou erro) —
 // e o comportamento atual (aviso fixo) segue normalmente.
+// Colisao com humano (Fatia 2.98): true quando a ULTIMA mensagem OUT da conversa
+// foi de um ATENDENTE HUMANO (viaIA != true). Nesse caso a Sol nao deve responder
+// junto — o humano ja assumiu, mesmo sem handoff formal. Regra de CODIGO.
+async function humanoAtivoNaConversa(conversaId: string): Promise<boolean> {
+  const ultimaOut = await prisma.mensagem.findFirst({
+    where: { conversaId, direcao: DirecaoMsg.OUT },
+    orderBy: { hora: "desc" },
+    select: { viaIA: true },
+  });
+  return !!ultimaOut && ultimaOut.viaIA !== true;
+}
+
 async function responderComLunaSePreciso(
   conversa: ConvLuna,
   telefone: string,
@@ -1134,6 +1146,13 @@ async function responderComLunaSePreciso(
       if (aberto) return false; // dentro do horario: humano atende (aviso fixo no-op)
     }
 
+    // Colisao com humano: se a ultima OUT foi de um humano, a Sol nao entra
+    // (return "assumido" = nao dispara nem Sol nem aviso fixo). Fatia 2.98.
+    if (await humanoAtivoNaConversa(conversa.id)) {
+      console.log(`[luna] humano ativo na conversa ${telefone}`);
+      return true;
+    }
+
     // Debounce: se ja ha resposta agendada, ela lera o historico atualizado.
     if (lunaAgendada.has(conversa.id)) return true;
     const seg = await prisma.configAgenteIA
@@ -1180,15 +1199,26 @@ async function executarRespostaLuna(
   });
   if (conv?.handoffFeitoEm) return;
 
+  // Colisao com humano: se a ultima OUT foi de um atendente, a Sol nao responde
+  // (o humano ja assumiu). Re-checa no disparo (pode ter mudado no intervalo). 2.98.
+  if (await humanoAtivoNaConversa(conversa.id)) {
+    console.log(`[luna] humano ativo na conversa ${telefone}`);
+    return;
+  }
+
   // Ultimas 15 mensagens (ordem cronologica) -> historico da Luna.
   const ultimas = await prisma.mensagem.findMany({
     where: { conversaId: conversa.id },
     orderBy: { hora: "desc" },
     take: 15,
-    select: { direcao: true, conteudo: true, transcricao: true },
+    select: { direcao: true, conteudo: true, transcricao: true, viaIA: true },
   });
   const historico = ultimas
     .reverse()
+    // Exclui OUT HUMANAS (viaIA != true): a regra de colisao ja impede a Sol de
+    // rodar quando ha humano ativo; este filtro protege o CONTEXTO (nao apresenta
+    // falas do atendente ao modelo como se fossem da Sol) caso as regras evoluam.
+    .filter((m) => !(m.direcao === DirecaoMsg.OUT && m.viaIA !== true))
     .map((m) => ({
       autor: (m.direcao === DirecaoMsg.IN ? "cliente" : "luna") as
         | "cliente"
