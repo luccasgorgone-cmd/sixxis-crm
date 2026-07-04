@@ -211,6 +211,8 @@ model Agente {
   notificacoes          Notificacao[]
   tarefas               Tarefa[]
   chamadas              Chamada[]
+  oracleConversas       OracleConversa[]
+  oracleComandos        OracleComando[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -1171,4 +1173,41 @@ model Chamada {
   @@index([instanciaId, horaEm])
   @@index([finalidade, horaEm])
   @@index([visto, status])
+}
+
+// Conversa persistente do ORACLE (chat de gestao), PRIVADA por agente. Fatia 2.93.
+model OracleConversa {
+  id           String           @id @default(cuid())
+  agenteId     String
+  agente       Agente           @relation(fields: [agenteId], references: [id])
+  titulo       String
+  criadoEm     DateTime         @default(now())
+  atualizadoEm DateTime         @updatedAt
+  arquivada    Boolean          @default(false)
+  mensagens    OracleMensagem[]
+
+  @@index([agenteId, arquivada, atualizadoEm])
+}
+
+model OracleMensagem {
+  id         String         @id @default(cuid())
+  conversaId String
+  conversa   OracleConversa @relation(fields: [conversaId], references: [id])
+  autor      String // "user" | "oracle"
+  texto      String         @db.Text
+  criadoEm   DateTime       @default(now())
+
+  @@index([conversaId, criadoEm])
+}
+
+// Comando salvo (atalho reutilizavel) do Oracle, PRIVADO por agente. Fatia 2.93.
+model OracleComando {
+  id       String   @id @default(cuid())
+  agenteId String
+  agente   Agente   @relation(fields: [agenteId], references: [id])
+  rotulo   String
+  pergunta String   @db.Text
+  criadoEm DateTime @default(now())
+
+  @@index([agenteId, criadoEm])
 }
