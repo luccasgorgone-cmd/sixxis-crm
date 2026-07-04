@@ -6,7 +6,6 @@ import { LogoutButton } from "./LogoutButton";
 import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
 import { SinoNotificacoes } from "./SinoNotificacoes";
 import { SinoAlertasSla } from "./SinoAlertasSla";
-import { SinoChamadas } from "./SinoChamadas";
 import { DisponibilidadeUsuario } from "./DisponibilidadeUsuario";
 import { TemaToggle } from "./TemaToggle";
 
@@ -23,7 +22,6 @@ const TITULO_ROTA: { prefixo: string; titulo: string }[] = [
   { prefixo: "/admin", titulo: "Administracao" },
   { prefixo: "/agenda", titulo: "Agenda" },
   { prefixo: "/campanhas", titulo: "Campanhas" },
-  { prefixo: "/chamadas", titulo: "Chamadas" },
   { prefixo: "/dashboard", titulo: "Painel" },
   { prefixo: "/google-trends", titulo: "Google Trends" },
   { prefixo: "/inteligencia", titulo: "Clima" },
@@ -55,7 +53,6 @@ export function Topbar({
         {/* Disponibilidade: so para quem recebe leads (nao-admin). Reusa Agente.ativo. */}
         {papel !== "ADMIN" && <DisponibilidadeUsuario />}
         <TemaToggle />
-        <SinoChamadas />
         <SinoAlertasSla agenteId={agenteId} papel={papel} />
         <SinoNotificacoes />
         <SinoLembretes papel={papel} agenteId={agenteId} />

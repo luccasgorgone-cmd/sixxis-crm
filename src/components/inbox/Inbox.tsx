@@ -118,7 +118,8 @@ export function Inbox({
   }, []);
 
   // Deep-link opcional: /inbox?lead=<id> pre-abre a conversa daquele lead (ex.:
-  // vindo da aba de Chamadas). Roda uma vez, quando a lista carrega. Aditivo.
+  // vindo da lista de Clientes ou de uma notificacao). Roda uma vez, quando a
+  // lista carrega. Aditivo.
   const leadAbertoRef = useRef(false);
   useEffect(() => {
     if (leadAbertoRef.current || conversas.length === 0) return;
