@@ -115,6 +115,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Sem numero de envio valido: NAO finge envio (nao grava bolha). Erro claro.
+  // Fatia 2.89-C.
+  if (!instanciaEvolution) {
+    return NextResponse.json(
+      { erro: "Nenhum numero de envio valido para esta conversa" },
+      { status: 422 },
+    );
+  }
+
   // Reply (Fatia 2.85): se responde a uma mensagem DESTA conversa, monta o quoted
   // (key da Evolution) para o WhatsApp exibir como resposta, e guarda respostaAId.
   const respostaAId = body?.respostaAId ? String(body.respostaAId) : null;

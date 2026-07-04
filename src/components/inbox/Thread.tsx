@@ -83,6 +83,26 @@ export function Thread({
     }
   }
 
+  // Reenvia uma mensagem OUT que falhou (statusEnvio ERRO). Cria um novo envio
+  // com o mesmo texto; a bolha de erro anterior permanece. Fatia 2.89-C.
+  async function reenviar(m: MensagemItem) {
+    try {
+      const r = await fetch("/api/mensagens/enviar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversaId: conversa.id, texto: m.conteudo ?? "" }),
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.mensagem) {
+        onEnviada?.(d.mensagem as MensagemItem);
+      } else {
+        toast.erro(d?.erro ?? "Nao foi possivel reenviar.");
+      }
+    } catch {
+      toast.erro("Falha de conexao.");
+    }
+  }
+
   async function excluirConversa() {
     setExcluindo(true);
     try {
@@ -248,6 +268,7 @@ export function Thread({
             onResponder={somenteLeitura ? undefined : setRespondendoA}
             onEncaminhar={setEncaminhando}
             onIrParaMensagem={irParaMensagem}
+            onReenviar={somenteLeitura ? undefined : reenviar}
           />
         )}
         <div ref={fimRef} />
@@ -290,6 +311,7 @@ function ListaMensagens({
   onResponder,
   onEncaminhar,
   onIrParaMensagem,
+  onReenviar,
 }: {
   mensagens: MensagemItem[];
   ehAdmin: boolean;
@@ -297,6 +319,7 @@ function ListaMensagens({
   onResponder?: (m: MensagemItem) => void;
   onEncaminhar?: (m: MensagemItem) => void;
   onIrParaMensagem?: (id: string) => void;
+  onReenviar?: (m: MensagemItem) => void;
 }) {
   const blocos: { dia: string; itens: MensagemItem[] }[] = [];
   let chaveAtual = "";
@@ -328,6 +351,7 @@ function ListaMensagens({
               onResponder={onResponder}
               onEncaminhar={onEncaminhar}
               onIrParaMensagem={onIrParaMensagem}
+              onReenviar={onReenviar}
             />
           ))}
         </div>
@@ -460,6 +484,7 @@ function Bolha({
   onResponder,
   onEncaminhar,
   onIrParaMensagem,
+  onReenviar,
 }: {
   mensagem: MensagemItem;
   ehAdmin: boolean;
@@ -467,6 +492,7 @@ function Bolha({
   onResponder?: (m: MensagemItem) => void;
   onEncaminhar?: (m: MensagemItem) => void;
   onIrParaMensagem?: (id: string) => void;
+  onReenviar?: (m: MensagemItem) => void;
 }) {
   const toast = useToast();
   const ehOut = mensagem.direcao === "OUT";
@@ -924,6 +950,22 @@ function Bolha({
           {horaCurta(mensagem.hora)}
           {ehOut && !apagada && <StatusEnvio status={mensagem.statusEnvio} />}
         </span>
+        {/* Falha de envio (estilo WhatsApp): nao finge entrega. Mostra "Nao
+            enviada" e, em texto, um botao de reenviar. Fatia 2.89-C. */}
+        {ehOut && !apagada && mensagem.statusEnvio === "ERRO" && (
+          <div className="mt-1 flex items-center gap-1.5 border-t border-white/20 pt-1 text-[11px] text-red-100">
+            <AlertCircle className="h-3 w-3 shrink-0" />
+            <span>Nao enviada</span>
+            {mensagem.tipo === "TEXTO" && onReenviar && (
+              <button
+                onClick={() => onReenviar(mensagem)}
+                className="ml-auto font-semibold underline hover:no-underline"
+              >
+                Reenviar
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -696,7 +696,11 @@ export function Compositor({
       const d = await r.json().catch(() => null);
       if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
       if (!r.ok) {
-        setErro("Falha ao enviar. Verifique a conexao com o WhatsApp.");
+        setErro(
+          d?.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.",
+        );
+        // Sem numero valido (nao gravou bolha): mantem o texto para reenviar.
+        if (!d?.mensagem) return;
       }
       setTexto("");
       setTextoAnterior(null);
