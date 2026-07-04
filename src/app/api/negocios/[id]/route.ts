@@ -233,6 +233,7 @@ export async function PATCH(
       valorUnitario?: number;
     }[];
     frete?: number | null;
+    fretePagoPelaEmpresa?: boolean;
   };
   try {
     body = await req.json();
@@ -300,7 +301,11 @@ export async function PATCH(
     body.frete !== undefined && body.frete !== null
       ? Math.max(0, Number(body.frete) || 0)
       : null;
-  const totalPedido = temPedido ? (valorProdutos ?? 0) + (freteInformado ?? 0) : null;
+  // Frete pago pela empresa: nao soma ao total (vira despesa rastreavel).
+  const fretePagoEmpresa = body.fretePagoPelaEmpresa === true;
+  const totalPedido = temPedido
+    ? (valorProdutos ?? 0) + (fretePagoEmpresa ? 0 : (freteInformado ?? 0))
+    : null;
 
   // ---- Mudanca de etapa ----
   if (body.etapaId) {
@@ -352,7 +357,16 @@ export async function PATCH(
       // negocio) + valorProdutos + frete. O historico do cliente guarda o pedido.
       if (temPedido) {
         data.valorProdutos = valorProdutos;
-        data.frete = freteInformado;
+        // Frete: quando pago pela empresa, o cliente nao paga (frete=null) e o
+        // valor vira DESPESA (freteDespesa); senao soma normalmente ao total.
+        data.fretePagoPelaEmpresa = fretePagoEmpresa;
+        if (fretePagoEmpresa) {
+          data.frete = null;
+          data.freteDespesa = freteInformado;
+        } else {
+          data.frete = freteInformado;
+          data.freteDespesa = null;
+        }
         data.itensPedido = {
           deleteMany: {},
           create: itensPedido.map((it) => ({
@@ -368,7 +382,11 @@ export async function PATCH(
       }
       const detalhePedido = temPedido
         ? ` — ${itensPedido.length} ${itensPedido.length === 1 ? "item" : "itens"}${
-            freteInformado ? ` + frete ${brl(freteInformado)}` : ""
+            freteInformado
+              ? fretePagoEmpresa
+                ? ` + frete ${brl(freteInformado)} (despesa da empresa)`
+                : ` + frete ${brl(freteInformado)}`
+              : ""
           }`
         : "";
       historicos.push({
@@ -583,9 +601,11 @@ export async function PATCH(
           nomeManual: true,
         },
       });
-      // Integridade (Fatia 2.71/2.72): `atualizado.valor` E o TOTAL do pedido
-      // (produtos + frete) quando ha itens — logo a conversao usa o total. O
-      // eventId `purchase-${id}` mantem o dedup por negocio. NAO alterar.
+      // Integridade (Fatia 2.71/2.72/2.76): `atualizado.valor` E o TOTAL COBRADO
+      // DO CLIENTE — produtos + frete quando o cliente paga o frete, ou SO
+      // produtos quando o frete e pago pela empresa (despesa, fora do total). A
+      // conversao usa esse valor (o que o cliente realmente pagou). O eventId
+      // `purchase-${id}` mantem o dedup por negocio. NAO alterar.
       const valorVenda =
         atualizado.valor != null ? Number(atualizado.valor) : null;
       if (leadCapi && valorVenda && valorVenda > 0) {

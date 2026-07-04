@@ -527,6 +527,10 @@ model Negocio {
   valor         Decimal?           @db.Decimal(12, 2)
   valorProdutos Decimal?           @db.Decimal(12, 2)
   frete         Decimal?           @db.Decimal(12, 2)
+  // Frete pago pela EMPRESA (despesa): quando true, o frete NAO entra no total
+  // cobrado do cliente (valor = produtos) e vira despesa rastreavel (freteDespesa).
+  fretePagoPelaEmpresa Boolean       @default(false)
+  freteDespesa  Decimal?           @db.Decimal(12, 2)
   itensPedido   ItemPedido[]
   produtos      Json?
   status        StatusNeg          @default(ABERTO)

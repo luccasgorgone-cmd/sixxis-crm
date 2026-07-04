@@ -38,6 +38,8 @@ export async function GET(
       valor: true,
       valorProdutos: true,
       frete: true,
+      fretePagoPelaEmpresa: true,
+      freteDespesa: true,
       fechadoEm: true,
       itensPedido: {
         orderBy: { criadoEm: "asc" },
@@ -62,6 +64,8 @@ export async function GET(
       total: num(n.valor),
       valorProdutos: num(n.valorProdutos),
       frete: num(n.frete),
+      fretePagoPelaEmpresa: n.fretePagoPelaEmpresa,
+      freteDespesa: num(n.freteDespesa),
       itens: n.itensPedido.map((it) => ({
         produtoCatalogoId: it.produtoCatalogoId,
         descricao: it.descricao,

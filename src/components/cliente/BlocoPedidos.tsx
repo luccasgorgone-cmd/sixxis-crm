@@ -21,6 +21,8 @@ type Pedido = {
   total: number | null;
   valorProdutos: number | null;
   frete: number | null;
+  fretePagoPelaEmpresa?: boolean;
+  freteDespesa?: number | null;
   itens: (ItemPedidoSeed & { subtotal: number })[];
 };
 
@@ -132,6 +134,13 @@ export function BlocoPedidos({
                         <span>Total</span>
                         <span>{p.total != null ? formatarBRL(p.total) : "—"}</span>
                       </div>
+                      {/* Frete pago pela empresa: despesa (fora do total do cliente). */}
+                      {p.fretePagoPelaEmpresa && p.freteDespesa != null && p.freteDespesa > 0 && (
+                        <div className="mt-1 flex justify-between rounded-md bg-amber-50 px-1.5 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
+                          <span>Frete (pago pela empresa · despesa)</span>
+                          <span>{formatarBRL(p.freteDespesa)}</span>
+                        </div>
+                      )}
                     </div>
                     {onRepetir && p.itens.length > 0 && (
                       <button

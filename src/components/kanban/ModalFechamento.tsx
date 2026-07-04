@@ -37,6 +37,8 @@ export type DadosFechamento = {
     valorUnitario: number;
   }[];
   frete?: number | null;
+  // Frete pago pela empresa: quando true, o frete NAO soma ao total (vira despesa).
+  fretePagoPelaEmpresa?: boolean;
 };
 
 export function ModalFechamento({
@@ -84,6 +86,8 @@ export function ModalFechamento({
     }),
   );
   const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
+  // Frete pago pela empresa: sai do total (vira despesa rastreavel).
+  const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(false);
 
   useEffect(() => {
     if (!ehGanho) return;
@@ -130,7 +134,8 @@ export function ModalFechamento({
 
   const produtos = itens.reduce((acc, i) => acc + i.quantidade * i.valorUnitario, 0);
   const freteNum = Math.max(0, Number((frete || "0").replace(",", ".")) || 0);
-  const total = produtos + freteNum;
+  // Total cobrado do cliente: quando a empresa paga o frete, ele NAO soma.
+  const total = produtos + (fretePagoPelaEmpresa ? 0 : freteNum);
 
   async function confirmar() {
     setErro(null);
@@ -150,6 +155,7 @@ export function ModalFechamento({
           await onConfirmar({
             valor: total,
             frete: freteNum,
+            fretePagoPelaEmpresa,
             itens: validos.map((i) => ({
               produtoCatalogoId: i.produtoCatalogoId,
               descricao: i.descricao.trim(),
@@ -317,6 +323,22 @@ export function ModalFechamento({
                       className="campo w-28 text-right"
                     />
                   </label>
+                  {/* Frete pago pela empresa: sai do total e vira despesa. */}
+                  <label className="flex items-start gap-2 text-xs text-medio/70">
+                    <input
+                      type="checkbox"
+                      checked={fretePagoPelaEmpresa}
+                      onChange={(e) => setFretePagoPelaEmpresa(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-tiffany"
+                    />
+                    <span>Frete pago pela empresa (despesa)</span>
+                  </label>
+                  {fretePagoPelaEmpresa && freteNum > 0 && (
+                    <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
+                      O frete de {formatarBRL(freteNum)} nao entra no total do
+                      cliente e sera registrado como despesa da empresa.
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-2 border-t border-black/10 pt-2">
                     <span className="text-sm font-semibold text-escuro">Total</span>
                     <span className="whitespace-nowrap text-base font-bold text-tiffany">

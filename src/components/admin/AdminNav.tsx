@@ -29,6 +29,7 @@ import {
   Target,
   Sticker,
   PackageSearch,
+  Truck,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const SECOES: Secao[] = [
   { rotulo: "Empresas faturadas", href: "/admin/empresas", icone: Building2 },
   { rotulo: "Produtos de interesse", href: "/admin/produtos-interesse", icone: Boxes },
   { rotulo: "Catalogo de pedidos", href: "/admin/catalogo", icone: PackageSearch },
+  { rotulo: "Despesas de frete", href: "/admin/despesas-frete", icone: Truck },
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },
