@@ -65,7 +65,7 @@ export function ModalTransferencia({
 
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat className="h-5 w-5 text-tiffany" />

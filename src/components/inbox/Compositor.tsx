@@ -619,7 +619,7 @@ export function Compositor({
 
       {modeloPendente && (
         <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="modal-in w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+          <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-escuro">
                 {modeloPendente.resposta.titulo}

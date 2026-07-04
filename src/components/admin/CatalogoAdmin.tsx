@@ -220,7 +220,7 @@ function ModalCatalogo({
 
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-escuro">{item ? "Editar item" : "Novo item"}</h3>
           <button onClick={onFechar} className="rounded-lg p-1 text-medio/60 hover:bg-black/5">

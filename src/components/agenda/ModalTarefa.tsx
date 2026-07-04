@@ -148,7 +148,7 @@ export function ModalTarefa({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fade-in absolute inset-0 bg-black/30" onClick={onFechar} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+      <div className="scroll-fino relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
             {edicao ? "Editar tarefa" : "Nova tarefa"}

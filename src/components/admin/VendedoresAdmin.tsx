@@ -241,7 +241,7 @@ function ModalVendedor({
 
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="modal-in w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-escuro">
             {edicao ? "Editar colaborador" : "Novo colaborador"}
