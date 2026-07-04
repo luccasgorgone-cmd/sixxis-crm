@@ -19,6 +19,7 @@ import {
   Sparkles,
   Trash2,
   Repeat,
+  ArrowLeftRight,
   UserPlus,
   MessageSquare,
   MessageCircle,
@@ -40,6 +41,7 @@ import {
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import { ModalFechamento } from "./ModalFechamento";
+import { ModalMoverFinalidade } from "./ModalMoverFinalidade";
 import { LojaCliente } from "@/components/loja/LojaCliente";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
@@ -534,6 +536,7 @@ export function NegocioAcoes({
   abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
   const toast = useToast();
+  const agente = useAgente();
   const [valor, setValor] = useState(
     detalhe.valor != null ? String(detalhe.valor) : "",
   );
@@ -543,7 +546,18 @@ export function NegocioAcoes({
   const [destino, setDestino] = useState("");
   const [reativando, setReativando] = useState(false);
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
+  const [moverAberto, setMoverAberto] = useState(false);
   const produtos = produtosParaLista(detalhe.produtos);
+
+  // Mover atendimento entre finalidades: destino = a oposta da atual. So aparece
+  // para quem tem acesso a finalidade DESTINO (ou admin) — o endpoint tambem valida.
+  const finalidadeDestino =
+    detalhe.finalidade === "POS_VENDA" ? "VENDA" : "POS_VENDA";
+  const podeMover =
+    ehAdmin ||
+    (finalidadeDestino === "POS_VENDA"
+      ? !!agente?.acessoPosVenda
+      : !!agente?.acessoVenda);
 
   const etapaGanho = etapas.find((e) => e.tipo === "GANHO");
   const etapaPerda = etapas.find((e) => e.tipo === "PERDIDO");
@@ -817,12 +831,24 @@ export function NegocioAcoes({
             )}
           </div>
         )}
-        <button
-          onClick={() => setTransferindo((v) => !v)}
-          className="mt-2 flex items-center gap-1.5 text-xs font-medium text-medio transition-colors hover:text-tiffany"
-        >
-          <Repeat className="h-3.5 w-3.5" /> Transferir cliente
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setTransferindo((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-medio transition-colors hover:text-tiffany"
+          >
+            <Repeat className="h-3.5 w-3.5" /> Transferir cliente
+          </button>
+          {podeMover && (
+            <button
+              onClick={() => setMoverAberto(true)}
+              title={`Mover atendimento para ${finalidadeDestino === "POS_VENDA" ? "Pos-venda" : "Vendas"}`}
+              className="flex items-center gap-1.5 text-xs font-medium text-medio transition-colors hover:text-tiffany"
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Mover para {finalidadeDestino === "POS_VENDA" ? "Pos-venda" : "Vendas"}
+            </button>
+          )}
+        </div>
         {transferindo && (
           <div className="mt-2 flex gap-2">
             <select
@@ -1016,6 +1042,19 @@ export function NegocioAcoes({
             </button>
           </div>
         </div>
+      )}
+
+      {moverAberto && (
+        <ModalMoverFinalidade
+          leadId={detalhe.cliente.id}
+          finalidadeOrigem={detalhe.finalidade}
+          onFechar={() => setMoverAberto(false)}
+          onConcluido={() => {
+            setMoverAberto(false);
+            void recarregar();
+            onAtualizado();
+          }}
+        />
       )}
     </section>
   );
