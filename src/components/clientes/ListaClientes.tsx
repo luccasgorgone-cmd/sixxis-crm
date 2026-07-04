@@ -108,8 +108,9 @@ export function ListaClientes({
 }) {
   const ehAdmin = papel === "ADMIN";
   // Garantia e conceito de POS-VENDA: filtro so aparece para quem tem esse acesso
-  // (ou admin). Quem tem os dois acessos ve venda + pos-venda combinados.
-  const podePosVenda = ehAdmin || acessoPosVenda;
+  // (admin, papel POS_VENDA ou flag acessoPosVenda). Quem tem venda + pos-venda
+  // ve os filtros dos dois.
+  const podePosVenda = ehAdmin || papel === "POS_VENDA" || acessoPosVenda;
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregando, setCarregando] = useState(true);
