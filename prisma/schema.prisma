@@ -249,6 +249,11 @@ model Lead {
   notaFiscal     String?
   // Garantia pos-venda: null = nao definido, true = com garantia, false = sem.
   garantia       Boolean?
+  // Arquivamento (Fatia 2.81): admin "exclui" um cliente COM historico -> arquiva
+  // (some das listas por padrao) em vez de apagar, preservando o historico de
+  // vendas e evitando erro de FK. Cliente SEM historico e apagado de fato.
+  arquivado      Boolean        @default(false)
+  arquivadoEm    DateTime?
   empresaFaturadaId String?
   empresaFaturada   EmpresaFaturada? @relation(fields: [empresaFaturadaId], references: [id], onDelete: SetNull)
   donoId         String?

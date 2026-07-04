@@ -31,6 +31,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const where: Prisma.LeadWhereInput = {};
 
+  // Clientes ARQUIVADOS (excluidos com historico) somem da lista por padrao.
+  where.arquivado = false;
+
   // Escopo por dono.
   if (admin) {
     const agenteId = sp.get("agenteId");

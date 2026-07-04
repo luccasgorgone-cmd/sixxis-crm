@@ -25,6 +25,7 @@ import {
   Send,
   Repeat,
   CheckSquare,
+  Trash2,
 } from "lucide-react";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -46,6 +47,7 @@ import { ModalCadastrarCliente } from "./ModalCadastrarCliente";
 import { ModalEnvioSelecao } from "./ModalEnvioSelecao";
 import { ModalTransferencia } from "./ModalTransferencia";
 import { ModalEtiquetasMassa } from "./ModalEtiquetasMassa";
+import { ModalExcluirClientes } from "./ModalExcluirClientes";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
 
@@ -150,6 +152,8 @@ export function ListaClientes({
   const [envioAberto, setEnvioAberto] = useState(false);
   const [transferAberto, setTransferAberto] = useState(false);
   const [etiquetarAberto, setEtiquetarAberto] = useState(false);
+  // Exclusao (admin): lista de leadIds a excluir (null = fechado).
+  const [excluirIds, setExcluirIds] = useState<string[] | null>(null);
 
   // Painel
   const [painelId, setPainelId] = useState<string | null>(null);
@@ -557,22 +561,37 @@ export function ListaClientes({
       rotulo: "",
       align: "right",
       render: (c) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            void abrirConversa(c.leadId);
-          }}
-          disabled={abrindoConversa === c.leadId}
-          title="Abrir conversa no Inbox"
-          aria-label="Abrir conversa"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-tiffany/10 hover:text-tiffany disabled:opacity-50"
-        >
-          {abrindoConversa === c.leadId ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <MessageCircle className="h-4 w-4" />
+        <div className="flex items-center justify-end gap-0.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void abrirConversa(c.leadId);
+            }}
+            disabled={abrindoConversa === c.leadId}
+            title="Abrir conversa no Inbox"
+            aria-label="Abrir conversa"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-tiffany/10 hover:text-tiffany disabled:opacity-50"
+          >
+            {abrindoConversa === c.leadId ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MessageCircle className="h-4 w-4" />
+            )}
+          </button>
+          {ehAdmin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExcluirIds([c.leadId]);
+              }}
+              title="Excluir cliente"
+              aria-label="Excluir cliente"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-medio/70 transition-colors hover:bg-erro/10 hover:text-erro"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           )}
-        </button>
+        </div>
       ),
     },
   ];
@@ -684,6 +703,15 @@ export function ListaClientes({
             >
               <Send className="h-4 w-4" /> Escrever mensagem ({selecionados.size})
             </button>
+            {ehAdmin && (
+              <button
+                onClick={() => setExcluirIds([...selecionados])}
+                disabled={selecionados.size === 0}
+                className="flex items-center gap-1.5 rounded-lg border border-erro/40 px-3 py-1.5 text-sm font-semibold text-erro transition-colors hover:bg-erro/10 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" /> Excluir ({selecionados.size})
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -885,6 +913,19 @@ export function ListaClientes({
           onFechar={() => setEtiquetarAberto(false)}
           onConcluido={() => {
             setEtiquetarAberto(false);
+            setSelecionados(new Set());
+            setModoSelecao(false);
+            void carregar();
+          }}
+        />
+      )}
+
+      {excluirIds && (
+        <ModalExcluirClientes
+          leadIds={excluirIds}
+          onFechar={() => setExcluirIds(null)}
+          onConcluido={() => {
+            setExcluirIds(null);
             setSelecionados(new Set());
             setModoSelecao(false);
             void carregar();

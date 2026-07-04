@@ -4,7 +4,13 @@
 // Registra Atividade com o que mudou.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obterAgente, ehAdmin, podeGerenciarLead } from "@/lib/autorizacao";
+import {
+  obterAgente,
+  obterAdmin,
+  ehAdmin,
+  podeGerenciarLead,
+} from "@/lib/autorizacao";
+import { excluirOuArquivarLeads } from "@/lib/exclusao";
 import { registrarAtividade } from "@/lib/atividade";
 import {
   nomeEfetivo,
@@ -296,5 +302,36 @@ export async function PATCH(
 
   return NextResponse.json({
     lead: { ...atualizado, nomeEfetivo: nomeEfetivo(atualizado) },
+  });
+}
+
+// ----------------------------------------------------------------------------
+// DELETE: exclui (ou arquiva) um cliente. SOMENTE ADMIN. Regra de seguranca:
+// sem historico (conversa/negocio) => apaga de fato; com historico => ARQUIVA
+// (protege), a menos que ?force=1 (apaga em cascata, irreversivel). Fatia 2.81.
+// ----------------------------------------------------------------------------
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const admin = await obterAdmin();
+  if (!admin) {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
+  const { id } = await ctx.params;
+  const existe = await prisma.lead.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existe) {
+    return NextResponse.json({ erro: "cliente nao encontrado" }, { status: 404 });
+  }
+  const force = req.nextUrl.searchParams.get("force") === "1";
+  const r = await excluirOuArquivarLeads([id], force);
+  getIO()?.emit("cliente:atualizado", { leadId: id, nome: null });
+  return NextResponse.json({
+    ok: true,
+    acao: r.excluidos > 0 ? "excluido" : "arquivado",
+    ...r,
   });
 }

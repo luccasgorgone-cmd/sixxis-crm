@@ -66,3 +66,62 @@ export async function excluirLeadsCompleto(
     };
   });
 }
+
+export type ResultadoExcluirArquivar = {
+  excluidos: number; // apagados de fato (sem historico, ou force)
+  arquivados: number; // com historico -> arquivados (protegidos)
+  arquivadosIds: string[];
+};
+
+// Regra de seguranca (Fatia 2.81): um lead SEM historico (sem conversa/negocio)
+// e apagado de fato; um lead COM historico e ARQUIVADO (some das listas, mas
+// preserva o rastro e evita erro de FK). Com `force=true`, apaga em cascata
+// mesmo com historico (irreversivel). Retorna quantos foram para cada caminho.
+export async function excluirOuArquivarLeads(
+  leadIds: string[],
+  force: boolean,
+): Promise<ResultadoExcluirArquivar> {
+  const ids = Array.from(new Set(leadIds)).filter(Boolean);
+  if (ids.length === 0) return { excluidos: 0, arquivados: 0, arquivadosIds: [] };
+
+  // Quem tem historico = tem conversa OU negocio.
+  const [comConversa, comNegocio] = await Promise.all([
+    prisma.conversa.findMany({
+      where: { leadId: { in: ids } },
+      select: { leadId: true },
+      distinct: ["leadId"],
+    }),
+    prisma.negocio.findMany({
+      where: { leadId: { in: ids } },
+      select: { leadId: true },
+      distinct: ["leadId"],
+    }),
+  ]);
+  const comHistorico = new Set<string>([
+    ...comConversa.map((c) => c.leadId),
+    ...comNegocio.map((n) => n.leadId),
+  ]);
+
+  const semHistorico = ids.filter((id) => !comHistorico.has(id));
+  const comHist = ids.filter((id) => comHistorico.has(id));
+
+  // Sempre apaga os sem historico. Com force, apaga tambem os com historico.
+  const paraApagar = force ? ids : semHistorico;
+  const paraArquivar = force ? [] : comHist;
+
+  let excluidos = 0;
+  if (paraApagar.length > 0) {
+    const r = await excluirLeadsCompleto(paraApagar);
+    excluidos = r.leads;
+  }
+  let arquivados = 0;
+  if (paraArquivar.length > 0) {
+    const r = await prisma.lead.updateMany({
+      where: { id: { in: paraArquivar }, arquivado: false },
+      data: { arquivado: true, arquivadoEm: new Date() },
+    });
+    arquivados = r.count;
+  }
+
+  return { excluidos, arquivados, arquivadosIds: paraArquivar };
+}
