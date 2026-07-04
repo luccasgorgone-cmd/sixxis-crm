@@ -133,11 +133,14 @@ export function Compositor({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ---- Anexo GERAL de arquivo (clipe): qualquer tipo (imagem/video/pdf/doc/audio).
-  // Separado da gravacao de voz (microfone), que continua no seu proprio botao.
-  const [arquivoSel, setArquivoSel] = useState<File | null>(null);
-  const [arquivoPreview, setArquivoPreview] = useState<string | null>(null);
-  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  // ---- Anexo GERAL (clipe): MULTIPLOS arquivos numa fila, qualquer tipo. Cada um
+  // com preview (miniatura/icone + nome + tamanho + remover). Envia em ordem pelo
+  // /api/mensagens/enviar-arquivo. Separado da gravacao de voz (microfone). 2.85.
+  type ItemFila = { file: File; preview: string | null };
+  const [arquivoFila, setArquivoFila] = useState<ItemFila[]>([]);
+  const [legendaArquivos, setLegendaArquivos] = useState("");
+  const [enviandoFila, setEnviandoFila] = useState(false);
+  const [progressoFila, setProgressoFila] = useState<{ atual: number; total: number } | null>(null);
   const arquivoRef = useRef<HTMLInputElement>(null);
   // Limites (folga profissional, dentro do WhatsApp): ~64MB midia, ~100MB documento.
   const LIMITE_MIDIA = 64 * 1024 * 1024;
@@ -149,59 +152,104 @@ export function Compositor({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  function descartarArquivo() {
-    setArquivoSel(null);
-    setArquivoPreview((u) => {
-      if (u) URL.revokeObjectURL(u);
-      return null;
+  function limparFila() {
+    setArquivoFila((prev) => {
+      prev.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
+      return [];
+    });
+    setLegendaArquivos("");
+  }
+
+  function removerArquivo(idx: number) {
+    setArquivoFila((prev) => {
+      const a = prev[idx];
+      if (a?.preview) URL.revokeObjectURL(a.preview);
+      return prev.filter((_, i) => i !== idx);
     });
   }
 
-  function anexarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+  function anexarArquivos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!f) return;
-    const ehMidia = /^(image|video|audio)\//.test(f.type);
-    const limite = ehMidia ? LIMITE_MIDIA : LIMITE_DOC;
-    if (f.size > limite) {
-      setErro(`Arquivo muito grande (max ${ehMidia ? "64MB" : "100MB"}).`);
-      return;
+    if (files.length === 0) return;
+    const validos: ItemFila[] = [];
+    let excedeu = false;
+    for (const f of files) {
+      const ehMidia = /^(image|video|audio)\//.test(f.type);
+      const limite = ehMidia ? LIMITE_MIDIA : LIMITE_DOC;
+      if (f.size > limite) {
+        excedeu = true;
+        continue;
+      }
+      validos.push({
+        file: f,
+        preview: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
+      });
     }
-    setErro(null);
-    setArquivoSel(f);
-    setArquivoPreview((u) => {
-      if (u) URL.revokeObjectURL(u);
-      return f.type.startsWith("image/") ? URL.createObjectURL(f) : null;
-    });
+    setErro(
+      excedeu
+        ? "Alguns arquivos passam do limite (midia 64MB, documento 100MB) e foram ignorados."
+        : null,
+    );
+    if (validos.length > 0) setArquivoFila((prev) => [...prev, ...validos]);
   }
 
-  async function enviarArquivoMsg() {
-    if (!arquivoSel || enviandoArquivo) return;
-    setEnviandoArquivo(true);
+  async function enviarFila() {
+    if (arquivoFila.length === 0 || enviandoFila) return;
+    setEnviandoFila(true);
     setErro(null);
-    try {
-      const fd = new FormData();
-      fd.append("conversaId", conversaId);
-      if (instanciaSel) fd.append("instanciaId", instanciaSel);
-      fd.append("arquivo", arquivoSel, arquivoSel.name);
-      const r = await fetch("/api/mensagens/enviar-arquivo", {
-        method: "POST",
-        body: fd,
-      });
-      const d = await r.json().catch(() => null);
-      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
-      if (!r.ok) {
-        setErro(
-          d?.erro ??
-            "Falha ao enviar o arquivo. Verifique a conexao com o WhatsApp.",
-        );
+    const itens = arquivoFila;
+    const total = itens.length;
+    const legenda = legendaArquivos.trim();
+    // Legenda geral vira caption da PRIMEIRA imagem/video (estilo WhatsApp).
+    const idxLegenda = legenda
+      ? itens.findIndex((a) => /^(image|video)\//.test(a.file.type))
+      : -1;
+    const falhas: string[] = [];
+    for (let i = 0; i < itens.length; i++) {
+      setProgressoFila({ atual: i + 1, total });
+      const { file } = itens[i];
+      try {
+        const fd = new FormData();
+        fd.append("conversaId", conversaId);
+        if (instanciaSel) fd.append("instanciaId", instanciaSel);
+        fd.append("arquivo", file, file.name);
+        if (i === idxLegenda) fd.append("legenda", legenda);
+        const r = await fetch("/api/mensagens/enviar-arquivo", {
+          method: "POST",
+          body: fd,
+        });
+        const d = await r.json().catch(() => null);
+        if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+        if (!r.ok) falhas.push(file.name);
+      } catch {
+        falhas.push(file.name);
       }
-      descartarArquivo();
-    } catch {
-      setErro("Nao foi possivel enviar o arquivo agora.");
-    } finally {
-      setEnviandoArquivo(false);
     }
+    // Legenda sem nenhuma midia (so documentos): manda como texto avulso.
+    if (legenda && idxLegenda === -1) {
+      try {
+        const r = await fetch("/api/mensagens/enviar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversaId,
+            texto: legenda,
+            ...(instanciaSel ? { instanciaId: instanciaSel } : {}),
+          }),
+        });
+        const d = await r.json().catch(() => null);
+        if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      } catch {
+        // silencioso: os arquivos ja foram
+      }
+    }
+    setProgressoFila(null);
+    setEnviandoFila(false);
+    if (falhas.length > 0) {
+      setErro(`Falha ao enviar: ${falhas.join(", ")}.`);
+    }
+    limparFila();
   }
 
   function pararTimer() {
@@ -299,9 +347,9 @@ export function Compositor({
         if (u) URL.revokeObjectURL(u);
         return null;
       });
-      setArquivoPreview((u) => {
-        if (u) URL.revokeObjectURL(u);
-        return null;
+      setArquivoFila((prev) => {
+        prev.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
+        return [];
       });
     };
   }, []);
@@ -817,52 +865,95 @@ export function Compositor({
         </div>
       )}
 
-      {/* Preview do ARQUIVO anexado (clipe): nome, tamanho e miniatura (imagem).
-          Enviar ou descartar. Aceita qualquer tipo (imagem/video/pdf/doc/audio). */}
-      {arquivoSel && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo p-2">
-          {arquivoPreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={arquivoPreview}
-              alt={arquivoSel.name}
-              className="h-12 w-12 shrink-0 rounded object-cover"
-            />
-          ) : (
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-black/5 text-medio/70">
-              <FileText className="h-6 w-6" />
+      {/* Fila de ARQUIVOS anexados (clipe): varios de uma vez, cada um com preview
+          (miniatura/icone + nome + tamanho + remover). Legenda geral opcional.
+          Envia em ordem, com progresso. Aceita qualquer tipo. */}
+      {arquivoFila.length > 0 && (
+        <div className="mb-2 space-y-2 rounded-lg border border-black/10 bg-fundo p-2">
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-xs font-medium text-medio/70">
+              {arquivoFila.length}{" "}
+              {arquivoFila.length === 1 ? "arquivo" : "arquivos"} para enviar
             </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-escuro">
-              {arquivoSel.name}
-            </p>
-            <p className="text-xs text-medio/60">
-              {tamanhoLegivel(arquivoSel.size)}
-              {arquivoSel.type ? ` · ${arquivoSel.type}` : ""}
-            </p>
-          </div>
-          <button
-            onClick={descartarArquivo}
-            disabled={enviandoArquivo}
-            title="Descartar arquivo"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio hover:bg-black/5 hover:text-erro"
-          >
-            <Trash2 className="h-4.5 w-4.5" />
-          </button>
-          <button
-            onClick={() => void enviarArquivoMsg()}
-            disabled={enviandoArquivo}
-            title="Enviar arquivo"
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-tiffany px-3 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
-          >
-            {enviandoArquivo ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
+            {!enviandoFila && (
+              <button
+                onClick={limparFila}
+                className="text-[11px] font-medium text-medio/60 hover:text-erro"
+              >
+                Limpar tudo
+              </button>
             )}
-            Enviar
-          </button>
+          </div>
+          <div className="scroll-fino max-h-44 space-y-1.5 overflow-y-auto">
+            {arquivoFila.map((it, idx) => (
+              <div
+                key={`${it.file.name}-${idx}`}
+                className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5"
+              >
+                {it.preview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={it.preview}
+                    alt={it.file.name}
+                    className="h-10 w-10 shrink-0 rounded object-cover"
+                  />
+                ) : (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-black/5 text-medio/70">
+                    <FileText className="h-5 w-5" />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-escuro">
+                    {it.file.name}
+                  </p>
+                  <p className="text-[11px] text-medio/60">
+                    {tamanhoLegivel(it.file.size)}
+                    {it.file.type ? ` · ${it.file.type}` : ""}
+                  </p>
+                </div>
+                {!enviandoFila && (
+                  <button
+                    onClick={() => removerArquivo(idx)}
+                    title="Remover"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-medio/60 hover:bg-black/5 hover:text-erro"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {/* Legenda geral (vai na 1a imagem/video, como no WhatsApp). */}
+          <input
+            value={legendaArquivos}
+            onChange={(e) => setLegendaArquivos(e.target.value)}
+            disabled={enviandoFila}
+            placeholder="Legenda (opcional)"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => arquivoRef.current?.click()}
+              disabled={enviandoFila}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-black/10 px-3 text-sm font-medium text-medio hover:bg-black/5 disabled:opacity-50"
+            >
+              <Paperclip className="h-4 w-4" /> Adicionar
+            </button>
+            <button
+              onClick={() => void enviarFila()}
+              disabled={enviandoFila}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-tiffany px-3 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
+            >
+              {enviandoFila ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {progressoFila
+                ? `Enviando ${progressoFila.atual} de ${progressoFila.total}...`
+                : `Enviar ${arquivoFila.length}`}
+            </button>
+          </div>
         </div>
       )}
 
@@ -894,11 +985,12 @@ export function Compositor({
         </div>
       )}
 
-      {/* Anexo geral: sem accept => a janela do sistema abre em "Todos os Arquivos". */}
+      {/* Anexo geral: multiplos, sem accept => abre em "Todos os Arquivos". */}
       <input
         ref={arquivoRef}
         type="file"
-        onChange={anexarArquivo}
+        multiple
+        onChange={anexarArquivos}
         className="hidden"
       />
 

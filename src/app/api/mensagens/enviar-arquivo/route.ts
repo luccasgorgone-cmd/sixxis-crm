@@ -58,6 +58,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const instanciaIdEscolhida = form.get("instanciaId")
     ? String(form.get("instanciaId"))
     : null;
+  // Legenda opcional (caption estilo WhatsApp) para imagem/video.
+  const legenda = String(form.get("legenda") ?? "").trim();
   const arquivo = form.get("arquivo");
   if (!conversaId || !(arquivo instanceof Blob)) {
     return NextResponse.json(
@@ -130,13 +132,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const mediaUrl = await enviarParaR2ComRetry(chave, buffer, mime);
   const midiaParaEnviar = mediaUrl ?? base64;
 
-  // Envia pelo canal certo. Documento preserva o nome do arquivo (filename).
+  // Legenda (caption) so faz sentido em imagem/video.
+  const temCaption = !!legenda && (midia === "image" || midia === "video");
+
+  // Envia pelo canal certo. Documento preserva o nome do arquivo (filename);
+  // imagem/video levam a legenda como caption (estilo WhatsApp).
   const resultado =
     midia === "audio"
       ? await enviarAudio(numero, midiaParaEnviar, instanciaEvolution)
       : await enviarMidia(numero, midiaParaEnviar, midia, instanciaEvolution, {
           mimetype: mime,
           ...(ehDocumento ? { fileName: nomeArquivo } : {}),
+          ...(temCaption ? { caption: legenda } : {}),
         });
 
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
@@ -145,14 +152,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Conteudo: placeholder por tipo de midia; documento guarda o NOME do arquivo
   // (o thread mostra o nome no link de download).
+  // Imagem/video com legenda guardam a legenda como conteudo (o thread mostra
+  // como caption); documento guarda o NOME do arquivo; demais, placeholder.
   const conteudo =
     tipo === TipoMsg.DOCUMENTO
       ? nomeArquivo
-      : tipo === TipoMsg.IMAGEM
-        ? "[imagem]"
-        : tipo === TipoMsg.VIDEO
-          ? "[video]"
-          : "[audio]";
+      : temCaption
+        ? legenda
+        : tipo === TipoMsg.IMAGEM
+          ? "[imagem]"
+          : tipo === TipoMsg.VIDEO
+            ? "[video]"
+            : "[audio]";
 
   const dados = {
     conversaId: conversa.id,
