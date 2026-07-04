@@ -111,6 +111,8 @@ export function ListaClientes({
   // (admin, papel POS_VENDA ou flag acessoPosVenda). Quem tem venda + pos-venda
   // ve os filtros dos dois.
   const podePosVenda = ehAdmin || papel === "POS_VENDA" || acessoPosVenda;
+  // Temperatura e conceito de VENDA: filtro visivel a quem tem acesso a venda.
+  const podeVenda = ehAdmin || acessoVenda;
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -722,12 +724,14 @@ export function ListaClientes({
             </option>
           ))}
         </select>
-        <select value={temperaturaF} onChange={(e) => setTemperaturaF(e.target.value)} className="campo">
-          <option value="">Temperatura: todas</option>
-          <option value="QUENTE">Quente</option>
-          <option value="MORNO">Morno</option>
-          <option value="FRIO">Frio</option>
-        </select>
+        {podeVenda && (
+          <select value={temperaturaF} onChange={(e) => setTemperaturaF(e.target.value)} className="campo">
+            <option value="">Temperatura: todas</option>
+            <option value="QUENTE">Quente</option>
+            <option value="MORNO">Morno</option>
+            <option value="FRIO">Frio</option>
+          </select>
+        )}
         <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className="campo">
           <option value="">Status: todos</option>
           <option value="ABERTO">Em aberto</option>
