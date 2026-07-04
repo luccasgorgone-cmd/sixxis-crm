@@ -853,9 +853,6 @@ function agendarMidia(
 
 
 
-// Mensagem padrao (editavel em Admin -> Geral) quando o admin nao definiu uma.
-const MSG_FORA_HORARIO_PADRAO =
-  "Olá! Agradecemos o seu contato com a Sixxis. No momento estamos fora do horário de atendimento. Assim que um de nossos atendentes estiver disponível, retornaremos por aqui. Obrigado pela preferência!";
 // Reenvio so apos ~8h (nao repete a cada mensagem do cliente).
 const REENVIO_FORA_HORARIO_MS = 8 * 60 * 60 * 1000;
 
@@ -906,7 +903,10 @@ async function responderForaHorarioSePreciso(
     const ultimo = conversa.foraHorarioAvisadoEm?.getTime() ?? 0;
     if (Date.now() - ultimo < REENVIO_FORA_HORARIO_MS) return;
 
-    const texto = (config.mensagemForaHorario ?? "").trim() || MSG_FORA_HORARIO_PADRAO;
+    // Sem fallback hardcoded (Fatia 2.78): so envia o que o dono ESCREVEU. Campo
+    // vazio => nao envia nada, mesmo com o mestre e o aviso ligados.
+    const texto = (config.mensagemForaHorario ?? "").trim();
+    if (!texto) return;
     const agora = new Date();
     const r = await enviarTexto(telefone, texto, conversa.instancia);
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
