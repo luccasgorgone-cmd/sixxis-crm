@@ -13,13 +13,30 @@ export function ModalTransferencia({
   leadIds,
   onFechar,
   onConcluido,
+  ehAdmin = true,
+  podeVenda = true,
+  podePosVenda = true,
 }: {
   leadIds: string[];
   onFechar: () => void;
   onConcluido: () => void;
+  // Admin transfere qualquer finalidade; nao-admin so as que tem acesso, e apenas
+  // os PROPRIOS leads (o servidor ignora os demais). Fatia 2.84.
+  ehAdmin?: boolean;
+  podeVenda?: boolean;
+  podePosVenda?: boolean;
 }) {
   const toast = useToast();
-  const [finalidade, setFinalidade] = useState<"VENDA" | "POS_VENDA">("VENDA");
+  // Finalidades que o usuario pode escolher como destino da transferencia.
+  const finalidadesDisp: ("VENDA" | "POS_VENDA")[] = ehAdmin
+    ? ["VENDA", "POS_VENDA"]
+    : [
+        ...(podeVenda ? (["VENDA"] as const) : []),
+        ...(podePosVenda ? (["POS_VENDA"] as const) : []),
+      ];
+  const [finalidade, setFinalidade] = useState<"VENDA" | "POS_VENDA">(
+    finalidadesDisp[0] ?? "VENDA",
+  );
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [destino, setDestino] = useState("");
   const [transferindo, setTransferindo] = useState(false);
@@ -86,6 +103,12 @@ export function ModalTransferencia({
           selecionado(s). Cada um tera o dono, o negocio aberto e as conversas da
           finalidade reatribuidos ao destino.
         </p>
+        {!ehAdmin && (
+          <p className="mb-4 rounded-lg bg-tiffany/[0.06] px-2.5 py-1.5 text-[11px] text-medio/70">
+            Apenas os clientes que sao SEUS (nessa finalidade) serao transferidos;
+            os demais serao ignorados.
+          </p>
+        )}
 
         <div className="space-y-3">
           <div>
@@ -95,10 +118,14 @@ export function ModalTransferencia({
             <select
               value={finalidade}
               onChange={(e) => setFinalidade(e.target.value as "VENDA" | "POS_VENDA")}
-              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              disabled={finalidadesDisp.length <= 1}
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany disabled:opacity-70"
             >
-              <option value="VENDA">Venda</option>
-              <option value="POS_VENDA">Pos-venda</option>
+              {finalidadesDisp.map((f) => (
+                <option key={f} value={f}>
+                  {f === "VENDA" ? "Venda" : "Pos-venda"}
+                </option>
+              ))}
             </select>
           </div>
           <div>

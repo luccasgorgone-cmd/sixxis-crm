@@ -726,7 +726,7 @@ export function ListaClientes({
             </button>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {ehAdmin && (
+            {(podeVenda || podePosVenda) && (
               <button
                 onClick={() => setTransferAberto(true)}
                 disabled={selecionados.size === 0}
@@ -942,6 +942,9 @@ export function ListaClientes({
       {transferAberto && (
         <ModalTransferencia
           leadIds={[...selecionados]}
+          ehAdmin={ehAdmin}
+          podeVenda={podeVenda}
+          podePosVenda={podePosVenda}
           onFechar={() => setTransferAberto(false)}
           onConcluido={() => {
             setTransferAberto(false);
