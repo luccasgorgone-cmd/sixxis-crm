@@ -10,7 +10,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { enviarAudio } from "@/lib/evolution";
-import { enviarParaR2, extensaoDoMime } from "@/lib/r2";
+import { enviarParaR2ComRetry, extensaoDoMime } from "@/lib/r2";
 import {
   DirecaoMsg,
   TipoMsg,
@@ -91,13 +91,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const mime = arquivo.type || "audio/ogg";
   const base64 = buffer.toString("base64");
 
-  // Sobe ao R2 (permanente); fallback degradado: sem R2, fica sem mediaUrl mas
-  // o audio ainda e enviado via base64 a Evolution.
+  // Sobe ao R2 (permanente) com RETRY — audios longos DEVEM ir pela URL do R2
+  // (o base64 grande estoura o payload da Evolution). So cai no base64 se o R2
+  // falhar em todas as tentativas.
   const ext = extensaoDoMime(mime);
   const chave = `whatsapp/${numero}/out-${randomUUID()}.${ext}`;
-  const mediaUrl = await enviarParaR2(chave, buffer, mime);
+  const mediaUrl = await enviarParaR2ComRetry(chave, buffer, mime);
 
-  // Chama a Evolution com a URL publica (se houver) ou o base64.
+  // Chama a Evolution com a URL publica (se houver) ou o base64 (ultimo recurso).
   const resultado = await enviarAudio(numero, mediaUrl ?? base64, instanciaEvolution);
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
   const externalId = resultado.externalId ?? `out-${randomUUID()}`;

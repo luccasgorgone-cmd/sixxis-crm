@@ -105,6 +105,25 @@ export async function enviarParaR2(
   }
 }
 
+// Sobe ao R2 com RETRY (backoff curto). Aumenta a chance de a midia ficar com a
+// URL permanente do R2 (renderavel e sem o problema de payload do base64) —
+// essencial para audios longos e arquivos maiores. Fatia 2.85.
+export async function enviarParaR2ComRetry(
+  chave: string,
+  corpo: Buffer,
+  contentType: string,
+  tentativas = 3,
+): Promise<string | null> {
+  for (let i = 0; i < tentativas; i++) {
+    const url = await enviarParaR2(chave, corpo, contentType);
+    if (url) return url;
+    if (i < tentativas - 1) {
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  return null;
+}
+
 // Extensao a partir do mimetype (fallback bin).
 export function extensaoDoMime(mime: string | null | undefined): string {
   if (!mime) return "bin";

@@ -139,8 +139,8 @@ export function Compositor({
   const [arquivoPreview, setArquivoPreview] = useState<string | null>(null);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const arquivoRef = useRef<HTMLInputElement>(null);
-  // Limites do WhatsApp: ~16MB midia (imagem/video/audio), ~100MB documento.
-  const LIMITE_MIDIA = 16 * 1024 * 1024;
+  // Limites (folga profissional, dentro do WhatsApp): ~64MB midia, ~100MB documento.
+  const LIMITE_MIDIA = 64 * 1024 * 1024;
   const LIMITE_DOC = 100 * 1024 * 1024;
 
   function tamanhoLegivel(bytes: number): string {
@@ -164,7 +164,7 @@ export function Compositor({
     const ehMidia = /^(image|video|audio)\//.test(f.type);
     const limite = ehMidia ? LIMITE_MIDIA : LIMITE_DOC;
     if (f.size > limite) {
-      setErro(`Arquivo muito grande (max ${ehMidia ? "16MB" : "100MB"}).`);
+      setErro(`Arquivo muito grande (max ${ehMidia ? "64MB" : "100MB"}).`);
       return;
     }
     setErro(null);

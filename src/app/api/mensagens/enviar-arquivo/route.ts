@@ -14,7 +14,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { enviarAudio, enviarMidia } from "@/lib/evolution";
-import { enviarParaR2, extensaoDoMime } from "@/lib/r2";
+import { enviarParaR2ComRetry, extensaoDoMime } from "@/lib/r2";
 import {
   DirecaoMsg,
   TipoMsg,
@@ -25,8 +25,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Limites do WhatsApp: ~16MB para midia (imagem/video/audio), ~100MB documento.
-const LIMITE_MIDIA = 16 * 1024 * 1024;
+// Limites (folga profissional, dentro do WhatsApp): ~64MB midia (imagem/video/
+// audio), ~100MB documento. Fatia 2.85.
+const LIMITE_MIDIA = 64 * 1024 * 1024;
 const LIMITE_DOC = 100 * 1024 * 1024;
 
 // Classifica o arquivo pelo MIME para escolher o envio e o tipo da Mensagem.
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (arquivo.size > limite) {
     return NextResponse.json(
       {
-        erro: `Arquivo muito grande. Maximo ${ehDocumento ? "100MB" : "16MB"}.`,
+        erro: `Arquivo muito grande. Maximo ${ehDocumento ? "100MB" : "64MB"}.`,
       },
       { status: 413 },
     );
@@ -123,10 +124,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const buffer = Buffer.from(await arquivo.arrayBuffer());
   const base64 = buffer.toString("base64");
 
-  // Sobe ao R2 (permanente); fallback: sem R2, envia via base64 a Evolution.
+  // Sobe ao R2 (permanente) com RETRY; so cai no base64 se o R2 falhar de vez.
   const ext = extensaoDoMime(mime);
   const chave = `whatsapp/${numero}/out-${randomUUID()}.${ext}`;
-  const mediaUrl = await enviarParaR2(chave, buffer, mime);
+  const mediaUrl = await enviarParaR2ComRetry(chave, buffer, mime);
   const midiaParaEnviar = mediaUrl ?? base64;
 
   // Envia pelo canal certo. Documento preserva o nome do arquivo (filename).
