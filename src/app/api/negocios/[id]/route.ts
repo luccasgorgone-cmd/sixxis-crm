@@ -583,6 +583,9 @@ export async function PATCH(
           nomeManual: true,
         },
       });
+      // Integridade (Fatia 2.71/2.72): `atualizado.valor` E o TOTAL do pedido
+      // (produtos + frete) quando ha itens — logo a conversao usa o total. O
+      // eventId `purchase-${id}` mantem o dedup por negocio. NAO alterar.
       const valorVenda =
         atualizado.valor != null ? Number(atualizado.valor) : null;
       if (leadCapi && valorVenda && valorVenda > 0) {
