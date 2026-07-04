@@ -264,6 +264,7 @@ export function Thread({
           ehAdmin={ehAdmin}
           finalidade={conversa.finalidade}
           instanciaIdAtual={conversa.instanciaId}
+          instanciaRespostaId={conversa.instanciaRespostaId}
           lead={{
             nomeEfetivo: conversa.leadNome?.trim() || conversa.leadTelefone,
           }}

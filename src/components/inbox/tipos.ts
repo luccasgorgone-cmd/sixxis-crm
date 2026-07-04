@@ -34,6 +34,9 @@ export type ConversaItem = {
   instanciaId?: string | null;
   instanciaNome?: string | null;
   instanciaNumero?: string | null;
+  // Numero de resposta FIXADO pelo atendente (Fatia 2.89). Null = padrao (ultimo
+  // numero do cliente). O compositor usa este como default de envio.
+  instanciaRespostaId?: string | null;
   // Trecho da mensagem que bateu na busca por conteudo (quando ha ?texto=).
   trechoBusca?: string | null;
 };

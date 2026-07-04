@@ -71,29 +71,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Numero de envio: por padrao o da conversa (ultimo que o cliente usou no
-  // setor); ou o escolhido no compositor, desde que ativo e da MESMA finalidade.
+  // Numero de resposta (Fatia 2.89), em ordem:
+  //   (1) o escolhido no compositor (pontual) -> tambem PERSISTE como fixado;
+  //   (2) o FIXADO na conversa (instanciaRespostaId), se houver;
+  //   (3) o padrao: ultimo numero que o cliente usou (conversa.instancia).
+  // Assim, o numero escolhido pelo atendente sobrevive a resposta do cliente (que
+  // so mexe em conversa.instancia), em vez de "voltar sozinho".
   let instanciaEvolution =
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
   let instanciaIdUsada: string | null = conversa.instanciaId;
-  if (instanciaIdEscolhida) {
-    const escolhida = await prisma.instanciaWhatsApp.findFirst({
+  let fixarRespostaId: string | null = null;
+
+  // Resolve uma instancia valida (ativa; da finalidade da conversa OU a que a
+  // conversa ja usa — o numero do cliente e sempre valido, inclusive apos mover
+  // finalidade). Fatia 2.84/2.89.
+  async function resolverInstancia(idInstancia: string) {
+    return prisma.instanciaWhatsApp.findFirst({
       where: {
-        id: instanciaIdEscolhida,
+        id: idInstancia,
         ativo: true,
-        // Instancia da MESMA finalidade da conversa, OU a que a conversa JA usa
-        // (o numero que o cliente usa e sempre valido — apos mover finalidade, a
-        // instancia atual pode ser de outra finalidade). Fatia 2.84.
         OR: [
-          { finalidade: conversa.finalidade },
-          ...(conversa.instanciaId ? [{ id: conversa.instanciaId }] : []),
+          { finalidade: conversa!.finalidade },
+          ...(conversa!.instanciaId ? [{ id: conversa!.instanciaId }] : []),
         ],
       },
       select: { id: true, instanciaEvolution: true },
     });
+  }
+
+  if (instanciaIdEscolhida) {
+    const escolhida = await resolverInstancia(instanciaIdEscolhida);
     if (escolhida) {
       instanciaEvolution = escolhida.instanciaEvolution;
       instanciaIdUsada = escolhida.id;
+      // Persiste a escolha do atendente para os proximos envios.
+      fixarRespostaId = escolhida.id;
+    }
+  } else if (conversa.instanciaRespostaId) {
+    const fixada = await resolverInstancia(conversa.instanciaRespostaId);
+    if (fixada) {
+      instanciaEvolution = fixada.instanciaEvolution;
+      instanciaIdUsada = fixada.id;
     }
   }
 
@@ -174,12 +192,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // Atualiza a conversa: ultima atividade e dono (se ainda nao tinha agente).
+  // Atualiza a conversa: ultima atividade, dono (se ainda nao tinha agente) e o
+  // numero de resposta FIXADO quando o atendente escolheu um (persiste a escolha).
   await prisma.conversa.update({
     where: { id: conversa.id },
     data: {
       ultimaMensagemEm: agora,
       ...(conversa.agenteId ? {} : { agenteId }),
+      ...(fixarRespostaId ? { instanciaRespostaId: fixarRespostaId } : {}),
     },
   });
 

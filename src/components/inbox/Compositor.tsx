@@ -59,6 +59,7 @@ export function Compositor({
   ehAdmin = false,
   finalidade,
   instanciaIdAtual,
+  instanciaRespostaId,
   lead,
   respondendoA,
   onCancelarResposta,
@@ -68,6 +69,9 @@ export function Compositor({
   ehAdmin?: boolean;
   finalidade?: "VENDA" | "POS_VENDA";
   instanciaIdAtual?: string | null;
+  // Numero FIXADO pelo atendente (Fatia 2.89): quando presente, e o default de
+  // envio — nao volta ao ultimo numero do cliente quando ele responde.
+  instanciaRespostaId?: string | null;
   lead?: LeadModelo | null;
   // Reply (Fatia 2.85): mensagem sendo respondida (citada) + cancelar.
   respondendoA?: MensagemItem | null;
@@ -88,11 +92,17 @@ export function Compositor({
   // escolher outro. A resposta do cliente sempre cai na conversa unificada.
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [instanciaSel, setInstanciaSel] = useState<string | null>(
-    instanciaIdAtual ?? null,
+    instanciaRespostaId ?? instanciaIdAtual ?? null,
   );
+  // Recalcula o numero de envio ao TROCAR de conversa (conversaId) ou quando o
+  // numero FIXADO muda: default = fixado (se houver), senao o ultimo do cliente.
+  // NAO depende de instanciaIdAtual isolado — assim, quando o cliente responde por
+  // outro numero (que altera instanciaIdAtual), a escolha do atendente NAO reseta.
+  // Fatia 2.89.
   useEffect(() => {
-    setInstanciaSel(instanciaIdAtual ?? null);
-  }, [instanciaIdAtual, conversaId]);
+    setInstanciaSel(instanciaRespostaId ?? instanciaIdAtual ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaId, instanciaRespostaId]);
 
   // Troca de conversa: descarta anexos/audio pendentes (nao envia para a conversa
   // errada — o compositor nao remonta ao trocar de conversa). Fatia 2.85.

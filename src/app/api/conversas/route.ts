@@ -142,6 +142,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     finalidade: c.finalidade,
     // Numero padrao de resposta (ultima entrada do cliente naquele setor).
     instanciaId: c.instanciaId,
+    // Numero de resposta FIXADO pelo atendente (Fatia 2.89), se houver.
+    instanciaRespostaId: c.instanciaRespostaId,
     ...(admin
       ? {
           instanciaNome: c.instanciaRef?.nome ?? c.instancia,

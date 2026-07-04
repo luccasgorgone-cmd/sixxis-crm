@@ -349,6 +349,10 @@ model Conversa {
   instancia        String            @default("sixxis-wa1")
   instanciaId      String?
   instanciaRef     InstanciaWhatsApp? @relation(fields: [instanciaId], references: [id])
+  // Numero FIXADO pelo atendente para responder (Fatia 2.89). Null = usar o
+  // padrao (ultimo numero que o cliente usou). Sobrevive a resposta do cliente:
+  // a ingestao atualiza `instancia` (ultimo do cliente) mas NAO isto.
+  instanciaRespostaId String?
   finalidade       Finalidade        @default(VENDA)
   status           String            @default("aberta")
   atendidoPor      AtendidoPor       @default(HUMANO)
