@@ -8,6 +8,7 @@ import {
   Loader2,
   Bot,
   Info,
+  ListTree,
   AlertTriangle,
   Clock,
   Power,
@@ -508,6 +509,33 @@ export function IAAdmin() {
               diferenciais). Enquanto os campos estiverem em branco, a Sol nao vai
               afirmar especificacoes — ela e instruida a nao inventar.
             </p>
+            {/* Convencao de secoes para organizar a base (Fatia 2.98). */}
+            <div className="mb-2 rounded-lg border border-black/5 bg-black/[0.02] p-2.5 text-xs text-medio/70 dark:bg-white/5">
+              <p className="mb-1 flex items-center gap-1 font-medium text-escuro">
+                <ListTree className="h-3.5 w-3.5 text-tiffany" /> Organize em secoes
+                demarcadas
+              </p>
+              <ul className="space-y-0.5 pl-4">
+                <li>
+                  <code>=== FICHAS DE PRODUTO ===</code> — uma ficha por produto:
+                  indicado para, voltagem, reservatorio, garantia, diferenciais,
+                  objecoes comuns e como contorna-las.
+                </li>
+                <li>
+                  <code>=== POLITICAS ===</code> — frete, prazos (em faixas
+                  honestas), pagamento, troca/devolucao, garantia.
+                </li>
+                <li>
+                  <code>=== FAQ ===</code> — perguntas e respostas frequentes.
+                </li>
+              </ul>
+              <p className="mt-1.5">
+                PRECO e LINK vem da ferramenta ao vivo (buscar_produto) — NAO
+                escreva na base. A secao{" "}
+                <code>=== GUIA DE ATENDIMENTO (Oracle) ===</code> e gerida pelo
+                Oracle.
+              </p>
+            </div>
             <textarea
               value={c.baseConhecimento ?? ""}
               onChange={(e) => set({ baseConhecimento: e.target.value })}
