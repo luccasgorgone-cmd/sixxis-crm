@@ -1380,9 +1380,12 @@ export function BlocoRastreio({
         {salvando && <Loader2 className="h-3 w-3 animate-spin text-tiffany" />}
       </h4>
 
-      {/* Transportadora principal + datas */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="sm:col-span-3">
+      {/* Transportadora principal + datas. As duas datas ficam numa grade de 2
+          colunas (mesma proporcao dos demais campos do painel), evitando o
+          desalinhamento que havia com 3 colunas — labels de tamanhos diferentes
+          nao quebram e os inputs alinham lado a lado. */}
+      <div className="space-y-3">
+        <div>
           <Rotulo>Transportadora (principal)</Rotulo>
           <input
             value={transportadora}
@@ -1396,29 +1399,31 @@ export function BlocoRastreio({
             className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           />
         </div>
-        <div>
-          <Rotulo>Data de envio</Rotulo>
-          <input
-            type="date"
-            value={dataEnvio}
-            onChange={(e) => {
-              setDataEnvio(e.target.value);
-              void salvarTransporte({ dataEnvio: e.target.value || null });
-            }}
-            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-          />
-        </div>
-        <div>
-          <Rotulo>Previsao de chegada</Rotulo>
-          <input
-            type="date"
-            value={previsao}
-            onChange={(e) => {
-              setPrevisao(e.target.value);
-              void salvarTransporte({ previsaoChegada: e.target.value || null });
-            }}
-            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-          />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Rotulo>Data de envio</Rotulo>
+            <input
+              type="date"
+              value={dataEnvio}
+              onChange={(e) => {
+                setDataEnvio(e.target.value);
+                void salvarTransporte({ dataEnvio: e.target.value || null });
+              }}
+              className="h-10 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            />
+          </div>
+          <div>
+            <Rotulo>Previsao de chegada</Rotulo>
+            <input
+              type="date"
+              value={previsao}
+              onChange={(e) => {
+                setPrevisao(e.target.value);
+                void salvarTransporte({ previsaoChegada: e.target.value || null });
+              }}
+              className="h-10 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            />
+          </div>
         </div>
       </div>
 
