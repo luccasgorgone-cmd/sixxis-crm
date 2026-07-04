@@ -40,6 +40,7 @@ export async function GET(): Promise<NextResponse> {
       horarios,
       mensagemForaHorario: config.mensagemForaHorario,
       avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
+      mensagensAutomaticasAtivas: config.mensagensAutomaticasAtivas,
       temLogo: Boolean(config.logoData),
       logoEm: config.logoEm?.getTime() ?? 0,
       temFavicon: Boolean(config.faviconData),
@@ -60,6 +61,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     horarios?: unknown;
     mensagemForaHorario?: string;
     avisoForaHorarioAtivo?: boolean;
+    mensagensAutomaticasAtivas?: boolean;
     logoData?: unknown;
     logoMime?: unknown;
     // Sinal explicito para remover a logo atual.
@@ -96,6 +98,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     }
     if (body.avisoForaHorarioAtivo !== undefined) {
       data.avisoForaHorarioAtivo = body.avisoForaHorarioAtivo === true;
+    }
+    if (body.mensagensAutomaticasAtivas !== undefined) {
+      data.mensagensAutomaticasAtivas = body.mensagensAutomaticasAtivas === true;
     }
 
     // Logo: remover, ou validar/sanitizar e salvar com nova versao (logoEm).
@@ -165,6 +170,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         horarios,
         mensagemForaHorario: config.mensagemForaHorario,
         avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
+        mensagensAutomaticasAtivas: config.mensagensAutomaticasAtivas,
         temLogo: Boolean(config.logoData),
         logoEm: config.logoEm?.getTime() ?? 0,
         temFavicon: Boolean(config.faviconData),

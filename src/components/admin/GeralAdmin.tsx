@@ -19,6 +19,7 @@ type Config = {
   horarios: DiaHorario[];
   mensagemForaHorario: string | null;
   avisoForaHorarioAtivo: boolean;
+  mensagensAutomaticasAtivas: boolean;
   temLogo: boolean;
   logoEm: number;
   temFavicon: boolean;
@@ -303,6 +304,37 @@ export function GeralAdmin() {
           </div>
         </div>
 
+        {/* Interruptor MESTRE de TODAS as mensagens automaticas (default OFF). */}
+        <div className="rounded-xl border-2 border-tiffany/40 bg-tiffany/[0.04] p-4">
+          <label className="flex cursor-pointer items-start justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-escuro">
+                Mensagens automaticas
+              </span>
+              <span className="mt-0.5 block text-xs text-medio/70">
+                Interruptor geral das mensagens automaticas ao cliente (ex.: aviso
+                de fora de horario). Desligado: nenhuma mensagem automatica e
+                enviada. Ligue apenas quando quiser respostas automaticas.
+              </span>
+              <span className="mt-1.5 block text-xs text-medio/50">
+                Com a IA (Sol) atendendo, normalmente mantenha isto DESLIGADO para
+                nao competir.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={config.mensagensAutomaticasAtivas}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  mensagensAutomaticasAtivas: e.target.checked,
+                })
+              }
+              className="mt-0.5 h-5 w-5 shrink-0 accent-tiffany"
+            />
+          </label>
+        </div>
+
         {/* Interruptor do aviso automatico fora do horario (default DESLIGADO). */}
         <div className="rounded-xl border border-black/5 bg-white p-4">
           <label className="flex cursor-pointer items-start justify-between gap-3">
@@ -313,7 +345,7 @@ export function GeralAdmin() {
               <span className="mt-0.5 block text-xs text-medio/60">
                 Quando ligado, clientes que escreverem fora do expediente recebem
                 uma resposta automatica. Desligado, nada e enviado
-                automaticamente.
+                automaticamente. Depende do interruptor mestre acima estar ligado.
               </span>
             </span>
             <input
@@ -340,12 +372,10 @@ export function GeralAdmin() {
             placeholder="Ex.: Nosso atendimento e de seg a sex, 9h as 18h. Retornamos em breve."
             className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           />
-          {!config.avisoForaHorarioAtivo && (
-            <p className="mt-1 text-xs text-medio/50">
-              O aviso automatico esta desligado — esta mensagem so e usada quando
-              o interruptor acima for ligado.
-            </p>
-          )}
+          <p className="mt-1 text-xs text-medio/50">
+            So e enviada se o interruptor de mensagens automaticas estiver LIGADO
+            e este campo tiver texto.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
