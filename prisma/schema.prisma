@@ -1018,6 +1018,20 @@ model ItemLocal {
   localizacao      String?
   tecnicoResponsavel String?
   observacoes      String?           @db.Text
+  // Dados do cliente (Fatia 2.75): contato e endereco. Sao um SNAPSHOT editavel —
+  // copiados do lead quando vinculado (leadId), ou preenchidos manualmente quando
+  // nao ha lead. Ficam no item para constar na assistencia mesmo sem lead.
+  clienteNome         String?
+  clienteTelefone     String?
+  clienteEmail        String?
+  clienteCpf          String?
+  enderecoCep         String?
+  enderecoLogradouro  String?
+  enderecoNumero      String?
+  enderecoComplemento String?
+  enderecoBairro      String?
+  enderecoCidade      String?
+  enderecoUf          String?
   dataEntrada      DateTime          @default(now())
   dataSaida        DateTime?
   criadoEm         DateTime          @default(now())
@@ -1025,6 +1039,7 @@ model ItemLocal {
 
   @@index([status, dataEntrada])
   @@index([dataEntrada])
+  @@index([leadId])
 }
 
 // Figurinhas (stickers) predefinidas da Sixxis para os atendentes enviarem no

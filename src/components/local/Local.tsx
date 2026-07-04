@@ -16,10 +16,15 @@ import {
   MapPin,
   Wrench,
   CalendarDays,
+  Phone,
+  Mail,
+  IdCard,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EstadoErro } from "@/components/ui/Estado";
+import { mascararCep, mascararCpf, formatarTelefone } from "@/lib/format";
+import { buscarViaCep } from "@/lib/viacep";
 
 type Item = {
   id: string;
@@ -32,12 +37,41 @@ type Item = {
   localizacao: string | null;
   tecnicoResponsavel: string | null;
   observacoes: string | null;
+  clienteNome: string | null;
+  clienteTelefone: string | null;
+  clienteEmail: string | null;
+  clienteCpf: string | null;
+  enderecoCep: string | null;
+  enderecoLogradouro: string | null;
+  enderecoNumero: string | null;
+  enderecoComplemento: string | null;
+  enderecoBairro: string | null;
+  enderecoCidade: string | null;
+  enderecoUf: string | null;
   dataEntrada: string;
   dataSaida: string | null;
   leadId: string | null;
   leadNome: string | null;
   leadFoto: string | null;
 };
+
+// Resumo do endereco do item numa linha (logradouro, numero · bairro · cidade/UF).
+function resumoEndereco(it: {
+  enderecoLogradouro: string | null;
+  enderecoNumero: string | null;
+  enderecoComplemento: string | null;
+  enderecoBairro: string | null;
+  enderecoCidade: string | null;
+  enderecoUf: string | null;
+}): string {
+  const linha1 = [it.enderecoLogradouro, it.enderecoNumero].filter(Boolean).join(", ");
+  const cidadeUf =
+    it.enderecoCidade && it.enderecoUf
+      ? `${it.enderecoCidade}/${it.enderecoUf}`
+      : it.enderecoCidade;
+  const linha2 = [it.enderecoBairro, cidadeUf].filter(Boolean).join(" — ");
+  return [linha1, it.enderecoComplemento, linha2].filter(Boolean).join(" · ");
+}
 
 const STATUS_ORDEM = [
   "RECEBIDO",
@@ -266,6 +300,8 @@ function ItemCard({
   onRemover: () => void;
 }) {
   const meta = STATUS_META[it.status] ?? STATUS_META.RECEBIDO;
+  const nomeCliente = it.leadNome ?? it.clienteNome;
+  const endereco = resumoEndereco(it);
   return (
     <div className="rounded-xl border border-black/5 bg-white p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -287,17 +323,23 @@ function ItemCard({
             {it.leadId ? (
               <Link
                 href={`/inbox?lead=${it.leadId}`}
+                title="Abrir conversa do cliente"
                 className="flex max-w-[12rem] items-center gap-1 text-tiffany hover:underline"
               >
                 <User className="h-3 w-3 shrink-0" />
-                <span className="truncate">{it.leadNome ?? "Cliente"}</span>
+                <span className="truncate">{nomeCliente ?? "Cliente"}</span>
               </Link>
-            ) : it.leadNome ? (
+            ) : nomeCliente ? (
               <span className="flex max-w-[12rem] items-center gap-1">
                 <User className="h-3 w-3 shrink-0 text-medio/40" />
-                <span className="truncate">{it.leadNome}</span>
+                <span className="truncate">{nomeCliente}</span>
               </span>
             ) : null}
+            {it.clienteTelefone && (
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3 text-medio/40" /> {formatarTelefone(it.clienteTelefone)}
+              </span>
+            )}
             {it.numeroSerie && <span>Serie: {it.numeroSerie}</span>}
             {it.localizacao && (
               <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-medio/40" /> {it.localizacao}</span>
@@ -307,6 +349,27 @@ function ItemCard({
             )}
             <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3 text-medio/40" /> {dataCurta(it.dataEntrada)}</span>
           </div>
+          {/* Contato extra + endereco do cliente (quando informados) */}
+          {(it.clienteEmail || it.clienteCpf || endereco) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-medio/50">
+              {it.clienteEmail && (
+                <span className="flex items-center gap-1">
+                  <Mail className="h-3 w-3 text-medio/40" /> {it.clienteEmail}
+                </span>
+              )}
+              {it.clienteCpf && (
+                <span className="flex items-center gap-1">
+                  <IdCard className="h-3 w-3 text-medio/40" /> {mascararCpf(it.clienteCpf)}
+                </span>
+              )}
+              {endereco && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-medio/40" /> {endereco}
+                  {it.enderecoCep ? ` (CEP ${mascararCep(it.enderecoCep)})` : ""}
+                </span>
+              )}
+            </div>
+          )}
           {it.defeitoRelatado && (
             <p className="mt-1 line-clamp-2 text-xs text-medio/70">Defeito: {it.defeitoRelatado}</p>
           )}
@@ -344,6 +407,16 @@ function ItemCard({
 }
 
 type LeadOpcao = { leadId: string; nome: string; telefone: string };
+type EnderecoLead = {
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  principal: boolean;
+};
 
 function ModalItem({
   item,
@@ -368,6 +441,77 @@ function ModalItem({
   const [leadId, setLeadId] = useState<string | null>(item?.leadId ?? null);
   const [leadNome, setLeadNome] = useState<string | null>(item?.leadNome ?? null);
   const [salvando, setSalvando] = useState(false);
+
+  // Dados do cliente (snapshot editavel). Ao vincular um cliente, sao
+  // pre-preenchidos a partir do lead (contato + endereco principal).
+  const [clienteNome, setClienteNome] = useState(item?.clienteNome ?? "");
+  const [clienteTelefone, setClienteTelefone] = useState(item?.clienteTelefone ?? "");
+  const [clienteEmail, setClienteEmail] = useState(item?.clienteEmail ?? "");
+  const [clienteCpf, setClienteCpf] = useState(
+    item?.clienteCpf ? mascararCpf(item.clienteCpf) : "",
+  );
+  const [endCep, setEndCep] = useState(item?.enderecoCep ? mascararCep(item.enderecoCep) : "");
+  const [endLogradouro, setEndLogradouro] = useState(item?.enderecoLogradouro ?? "");
+  const [endNumero, setEndNumero] = useState(item?.enderecoNumero ?? "");
+  const [endComplemento, setEndComplemento] = useState(item?.enderecoComplemento ?? "");
+  const [endBairro, setEndBairro] = useState(item?.enderecoBairro ?? "");
+  const [endCidade, setEndCidade] = useState(item?.enderecoCidade ?? "");
+  const [endUf, setEndUf] = useState(item?.enderecoUf ?? "");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  // Busca no ViaCEP (helper compartilhado) e completa logradouro/bairro/cidade/uf.
+  async function buscarCep(cepBruto: string) {
+    if (cepBruto.replace(/\D/g, "").length !== 8) return;
+    setBuscandoCep(true);
+    try {
+      const via = await buscarViaCep(cepBruto);
+      if (via) {
+        setEndLogradouro((v) => v || via.logradouro);
+        setEndBairro((v) => v || via.bairro);
+        setEndCidade((v) => v || via.cidade);
+        setEndUf((v) => v || via.uf);
+      }
+    } finally {
+      setBuscandoCep(false);
+    }
+  }
+
+  // Pre-preenche os dados do cliente a partir do lead vinculado (contato via
+  // /api/leads/[id]; endereco principal via .../enderecos). So preenche vazios,
+  // sem sobrescrever ajustes ja feitos. Silencioso se nao houver escopo/dados —
+  // o servidor tambem completa o que faltar ao salvar.
+  async function preencherDoLead(id: string, nome: string, telefone: string) {
+    setClienteNome((v) => v || nome);
+    setClienteTelefone((v) => v || telefone);
+    try {
+      const [rLead, rEnd] = await Promise.all([
+        fetch(`/api/leads/${id}`),
+        fetch(`/api/leads/${id}/enderecos`),
+      ]);
+      if (rLead.ok) {
+        const c = (await rLead.json())?.cliente;
+        if (c) {
+          setClienteEmail((v) => v || c.email || "");
+          setClienteCpf((v) => v || (c.cpf ? mascararCpf(c.cpf) : ""));
+        }
+      }
+      if (rEnd.ok) {
+        const lista = ((await rEnd.json())?.enderecos ?? []) as EnderecoLead[];
+        const e = lista.find((x) => x.principal) ?? lista[0];
+        if (e) {
+          setEndCep((v) => v || (e.cep ? mascararCep(e.cep) : ""));
+          setEndLogradouro((v) => v || e.logradouro || "");
+          setEndNumero((v) => v || e.numero || "");
+          setEndComplemento((v) => v || e.complemento || "");
+          setEndBairro((v) => v || e.bairro || "");
+          setEndCidade((v) => v || e.cidade || "");
+          setEndUf((v) => v || e.uf || "");
+        }
+      }
+    } catch {
+      // silencioso: o servidor completa a partir do lead ao salvar
+    }
+  }
 
   // Busca de cliente (opcional).
   const [buscaCliente, setBuscaCliente] = useState("");
@@ -402,6 +546,24 @@ function ModalItem({
       return;
     }
     setSalvando(true);
+    // Dados do cliente/endereco. Na EDICAO envia todos (permite limpar campos);
+    // na CRIACAO omite os vazios para o servidor completar a partir do lead.
+    const cliente: Record<string, string> = {
+      clienteNome: clienteNome.trim(),
+      clienteTelefone: clienteTelefone.trim(),
+      clienteEmail: clienteEmail.trim(),
+      clienteCpf: clienteCpf.replace(/\D/g, ""),
+      enderecoCep: endCep.replace(/\D/g, ""),
+      enderecoLogradouro: endLogradouro.trim(),
+      enderecoNumero: endNumero.trim(),
+      enderecoComplemento: endComplemento.trim(),
+      enderecoBairro: endBairro.trim(),
+      enderecoCidade: endCidade.trim(),
+      enderecoUf: endUf.trim(),
+    };
+    const clientePayload = item
+      ? cliente
+      : Object.fromEntries(Object.entries(cliente).filter(([, v]) => v));
     const corpo = {
       descricaoProduto: descricaoProduto.trim(),
       modelo: modelo.trim() || null,
@@ -413,6 +575,7 @@ function ModalItem({
       observacoes: observacoes.trim() || null,
       status,
       leadId,
+      ...clientePayload,
     };
     try {
       const r = item
@@ -524,6 +687,7 @@ function ModalItem({
                           setLeadNome(c.nome);
                           setBuscaCliente("");
                           setResultados([]);
+                          void preencherDoLead(c.leadId, c.nome, c.telefone);
                         }}
                         className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-fundo"
                       >
@@ -536,6 +700,74 @@ function ModalItem({
               </div>
             )}
           </Campo>
+
+          {/* Dados do cliente (contato + endereco). Pre-preenchidos a partir do
+              lead vinculado; editaveis para quando nao ha lead. */}
+          <div className="space-y-3 rounded-lg border border-black/5 bg-fundo/60 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">
+              <User className="h-3.5 w-3.5" /> Dados do cliente
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo rotulo="Nome do cliente">
+                <input value={clienteNome} onChange={(e) => setClienteNome(e.target.value)} className="campo w-full" placeholder="Nome completo" />
+              </Campo>
+              <Campo rotulo="Telefone">
+                <input value={clienteTelefone} onChange={(e) => setClienteTelefone(e.target.value)} className="campo w-full" placeholder="(00) 00000-0000" />
+              </Campo>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo rotulo="Email">
+                <input value={clienteEmail} onChange={(e) => setClienteEmail(e.target.value)} className="campo w-full" placeholder="email@exemplo.com" />
+              </Campo>
+              <Campo rotulo="CPF">
+                <input value={clienteCpf} onChange={(e) => setClienteCpf(mascararCpf(e.target.value))} className="campo w-full" placeholder="000.000.000-00" />
+              </Campo>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Campo rotulo="CEP">
+                <div className="relative">
+                  <input
+                    value={endCep}
+                    onChange={(e) => setEndCep(mascararCep(e.target.value))}
+                    onBlur={() => void buscarCep(endCep)}
+                    className="campo w-full"
+                    placeholder="00000-000"
+                  />
+                  {buscandoCep && (
+                    <Loader2 className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-tiffany" />
+                  )}
+                </div>
+              </Campo>
+              <div className="col-span-2">
+                <Campo rotulo="Logradouro">
+                  <input value={endLogradouro} onChange={(e) => setEndLogradouro(e.target.value)} className="campo w-full" />
+                </Campo>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Campo rotulo="Numero">
+                <input value={endNumero} onChange={(e) => setEndNumero(e.target.value)} className="campo w-full" />
+              </Campo>
+              <div className="col-span-2">
+                <Campo rotulo="Complemento">
+                  <input value={endComplemento} onChange={(e) => setEndComplemento(e.target.value)} className="campo w-full" placeholder="Apto, bloco..." />
+                </Campo>
+              </div>
+            </div>
+            <Campo rotulo="Bairro">
+              <input value={endBairro} onChange={(e) => setEndBairro(e.target.value)} className="campo w-full" />
+            </Campo>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <Campo rotulo="Cidade">
+                  <input value={endCidade} onChange={(e) => setEndCidade(e.target.value)} className="campo w-full" />
+                </Campo>
+              </div>
+              <Campo rotulo="UF">
+                <input value={endUf} onChange={(e) => setEndUf(e.target.value.toUpperCase().slice(0, 2))} className="campo w-full" />
+              </Campo>
+            </div>
+          </div>
 
           <Campo rotulo="Observacoes">
             <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={2} className="campo w-full resize-none" />

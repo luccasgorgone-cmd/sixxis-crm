@@ -75,6 +75,23 @@ export async function PUT(
   if (body.localizacao !== undefined) data.localizacao = txt(body.localizacao);
   if (body.tecnicoResponsavel !== undefined) data.tecnicoResponsavel = txt(body.tecnicoResponsavel);
   if (body.observacoes !== undefined) data.observacoes = txt(body.observacoes);
+  // Dados do cliente/endereco (snapshot editavel): so mexe no que veio no corpo.
+  const CAMPOS_CLIENTE = [
+    "clienteNome",
+    "clienteTelefone",
+    "clienteEmail",
+    "clienteCpf",
+    "enderecoCep",
+    "enderecoLogradouro",
+    "enderecoNumero",
+    "enderecoComplemento",
+    "enderecoBairro",
+    "enderecoCidade",
+    "enderecoUf",
+  ] as const;
+  for (const c of CAMPOS_CLIENTE) {
+    if (body[c] !== undefined) data[c] = txt(body[c]);
+  }
   if (body.leadId !== undefined) {
     const lid = txt(body.leadId);
     data.lead = lid ? { connect: { id: lid } } : { disconnect: true };

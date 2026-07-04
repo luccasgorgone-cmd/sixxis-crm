@@ -7,6 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { obterAgente, podePosVenda } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
+import { montarDadosCliente } from "@/lib/local";
 import { resolverPeriodo } from "@/lib/metricas";
 import { StatusAssistencia } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
@@ -28,6 +29,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // Filtros base (sem status) — o resumo por status usa esta base.
   const base: Prisma.ItemLocalWhereInput = {};
+  // Filtro por cliente vinculado (sincronia com a ficha/Kanban): lista os itens
+  // de assistencia daquele lead.
+  const leadId = sp.get("leadId")?.trim();
+  if (leadId) base.leadId = leadId;
   const categoria = sp.get("categoria")?.trim();
   if (categoria) base.categoria = { equals: categoria, mode: "insensitive" };
   const q = sp.get("busca")?.trim();
@@ -84,6 +89,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       localizacao: it.localizacao,
       tecnicoResponsavel: it.tecnicoResponsavel,
       observacoes: it.observacoes,
+      clienteNome: it.clienteNome,
+      clienteTelefone: it.clienteTelefone,
+      clienteEmail: it.clienteEmail,
+      clienteCpf: it.clienteCpf,
+      enderecoCep: it.enderecoCep,
+      enderecoLogradouro: it.enderecoLogradouro,
+      enderecoNumero: it.enderecoNumero,
+      enderecoComplemento: it.enderecoComplemento,
+      enderecoBairro: it.enderecoBairro,
+      enderecoCidade: it.enderecoCidade,
+      enderecoUf: it.enderecoUf,
       dataEntrada: it.dataEntrada,
       dataSaida: it.dataSaida,
       leadId: it.leadId,
@@ -126,9 +142,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return s || null;
   };
 
+  const leadId = txt(body.leadId);
+  // Snapshot do cliente/endereco: usa o que veio no corpo; o que faltar e
+  // preenchido AUTOMATICAMENTE a partir do lead vinculado (contato + endereco
+  // principal). Assim o pos-venda pode so vincular o cliente e ja vem tudo.
+  const cli = await montarDadosCliente(body, leadId);
+
   const item = await prisma.itemLocal.create({
     data: {
-      leadId: txt(body.leadId),
+      leadId,
       descricaoProduto,
       modelo: txt(body.modelo),
       categoria: txt(body.categoria),
@@ -138,6 +160,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       localizacao: txt(body.localizacao),
       tecnicoResponsavel: txt(body.tecnicoResponsavel),
       observacoes: txt(body.observacoes),
+      ...cli,
       ...(status === StatusAssistencia.ENTREGUE ? { dataSaida: new Date() } : {}),
     },
     select: { id: true },
