@@ -34,7 +34,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   });
   return NextResponse.json({
     parceiros: parceiros.map(serializar),
-    podeGerenciar: podeGerenciarParceiros(agente.papel),
+    podeGerenciar: podeGerenciarParceiros(agente.papel, agente.acessoPosVenda),
   });
 }
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  if (!podeGerenciarParceiros(agente.papel)) {
+  if (!podeGerenciarParceiros(agente.papel, agente.acessoPosVenda)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 

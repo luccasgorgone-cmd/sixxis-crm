@@ -29,7 +29,12 @@ export default async function AppLayout({
         }}
       >
       <div className="flex h-screen overflow-hidden bg-fundo">
-        <Sidebar papel={session.user.papel} marca={marca} />
+        <Sidebar
+          papel={session.user.papel}
+          marca={marca}
+          acessoVenda={session.user.acessoVenda}
+          acessoPosVenda={session.user.acessoPosVenda}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar
             nome={session.user.name}

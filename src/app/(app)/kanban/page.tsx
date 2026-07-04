@@ -10,6 +10,11 @@ export default async function KanbanPage() {
   const session = await auth();
   if (!session) redirect("/login");
   return (
-    <Kanban papel={session.user.papel} agenteIdAtual={session.user.id} />
+    <Kanban
+      papel={session.user.papel}
+      agenteIdAtual={session.user.id}
+      acessoVenda={session.user.acessoVenda}
+      acessoPosVenda={session.user.acessoPosVenda}
+    />
   );
 }

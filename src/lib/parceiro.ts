@@ -52,8 +52,8 @@ export function filtrosParceiro(sp: URLSearchParams): Prisma.ParceiroWhereInput 
 
 // Quem gerencia parceiros: ADMIN e POS_VENDA (ferramenta de pos-venda). Os demais
 // papeis logados so LEEM (GET). Ver os endpoints.
-export function podeGerenciarParceiros(papel: Papel): boolean {
-  return papel === Papel.ADMIN || papel === Papel.POS_VENDA;
+export function podeGerenciarParceiros(papel: Papel, acessoPosVenda = false): boolean {
+  return papel === Papel.ADMIN || papel === Papel.POS_VENDA || acessoPosVenda;
 }
 
 // Resolve uf/regiao: prioriza a UF manual; na falta, infere do telefone (DDD). A

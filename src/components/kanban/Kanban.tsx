@@ -46,12 +46,27 @@ type Pendente = {
 export function Kanban({
   papel,
   agenteIdAtual,
+  acessoVenda = false,
+  acessoPosVenda = false,
 }: {
   papel: string;
   agenteIdAtual: string;
+  acessoVenda?: boolean;
+  acessoPosVenda?: boolean;
 }) {
   const ehAdmin = papel === "ADMIN";
   const toast = useToast();
+
+  // Finalidades que o usuario pode ver: admin ve as duas; os demais veem as que
+  // tem acesso. Quem tem venda + pos-venda ve/alterna os DOIS funis.
+  const finalidadesAcessiveis: Finalidade[] = ehAdmin
+    ? ["VENDA", "POS_VENDA"]
+    : [
+        ...(acessoVenda ? (["VENDA"] as Finalidade[]) : []),
+        ...(acessoPosVenda ? (["POS_VENDA"] as Finalidade[]) : []),
+      ];
+  const finalidadesEfetivas =
+    finalidadesAcessiveis.length > 0 ? finalidadesAcessiveis : (["VENDA"] as Finalidade[]);
 
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [colunas, setColunas] = useState<Record<string, Card[]>>({});
@@ -74,10 +89,8 @@ export function Kanban({
     ehAdmin ? "todos" : "meus",
   );
   const [agenteId, setAgenteId] = useState("");
-  // Finalidade: POS_VENDA ve so pos-venda; VENDEDOR so venda; ADMIN alterna.
-  const [finalidade, setFinalidade] = useState<Finalidade>(
-    papel === "POS_VENDA" ? "POS_VENDA" : "VENDA",
-  );
+  // Default: a primeira finalidade acessivel (evita pedir um funil sem acesso).
+  const [finalidade, setFinalidade] = useState<Finalidade>(finalidadesEfetivas[0]);
 
   const [ativo, setAtivo] = useState<Card | null>(null);
   const [pendente, setPendente] = useState<Pendente | null>(null);
@@ -403,13 +416,13 @@ export function Kanban({
   }, [etapas]);
   const multiSecao = secoes.length > 1;
 
-  const podeAlternar = papel === "ADMIN";
+  const podeAlternar = finalidadesEfetivas.length > 1;
 
   return (
     <div className="flex h-full flex-col">
       {podeAlternar && (
         <div className="flex items-center gap-2 border-b border-black/5 bg-white px-4 pt-2.5">
-          {(["VENDA", "POS_VENDA"] as Finalidade[]).map((f) => (
+          {finalidadesEfetivas.map((f) => (
             <button
               key={f}
               onClick={() => setFinalidade(f)}

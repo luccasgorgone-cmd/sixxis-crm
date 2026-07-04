@@ -35,9 +35,21 @@ type Item = {
   icone: LucideIcon;
 };
 
-export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
+export function Sidebar({
+  papel,
+  marca,
+  acessoPosVenda = false,
+}: {
+  papel: string;
+  marca?: Marca;
+  acessoVenda?: boolean;
+  acessoPosVenda?: boolean;
+}) {
   const pathname = usePathname();
   const ehAdmin = papel === "ADMIN";
+  // Ferramentas de pos-venda visiveis a quem tem acesso pos-venda (papel OU flag).
+  // Quem tem venda + pos-venda ve os itens dos dois.
+  const podePosVenda = ehAdmin || papel === "POS_VENDA" || acessoPosVenda;
   const [naoLidas, setNaoLidas] = useState(0);
 
   const carregarNaoLidas = useCallback(async () => {
@@ -84,8 +96,9 @@ export function Sidebar({ papel, marca }: { papel: string; marca?: Marca }) {
     { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
     { rotulo: "Google Trends", href: "/google-trends", icone: TrendingUp },
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
-    // Parceiros (tecnicos): ferramenta de pos-venda — visivel a ADMIN e POS_VENDA.
-    ...(ehAdmin || papel === "POS_VENDA"
+    // Parceiros (tecnicos) e Local: ferramentas de pos-venda — visiveis a quem
+    // tem acesso pos-venda (papel OU flag), alem do admin.
+    ...(podePosVenda
       ? [
           { rotulo: "Parceiros", href: "/parceiros", icone: Wrench },
           { rotulo: "Local", href: "/local", icone: PackageOpen },

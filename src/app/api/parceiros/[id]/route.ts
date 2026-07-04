@@ -46,7 +46,7 @@ export async function PUT(
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  if (!podeGerenciarParceiros(agente.papel)) {
+  if (!podeGerenciarParceiros(agente.papel, agente.acessoPosVenda)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;
@@ -101,7 +101,7 @@ export async function DELETE(
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  if (!podeGerenciarParceiros(agente.papel)) {
+  if (!podeGerenciarParceiros(agente.papel, agente.acessoPosVenda)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;

@@ -2,11 +2,11 @@
 // resumo por status) e POST cadastra. Permissao: ADMIN e POS_VENDA. Entidade
 // isolada — nao entra em metricas de venda.
 import { NextResponse, type NextRequest } from "next/server";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, podePosVenda } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
 import { resolverPeriodo } from "@/lib/metricas";
-import { Papel, StatusAssistencia } from "@/generated/prisma/enums";
+import { StatusAssistencia } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -14,16 +14,12 @@ export const dynamic = "force-dynamic";
 
 const STATUS_VALIDOS = new Set<string>(Object.values(StatusAssistencia));
 
-function podeLocal(papel: Papel): boolean {
-  return papel === Papel.ADMIN || papel === Papel.POS_VENDA;
-}
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  if (!podeLocal(agente.papel)) {
+  if (!podePosVenda(agente)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const sp = req.nextUrl.searchParams;
@@ -101,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  if (!podeLocal(agente.papel)) {
+  if (!podePosVenda(agente)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   let body: Record<string, unknown>;

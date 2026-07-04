@@ -2,10 +2,10 @@
 // remocao (DELETE). Permissao: ADMIN e POS_VENDA. Marcar ENTREGUE preenche a
 // dataSaida automaticamente.
 import { NextResponse, type NextRequest } from "next/server";
-import { obterAgente } from "@/lib/autorizacao";
+import { obterAgente, podePosVenda } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
-import { Papel, StatusAssistencia } from "@/generated/prisma/enums";
+import { StatusAssistencia } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -13,17 +13,13 @@ export const dynamic = "force-dynamic";
 
 const STATUS_VALIDOS = new Set<string>(Object.values(StatusAssistencia));
 
-function podeLocal(papel: Papel): boolean {
-  return papel === Papel.ADMIN || papel === Papel.POS_VENDA;
-}
-
 export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
-  if (!podeLocal(agente.papel)) {
+  if (!podePosVenda(agente)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;
@@ -47,7 +43,7 @@ export async function PUT(
 ): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
-  if (!podeLocal(agente.papel)) {
+  if (!podePosVenda(agente)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;
@@ -107,7 +103,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
-  if (!podeLocal(agente.papel)) {
+  if (!podePosVenda(agente)) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   const { id } = await ctx.params;
