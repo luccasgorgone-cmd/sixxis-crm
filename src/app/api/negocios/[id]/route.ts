@@ -260,12 +260,21 @@ export async function PATCH(
       motivoPerda: true,
       finalidade: true,
       pendente: true,
+      // Donos do lead por finalidade: o DONO edita o negocio do proprio cliente,
+      // inclusive quando o negocio ainda nao tem agenteId (criado ao abrir a
+      // conversa/cadastro manual). Fatia 2.86.
+      lead: { select: { donoId: true, donoPosVendaId: true } },
     },
   });
   if (!negocio) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  if (!podeAcessarNegocio(agente, negocio.agenteId)) {
+  // ESCRITA: admin, dono do negocio, ou DONO do cliente na finalidade do negocio.
+  const ehDonoCliente =
+    negocio.finalidade === Finalidade.VENDA
+      ? negocio.lead.donoId === agente.id
+      : negocio.lead.donoPosVendaId === agente.id;
+  if (!podeAcessarNegocio(agente, negocio.agenteId) && !ehDonoCliente) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 

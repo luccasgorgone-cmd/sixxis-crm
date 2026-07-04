@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
-import { TipoHistorico, AtividadeTipo } from "@/generated/prisma/enums";
+import { TipoHistorico, AtividadeTipo, Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,12 +30,23 @@ export async function POST(
 
   const negocio = await prisma.negocio.findUnique({
     where: { id },
-    select: { id: true, leadId: true, agenteId: true },
+    select: {
+      id: true,
+      leadId: true,
+      agenteId: true,
+      finalidade: true,
+      lead: { select: { donoId: true, donoPosVendaId: true } },
+    },
   });
   if (!negocio) {
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
-  if (!podeAcessarNegocio(agente, negocio.agenteId)) {
+  // Admin / dono do negocio / dono do cliente na finalidade. Fatia 2.86.
+  const ehDonoCliente =
+    negocio.finalidade === Finalidade.VENDA
+      ? negocio.lead.donoId === agente.id
+      : negocio.lead.donoPosVendaId === agente.id;
+  if (!podeAcessarNegocio(agente, negocio.agenteId) && !ehDonoCliente) {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
