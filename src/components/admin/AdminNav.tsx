@@ -27,7 +27,6 @@ import {
   Boxes,
   BellRing,
   Target,
-  Sticker,
   PackageSearch,
   Truck,
   ArrowLeft,
@@ -54,7 +53,8 @@ const SECOES: Secao[] = [
   { rotulo: "Observacoes", href: "/admin/observacoes", icone: StickyNote },
   { rotulo: "Roteamento", href: "/admin/roteamento", icone: Route },
   { rotulo: "Modelos de mensagem", href: "/admin/respostas", icone: Zap },
-  { rotulo: "Figurinhas", href: "/admin/figurinhas", icone: Sticker },
+  // Oculto: envio de figurinha descontinuado (3.03). Reativar na migração à API oficial.
+  // { rotulo: "Figurinhas", href: "/admin/figurinhas", icone: Sticker },
   { rotulo: "Assistente de Escrita", href: "/admin/assistente-escrita", icone: Wand2 },
   { rotulo: "Alertas de SLA", href: "/admin/alertas", icone: BellRing },
   { rotulo: "Comunicacoes", href: "/admin/comunicacoes", icone: Megaphone },

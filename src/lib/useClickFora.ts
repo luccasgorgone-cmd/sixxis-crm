@@ -3,7 +3,7 @@ import { useEffect, type RefObject } from "react";
 // Fecha um popover ao clicar/tocar FORA dele (comportamento WhatsApp). Ignora
 // cliques dentro do proprio popover e nos refs passados (ex.: o botao-gatilho,
 // para que ele possa alternar sem reabrir imediatamente). So age quando `ativo`.
-// Reusavel pelos seletores do inbox (emoji, figurinha e reacao).
+// Reusavel pelos seletores do inbox (emoji e reacao).
 export function useClickFora(
   onFora: () => void,
   ativo: boolean,
