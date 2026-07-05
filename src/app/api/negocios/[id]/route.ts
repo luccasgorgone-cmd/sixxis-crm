@@ -247,6 +247,8 @@ export async function PATCH(
     fretePagoPelaEmpresa?: boolean;
     // Pos-venda (pecas): valor final realmente cobrado quando houve desconto.
     valorAjustado?: number | null;
+    // Pos-venda: modelo do aparelho do cliente (marcado no atendimento).
+    modeloProdutoCliente?: string | null;
   };
   try {
     body = await req.json();
@@ -588,6 +590,15 @@ export async function PATCH(
       }
       data[campo] = parsed.valor;
     }
+  }
+
+  // ---- Modelo do produto do cliente (pos-venda): trim, max 60, null limpa ----
+  if (ehPosVenda && body.modeloProdutoCliente !== undefined) {
+    const m =
+      body.modeloProdutoCliente === null
+        ? null
+        : String(body.modeloProdutoCliente).trim().slice(0, 60) || null;
+    data.modeloProdutoCliente = m;
   }
 
   if (
