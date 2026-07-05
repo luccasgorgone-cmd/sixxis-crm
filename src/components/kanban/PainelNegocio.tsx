@@ -49,6 +49,7 @@ import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import { BlocoPecasCliente } from "@/components/pecas/BlocoPecasCliente";
+import { BlocoPecasNecessarias } from "@/components/pecas/BlocoPecasNecessarias";
 import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
 import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -403,6 +404,11 @@ export function PainelNegocio({
 
                 {/* Assistencia (Local): so para pos-venda; cliente continua no funil. */}
                 <BlocoAssistencia leadId={detalhe.cliente.id} />
+
+                {/* Pecas necessarias (planejamento): so POS_VENDA com negocio. */}
+                {detalhe.finalidade === "POS_VENDA" && (
+                  <BlocoPecasNecessarias negocioId={negocioId} />
+                )}
 
                 {/* Pecas do cliente (pedidos pos-venda): so pos-venda. */}
                 <BlocoPecasCliente leadId={detalhe.cliente.id} />
