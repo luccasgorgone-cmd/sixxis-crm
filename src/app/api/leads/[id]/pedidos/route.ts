@@ -36,6 +36,7 @@ export async function GET(
       id: true,
       finalidade: true,
       valor: true,
+      valorAjustado: true,
       valorProdutos: true,
       frete: true,
       fretePagoPelaEmpresa: true,
@@ -61,7 +62,8 @@ export async function GET(
       negocioId: n.id,
       finalidade: n.finalidade,
       data: n.fechadoEm,
-      total: num(n.valor),
+      // Pos-venda com desconto: total = valor realmente cobrado (valorAjustado).
+      total: n.valorAjustado != null ? num(n.valorAjustado) : num(n.valor),
       valorProdutos: num(n.valorProdutos),
       frete: num(n.frete),
       fretePagoPelaEmpresa: n.fretePagoPelaEmpresa,

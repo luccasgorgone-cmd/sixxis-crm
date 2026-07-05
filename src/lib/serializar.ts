@@ -34,7 +34,14 @@ export function cardNegocio(n: NegocioCard) {
     leadFoto: n.lead.fotoUrl,
     leadTelefone: n.lead.telefone,
     origem: n.lead.origem,
-    valor: n.valor != null ? Number(n.valor) : null,
+    // Pos-venda com desconto: mostra o valor REALMENTE cobrado (valorAjustado).
+    // Em venda valorAjustado e sempre null -> cai no valor (conversao intocada).
+    valor:
+      n.valorAjustado != null
+        ? Number(n.valorAjustado)
+        : n.valor != null
+          ? Number(n.valor)
+          : null,
     temperatura: n.temperatura,
     status: n.status,
     finalidade: n.finalidade,
