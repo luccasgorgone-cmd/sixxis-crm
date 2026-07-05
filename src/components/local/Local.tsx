@@ -26,6 +26,7 @@ import { EstadoErro } from "@/components/ui/Estado";
 import { mascararCep, mascararCpf, formatarTelefone } from "@/lib/format";
 import { buscarViaCep } from "@/lib/viacep";
 import { STATUS_ORDEM, STATUS_META } from "@/lib/assistencia";
+import { BlocoPecasLocal } from "@/components/pecas/BlocoPecasNecessarias";
 
 type Item = {
   id: string;
@@ -780,6 +781,10 @@ function ModalItem({
           <Campo rotulo="Observacoes">
             <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={2} className="campo w-full resize-none" />
           </Campo>
+
+          {/* Pecas aplicadas no reparo (Fatia 3.06): so para item ja salvo (tem id).
+              Movimenta o estoque na hora — filtra pelo modelo do proprio item. */}
+          {item && <BlocoPecasLocal itemLocalId={item.id} modelo={modelo || item.modelo} />}
         </div>
         <div className="flex justify-end gap-2 border-t border-black/5 px-5 py-3">
           <button onClick={onFechar} className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5">

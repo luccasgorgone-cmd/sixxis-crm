@@ -434,3 +434,28 @@ export function BlocoPecasNecessarias({ negocioId }: { negocioId: string }) {
     />
   );
 }
+
+// Wrapper LOCAL (Bloco 5): "Pecas aplicadas" na assistencia — move estoque na
+// hora. Filtra pelo modelo do proprio ItemLocal (fixo).
+export function BlocoPecasLocal({
+  itemLocalId,
+  modelo,
+  onMudou,
+}: {
+  itemLocalId: string;
+  modelo?: string | null;
+  onMudou?: () => void;
+}) {
+  return (
+    <PecasEditor
+      titulo="Pecas aplicadas"
+      listUrl={`/api/local/${itemLocalId}/pecas`}
+      addUrl={`/api/local/${itemLocalId}/pecas`}
+      removeUrl={(usoId) => `/api/local/${itemLocalId}/pecas/${usoId}`}
+      modeloEditavel={false}
+      modeloFixo={modelo ?? null}
+      movimentaEstoque
+      onMudou={onMudou}
+    />
+  );
+}

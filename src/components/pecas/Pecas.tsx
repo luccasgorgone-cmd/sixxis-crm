@@ -691,6 +691,7 @@ type Movimentacao = {
   criadoEm: string;
   agente: string | null;
   negocioId: string | null;
+  assistenciaLocal?: boolean;
   cliente: string | null;
 };
 
@@ -792,6 +793,7 @@ function DrawerHistorico({ peca, onFechar }: { peca: Peca; onFechar: () => void 
                         })}
                       </span>
                       {m.agente && <span>· {m.agente}</span>}
+                      {m.assistenciaLocal && <span>· Assistencia local</span>}
                       {m.cliente && <span>· cliente {m.cliente}</span>}
                     </div>
                     {m.motivo && (

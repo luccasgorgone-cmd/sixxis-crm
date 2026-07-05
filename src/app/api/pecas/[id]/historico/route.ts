@@ -42,15 +42,17 @@ export async function GET(
       motivo: true,
       negocioId: true,
       leadId: true,
+      itemLocalId: true,
       agenteId: true,
       criadoEm: true,
     },
   });
 
-  // Nomes de agente e cliente em lote (leadId/agenteId sao campos livres, sem FK).
+  // Nomes de agente/cliente e itens de assistencia em lote (campos livres, sem FK).
   const agenteIds = [...new Set(movs.map((m) => m.agenteId).filter(Boolean) as string[])];
   const leadIds = [...new Set(movs.map((m) => m.leadId).filter(Boolean) as string[])];
-  const [agentes, leads] = await Promise.all([
+  const itemLocalIds = [...new Set(movs.map((m) => m.itemLocalId).filter(Boolean) as string[])];
+  const [agentes, leads, itensLocal] = await Promise.all([
     agenteIds.length
       ? prisma.agente.findMany({
           where: { id: { in: agenteIds } },
@@ -63,20 +65,36 @@ export async function GET(
           select: { id: true, nome: true, pushName: true, nomeManual: true, telefone: true },
         })
       : Promise.resolve([]),
+    itemLocalIds.length
+      ? prisma.itemLocal.findMany({
+          where: { id: { in: itemLocalIds } },
+          select: { id: true, clienteNome: true },
+        })
+      : Promise.resolve([]),
   ]);
   const nomeAgente = new Map(agentes.map((a) => [a.id, a.nome]));
   const nomeLead = new Map(leads.map((l) => [l.id, nomeEfetivo(l)]));
+  const clienteItemLocal = new Map(itensLocal.map((i) => [i.id, i.clienteNome]));
 
   return NextResponse.json({
-    movimentacoes: movs.map((m) => ({
-      id: m.id,
-      tipo: m.tipo,
-      quantidade: m.quantidade,
-      motivo: m.motivo,
-      criadoEm: m.criadoEm,
-      agente: m.agenteId ? nomeAgente.get(m.agenteId) ?? null : null,
-      negocioId: m.negocioId,
-      cliente: m.leadId ? nomeLead.get(m.leadId) ?? null : null,
-    })),
+    movimentacoes: movs.map((m) => {
+      // Cliente: o lead vinculado; para assistencia sem lead, o nome do item.
+      const cliente = m.leadId
+        ? nomeLead.get(m.leadId) ?? null
+        : m.itemLocalId
+          ? clienteItemLocal.get(m.itemLocalId) ?? null
+          : null;
+      return {
+        id: m.id,
+        tipo: m.tipo,
+        quantidade: m.quantidade,
+        motivo: m.motivo,
+        criadoEm: m.criadoEm,
+        agente: m.agenteId ? nomeAgente.get(m.agenteId) ?? null : null,
+        negocioId: m.negocioId,
+        assistenciaLocal: !!m.itemLocalId,
+        cliente,
+      };
+    }),
   });
 }
