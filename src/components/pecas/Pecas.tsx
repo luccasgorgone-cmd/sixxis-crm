@@ -423,12 +423,34 @@ function ModalPeca({
   );
   const [ativo, setAtivo] = useState(peca?.ativo ?? true);
   const [salvando, setSalvando] = useState(false);
+  // Duplicata (409): mensagem e, quando a existente esta inativa, id para reativar.
+  const [erroDup, setErroDup] = useState<{ msg: string; inativaId?: string } | null>(null);
+  const [reativando, setReativando] = useState(false);
+
+  async function reativar(inativaId: string) {
+    setReativando(true);
+    try {
+      const r = await fetch(`/api/pecas/${inativaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativo: true }),
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Peca reativada.");
+      onSalvo();
+    } catch {
+      toast.erro("Nao foi possivel reativar.");
+    } finally {
+      setReativando(false);
+    }
+  }
 
   async function salvar() {
     if (!nome.trim()) {
       toast.erro("Informe o nome.");
       return;
     }
+    setErroDup(null);
     setSalvando(true);
     const corpo = {
       nome: nome.trim(),
@@ -450,6 +472,14 @@ function ModalPeca({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(corpo),
           });
+      if (r.status === 409) {
+        const d = await r.json().catch(() => null);
+        setErroDup({
+          msg: d?.erro ?? "Peca ja cadastrada.",
+          inativaId: d?.inativaId,
+        });
+        return;
+      }
       if (!r.ok) {
         toast.erro("Nao foi possivel salvar.");
         return;
@@ -550,6 +580,21 @@ function ModalPeca({
             <p className="rounded-md bg-fundo px-2.5 py-1.5 text-[11px] text-medio/60">
               O estoque comeca em 0. Use "Movimentar" para dar entrada.
             </p>
+          )}
+          {erroDup && (
+            <div className="space-y-2 rounded-md border border-erro/20 bg-erro/5 px-2.5 py-2 text-xs text-erro">
+              <p>{erroDup.msg}</p>
+              {erroDup.inativaId && (
+                <button
+                  onClick={() => void reativar(erroDup.inativaId!)}
+                  disabled={reativando}
+                  className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-xs font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
+                >
+                  {reativando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Reativar peca existente
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="mt-5 flex justify-end gap-2">

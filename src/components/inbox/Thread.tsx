@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   Pencil,
   X,
-  Sticker,
   Copy,
   Reply,
   Forward,
@@ -1102,11 +1101,9 @@ function CartaoContato({
 function Figurinha({ ehOut }: { ehOut: boolean }) {
   return (
     <span
-      className={`flex items-center gap-2 italic ${
-        ehOut ? "text-white/90" : "text-medio/70"
-      }`}
+      className={`italic ${ehOut ? "text-white/90" : "text-medio/70"}`}
     >
-      <Sticker className="h-4 w-4" /> Figurinha
+      Figurinha
     </span>
   );
 }

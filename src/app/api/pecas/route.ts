@@ -89,6 +89,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const nome = txt(body.nome);
   if (!nome) return NextResponse.json({ erro: "nome obrigatorio" }, { status: 400 });
+  const categoria = txt(body.categoria);
+  const modelo = txt(body.modelo);
+
+  // Guarda de duplicata: mesma (nome, categoria, modelo) case-insensitive. Ativa
+  // -> 409; inativa -> 409 com inativaId para o front oferecer "Reativar".
+  const dup = await prisma.produtoCatalogo.findFirst({
+    where: {
+      tipo: TipoCatalogo.PECA,
+      nome: { equals: nome, mode: "insensitive" },
+      categoria: categoria === null ? null : { equals: categoria, mode: "insensitive" },
+      modelo: modelo === null ? null : { equals: modelo, mode: "insensitive" },
+    },
+    select: { id: true, ativo: true },
+  });
+  if (dup) {
+    return dup.ativo
+      ? NextResponse.json(
+          { erro: "peça já cadastrada nesta categoria/modelo" },
+          { status: 409 },
+        )
+      : NextResponse.json(
+          { erro: "peça já existe, porém inativa", inativaId: dup.id },
+          { status: 409 },
+        );
+  }
+
   const ultima = await prisma.produtoCatalogo.findFirst({
     orderBy: { ordem: "desc" },
     select: { ordem: true },
@@ -96,8 +122,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const item = await prisma.produtoCatalogo.create({
     data: {
       nome,
-      categoria: txt(body.categoria),
-      modelo: txt(body.modelo),
+      categoria,
+      modelo,
       precoSugerido: precoNum(body.precoSugerido),
       estoqueMinimo: intOuNull(body.estoqueMinimo),
       tipo: TipoCatalogo.PECA,
