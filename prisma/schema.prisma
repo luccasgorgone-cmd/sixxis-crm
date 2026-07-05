@@ -1033,9 +1033,36 @@ model ProdutoCatalogo {
   tipo          TipoCatalogo @default(PRODUTO)
   ativo         Boolean      @default(true)
   ordem         Int          @default(0)
+  // Estoque (Fatia 3.01): quantidade atual em estoque (pode ficar NEGATIVA — a
+  // baixa nunca trava a operacao; a UI sinaliza). estoqueMinimo null = sem alerta.
+  estoque       Int          @default(0)
+  estoqueMinimo Int?
+  movimentacoes MovimentacaoPeca[]
   criadoEm      DateTime     @default(now())
 
   @@index([tipo, ativo, ordem])
+}
+
+// Movimentacao de estoque de uma peca (Fatia 3.01). Cada linha e um evento
+// imutavel: tipo da o sinal (ENTRADA/ESTORNO somam; SAIDA subtrai; AJUSTE define
+// o valor absoluto, registrando o delta em quantidade). Vincula opcionalmente ao
+// negocio/lead/agente que originou (baixa na venda de pecas, estorno na reabertura).
+model MovimentacaoPeca {
+  id         String          @id @default(cuid())
+  pecaId     String
+  peca       ProdutoCatalogo @relation(fields: [pecaId], references: [id])
+  // "ENTRADA" | "SAIDA" | "AJUSTE" | "ESTORNO".
+  tipo       String
+  // Sempre POSITIVO; o tipo da o sinal. Em AJUSTE guarda o delta aplicado.
+  quantidade Int
+  motivo     String?
+  negocioId  String?
+  leadId     String?
+  agenteId   String?
+  criadoEm   DateTime        @default(now())
+
+  @@index([pecaId, criadoEm])
+  @@index([negocioId])
 }
 
 // Status de um item em assistencia (aba Local, pos-venda). Fatia 2.70.
