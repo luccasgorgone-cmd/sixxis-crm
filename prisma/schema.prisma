@@ -557,6 +557,10 @@ model Negocio {
   // conversao Meta CAPI ao marcar GANHO. valorProdutos = soma dos itens.
   valor         Decimal?           @db.Decimal(12, 2)
   valorProdutos Decimal?           @db.Decimal(12, 2)
+  // Valor final REALMENTE cobrado quando houve desconto/acrescimo no fechamento
+  // de pos-venda (pecas). null = vale o calculado (itens cobraveis + frete). O
+  // valor da venda (Meta CAPI) continua em `valor`; este e so o ajuste manual.
+  valorAjustado Decimal?           @db.Decimal(12, 2)
   frete         Decimal?           @db.Decimal(12, 2)
   // Frete pago pela EMPRESA (despesa): quando true, o frete NAO entra no total
   // cobrado do cliente (valor = produtos) e vira despesa rastreavel (freteDespesa).
@@ -1011,6 +1015,9 @@ model ItemPedido {
   quantidade        Int      @default(1)
   valorUnitario     Decimal  @db.Decimal(12, 2)
   subtotal          Decimal  @db.Decimal(12, 2)
+  // Item em GARANTIA (Fatia 3.02): nao soma no total cobrado do cliente. A baixa
+  // de estoque ocorre igual (peca sai), com motivo "garantia".
+  garantia          Boolean  @default(false)
   criadoEm          DateTime @default(now())
 
   @@index([negocioId])
