@@ -21,6 +21,8 @@ export type MovimentarArgs = {
   negocioId?: string | null;
   leadId?: string | null;
   agenteId?: string | null;
+  // Vinculo opcional a um item da assistencia (aba Local). Fatia 3.06.
+  itemLocalId?: string | null;
   // tx opcional: quando fornecido, compoe a transacao externa (nao abre outra).
   tx?: ClientePrisma;
 };
@@ -41,6 +43,7 @@ export async function movimentarPeca(
     negocioId = null,
     leadId = null,
     agenteId = null,
+    itemLocalId = null,
   } = args;
 
   const executar = async (
@@ -78,6 +81,7 @@ export async function movimentarPeca(
         negocioId,
         leadId,
         agenteId,
+        itemLocalId,
       },
       select: { id: true },
     });

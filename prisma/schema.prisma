@@ -561,6 +561,9 @@ model Negocio {
   // de pos-venda (pecas). null = vale o calculado (itens cobraveis + frete). O
   // valor da venda (Meta CAPI) continua em `valor`; este e so o ajuste manual.
   valorAjustado Decimal?           @db.Decimal(12, 2)
+  // Modelo do aparelho que o CLIENTE possui, marcado no atendimento de pos-venda
+  // (Fatia 3.06). Filtra as pecas compativeis no bloco "Pecas necessarias".
+  modeloProdutoCliente String?
   frete         Decimal?           @db.Decimal(12, 2)
   // Frete pago pela EMPRESA (despesa): quando true, o frete NAO entra no total
   // cobrado do cliente (valor = produtos) e vira despesa rastreavel (freteDespesa).
@@ -1045,6 +1048,7 @@ model ProdutoCatalogo {
   estoque       Int          @default(0)
   estoqueMinimo Int?
   movimentacoes MovimentacaoPeca[]
+  usos          PecaUso[]
   criadoEm      DateTime     @default(now())
 
   @@index([tipo, ativo, ordem])
@@ -1066,10 +1070,37 @@ model MovimentacaoPeca {
   negocioId  String?
   leadId     String?
   agenteId   String?
+  // Vinculo opcional a um item da assistencia (aba Local) — baixa/estorno de peca
+  // aplicada no reparo (Fatia 3.06). null quando a origem e negocio/manual.
+  itemLocalId String?
   criadoEm   DateTime        @default(now())
 
   @@index([pecaId, criadoEm])
   @@index([negocioId])
+  @@index([itemLocalId])
+}
+
+// Uso/planejamento de peca (Fatia 3.06). Duas origens:
+// - NEGOCIO: peca PLANEJADA no atendimento de pos-venda. NAO movimenta estoque —
+//   e staging; vira ItemPedido (e da baixa) no fechamento do negocio como ganho.
+// - LOCAL: peca APLICADA no reparo (aba Local/assistencia). Movimenta o estoque
+//   IMEDIATAMENTE (SAIDA na criacao, ESTORNO na remocao).
+model PecaUso {
+  id          String          @id @default(cuid())
+  // "NEGOCIO" | "LOCAL".
+  origem      String
+  negocioId   String?
+  itemLocalId String?
+  pecaId      String
+  peca        ProdutoCatalogo @relation(fields: [pecaId], references: [id])
+  quantidade  Int
+  garantia    Boolean         @default(false)
+  agenteId    String?
+  criadoEm    DateTime        @default(now())
+
+  @@index([negocioId])
+  @@index([itemLocalId])
+  @@index([pecaId])
 }
 
 // Status de um item em assistencia (aba Local, pos-venda). Fatia 2.70.
