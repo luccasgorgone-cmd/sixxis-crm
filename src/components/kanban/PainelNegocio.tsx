@@ -131,7 +131,7 @@ export function PainelNegocio({
   const [modal, setModal] = useState<{
     tipo: "ganho" | "perdido";
     etapaId: string;
-    itensIniciais?: ItemPedidoSeed[];
+    itensIniciais?: (ItemPedidoSeed & { garantia?: boolean })[];
   } | null>(null);
   const [iniciandoConversa, setIniciandoConversa] = useState(false);
 
@@ -140,6 +140,43 @@ export function PainelNegocio({
   const etapaGanhoId = etapas.find((e) => e.tipo === "GANHO")?.id ?? null;
   function repetirPedido(itens: ItemPedidoSeed[]) {
     if (etapaGanhoId) setModal({ tipo: "ganho", etapaId: etapaGanhoId, itensIniciais: itens });
+  }
+
+  // Abre o modal de fechamento. No GANHO de POS-VENDA, carrega as pecas
+  // NECESSARIAS (planejadas no atendimento) como itens iniciais — sem duplicar as
+  // que ja estejam na base (chave produtoCatalogoId); um pedido reaberto mantem o
+  // que tinha. O staging e apagado no servidor apos o fechamento bem-sucedido.
+  async function abrirModalPedido(
+    tipo: "ganho" | "perdido",
+    etapaId: string,
+  ): Promise<void> {
+    if (tipo !== "ganho" || detalhe?.finalidade !== "POS_VENDA") {
+      setModal({ tipo, etapaId });
+      return;
+    }
+    const base: (ItemPedidoSeed & { garantia?: boolean })[] = [];
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/pecas-necessarias`);
+      if (r.ok) {
+        const d = await r.json();
+        const jaTem = new Set(
+          base.map((i) => i.produtoCatalogoId).filter(Boolean) as string[],
+        );
+        for (const p of d.pecas ?? []) {
+          if (p.pecaId && jaTem.has(p.pecaId)) continue;
+          base.push({
+            produtoCatalogoId: p.pecaId,
+            descricao: [p.nome, p.modelo].filter(Boolean).join(" "),
+            quantidade: p.quantidade,
+            valorUnitario: p.precoSugerido ?? 0,
+            garantia: p.garantia,
+          });
+        }
+      }
+    } catch {
+      // Falha ao carregar necessarias: abre o modal vazio (nao trava o fechamento).
+    }
+    setModal({ tipo, etapaId, itensIniciais: base.length ? base : undefined });
   }
 
   const carregar = useCallback(async () => {
@@ -424,7 +461,7 @@ export function PainelNegocio({
                   salvar={salvar}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
-                  abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
                 />
 
                 <BlocoAgendar detalhe={detalhe} recarregar={carregar} />

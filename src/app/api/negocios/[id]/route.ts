@@ -662,6 +662,11 @@ export async function PATCH(
             agenteId: agente.id,
           });
         }
+        // Staging consumido: as pecas NECESSARIAS deste negocio viraram itens do
+        // pedido (ou foram descartadas no modal). Apaga o planejamento (Fatia 3.06).
+        await tx.pecaUso.deleteMany({
+          where: { negocioId: id, origem: "NEGOCIO" },
+        });
       }
       return upd;
     });
