@@ -6,7 +6,7 @@
 // Sem itens, cai no modo simples (so valor). PERDIDO pede o motivo. O total do
 // pedido vira o `valor` do negocio (usado inclusive pela conversao Meta).
 import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Plus, Trash2 } from "lucide-react";
+import { X, Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
 import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
 import { formatarBRL } from "@/lib/format";
 
@@ -24,6 +24,8 @@ type Linha = {
   descricao: string;
   quantidade: number;
   valorUnitario: number;
+  // Garantia (so pos-venda): item nao soma no total cobrado.
+  garantia: boolean;
 };
 
 export type DadosFechamento = {
@@ -35,10 +37,13 @@ export type DadosFechamento = {
     descricao: string;
     quantidade: number;
     valorUnitario: number;
+    garantia?: boolean;
   }[];
   frete?: number | null;
   // Frete pago pela empresa: quando true, o frete NAO soma ao total (vira despesa).
   fretePagoPelaEmpresa?: boolean;
+  // Pos-venda: valor final cobrado quando difere do calculado (null = calculado).
+  valorAjustado?: number | null;
 };
 
 export function ModalFechamento({
@@ -59,6 +64,7 @@ export function ModalFechamento({
     descricao: string;
     quantidade: number;
     valorUnitario: number;
+    garantia?: boolean;
   }[];
   onConfirmar: (dados: DadosFechamento) => Promise<void>;
   onCancelar: () => void;
@@ -82,9 +88,14 @@ export function ModalFechamento({
         descricao: it.descricao,
         quantidade: it.quantidade,
         valorUnitario: it.valorUnitario,
+        garantia: it.garantia ?? false,
       };
     }),
   );
+  // Pos-venda: valor final cobrado (editavel). editouFinal = usuario mexeu; ate
+  // la o campo espelha o total calculado.
+  const [valorFinalStr, setValorFinalStr] = useState("");
+  const [editouFinal, setEditouFinal] = useState(false);
   const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
   // Frete pago pela empresa: sai do total (vira despesa rastreavel).
   const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(false);
@@ -109,8 +120,11 @@ export function ModalFechamento({
     contador.current += 1;
     setItens((p) => [
       ...p,
-      { key: `l${contador.current}`, produtoCatalogoId: null, descricao: "", quantidade: 1, valorUnitario: 0 },
+      { key: `l${contador.current}`, produtoCatalogoId: null, descricao: "", quantidade: 1, valorUnitario: 0, garantia: false },
     ]);
+  }
+  function alternarGarantia(key: string) {
+    setItens((p) => p.map((i) => (i.key === key ? { ...i, garantia: !i.garantia } : i)));
   }
   function remover(key: string) {
     setItens((p) => p.filter((i) => i.key !== key));
@@ -133,9 +147,24 @@ export function ModalFechamento({
   }
 
   const produtos = itens.reduce((acc, i) => acc + i.quantidade * i.valorUnitario, 0);
+  // Cobraveis: exclui itens em garantia (so pos-venda). Em venda == produtos.
+  const cobraveis = ehPeca
+    ? itens.filter((i) => !i.garantia).reduce((acc, i) => acc + i.quantidade * i.valorUnitario, 0)
+    : produtos;
+  const garantiaTotal = ehPeca ? produtos - cobraveis : 0;
   const freteNum = Math.max(0, Number((frete || "0").replace(",", ".")) || 0);
-  // Total cobrado do cliente: quando a empresa paga o frete, ele NAO soma.
-  const total = produtos + (fretePagoPelaEmpresa ? 0 : freteNum);
+  // Total calculado (cobrado do cliente): cobraveis + frete quando o cliente paga.
+  const total = cobraveis + (fretePagoPelaEmpresa ? 0 : freteNum);
+
+  // Valor final cobrado: espelha o total ate o usuario editar (so pos-venda).
+  useEffect(() => {
+    if (ehPeca && ehGanho && !editouFinal) {
+      setValorFinalStr(total > 0 ? String(total) : "");
+    }
+  }, [total, ehPeca, ehGanho, editouFinal]);
+  const valorFinal = Math.max(0, Number((valorFinalStr || "0").replace(",", ".")) || 0);
+  const diferenca = total - valorFinal; // >0 desconto, <0 acrescimo
+  const temAjuste = ehPeca && Math.abs(diferenca) > 0.005;
 
   async function confirmar() {
     setErro(null);
@@ -146,7 +175,9 @@ export function ModalFechamento({
           setErro("Escolha ao menos um produto.");
           return;
         }
-        if (total <= 0) {
+        // Peca pode fechar com total 0 (pedido inteiramente em garantia). Venda
+        // continua exigindo total > 0.
+        if (!ehPeca && total <= 0) {
           setErro("O total do pedido deve ser maior que zero.");
           return;
         }
@@ -156,11 +187,13 @@ export function ModalFechamento({
             valor: total,
             frete: freteNum,
             fretePagoPelaEmpresa,
+            ...(ehPeca ? { valorAjustado: temAjuste ? valorFinal : null } : {}),
             itens: validos.map((i) => ({
               produtoCatalogoId: i.produtoCatalogoId,
               descricao: i.descricao.trim(),
               quantidade: i.quantidade,
               valorUnitario: i.valorUnitario,
+              ...(ehPeca ? { garantia: i.garantia } : {}),
             })),
           });
         } catch {
@@ -289,10 +322,36 @@ export function ModalFechamento({
                           className="campo w-full"
                         />
                       </label>
-                      <span className="shrink-0 whitespace-nowrap pb-2 text-right text-sm font-medium text-escuro">
+                      <span
+                        className={`shrink-0 whitespace-nowrap pb-2 text-right text-sm font-medium ${
+                          ehPeca && it.garantia ? "text-medio/40 line-through" : "text-escuro"
+                        }`}
+                      >
                         {formatarBRL(it.quantidade * it.valorUnitario)}
                       </span>
                     </div>
+                    {/* Garantia (so pos-venda): item nao soma no total cobrado. */}
+                    {ehPeca && (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => alternarGarantia(it.key)}
+                          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                            it.garantia
+                              ? "bg-tiffany/10 text-tiffany"
+                              : "text-medio/60 hover:bg-black/5"
+                          }`}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          Garantia
+                        </button>
+                        {it.garantia && (
+                          <span className="rounded bg-tiffany/10 px-1.5 py-0.5 text-[11px] font-semibold text-tiffany">
+                            nao cobrado
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <button
@@ -306,11 +365,22 @@ export function ModalFechamento({
               {itens.length > 0 ? (
                 <div className="space-y-2 rounded-lg border border-black/5 bg-fundo p-3">
                   <div className="flex items-center justify-between gap-2 text-sm text-medio/70">
-                    <span>Produtos</span>
+                    <span>{ehPeca ? "Pecas" : "Produtos"}</span>
                     <span className="whitespace-nowrap font-medium text-escuro">
-                      {formatarBRL(produtos)}
+                      {formatarBRL(ehPeca ? cobraveis : produtos)}
                     </span>
                   </div>
+                  {ehPeca && garantiaTotal > 0 && (
+                    <div className="flex items-center justify-between gap-2 text-sm text-medio/70">
+                      <span className="flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-tiffany" /> Garantia
+                        <span className="text-medio/40">(nao cobrado)</span>
+                      </span>
+                      <span className="whitespace-nowrap font-medium text-medio/40 line-through">
+                        {formatarBRL(garantiaTotal)}
+                      </span>
+                    </div>
+                  )}
                   <label className="flex items-center justify-between gap-2 text-sm text-medio/70">
                     <span className="shrink-0">Frete</span>
                     <input
@@ -340,11 +410,49 @@ export function ModalFechamento({
                     </p>
                   )}
                   <div className="flex items-center justify-between gap-2 border-t border-black/10 pt-2">
-                    <span className="text-sm font-semibold text-escuro">Total</span>
-                    <span className="whitespace-nowrap text-base font-bold text-tiffany">
+                    <span className="text-sm font-semibold text-escuro">
+                      {ehPeca ? "Total calculado" : "Total"}
+                    </span>
+                    <span
+                      className={`whitespace-nowrap font-bold text-tiffany ${
+                        ehPeca ? "text-sm" : "text-base"
+                      }`}
+                    >
                       {formatarBRL(total)}
                     </span>
                   </div>
+                  {ehPeca && (
+                    <>
+                      <label className="flex items-center justify-between gap-2 pt-1 text-sm text-escuro">
+                        <span className="shrink-0 font-semibold">Valor final cobrado</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={valorFinalStr}
+                          onChange={(e) => {
+                            setEditouFinal(true);
+                            setValorFinalStr(e.target.value);
+                          }}
+                          placeholder="0,00"
+                          className="campo w-28 text-right font-bold"
+                        />
+                      </label>
+                      {temAjuste && (
+                        <p
+                          className={`rounded-md px-2 py-1 text-[11px] ${
+                            diferenca > 0
+                              ? "bg-green-50 text-green-700 dark:bg-green-500/10"
+                              : "bg-amber-50 text-amber-800 dark:bg-amber-500/10"
+                          }`}
+                        >
+                          {diferenca > 0
+                            ? `Desconto aplicado: ${formatarBRL(diferenca)}`
+                            : `Acrescimo aplicado: ${formatarBRL(-diferenca)}`}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               ) : (
                 <div>

@@ -8,6 +8,7 @@ import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
 import { primeiraEtapaAberta } from "@/lib/negocio";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { rotuloMotivo } from "@/lib/motivosPerda";
+import { estornarSaidasNegocio } from "@/lib/pecas";
 import { getIO } from "@/lib/socket";
 import {
   StatusNeg,
@@ -83,26 +84,39 @@ export async function POST(
   const descricao = `Negocio reativado${detalhePerda}`;
   const agora = new Date();
 
-  const atualizado = await prisma.negocio.update({
-    where: { id },
-    data: {
-      status: StatusNeg.ABERTO,
-      etapaId: etapa.id,
-      entrouEtapaEm: agora,
-      fechadoEm: null,
-      temperatura: Temperatura.MORNO,
-      // Limpa o motivo do negocio ATIVO (preservado acima no historico).
-      motivoPerda: null,
-      motivoPerdaObs: null,
-      historicos: {
-        create: {
-          tipo: TipoHistorico.ETAPA,
-          descricao,
-          agenteId: agente.id,
+  const atualizado = await prisma.$transaction(async (tx) => {
+    const upd = await tx.negocio.update({
+      where: { id },
+      data: {
+        status: StatusNeg.ABERTO,
+        etapaId: etapa.id,
+        entrouEtapaEm: agora,
+        fechadoEm: null,
+        temperatura: Temperatura.MORNO,
+        // Limpa o motivo do negocio ATIVO (preservado acima no historico).
+        motivoPerda: null,
+        motivoPerdaObs: null,
+        historicos: {
+          create: {
+            tipo: TipoHistorico.ETAPA,
+            descricao,
+            agenteId: agente.id,
+          },
         },
       },
-    },
-    include: includeCard,
+      include: includeCard,
+    });
+    // Pos-venda: devolve ao estoque as pecas que ainda estivessem baixadas neste
+    // negocio (estorno de reabertura). Idempotente: se ja foi estornado ao sair
+    // do ganho, nao faz nada. Fechar de novo -> baixa de novo (o historico conta).
+    if (negocio.finalidade === Finalidade.POS_VENDA) {
+      await estornarSaidasNegocio(tx, {
+        negocioId: id,
+        leadId: negocio.leadId,
+        agenteId: agente.id,
+      });
+    }
+    return upd;
   });
 
   // Espelha na linha do tempo do cliente, com quem reativou.

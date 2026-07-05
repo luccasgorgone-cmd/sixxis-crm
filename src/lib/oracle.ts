@@ -319,8 +319,15 @@ async function consultarDesempenhoVendedores(
   const { inicio, fim } = periodoDe(input.periodo);
   const periodo = { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) };
   const numDe = async (agenteId: string) => {
+    // Desempenho de VENDEDORES conta apenas VENDA: pedidos de pecas (pos-venda)
+    // e itens de garantia NAO entram como venda de usuario (Fatia 3.02).
     const agg = await prisma.negocio.aggregate({
-      where: { agenteId, status: StatusNeg.GANHO, fechadoEm: { gte: inicio, lte: fim } },
+      where: {
+        agenteId,
+        finalidade: Finalidade.VENDA,
+        status: StatusNeg.GANHO,
+        fechadoEm: { gte: inicio, lte: fim },
+      },
       _count: true,
       _sum: { valor: true },
     });

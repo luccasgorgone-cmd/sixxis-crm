@@ -91,3 +91,44 @@ export async function movimentarPeca(
   // Sem tx externo, abrimos a nossa (movimentacao + estoque atomicos).
   return args.tx ? executar(args.tx) : prisma.$transaction(executar);
 }
+
+// Estorna as SAIDAs pendentes de um negocio (Fatia 3.02): para cada peca, o
+// "saldo em aberto" = soma das SAIDAs - soma dos ESTORNOs daquele negocio. Cria
+// um ESTORNO (entrada) para zerar o que ainda estiver baixado, devolvendo a peca
+// ao estoque. IDEMPOTENTE: se ja foi estornado (saldo 0), nao faz nada — reabrir
+// duas vezes nao duplica. Usado ao SAIR do estado GANHO (reabrir/perdido) e na
+// reativacao. Deve receber o tx da transacao externa para ficar atomico.
+export async function estornarSaidasNegocio(
+  client: ClientePrisma,
+  args: { negocioId: string; leadId?: string | null; agenteId?: string | null },
+): Promise<number> {
+  const movs = await client.movimentacaoPeca.findMany({
+    where: { negocioId: args.negocioId },
+    select: { pecaId: true, tipo: true, quantidade: true },
+  });
+  const saldo = new Map<string, number>();
+  for (const m of movs) {
+    if (m.tipo === "SAIDA") {
+      saldo.set(m.pecaId, (saldo.get(m.pecaId) ?? 0) + m.quantidade);
+    } else if (m.tipo === "ESTORNO") {
+      saldo.set(m.pecaId, (saldo.get(m.pecaId) ?? 0) - m.quantidade);
+    }
+  }
+  let estornadas = 0;
+  for (const [pecaId, qtd] of saldo) {
+    if (qtd > 0) {
+      await movimentarPeca({
+        tx: client,
+        pecaId,
+        tipo: "ESTORNO",
+        quantidade: qtd,
+        motivo: "estorno reabertura",
+        negocioId: args.negocioId,
+        leadId: args.leadId ?? null,
+        agenteId: args.agenteId ?? null,
+      });
+      estornadas++;
+    }
+  }
+  return estornadas;
+}

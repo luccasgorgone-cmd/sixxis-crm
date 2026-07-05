@@ -20,6 +20,7 @@ import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { dispararPurchase } from "@/lib/metaCapi";
+import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -240,9 +241,12 @@ export async function PATCH(
       descricao?: string;
       quantidade?: number;
       valorUnitario?: number;
+      garantia?: boolean;
     }[];
     frete?: number | null;
     fretePagoPelaEmpresa?: boolean;
+    // Pos-venda (pecas): valor final realmente cobrado quando houve desconto.
+    valorAjustado?: number | null;
   };
   try {
     body = await req.json();
@@ -257,6 +261,7 @@ export async function PATCH(
       leadId: true,
       agenteId: true,
       valor: true,
+      status: true,
       motivoPerda: true,
       finalidade: true,
       pendente: true,
@@ -297,9 +302,14 @@ export async function PATCH(
   let atividadePendencia: string | null = null;
   const agora = new Date();
 
+  // Pecas / pos-venda: garantia e baixa de estoque so valem para POS_VENDA. Em
+  // VENDA nada disso executa (fluxo e conversao Meta preservados).
+  const ehPosVenda = negocio.finalidade === Finalidade.POS_VENDA;
+
   // ---- Fechamento de PEDIDO (opcional): itens + frete ----
   // Normaliza os itens e calcula os totais. Quando ha itens, o VALOR do negocio
-  // (total) passa a ser produtos + frete — e e esse total que a conversao usa.
+  // (total) passa a ser produtos COBRAVEIS + frete — itens em garantia (so
+  // pos-venda) NUNCA somam no total cobrado, mas a peca sai do estoque igual.
   const itensPedido = Array.isArray(body.itens)
     ? body.itens
         .map((it) => ({
@@ -308,12 +318,17 @@ export async function PATCH(
           descricao: String(it.descricao ?? "").trim(),
           quantidade: Math.max(1, Math.floor(Number(it.quantidade) || 1)),
           valorUnitario: Math.max(0, Number(it.valorUnitario) || 0),
+          // Garantia so tem efeito no pos-venda; em venda e sempre false.
+          garantia: ehPosVenda && it.garantia === true,
         }))
         .filter((it) => it.descricao)
     : [];
   const temPedido = itensPedido.length > 0;
+  // Produtos = soma dos COBRAVEIS (exclui garantia). Em venda == todos os itens.
   const valorProdutos = temPedido
-    ? itensPedido.reduce((acc, it) => acc + it.quantidade * it.valorUnitario, 0)
+    ? itensPedido
+        .filter((it) => !it.garantia)
+        .reduce((acc, it) => acc + it.quantidade * it.valorUnitario, 0)
     : null;
   const freteInformado =
     body.frete !== undefined && body.frete !== null
@@ -393,8 +408,22 @@ export async function PATCH(
             quantidade: it.quantidade,
             valorUnitario: it.valorUnitario,
             subtotal: it.quantidade * it.valorUnitario,
+            garantia: it.garantia,
           })),
         };
+        // Pos-venda: valor final REALMENTE cobrado quando difere do calculado
+        // (desconto/acrescimo). null quando igual — a leitura usa valorAjustado
+        // ?? valor. Nunca toca o `valor` (base da conversao) nem o fluxo de venda.
+        if (ehPosVenda) {
+          const aj = body.valorAjustado;
+          data.valorAjustado =
+            typeof aj === "number" &&
+            Number.isFinite(aj) &&
+            aj >= 0 &&
+            Math.abs(aj - (totalPedido ?? 0)) > 0.005
+              ? aj
+              : null;
+        }
       } else if (freteInformado != null) {
         data.frete = freteInformado;
       }
@@ -569,20 +598,65 @@ export async function PATCH(
     return NextResponse.json({ erro: "nada a atualizar" }, { status: 400 });
   }
 
-  const atualizado = await prisma.negocio.update({
-    where: { id },
-    data: {
-      ...data,
-      historicos: {
-        create: historicos.map((h) => ({
-          tipo: h.tipo,
-          descricao: h.descricao,
-          agenteId: agente.id,
-        })),
-      },
+  const dataFinal: Prisma.NegocioUncheckedUpdateInput = {
+    ...data,
+    historicos: {
+      create: historicos.map((h) => ({
+        tipo: h.tipo,
+        descricao: h.descricao,
+        agenteId: agente.id,
+      })),
     },
-    include: includeCard,
-  });
+  };
+  const executarUpdate = (client: Prisma.TransactionClient) =>
+    client.negocio.update({ where: { id }, data: dataFinal, include: includeCard });
+
+  // Baixa/estorno de estoque de PECAS (Fatia 3.02) — SO pos-venda:
+  // - fechandoGanhoPeca: fecha como GANHO com itens -> baixa (SAIDA) das pecas do
+  //   catalogo (itens digitados livres, sem produtoCatalogoId, nao movimentam).
+  // - saindoDeGanho: reabrir (-> ABERTO) ou marcar perdido a partir de GANHO ->
+  //   estorna (ESTORNO) as SAIDAs pendentes daquele negocio. Idempotente.
+  // Ambos rodam na MESMA transacao do update. Antes da baixa, reconciliamos
+  // (estorno) o que estivesse aberto, para um re-fechamento nunca dobrar a baixa.
+  const fechandoGanhoPeca =
+    ehPosVenda && data.status === StatusNeg.GANHO && temPedido;
+  const saindoDeGanho =
+    ehPosVenda &&
+    negocio.status === StatusNeg.GANHO &&
+    data.status !== undefined &&
+    data.status !== StatusNeg.GANHO;
+
+  let atualizado: Awaited<ReturnType<typeof executarUpdate>>;
+  if (fechandoGanhoPeca || saindoDeGanho) {
+    atualizado = await prisma.$transaction(async (tx) => {
+      const upd = await executarUpdate(tx);
+      // Devolve ao estoque o que ainda estava baixado neste negocio.
+      await estornarSaidasNegocio(tx, {
+        negocioId: id,
+        leadId: negocio.leadId,
+        agenteId: agente.id,
+      });
+      // Fechando como ganho: baixa as pecas do catalogo deste pedido.
+      if (fechandoGanhoPeca) {
+        for (const it of itensPedido) {
+          if (!it.produtoCatalogoId) continue;
+          await movimentarPeca({
+            tx,
+            pecaId: it.produtoCatalogoId,
+            tipo: "SAIDA",
+            quantidade: it.quantidade,
+            motivo: it.garantia ? "garantia" : "venda",
+            negocioId: id,
+            leadId: negocio.leadId,
+            agenteId: agente.id,
+          });
+        }
+      }
+      return upd;
+    });
+  } else {
+    atualizado = await executarUpdate(prisma);
+  }
 
   // Espelha os eventos na timeline do CLIENTE (Atividade). Os nomes de
   // TipoHistorico coincidem com AtividadeTipo para os casos gerados aqui.
