@@ -3,12 +3,15 @@
 // (bcrypt) de ADMIN_SENHA. Se ja existir, garante que tem senha definida.
 // Nunca derruba o boot: erros sao logados e engolidos.
 import bcrypt from "bcryptjs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { prisma } from "./prisma";
 import {
   Papel,
   TipoEtapa,
   Finalidade,
   FinalidadeEtapa,
+  TipoCatalogo,
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
 import { excluirLeadsCompleto } from "./exclusao";
@@ -964,6 +967,98 @@ export async function purgarDadosTeste(): Promise<void> {
   } catch (erro) {
     console.error(
       `[seed] falha na purga de teste: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Estoque inicial de TODAS as pecas na criacao pelo seed (informado pelo dono).
+const ESTOQUE_INICIAL_PECA = 20;
+
+// Seed do catalogo real de PECAS (Fatia 3.01) a partir de prisma/seed-data/
+// pecas.txt (cabecalho "categoria|nome|modelo|preco"). Idempotente: cria por
+// (nome, categoria, modelo) SOMENTE o que ainda nao existe; NUNCA sobrescreve
+// preco/estoque/ativo de pecas ja existentes (as edicoes do admin sao soberanas).
+// Na criacao: tipo PECA, precoSugerido=preco, estoque=20, estoqueMinimo=null,
+// ativo=true e UMA MovimentacaoPeca ENTRADA de 20 ("estoque inicial (seed)").
+export async function seedPecas(): Promise<void> {
+  try {
+    let bruto: string;
+    try {
+      bruto = readFileSync(
+        join(process.cwd(), "prisma", "seed-data", "pecas.txt"),
+        "utf8",
+      );
+    } catch {
+      console.warn("[seed] pecas: arquivo pecas.txt nao encontrado; ignorado");
+      return;
+    }
+
+    const linhas = bruto.split(/\r?\n/).map((l) => l.trim());
+    // Descarta cabecalho e linhas vazias.
+    const dados = linhas
+      .filter((l) => l.length > 0)
+      .filter((l) => l !== "categoria|nome|modelo|preco");
+
+    // Chave (nome|||categoria|||modelo) das pecas ja existentes, para nao duplicar.
+    const existentes = await prisma.produtoCatalogo.findMany({
+      where: { tipo: TipoCatalogo.PECA },
+      select: { nome: true, categoria: true, modelo: true },
+    });
+    const chave = (nome: string, categoria: string | null, modelo: string | null) =>
+      `${nome}|||${categoria ?? ""}|||${modelo ?? ""}`;
+    const jaTem = new Set(
+      existentes.map((e) => chave(e.nome, e.categoria, e.modelo)),
+    );
+
+    // Proxima ordem (continua a sequencia do catalogo existente).
+    const ultima = await prisma.produtoCatalogo.findFirst({
+      orderBy: { ordem: "desc" },
+      select: { ordem: true },
+    });
+    let ordem = ultima?.ordem ?? 0;
+
+    let criadas = 0;
+    let jaExistiam = 0;
+    for (const linha of dados) {
+      const partes = linha.split("|");
+      if (partes.length < 4) continue;
+      const categoria = partes[0].trim() || null;
+      const nome = partes[1].trim();
+      const modelo = partes[2].trim() || null;
+      const preco = Number(partes[3].trim());
+      if (!nome || !Number.isFinite(preco)) continue;
+
+      if (jaTem.has(chave(nome, categoria, modelo))) {
+        jaExistiam++;
+        continue;
+      }
+      await prisma.produtoCatalogo.create({
+        data: {
+          nome,
+          categoria,
+          modelo,
+          tipo: TipoCatalogo.PECA,
+          precoSugerido: preco,
+          estoque: ESTOQUE_INICIAL_PECA,
+          estoqueMinimo: null,
+          ativo: true,
+          ordem: ++ordem,
+          movimentacoes: {
+            create: {
+              tipo: "ENTRADA",
+              quantidade: ESTOQUE_INICIAL_PECA,
+              motivo: "estoque inicial (seed)",
+            },
+          },
+        },
+      });
+      jaTem.add(chave(nome, categoria, modelo));
+      criadas++;
+    }
+    console.log(`[seed] pecas: ${criadas} criadas, ${jaExistiam} ja existiam`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear pecas: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }

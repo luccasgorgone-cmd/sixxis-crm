@@ -1,0 +1,243 @@
+categoria|nome|modelo|preco
+Climatizadores|Aleta Horizontal|M45 Trend|15
+Climatizadores|Aleta Horizontal|SX040 Trend|15
+Climatizadores|Aleta Horizontal|SX060 Prime|20
+Climatizadores|Aleta Horizontal|SX070 Trend|20
+Climatizadores|Aleta Horizontal|SX100 Trend|20
+Climatizadores|Aleta Horizontal|SX120 Prime|25
+Climatizadores|Aleta Horizontal|SX180 Trend|25
+Climatizadores|Aleta Horizontal|SX200 Prime|30
+Climatizadores|Aleta Horizontal|SX200 Trend|25
+Climatizadores|Aleta Vertical|M45 Trend|15
+Climatizadores|Aleta Vertical|SX040 Trend|15
+Climatizadores|Aleta Vertical|SX060 Prime|20
+Climatizadores|Aleta Vertical|SX070 Trend|20
+Climatizadores|Aleta Vertical|SX100 Trend|20
+Climatizadores|Aleta Vertical|SX120 Prime|25
+Climatizadores|Aleta Vertical|SX180 Trend|25
+Climatizadores|Aleta Vertical|SX200 Prime|30
+Climatizadores|Aleta Vertical|SX200 Trend|25
+Climatizadores|Boia|SX060 Prime|50
+Climatizadores|Boia|SX070 Trend|50
+Climatizadores|Boia|SX100 Trend|50
+Climatizadores|Boia|SX120 Prime|60
+Climatizadores|Boia|SX180 Trend|60
+Climatizadores|Boia|SX200 Prime|60
+Climatizadores|Boia|SX200 Trend|60
+Climatizadores|Bomba d'água|M45 Trend|150
+Climatizadores|Bomba d'água|SX040 Trend|150
+Climatizadores|Bomba d'água|SX060 Prime|150
+Climatizadores|Bomba d'água|SX070 Trend|200
+Climatizadores|Bomba d'água|SX100 Trend|200
+Climatizadores|Bomba d'água|SX120 Prime|200
+Climatizadores|Bomba d'água|SX180 Trend|250
+Climatizadores|Bomba d'água|SX200 Prime|250
+Climatizadores|Bomba d'água|SX200 Trend|250
+Climatizadores|Botão Painel Grande|M45 Trend|40
+Climatizadores|Botão Painel Menor|M45 Trend|25
+Climatizadores|Cabo de Alimentação|M45 Trend|30
+Climatizadores|Cabo de Alimentação|SX040 Trend|30
+Climatizadores|Cabo de Alimentação|SX060 Prime|60
+Climatizadores|Cabo de Alimentação|SX070 Trend|40
+Climatizadores|Cabo de Alimentação|SX100 Trend|40
+Climatizadores|Cabo de Alimentação|SX120 Prime|65
+Climatizadores|Cabo de Alimentação|SX180 Trend|50
+Climatizadores|Cabo de Alimentação|SX200 Prime|65
+Climatizadores|Cabo de Alimentação|SX200 Trend|50
+Climatizadores|Capacitor|M45 Trend|50
+Climatizadores|Capacitor|SX040 Trend|50
+Climatizadores|Capacitor|SX070 Trend|55
+Climatizadores|Capacitor|SX100 Trend|60
+Climatizadores|Capacitor|SX180 Trend|70
+Climatizadores|Capacitor|SX200 Trend|70
+Climatizadores|Colmeia Lateral|M45 Trend|150
+Climatizadores|Colmeia Lateral|SX040 Trend|150
+Climatizadores|Colmeia Lateral|SX060 Prime|175
+Climatizadores|Colmeia Lateral|SX070 Trend|200
+Climatizadores|Colmeia Lateral|SX100 Trend|200
+Climatizadores|Colmeia Lateral|SX120 Prime|250
+Climatizadores|Colmeia Lateral|SX180 Trend|250
+Climatizadores|Colmeia Lateral|SX200 Prime|350
+Climatizadores|Colmeia Lateral|SX200 Trend|300
+Climatizadores|Colmeia Traseira|M45 Trend|200
+Climatizadores|Colmeia Traseira|SX040 Trend|200
+Climatizadores|Colmeia Traseira|SX060 Prime|225
+Climatizadores|Colmeia Traseira|SX070 Trend|250
+Climatizadores|Colmeia Traseira|SX100 Trend|250
+Climatizadores|Colmeia Traseira|SX120 Prime|300
+Climatizadores|Colmeia Traseira|SX180 Trend|300
+Climatizadores|Colmeia Traseira|SX200 Prime|400
+Climatizadores|Colmeia Traseira|SX200 Trend|350
+Climatizadores|Controle Remoto|SX040 Trend|50
+Climatizadores|Controle Remoto|SX060 Prime|65
+Climatizadores|Controle Remoto|SX070 Trend|50
+Climatizadores|Controle Remoto|SX100 Trend|50
+Climatizadores|Controle Remoto|SX120 Prime|65
+Climatizadores|Controle Remoto|SX180 Trend|50
+Climatizadores|Controle Remoto|SX200 Prime|65
+Climatizadores|Controle Remoto|SX200 Trend|50
+Climatizadores|Dreno|M45 Trend|25
+Climatizadores|Dreno|SX040 Trend|25
+Climatizadores|Dreno|SX060 Prime|25
+Climatizadores|Dreno|SX070 Trend|25
+Climatizadores|Dreno|SX100 Trend|25
+Climatizadores|Dreno|SX120 Prime|25
+Climatizadores|Dreno|SX180 Trend|25
+Climatizadores|Dreno|SX200 Prime|25
+Climatizadores|Dreno|SX200 Trend|25
+Climatizadores|Estrutura Frontal|M45 Trend|150
+Climatizadores|Estrutura Frontal|SX040 Trend|150
+Climatizadores|Estrutura Frontal|SX060 Prime|250
+Climatizadores|Estrutura Frontal|SX070 Trend|200
+Climatizadores|Estrutura Frontal|SX100 Trend|250
+Climatizadores|Estrutura Frontal|SX120 Prime|300
+Climatizadores|Estrutura Frontal|SX180 Trend|300
+Climatizadores|Estrutura Frontal|SX200 Prime|300
+Climatizadores|Estrutura Frontal|SX200 Trend|300
+Climatizadores|Estrutura Lateral|M45 Trend|100
+Climatizadores|Estrutura Lateral|SX040 Trend|100
+Climatizadores|Estrutura Lateral|SX060 Prime|200
+Climatizadores|Estrutura Lateral|SX070 Trend|150
+Climatizadores|Estrutura Lateral|SX100 Trend|200
+Climatizadores|Estrutura Lateral|SX120 Prime|250
+Climatizadores|Estrutura Lateral|SX180 Trend|250
+Climatizadores|Estrutura Lateral|SX200 Prime|250
+Climatizadores|Estrutura Lateral|SX200 Trend|250
+Climatizadores|Estrutura Superior|M45 Trend|100
+Climatizadores|Estrutura Superior|SX040 Trend|100
+Climatizadores|Estrutura Superior|SX060 Prime|200
+Climatizadores|Estrutura Superior|SX070 Trend|150
+Climatizadores|Estrutura Superior|SX100 Trend|200
+Climatizadores|Estrutura Superior|SX120 Prime|250
+Climatizadores|Estrutura Superior|SX180 Trend|250
+Climatizadores|Estrutura Superior|SX200 Prime|250
+Climatizadores|Estrutura Superior|SX200 Trend|250
+Climatizadores|Estrutura Traseira|M45 Trend|150
+Climatizadores|Estrutura Traseira|SX040 Trend|150
+Climatizadores|Estrutura Traseira|SX060 Prime|250
+Climatizadores|Estrutura Traseira|SX070 Trend|200
+Climatizadores|Estrutura Traseira|SX100 Trend|250
+Climatizadores|Estrutura Traseira|SX120 Prime|300
+Climatizadores|Estrutura Traseira|SX180 Trend|300
+Climatizadores|Estrutura Traseira|SX200 Prime|300
+Climatizadores|Estrutura Traseira|SX200 Trend|300
+Climatizadores|Filtro Colmeia|SX060 Prime|80
+Climatizadores|Filtro Colmeia|SX070 Trend|80
+Climatizadores|Filtro Colmeia|SX100 Trend|80
+Climatizadores|Filtro Colmeia|SX120 Prime|90
+Climatizadores|Filtro Colmeia|SX180 Trend|90
+Climatizadores|Filtro Colmeia|SX200 Prime|100
+Climatizadores|Filtro Colmeia|SX200 Trend|90
+Climatizadores|Filtro Lateral|M45 Trend|70
+Climatizadores|Filtro Lateral|SX040 Trend|70
+Climatizadores|Filtro Traseiro|M45 Trend|90
+Climatizadores|Filtro Traseiro|SX040 Trend|90
+Climatizadores|Hélice|M45 Trend|200
+Climatizadores|Hélice|SX040 Trend|200
+Climatizadores|Hélice|SX060 Prime|250
+Climatizadores|Hélice|SX070 Trend|250
+Climatizadores|Hélice|SX100 Trend|250
+Climatizadores|Hélice|SX120 Prime|400
+Climatizadores|Hélice|SX180 Trend|400
+Climatizadores|Hélice|SX200 Prime|450
+Climatizadores|Hélice|SX200 Trend|450
+Climatizadores|Inversor|SX060 Prime|750
+Climatizadores|Inversor|SX120 Prime|850
+Climatizadores|Inversor|SX200 Prime|950
+Climatizadores|Motor Swing|M45 Trend|500
+Climatizadores|Motor Swing|SX040 Trend|500
+Climatizadores|Motor Swing|SX060 Prime|550
+Climatizadores|Motor Swing|SX070 Trend|650
+Climatizadores|Motor Swing|SX100 Trend|750
+Climatizadores|Motor Swing|SX120 Prime|900
+Climatizadores|Motor Swing|SX180 Trend|900
+Climatizadores|Motor Swing|SX200 Prime|1000
+Climatizadores|Motor Swing|SX200 Trend|950
+Climatizadores|Pino Eixo Swing|M45 Trend|25
+Climatizadores|Pino Eixo Swing|SX040 Trend|25
+Climatizadores|Pino Eixo Swing|SX060 Prime|25
+Climatizadores|Pino Eixo Swing|SX070 Trend|25
+Climatizadores|Pino Eixo Swing|SX100 Trend|25
+Climatizadores|Pino Eixo Swing|SX120 Prime|25
+Climatizadores|Pino Eixo Swing|SX180 Trend|25
+Climatizadores|Pino Eixo Swing|SX200 Prime|25
+Climatizadores|Pino Eixo Swing|SX200 Trend|25
+Climatizadores|Placa de Comando|M45 Trend|200
+Climatizadores|Placa de Comando|SX040 Trend|250
+Climatizadores|Placa de Comando|SX070 Trend|300
+Climatizadores|Placa de Comando|SX100 Trend|300
+Climatizadores|Placa de Comando|SX180 Trend|350
+Climatizadores|Placa de Comando|SX200 Trend|400
+Climatizadores|Placa de Painel|SX040 Trend|250
+Climatizadores|Placa de Painel|SX060 Prime|300
+Climatizadores|Placa de Painel|SX070 Trend|250
+Climatizadores|Placa de Painel|SX100 Trend|250
+Climatizadores|Placa de Painel|SX120 Prime|350
+Climatizadores|Placa de Painel|SX180 Trend|350
+Climatizadores|Placa de Painel|SX200 Prime|350
+Climatizadores|Placa de Painel|SX200 Trend|350
+Climatizadores|Reservatório|M45 Trend|150
+Climatizadores|Reservatório|SX040 Trend|150
+Climatizadores|Reservatório|SX060 Prime|250
+Climatizadores|Reservatório|SX070 Trend|200
+Climatizadores|Reservatório|SX100 Trend|250
+Climatizadores|Reservatório|SX120 Prime|300
+Climatizadores|Reservatório|SX180 Trend|300
+Climatizadores|Reservatório|SX200 Prime|300
+Climatizadores|Reservatório|SX200 Trend|300
+Climatizadores|Rodízios|M45 Trend|20
+Climatizadores|Rodízios|SX040 Trend|20
+Climatizadores|Rodízios|SX060 Prime|25
+Climatizadores|Rodízios|SX070 Trend|35
+Climatizadores|Rodízios|SX100 Trend|35
+Climatizadores|Rodízios|SX120 Prime|40
+Climatizadores|Rodízios|SX180 Trend|40
+Climatizadores|Rodízios|SX200 Prime|50
+Climatizadores|Rodízios|SX200 Trend|40
+Climatizadores|Suporte Rodízios|SX070 Trend|60
+Climatizadores|Suporte Rodízios|SX100 Trend|60
+Climatizadores|Suporte Rodízios|SX120 Prime|125
+Climatizadores|Suporte Rodízios|SX200 Prime|150
+Climatizadores|Swing Aleta|M45 Trend|25
+Climatizadores|Swing Aleta|SX040 Trend|25
+Climatizadores|Swing Aleta|SX060 Prime|35
+Climatizadores|Swing Aleta|SX070 Trend|30
+Climatizadores|Swing Aleta|SX100 Trend|30
+Climatizadores|Swing Aleta|SX120 Prime|40
+Climatizadores|Swing Aleta|SX180 Trend|35
+Climatizadores|Swing Aleta|SX200 Prime|45
+Climatizadores|Swing Aleta|SX200 Trend|35
+Climatizadores|Tampa Superior|M45 Trend|200
+Climatizadores|Tampa Superior|SX040 Trend|200
+Climatizadores|Tampa Superior|SX060 Prime|200
+Climatizadores|Tampa Superior|SX070 Trend|200
+Climatizadores|Tampa Superior|SX100 Trend|200
+Climatizadores|Tampa Superior|SX120 Prime|150
+Climatizadores|Tampa Superior|SX180 Trend|150
+Climatizadores|Tampa Superior|SX200 Prime|150
+Climatizadores|Tampa Superior|SX200 Trend|150
+Bikes Spinning|Pedais (par)|Sixxis Life|150
+Bikes Spinning|Selim (banco)|Sixxis Life|150
+Bikes Spinning|Carcaça|Sixxis Life|150
+Bikes Spinning|Correia|Sixxis Life|200
+Bikes Spinning|Motor Resistencia|Sixxis Life|250
+Bikes Spinning|Botão Stop Completo|Sixxis Life|150
+Bikes Spinning|Pés Niveladores|Sixxis Life|30
+Bikes Spinning|Rodizio|Sixxis Life|20
+Bikes Spinning|Display|Sixxis Life|350
+Bikes Spinning|Bateria|Sixxis Life|95
+Bikes Spinning|Guidão|Sixxis Life|200
+Bikes Spinning|Sensor Batimento|Sixxis Life|20
+Bikes Spinning|Haste Base Frontal|Sixxis Life|85
+Bikes Spinning|Haste Base Lateral|Sixxis Life|85
+Bikes Spinning|Trava do Selim|Sixxis Life|75
+Bikes Spinning|Trava do Guidão|Sixxis Life|75
+Aspiradores|Bocal Rodizio|Bravo|60
+Aspiradores|Filtro HEPA|Bravo|45
+Aspiradores|Suporte Filtro|Bravo|35
+Aspiradores|Bateria|Bravo|150
+Aspiradores|Haste Extensora|Bravo|60
+Aspiradores|Reservatorio|Bravo|100
+Aspiradores|Carregador|Bravo|30
+Aspiradores|Motor|Bravo|250
+Aspiradores|Base|Bravo|50
