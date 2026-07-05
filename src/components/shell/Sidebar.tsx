@@ -100,6 +100,7 @@ export function Sidebar({
     // tem acesso pos-venda (papel OU flag), alem do admin.
     ...(podePosVenda
       ? [
+          { rotulo: "Pecas", href: "/pecas", icone: Wrench },
           { rotulo: "Parceiros", href: "/parceiros", icone: Wrench },
           { rotulo: "Local", href: "/local", icone: PackageOpen },
         ]
