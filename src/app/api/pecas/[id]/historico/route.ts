@@ -22,6 +22,15 @@ export async function GET(
   }
   const { id } = await ctx.params;
 
+  // Peca inexistente -> 404 (nao devolve lista vazia como se existisse).
+  const peca = await prisma.produtoCatalogo.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!peca) {
+    return NextResponse.json({ erro: "nao encontrada" }, { status: 404 });
+  }
+
   const movs = await prisma.movimentacaoPeca.findMany({
     where: { pecaId: id },
     orderBy: { criadoEm: "desc" },
