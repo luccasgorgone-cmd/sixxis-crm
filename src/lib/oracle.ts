@@ -187,6 +187,42 @@ Admin > Roteamento. Quando nao souber o caminho exato, seja honesto e aponte a
 area mais provavel — nao invente telas que nao existem.
 `.trim();
 
+// Modelo mental NOVO (Fatia 3.10): o atendimento gira em torno do ORCAMENTO.
+const CONHECIMENTO_ORCAMENTO = `
+COMO O ATENDIMENTO FUNCIONA HOJE (modelo do ORCAMENTO): o processo comercial gira
+em torno do ORCAMENTO montado na conversa.
+- O atendente adiciona itens ao orcamento: na VENDA, produtos do SITE (a mesma
+  vitrine da loja); no POS-VENDA, PECAS filtradas pelo modelo do aparelho do
+  cliente. Aplica cupom, desconto (%) e frete (que pode ser "pago pela empresa",
+  saindo do total cobrado).
+- Depois DECIDE:
+  - Ganho: o orcamento vira pedido, BAIXA o estoque das pecas e define o valor
+    realmente cobrado (valorAjustado).
+  - Pendente: registra a versao da proposta e segue negociando — cada revisao
+    gera um NOVO numero de orcamento.
+  - Perdido: registra a proposta recusada.
+- Cada decisao gera um ORCAMENTO numerado (PED-000000), IMUTAVEL, que fica no
+  historico do cliente e na aba Orcamentos. Campos do snapshot: cupom, descontoPct,
+  frete, fretePagoPelaEmpresa, itens (com marcador de garantia), total (bruto dos
+  cobraveis), totalGarantia e totalFinal (o cobrado apos desconto/frete).
+
+PECAS E ESTOQUE: as pecas (catalogo tipo PECA) tem estoque com movimentacoes
+AUDITAVEIS (venda, garantia, assistencia local, ajustes, estornos). Itens em
+GARANTIA aparecem com valor mas NAO sao cobrados e NAO contam como venda.
+
+VALOR OFICIAL: o valor "oficial" de um negocio fechado e valorAjustado ?? valor
+(o cobrado com desconto/frete quando houver; senao o calculado). CotacaoProduto e
+o recurso LEGADO de cotacao de produto (dados historicos) — NAO confundir com o
+ORCAMENTO novo.
+
+FERRAMENTAS DO ORCAMENTO/ESTOQUE: quando o gestor perguntar sobre PROPOSTAS,
+DESCONTOS, CUPONS, CONVERSAO de orcamentos ou GARANTIA concedida, use
+"consultar_orcamentos". Sobre ESTOQUE de pecas (criticas, giro, imobilizado), use
+"consultar_estoque_pecas" (admin). Para checar a SAUDE do sistema (inconsistencias
+e pendencias operacionais), use "diagnosticar_sistema" (admin) e interprete os
+alertas em linguagem de negocio, sugerindo a correcao.
+`.trim();
+
 // ---------------------------------------------------------------------------
 // ESCOPO por usuario — aplicado DENTRO de cada ferramenta.
 // ---------------------------------------------------------------------------
@@ -1502,7 +1538,7 @@ function montarSystem(
     // Prefixo estavel (travas + persona + areas do sistema) -> cacheavel.
     {
       type: "text",
-      text: `${BASE_SEGURANCA}\n\n${PERSONA}\n\n${CONHECIMENTO_SISTEMA}`,
+      text: `${BASE_SEGURANCA}\n\n${PERSONA}\n\n${CONHECIMENTO_SISTEMA}\n\n${CONHECIMENTO_ORCAMENTO}`,
       cache_control: { type: "ephemeral" },
     },
     { type: "text", text: contexto },
