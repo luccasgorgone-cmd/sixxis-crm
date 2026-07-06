@@ -51,6 +51,9 @@ export function ModalFechamento({
   valorInicial,
   finalidade = "VENDA",
   freteInicial,
+  fretePagoPelaEmpresaInicial = false,
+  valorFinalInicial,
+  descontoInfo,
   itensIniciais,
   onConfirmar,
   onCancelar,
@@ -59,6 +62,10 @@ export function ModalFechamento({
   valorInicial?: number | null;
   finalidade?: "VENDA" | "POS_VENDA";
   freteInicial?: number | null;
+  // Pre-carga do orcamento (Fatia 3.09): frete/empresa e o valor final (totalFinal).
+  fretePagoPelaEmpresaInicial?: boolean;
+  valorFinalInicial?: number | null;
+  descontoInfo?: { cupom: string | null; descontoPct: number | null; descValor: number } | null;
   itensIniciais?: {
     produtoCatalogoId: string | null;
     descricao: string;
@@ -92,13 +99,16 @@ export function ModalFechamento({
       };
     }),
   );
-  // Pos-venda: valor final cobrado (editavel). editouFinal = usuario mexeu; ate
-  // la o campo espelha o total calculado.
-  const [valorFinalStr, setValorFinalStr] = useState("");
-  const [editouFinal, setEditouFinal] = useState(false);
+  // Valor final cobrado (editavel). Pre-carregado com o totalFinal do orcamento
+  // (Fatia 3.09); editouFinal=true ja de inicio quando pre-carregado, para nao
+  // ser sobrescrito pelo total calculado (mas o usuario ainda pode ajustar).
+  const [valorFinalStr, setValorFinalStr] = useState(
+    valorFinalInicial != null ? String(valorFinalInicial) : "",
+  );
+  const [editouFinal, setEditouFinal] = useState(valorFinalInicial != null);
   const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
   // Frete pago pela empresa: sai do total (vira despesa rastreavel).
-  const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(false);
+  const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(fretePagoPelaEmpresaInicial);
 
   useEffect(() => {
     if (!ehGanho) return;
@@ -156,15 +166,17 @@ export function ModalFechamento({
   // Total calculado (cobrado do cliente): cobraveis + frete quando o cliente paga.
   const total = cobraveis + (fretePagoPelaEmpresa ? 0 : freteNum);
 
-  // Valor final cobrado: espelha o total ate o usuario editar (so pos-venda).
+  // Valor final cobrado: espelha o total ate o usuario editar. Fatia 3.09: vale
+  // para venda e pos-venda; quando pre-carregado (totalFinal do orcamento),
+  // editouFinal ja e true e o campo mantem o valor com desconto.
   useEffect(() => {
-    if (ehPeca && ehGanho && !editouFinal) {
+    if (ehGanho && !editouFinal) {
       setValorFinalStr(total > 0 ? String(total) : "");
     }
-  }, [total, ehPeca, ehGanho, editouFinal]);
+  }, [total, ehGanho, editouFinal]);
   const valorFinal = Math.max(0, Number((valorFinalStr || "0").replace(",", ".")) || 0);
   const diferenca = total - valorFinal; // >0 desconto, <0 acrescimo
-  const temAjuste = ehPeca && Math.abs(diferenca) > 0.005;
+  const temAjuste = Math.abs(diferenca) > 0.005;
 
   async function confirmar() {
     setErro(null);
@@ -187,7 +199,9 @@ export function ModalFechamento({
             valor: total,
             frete: freteNum,
             fretePagoPelaEmpresa,
-            ...(ehPeca ? { valorAjustado: temAjuste ? valorFinal : null } : {}),
+            // Valor final cobrado (com desconto/frete) -> valorAjustado, venda e
+            // pos-venda. `valor` (base da conversao Meta) permanece o total calculado.
+            valorAjustado: temAjuste ? valorFinal : null,
             itens: validos.map((i) => ({
               produtoCatalogoId: i.produtoCatalogoId,
               descricao: i.descricao.trim(),
@@ -421,7 +435,17 @@ export function ModalFechamento({
                       {formatarBRL(total)}
                     </span>
                   </div>
-                  {ehPeca && (
+                  {/* Linha do desconto do orcamento (Fatia 3.09), quando houver. */}
+                  {descontoInfo && (descontoInfo.descontoPct ?? 0) > 0 && (
+                    <div className="flex items-center justify-between gap-2 text-xs text-green-700">
+                      <span>
+                        {descontoInfo.cupom ? `Cupom ${descontoInfo.cupom} · ` : ""}
+                        −{descontoInfo.descontoPct}%
+                      </span>
+                      <span>− {formatarBRL(descontoInfo.descValor)}</span>
+                    </div>
+                  )}
+                  {ehGanho && (
                     <>
                       <label className="flex items-center justify-between gap-2 pt-1 text-sm text-escuro">
                         <span className="shrink-0 font-semibold">Valor final cobrado</span>

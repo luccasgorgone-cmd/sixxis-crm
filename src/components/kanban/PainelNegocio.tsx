@@ -69,7 +69,7 @@ import {
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
-import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido } from "@/lib/format";
+import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
 type AbaMobile = "conversa" | "detalhes";
@@ -131,6 +131,13 @@ export function PainelNegocio({
     tipo: "ganho" | "perdido";
     etapaId: string;
     itensIniciais?: (ItemPedidoSeed & { garantia?: boolean })[];
+    // Pre-carga do orcamento (Fatia 3.09): frete/empresa, valor final e desconto.
+    orc?: {
+      frete: number | null;
+      fretePagoPelaEmpresa: boolean;
+      valorFinal: number;
+      descontoInfo: { cupom: string | null; descontoPct: number | null; descValor: number } | null;
+    };
   } | null>(null);
   const [iniciandoConversa, setIniciandoConversa] = useState(false);
 
@@ -149,11 +156,18 @@ export function PainelNegocio({
     tipo: "ganho" | "perdido",
     etapaId: string,
   ): Promise<void> {
-    if (tipo !== "ganho" || detalhe?.finalidade !== "POS_VENDA") {
+    // So o GANHO pre-carrega o staging + o resumo do orcamento (venda E pos-venda).
+    if (tipo !== "ganho") {
       setModal({ tipo, etapaId });
       return;
     }
     const base: (ItemPedidoSeed & { garantia?: boolean })[] = [];
+    let orc: {
+      frete: number | null;
+      fretePagoPelaEmpresa: boolean;
+      valorFinal: number;
+      descontoInfo: { cupom: string | null; descontoPct: number | null; descValor: number } | null;
+    } | undefined;
     try {
       const r = await fetch(`/api/negocios/${negocioId}/pecas-necessarias`);
       if (r.ok) {
@@ -171,11 +185,32 @@ export function PainelNegocio({
             garantia: p.garantia,
           });
         }
+        // Resumo do orcamento -> pre-carga do modal (frete/empresa/valor final).
+        const cobravel = base
+          .filter((i) => !i.garantia)
+          .reduce((a, i) => a + i.quantidade * i.valorUnitario, 0);
+        const od = d.orc ?? {};
+        const descPct = od.descontoPct ?? null;
+        const valorFinal = calcularTotalFinal({
+          totalCobravel: cobravel,
+          descontoPct: descPct,
+          frete: od.frete ?? null,
+          fretePagoPelaEmpresa: od.fretePagoPelaEmpresa === true,
+        });
+        orc = {
+          frete: od.frete ?? null,
+          fretePagoPelaEmpresa: od.fretePagoPelaEmpresa === true,
+          valorFinal,
+          descontoInfo:
+            descPct && descPct > 0
+              ? { cupom: od.cupom ?? null, descontoPct: descPct, descValor: cobravel * (descPct / 100) }
+              : null,
+        };
       }
     } catch {
       // Falha ao carregar necessarias: abre o modal vazio (nao trava o fechamento).
     }
-    setModal({ tipo, etapaId, itensIniciais: base.length ? base : undefined });
+    setModal({ tipo, etapaId, itensIniciais: base.length ? base : undefined, orc });
   }
 
   const carregar = useCallback(async () => {
@@ -537,6 +572,10 @@ export function PainelNegocio({
           valorInicial={detalhe.valor}
           finalidade={detalhe.finalidade}
           itensIniciais={modal.itensIniciais}
+          freteInicial={modal.orc?.frete}
+          fretePagoPelaEmpresaInicial={modal.orc?.fretePagoPelaEmpresa}
+          valorFinalInicial={modal.orc?.valorFinal}
+          descontoInfo={modal.orc?.descontoInfo}
           onConfirmar={async (dados) => {
             // Ganho/Perdido limpam a pendencia (estados mutuamente exclusivos).
             const ok = await salvar({
@@ -590,9 +629,6 @@ export function NegocioAcoes({
 }) {
   const toast = useToast();
   const agente = useAgente();
-  const [valor, setValor] = useState(
-    detalhe.valor != null ? String(detalhe.valor) : "",
-  );
   const [addEtiqueta, setAddEtiqueta] = useState(false);
   const [novoProduto, setNovoProduto] = useState("");
   const [transferindo, setTransferindo] = useState(false);
@@ -805,23 +841,14 @@ export function NegocioAcoes({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Rotulo>Valor</Rotulo>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              onBlur={() => {
-                const v =
-                  valor.trim() === "" ? null : Number(valor.replace(",", "."));
-                if (v !== detalhe.valor) void salvar({ valor: v });
-              }}
-              placeholder="0,00"
-              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-            />
-          </div>
-          <p className="mt-1 text-xs text-medio/50">{formatarBRL(detalhe.valor)}</p>
+          {/* Somente leitura (Fatia 3.09): o valor nasce no orcamento e se
+              consolida na decisao (valorAjustado ?? valor, derivado no card). */}
+          <p className="text-sm font-semibold text-escuro">
+            {detalhe.valor != null ? formatarBRL(detalhe.valor) : "—"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-medio/50">
+            Definido pelo orçamento no fechamento
+          </p>
         </div>
         {/* Temperatura so na VENDA. Pos-venda usa ganho/pendente/perdido +
             garantia (o campo Negocio.temperatura permanece no banco). */}

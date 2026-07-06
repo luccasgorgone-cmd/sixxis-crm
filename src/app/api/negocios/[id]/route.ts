@@ -424,10 +424,11 @@ export async function PATCH(
             garantia: it.garantia,
           })),
         };
-        // Pos-venda: valor final REALMENTE cobrado quando difere do calculado
-        // (desconto/acrescimo). null quando igual — a leitura usa valorAjustado
-        // ?? valor. Nunca toca o `valor` (base da conversao) nem o fluxo de venda.
-        if (ehPosVenda) {
+        // Valor final REALMENTE cobrado quando difere do calculado (desconto/
+        // frete). Fatia 3.09: vale para VENDA e POS_VENDA — a leitura usa
+        // valorAjustado ?? valor. NUNCA toca `valor` (base da conversao Meta, que
+        // segue usando o total pre-desconto), so registra o cobrado para exibicao.
+        {
           const aj = body.valorAjustado;
           data.valorAjustado =
             typeof aj === "number" &&
