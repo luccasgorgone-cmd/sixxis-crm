@@ -21,6 +21,7 @@ import { rotuloMotivo } from "@/lib/motivosPerda";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { dispararPurchase } from "@/lib/metaCapi";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
+import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -623,12 +624,8 @@ export async function PATCH(
     client.negocio.update({ where: { id }, data: dataFinal, include: includeCard });
 
   // Baixa/estorno de estoque de PECAS (Fatia 3.02) — SO pos-venda:
-  // - fechandoGanhoPeca: fecha como GANHO com itens -> baixa (SAIDA) das pecas do
-  //   catalogo (itens digitados livres, sem produtoCatalogoId, nao movimentam).
-  // - saindoDeGanho: reabrir (-> ABERTO) ou marcar perdido a partir de GANHO ->
-  //   estorna (ESTORNO) as SAIDAs pendentes daquele negocio. Idempotente.
-  // Ambos rodam na MESMA transacao do update. Antes da baixa, reconciliamos
-  // (estorno) o que estivesse aberto, para um re-fechamento nunca dobrar a baixa.
+  // - fechandoGanhoPeca: fecha como GANHO com itens -> baixa (SAIDA) das pecas.
+  // - saindoDeGanho: reabrir/perdir a partir de GANHO -> estorna as SAIDAs. Idempotente.
   const fechandoGanhoPeca =
     ehPosVenda && data.status === StatusNeg.GANHO && temPedido;
   const saindoDeGanho =
@@ -637,39 +634,138 @@ export async function PATCH(
     data.status !== undefined &&
     data.status !== StatusNeg.GANHO;
 
+  // DECISAO do atendimento (Fatia 3.07): Ganho / Perdido / Pendente. Quando ha
+  // decisao e o staging (ou o pedido, no ganho) tem itens, geramos um ORCAMENTO
+  // (snapshot + numero de pedido) na MESMA transacao. Regras por decisao:
+  //  - GANHO: snapshot dos ITENS DO PEDIDO + fluxo atual (ItemPedido, baixa,
+  //    valorAjustado) + staging apagado (consumido).
+  //  - PERDIDO: snapshot do STAGING (proposta recusada, registrada) + staging apagado.
+  //  - PENDENTE: snapshot do STAGING; staging PERMANECE (proposta segue editavel;
+  //    um novo Pendente com itens alterados gera novo numero -> versoes da proposta).
+  const decisao: "GANHO" | "PERDIDO" | "PENDENTE" | null =
+    data.status === StatusNeg.GANHO
+      ? "GANHO"
+      : data.status === StatusNeg.PERDIDO
+        ? "PERDIDO"
+        : data.pendente === true
+          ? "PENDENTE"
+          : null;
+  const finalidadeStr =
+    negocio.finalidade === Finalidade.POS_VENDA ? "POS_VENDA" : "VENDA";
+
+  let numeroOrcamentoGerado: number | null = null;
   let atualizado: Awaited<ReturnType<typeof executarUpdate>>;
-  if (fechandoGanhoPeca || saindoDeGanho) {
-    atualizado = await prisma.$transaction(async (tx) => {
-      const upd = await executarUpdate(tx);
-      // Devolve ao estoque o que ainda estava baixado neste negocio.
-      await estornarSaidasNegocio(tx, {
-        negocioId: id,
-        leadId: negocio.leadId,
-        agenteId: agente.id,
-      });
-      // Fechando como ganho: baixa as pecas do catalogo deste pedido.
-      if (fechandoGanhoPeca) {
-        for (const it of itensPedido) {
-          if (!it.produtoCatalogoId) continue;
-          await movimentarPeca({
-            tx,
-            pecaId: it.produtoCatalogoId,
-            tipo: "SAIDA",
-            quantidade: it.quantidade,
-            motivo: it.garantia ? "garantia" : "venda",
+
+  if (fechandoGanhoPeca || saindoDeGanho || decisao !== null) {
+    // Retry por conflito de numero: cada tentativa e atomica (o rollback desfaz a
+    // baixa da tentativa perdida), entao repetir e seguro.
+    atualizado = await comRetryNumeroOrcamento(() =>
+      prisma.$transaction(async (tx) => {
+        const upd = await executarUpdate(tx);
+        // Estorno ao sair do ganho (pos-venda).
+        if (saindoDeGanho) {
+          await estornarSaidasNegocio(tx, {
             negocioId: id,
             leadId: negocio.leadId,
             agenteId: agente.id,
           });
         }
-        // Staging consumido: as pecas NECESSARIAS deste negocio viraram itens do
-        // pedido (ou foram descartadas no modal). Apaga o planejamento (Fatia 3.06).
-        await tx.pecaUso.deleteMany({
-          where: { negocioId: id, origem: "NEGOCIO" },
-        });
-      }
-      return upd;
-    });
+        // Baixa ao fechar como ganho (pos-venda com pecas do catalogo).
+        if (fechandoGanhoPeca) {
+          for (const it of itensPedido) {
+            if (!it.produtoCatalogoId) continue;
+            await movimentarPeca({
+              tx,
+              pecaId: it.produtoCatalogoId,
+              tipo: "SAIDA",
+              quantidade: it.quantidade,
+              motivo: it.garantia ? "garantia" : "venda",
+              negocioId: id,
+              leadId: negocio.leadId,
+              agenteId: agente.id,
+            });
+          }
+        }
+
+        // Snapshot do orcamento-decisao.
+        if (decisao) {
+          // Fonte: GANHO -> itens do pedido; PERDIDO/PENDENTE -> staging.
+          let fonte: {
+            produtoCatalogoId: string | null;
+            descricao: string;
+            quantidade: number;
+            valorUnitario: number;
+            garantia: boolean;
+          }[];
+          if (decisao === "GANHO") {
+            fonte = itensPedido.map((it) => ({
+              produtoCatalogoId: it.produtoCatalogoId,
+              descricao: it.descricao,
+              quantidade: it.quantidade,
+              valorUnitario: it.valorUnitario,
+              garantia: it.garantia,
+            }));
+          } else {
+            const staging = await tx.pecaUso.findMany({
+              where: { negocioId: id, origem: "NEGOCIO" },
+              select: {
+                pecaId: true,
+                quantidade: true,
+                garantia: true,
+                peca: { select: { nome: true, modelo: true, precoSugerido: true } },
+              },
+            });
+            fonte = staging.map((s) => ({
+              produtoCatalogoId: s.pecaId,
+              descricao: [s.peca.nome, s.peca.modelo].filter(Boolean).join(" "),
+              quantidade: s.quantidade,
+              valorUnitario:
+                s.peca.precoSugerido != null ? Number(s.peca.precoSugerido) : 0,
+              garantia: s.garantia,
+            }));
+          }
+          if (fonte.length > 0) {
+            const totalCobravel = fonte
+              .filter((i) => !i.garantia)
+              .reduce((a, i) => a + i.quantidade * i.valorUnitario, 0);
+            const totalGar = fonte
+              .filter((i) => i.garantia)
+              .reduce((a, i) => a + i.quantidade * i.valorUnitario, 0);
+            const numero = await proximoNumeroOrcamento(tx);
+            await tx.orcamento.create({
+              data: {
+                numero,
+                negocioId: id,
+                leadId: negocio.leadId,
+                finalidade: finalidadeStr,
+                decisao,
+                total: totalCobravel,
+                totalGarantia: totalGar > 0 ? totalGar : null,
+                agenteId: agente.id,
+                itens: {
+                  create: fonte.map((i) => ({
+                    produtoCatalogoId: i.produtoCatalogoId,
+                    descricao: i.descricao,
+                    quantidade: i.quantidade,
+                    valorUnitario: i.valorUnitario,
+                    garantia: i.garantia,
+                  })),
+                },
+              },
+            });
+            numeroOrcamentoGerado = numero;
+          }
+        }
+
+        // Staging: GANHO/PERDIDO consomem (apagam); PENDENTE mantem editavel.
+        if (decisao === "GANHO" || decisao === "PERDIDO") {
+          await tx.pecaUso.deleteMany({
+            where: { negocioId: id, origem: "NEGOCIO" },
+          });
+        }
+        return upd;
+      }),
+    );
   } else {
     atualizado = await executarUpdate(prisma);
   }
@@ -774,5 +870,7 @@ export async function PATCH(
     motivo: "patch",
   });
 
-  return NextResponse.json({ negocio: card });
+  // orcamentoNumero: numero do orcamento-decisao gerado (para o toast). null quando
+  // a decisao nao tinha itens (nao gerou orcamento).
+  return NextResponse.json({ negocio: card, orcamentoNumero: numeroOrcamentoGerado });
 }

@@ -99,8 +99,24 @@ export async function POST(
     where: { id: pecaId },
     select: { id: true, tipo: true, ativo: true },
   });
-  if (!peca || peca.tipo !== TipoCatalogo.PECA || !peca.ativo) {
-    return NextResponse.json({ erro: "peca invalida" }, { status: 400 });
+  // Tipo do item pela finalidade: POS_VENDA aceita PECA; VENDA aceita PRODUTO.
+  const tipoEsperado =
+    negocio.finalidade === Finalidade.POS_VENDA
+      ? TipoCatalogo.PECA
+      : TipoCatalogo.PRODUTO;
+  if (!peca || !peca.ativo) {
+    return NextResponse.json({ erro: "item invalido" }, { status: 400 });
+  }
+  if (peca.tipo !== tipoEsperado) {
+    return NextResponse.json(
+      {
+        erro:
+          tipoEsperado === TipoCatalogo.PECA
+            ? "neste atendimento de pos-venda so entram pecas"
+            : "nesta venda so entram produtos",
+      },
+      { status: 400 },
+    );
   }
 
   const uso = await prisma.pecaUso.create({
