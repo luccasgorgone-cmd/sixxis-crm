@@ -4,6 +4,8 @@
 // clara e cores da marca com sobriedade. Sem emoji. Funcao pura: recebe os dados
 // ja montados (+ a logo opcional em bytes) e devolve os bytes do PDF (Uint8Array).
 // A montagem dos dados e a leitura da logo (Prisma) ficam em orcamentoDados.ts.
+import crypto from "node:crypto";
+import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFImage } from "pdf-lib";
 
 // Cores da marca + superficies.
@@ -55,9 +57,24 @@ export type DadosPdfOrcamento = {
   totalGarantia: number;
 };
 
-// Logo embutivel: pdf-lib so aceita PNG/JPEG. WEBP/SVG nao embutem -> o gerador
-// cai no wordmark textual "Sixxis". Os bytes vem do ConfiguracaoCRM (orcamentoDados).
-export type LogoEmbed = { bytes: Uint8Array; formato: "png" | "jpg" };
+// Logo embutivel. pdf-lib so aceita PNG/JPEG nativamente; WEBP e convertido para
+// PNG em memoria (sharp) antes de embutir (Fatia 3.16). SVG segue sem suporte ->
+// wordmark textual. Os bytes vem do ConfiguracaoCRM (orcamentoDados).
+export type LogoEmbed = { bytes: Uint8Array; formato: "png" | "jpg" | "webp" };
+
+// Cache (modulo) da conversao webp -> PNG: a logo muda raramente, entao evitamos
+// reconverter a cada PDF. Chave = hash sha1 dos bytes webp.
+const cachePngLogo = new Map<string, Uint8Array>();
+
+async function webpParaPng(bytes: Uint8Array): Promise<Uint8Array> {
+  const chave = crypto.createHash("sha1").update(bytes).digest("hex");
+  const emCache = cachePngLogo.get(chave);
+  if (emCache) return emCache;
+  const png = await sharp(Buffer.from(bytes)).png().toBuffer();
+  const out = new Uint8Array(png);
+  cachePngLogo.set(chave, out);
+  return out;
+}
 
 // A fonte Helvetica usa encoding WinAnsi (CP1252) e LANCA em caracteres fora dele
 // (emoji, CJK, control chars). Texto dinamico (nome do cliente, descricao) pode
@@ -122,14 +139,18 @@ export async function gerarPdfOrcamento(
   const fonte = await doc.embedFont(StandardFonts.Helvetica);
   const fonteBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  // Logo (PNG/JPEG). Falha/formato nao suportado -> wordmark textual.
+  // Logo. PNG/JPEG embutem direto; WEBP e convertido para PNG (sharp, cacheado).
+  // Qualquer falha real de conversao/embed -> wordmark textual "Sixxis".
   let logoImg: PDFImage | null = null;
   if (logo) {
     try {
-      logoImg =
-        logo.formato === "png"
-          ? await doc.embedPng(logo.bytes)
-          : await doc.embedJpg(logo.bytes);
+      if (logo.formato === "jpg") {
+        logoImg = await doc.embedJpg(logo.bytes);
+      } else if (logo.formato === "png") {
+        logoImg = await doc.embedPng(logo.bytes);
+      } else {
+        logoImg = await doc.embedPng(await webpParaPng(logo.bytes));
+      }
     } catch {
       logoImg = null;
     }

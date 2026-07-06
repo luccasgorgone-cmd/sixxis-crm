@@ -47,9 +47,9 @@ export type MontagemOrcamento = {
   logo: LogoEmbed | null;
 };
 
-// Le a logo do ConfiguracaoCRM e a converte em bytes embutiveis (PNG/JPEG). WEBP e
-// SVG NAO sao suportados por pdf-lib -> retorna null (o gerador cai no wordmark).
-// Nunca lanca (falha de leitura -> null, o PDF sai com o texto "Sixxis").
+// Le a logo do ConfiguracaoCRM e a converte em bytes embutiveis. PNG/JPEG embutem
+// direto; WEBP e convertido para PNG no gerador (sharp). SVG segue sem suporte ->
+// null (o gerador cai no wordmark). Nunca lanca (falha -> null, PDF com "Sixxis").
 async function carregarLogoEmbed(): Promise<LogoEmbed | null> {
   try {
     const cfg = await prisma.configuracaoCRM.findFirst({
@@ -57,12 +57,14 @@ async function carregarLogoEmbed(): Promise<LogoEmbed | null> {
     });
     if (!cfg?.logoData || !cfg.logoData.startsWith("data:")) return null;
     const mime = (cfg.logoMime ?? "").toLowerCase();
-    const formato: "png" | "jpg" | null = mime.includes("png")
+    const formato: "png" | "jpg" | "webp" | null = mime.includes("png")
       ? "png"
       : mime.includes("jpeg") || mime.includes("jpg")
         ? "jpg"
-        : null;
-    if (!formato) return null; // webp/svg/outros: fallback textual
+        : mime.includes("webp")
+          ? "webp"
+          : null;
+    if (!formato) return null; // svg/outros: fallback textual
     const b64 = cfg.logoData.split(",")[1] ?? "";
     const bytes = Buffer.from(b64, "base64");
     return bytes.length > 0 ? { bytes, formato } : null;
