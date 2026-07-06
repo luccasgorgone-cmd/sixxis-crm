@@ -205,7 +205,8 @@ em torno do ORCAMENTO montado na conversa.
 - Cada decisao gera um ORCAMENTO numerado (PED-000000), IMUTAVEL, que fica no
   historico do cliente e na aba Orcamentos. Campos do snapshot: cupom, descontoPct,
   frete, fretePagoPelaEmpresa, itens (com marcador de garantia), total (bruto dos
-  cobraveis), totalGarantia e totalFinal (o cobrado apos desconto/frete).
+  cobraveis), totalGarantia e totalFinal. FORMULA: totalFinal = cobraveis x
+  (1 - desconto%) + frete (o frete so entra quando NAO for pago pela empresa).
 
 PECAS E ESTOQUE: as pecas (catalogo tipo PECA) tem estoque com movimentacoes
 AUDITAVEIS (venda, garantia, assistencia local, ajustes, estornos). Itens em
