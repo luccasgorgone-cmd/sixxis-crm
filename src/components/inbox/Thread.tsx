@@ -32,7 +32,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem, Finalidade } from "./tipos";
-import { Compositor } from "./Compositor";
+import { Compositor, type ViaOtimista } from "./Compositor";
 import { useToast } from "@/components/ui/Toast";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -52,6 +52,7 @@ export function Thread({
   somenteLeitura = false,
   ehAdmin = false,
   embutida = false,
+  otimista,
 }: {
   conversa: ConversaItem;
   mensagens: MensagemItem[];
@@ -60,6 +61,9 @@ export function Thread({
   onExcluida?: () => void;
   somenteLeitura?: boolean;
   ehAdmin?: boolean;
+  // Via de render otimista do texto (Fatia 3.11): repassada ao Compositor e usada
+  // pelo Reenviar. Ausente em usos somente-leitura (InspecaoConversa).
+  otimista?: ViaOtimista;
   // Quando embutida no painel do Kanban, o nome/avatar e a finalidade ja
   // aparecem na barra do painel; o cabecalho fica slim (so telefone/instancia,
   // selo IA/Humano e excluir) para nao repetir o nome do cliente.
@@ -293,6 +297,7 @@ export function Thread({
           }}
           respondendoA={respondendoA}
           onCancelarResposta={() => setRespondendoA(null)}
+          otimista={otimista}
         />
       )}
 

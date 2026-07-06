@@ -96,6 +96,11 @@ export type EventoMensagemNova = {
   ultimaMensagemEm: string;
   // Enviada pela Luna (IA)? (mensagens OUT geradas pelo motor de atendimento).
   viaIA?: boolean;
+  // Chave idempotente do envio otimista (Fatia 3.11): quando o texto foi enviado
+  // pelo compositor com um id temporario, a rota devolve o MESMO clientId aqui.
+  // O remetente casa este evento com a bolha "tmp-<uuid>" e reconcilia no lugar,
+  // em vez de criar uma segunda bolha. Ausente em mensagens IN / da Sol.
+  clientId?: string | null;
 };
 
 // Payload do evento "mensagem:midia" (mediaUrl preenchido em background/reproc.).

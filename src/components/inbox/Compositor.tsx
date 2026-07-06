@@ -34,6 +34,17 @@ import {
   type LeadModelo,
 } from "@/lib/modelos";
 import { useAgente } from "@/components/shell/AgenteContext";
+import { novoClientId, criarBolhaOtimista } from "@/lib/otimista";
+
+// Via de render OTIMISTA do texto (Fatia 3.11): o pai (Inbox/ConversaEmbed) e
+// dono da lista de mensagens; o compositor so dispara estas acoes. `adicionar`
+// injeta a bolha "enviando" na hora; `reconciliar` troca tmp->real quando a API
+// responde; `falhar` marca ERRO (remover=false) ou remove a bolha (remover=true).
+export type ViaOtimista = {
+  adicionar: (msg: MensagemItem) => void;
+  reconciliar: (clientId: string, real: MensagemItem) => void;
+  falhar: (clientId: string, remover: boolean) => void;
+};
 
 type Resposta = {
   id: string;
@@ -62,6 +73,7 @@ export function Compositor({
   lead,
   respondendoA,
   onCancelarResposta,
+  otimista,
 }: {
   conversaId: string;
   onEnviada: (msg: MensagemItem) => void;
@@ -75,6 +87,9 @@ export function Compositor({
   // Reply (Fatia 2.85): mensagem sendo respondida (citada) + cancelar.
   respondendoA?: MensagemItem | null;
   onCancelarResposta?: () => void;
+  // Via otimista do texto (Fatia 3.11). Quando presente, o envio de texto e
+  // otimista (bolha instantanea); ausente => cai no envio bloqueante antigo.
+  otimista?: ViaOtimista;
 }) {
   const agente = useAgente();
   const ctxAgente = agente ? { nome: agente.nome } : null;
@@ -589,7 +604,7 @@ export function Compositor({
   // foi confirmado, pede confirmacao (2.89-B); senao envia direto.
   function enviar() {
     const valor = texto.trim();
-    if (!valor || enviando) return;
+    if (!valor) return;
     const divergente =
       !!instanciaSel &&
       !!instanciaIdAtual &&
@@ -604,9 +619,73 @@ export function Compositor({
 
   async function enviarAgora(instanciaEnvio: string | null) {
     const valor = texto.trim();
-    if (!valor || enviando) return;
-    setEnviando(true);
+    if (!valor) return;
+    const reply = respondendoA ?? null;
+
+    // Fallback defensivo: sem via otimista, mantem o envio bloqueante (2.89).
+    if (!otimista) {
+      if (enviando) return;
+      setEnviando(true);
+      setErro(null);
+      try {
+        const r = await fetch("/api/mensagens/enviar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversaId,
+            texto: valor,
+            ...(instanciaEnvio ? { instanciaId: instanciaEnvio } : {}),
+            ...(reply ? { respostaAId: reply.id } : {}),
+          }),
+        });
+        const d = await r.json().catch(() => null);
+        if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+        if (!r.ok) {
+          setErro(d?.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.");
+          if (!d?.mensagem) return;
+        }
+        setTexto("");
+        setTextoAnterior(null);
+        onCancelarResposta?.();
+        ref.current?.focus();
+      } catch {
+        setErro("Nao foi possivel enviar agora.");
+      } finally {
+        setEnviando(false);
+      }
+      return;
+    }
+
+    // --- Fluxo OTIMISTA (estilo WhatsApp), Fatia 3.11 ---
+    // O await bloqueante ficava aqui: a bolha so surgia depois do round-trip
+    // API->Evolution->WhatsApp. Agora a bolha aparece na hora e o POST vai em
+    // background; a reconciliacao acontece quando a API responde (ou pelo socket).
+    const clientId = novoClientId();
+    const bolha = criarBolhaOtimista({
+      clientId,
+      texto: valor,
+      hora: new Date().toISOString(),
+      respostaAId: reply?.id ?? null,
+      citada: reply
+        ? {
+            id: reply.id,
+            direcao: reply.direcao,
+            tipo: reply.tipo,
+            conteudo: reply.conteudo,
+            contatoNome: reply.contatoNome ?? null,
+          }
+        : null,
+    });
+
+    // 1) Bolha "enviando" na hora + limpa input/reply SEM esperar a API.
+    otimista.adicionar(bolha);
     setErro(null);
+    setTexto("");
+    setTextoAnterior(null);
+    onCancelarResposta?.();
+    ref.current?.focus();
+
+    // 2) POST em background: reconcilia tmp -> real.
     try {
       const r = await fetch("/api/mensagens/enviar", {
         method: "POST",
@@ -614,27 +693,30 @@ export function Compositor({
         body: JSON.stringify({
           conversaId,
           texto: valor,
+          clientId,
           ...(instanciaEnvio ? { instanciaId: instanciaEnvio } : {}),
-          ...(respondendoA ? { respostaAId: respondendoA.id } : {}),
+          ...(reply ? { respostaAId: reply.id } : {}),
         }),
       });
       const d = await r.json().catch(() => null);
-      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
-      if (!r.ok) {
-        setErro(
-          d?.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.",
-        );
-        // Sem numero valido (nao gravou bolha): mantem o texto para reenviar.
-        if (!d?.mensagem) return;
+      if (d?.mensagem) {
+        // Sucesso OU falha da Evolution com bolha JA persistida (502 + mensagem):
+        // a real ja traz o statusEnvio certo (ENVIADA/ERRO). Reconcilia no lugar.
+        otimista.reconciliar(clientId, d.mensagem as MensagemItem);
+      } else {
+        // Falha "dura" sem bolha (sem numero valido, 400/404/422): remove a
+        // bolha otimista e devolve o texto ao compositor para reenviar.
+        otimista.falhar(clientId, true);
+        setTexto((t) => (t.trim() ? t : valor));
+        setErro(d?.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.");
       }
-      setTexto("");
-      setTextoAnterior(null);
-      onCancelarResposta?.();
-      ref.current?.focus();
     } catch {
-      setErro("Nao foi possivel enviar agora.");
-    } finally {
-      setEnviando(false);
+      // Rede caiu / resposta perdida: NAO remove a bolha (o envio pode ter ido).
+      // Marca ERRO com Reenviar; se de fato foi, o socket ("mensagem:nova" com
+      // clientId) reconcilia sozinho para ENVIADA. Nao devolve o texto (evita
+      // envio duplicado).
+      otimista.falhar(clientId, false);
+      setErro("Nao foi possivel confirmar o envio. Se persistir, use Reenviar.");
     }
   }
 

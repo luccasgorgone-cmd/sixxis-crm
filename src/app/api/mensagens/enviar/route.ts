@@ -30,6 +30,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     texto?: string;
     instanciaId?: string;
     respostaAId?: string;
+    // Chave idempotente do envio otimista (Fatia 3.11): so trafega de volta no
+    // socket para o remetente casar a bolha "tmp-<uuid>". Nao e persistida.
+    clientId?: string;
   };
   try {
     body = await req.json();
@@ -39,6 +42,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const conversaId = String(body?.conversaId ?? "");
   const texto = String(body?.texto ?? "").trim();
+  const clientId = body?.clientId ? String(body.clientId) : null;
   const instanciaIdEscolhida = body?.instanciaId
     ? String(body.instanciaId)
     : null;
@@ -227,6 +231,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     hora: mensagem.hora,
     naoLidas: 0,
     ultimaMensagemEm: agora,
+    // Devolve o clientId para o remetente reconciliar a bolha otimista (3.11).
+    clientId,
   });
 
   const payloadMsg = {

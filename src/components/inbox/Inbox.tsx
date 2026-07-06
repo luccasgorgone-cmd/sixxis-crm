@@ -9,6 +9,14 @@ import { previewMensagem } from "@/lib/preview";
 import { normalizarTexto } from "@/lib/format";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
+import type { ViaOtimista } from "./Compositor";
+import {
+  adicionarOtimista,
+  reconciliarOtimista,
+  marcarErroOtimista,
+  removerOtimista,
+  mesclarSocket,
+} from "@/lib/otimista";
 import { PainelClienteInbox } from "./PainelClienteInbox";
 import {
   paramsPeriodo,
@@ -150,24 +158,24 @@ export function Inbox({
     function onNova(evt: EventoMensagemNova) {
       const aberta = selecionadaRef.current === evt.conversaId;
 
-      // 1) Thread aberta: anexa a mensagem (dedup por id).
+      // 1) Thread aberta: anexa a mensagem. Dedup por id real E reconciliacao da
+      // bolha otimista pelo clientId (Fatia 3.11) — nunca aparece duas vezes.
       if (aberta) {
         setMensagens((prev) =>
-          prev.some((m) => m.id === evt.mensagemId)
-            ? prev
-            : [
-                ...prev,
-                {
-                  id: evt.mensagemId,
-                  direcao: evt.direcao,
-                  tipo: evt.tipo,
-                  conteudo: evt.conteudo,
-                  mediaUrl: evt.mediaUrl,
-                  statusEnvio: evt.statusEnvio,
-                  hora: evt.hora,
-                  viaIA: evt.viaIA,
-                },
-              ],
+          mesclarSocket(
+            prev,
+            { mensagemId: evt.mensagemId, clientId: evt.clientId },
+            () => ({
+              id: evt.mensagemId,
+              direcao: evt.direcao,
+              tipo: evt.tipo,
+              conteudo: evt.conteudo,
+              mediaUrl: evt.mediaUrl,
+              statusEnvio: evt.statusEnvio,
+              hora: evt.hora,
+              viaIA: evt.viaIA,
+            }),
+          ),
         );
       }
 
@@ -257,11 +265,10 @@ export function Inbox({
     };
   }, [carregarConversas]);
 
-  // Mensagem OUT recem-enviada: anexa na thread e atualiza a lista.
-  const aoEnviada = useCallback((msg: MensagemItem) => {
-    setMensagens((prev) =>
-      prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
-    );
+  // Atualiza a lista (previa/horario + reordena pro topo) para uma mensagem OUT
+  // da conversa aberta. Reusado pelo envio direto (audio/arquivo/contato) e pela
+  // bolha otimista de texto.
+  const bumpLista = useCallback((msg: MensagemItem) => {
     setConversas((prev) => {
       const id = selecionadaRef.current;
       const idx = prev.findIndex((c) => c.id === id);
@@ -276,6 +283,39 @@ export function Inbox({
       return [atualizado, ...resto];
     });
   }, []);
+
+  // Mensagem OUT recem-enviada (audio/arquivo/contato — envio direto): anexa na
+  // thread e atualiza a lista. O texto usa a via otimista abaixo.
+  const aoEnviada = useCallback(
+    (msg: MensagemItem) => {
+      setMensagens((prev) =>
+        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
+      );
+      bumpLista(msg);
+    },
+    [bumpLista],
+  );
+
+  // Via de render OTIMISTA do texto (Fatia 3.11): a bolha "enviando" aparece na
+  // hora e e reconciliada (tmp -> real) quando a API responde; ou marcada ERRO /
+  // removida em falha. A dedup com o socket usa o clientId (ver mesclarSocket).
+  const otimista = useMemo<ViaOtimista>(
+    () => ({
+      adicionar: (msg) => {
+        setMensagens((prev) => adicionarOtimista(prev, msg));
+        bumpLista(msg);
+      },
+      reconciliar: (clientId, real) =>
+        setMensagens((prev) => reconciliarOtimista(prev, clientId, real)),
+      falhar: (clientId, remover) =>
+        setMensagens((prev) =>
+          remover
+            ? removerOtimista(prev, clientId)
+            : marcarErroOtimista(prev, clientId),
+        ),
+    }),
+    [bumpLista],
+  );
 
   // Busca por CONTEUDO das mensagens (backend, escopado). Dispara so quando ha
   // termo; resultados trazem trechoBusca. Cancela requisicoes obsoletas.
@@ -371,6 +411,7 @@ export function Inbox({
             mensagens={mensagens}
             carregando={carregandoThread}
             onEnviada={aoEnviada}
+            otimista={otimista}
             ehAdmin={ehAdmin}
             onExcluida={() => {
               const id = selecionadaRef.current;

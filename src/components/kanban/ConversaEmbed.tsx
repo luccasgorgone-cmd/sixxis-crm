@@ -2,9 +2,17 @@
 
 // Embute a conversa do WhatsApp do lead dentro do painel do negocio, reusando
 // o componente Thread da inbox (com compositor). Faz fetch + socket ao vivo.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getSocket } from "@/lib/socketClient";
 import { Thread } from "@/components/inbox/Thread";
+import type { ViaOtimista } from "@/components/inbox/Compositor";
+import {
+  adicionarOtimista,
+  reconciliarOtimista,
+  marcarErroOtimista,
+  removerOtimista,
+  mesclarSocket,
+} from "@/lib/otimista";
 import type {
   MensagemItem,
   ConversaItem,
@@ -56,21 +64,21 @@ export function ConversaEmbed({
     const socket = getSocket();
     function onNova(evt: EventoMensagemNova) {
       if (evt.conversaId !== conversaId) return;
+      // Dedup por id real + reconciliacao da bolha otimista pelo clientId (3.11).
       setMensagens((prev) =>
-        prev.some((m) => m.id === evt.mensagemId)
-          ? prev
-          : [
-              ...prev,
-              {
-                id: evt.mensagemId,
-                direcao: evt.direcao,
-                tipo: evt.tipo,
-                conteudo: evt.conteudo,
-                mediaUrl: evt.mediaUrl,
-                statusEnvio: evt.statusEnvio,
-                hora: evt.hora,
-              },
-            ],
+        mesclarSocket(
+          prev,
+          { mensagemId: evt.mensagemId, clientId: evt.clientId },
+          () => ({
+            id: evt.mensagemId,
+            direcao: evt.direcao,
+            tipo: evt.tipo,
+            conteudo: evt.conteudo,
+            mediaUrl: evt.mediaUrl,
+            statusEnvio: evt.statusEnvio,
+            hora: evt.hora,
+          }),
+        ),
       );
     }
     function onMidia(evt: EventoMidia) {
@@ -123,6 +131,22 @@ export function ConversaEmbed({
     );
   }
 
+  // Via otimista do texto (Fatia 3.11): mesma logica do Inbox, sem lista lateral.
+  const otimista = useMemo<ViaOtimista>(
+    () => ({
+      adicionar: (msg) => setMensagens((prev) => adicionarOtimista(prev, msg)),
+      reconciliar: (clientId, real) =>
+        setMensagens((prev) => reconciliarOtimista(prev, clientId, real)),
+      falhar: (clientId, remover) =>
+        setMensagens((prev) =>
+          remover
+            ? removerOtimista(prev, clientId)
+            : marcarErroOtimista(prev, clientId),
+        ),
+    }),
+    [],
+  );
+
   return (
     <div className="flex h-full flex-col">
       <Thread
@@ -130,6 +154,7 @@ export function ConversaEmbed({
         mensagens={mensagens}
         carregando={carregando}
         onEnviada={aoEnviada}
+        otimista={otimista}
         ehAdmin={ehAdmin}
         embutida
       />
