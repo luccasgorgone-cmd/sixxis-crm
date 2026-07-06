@@ -12,6 +12,7 @@ import {
   Plus,
   Trophy,
   XCircle,
+  ChevronRight,
   ArrowRight,
   StickyNote,
   UserCheck,
@@ -847,6 +848,7 @@ export function NegocioAcoes({
       {/* Pendencia operacional */}
       <BlocoPendencia detalhe={detalhe} salvar={salvar} />
 
+      <Secao titulo="Gestao">
       {/* Dono / atribuicao / transferencia */}
       <div>
         <Rotulo>Dono</Rotulo>
@@ -968,6 +970,7 @@ export function NegocioAcoes({
           </div>
         )}
       </div>
+      </Secao>
 
       {/* Produtos (venda) / Pecas necessarias (pos-venda) */}
       <div>
@@ -1110,6 +1113,36 @@ export function NegocioAcoes({
 function Rotulo({ children }: { children: React.ReactNode }) {
   return (
     <label className="mb-1 block text-xs font-medium text-medio/70">{children}</label>
+  );
+}
+
+// Seccao colapsavel compacta (Fatia 3.07): agrupa controles do painel (ex.:
+// "Gestao") com titulo padronizado. So organizacao — nada de funcionalidade muda.
+function Secao({
+  titulo,
+  children,
+  inicialAberta = true,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+  inicialAberta?: boolean;
+}) {
+  const [aberta, setAberta] = useState(inicialAberta);
+  return (
+    <div className="rounded-lg border border-black/5">
+      <button
+        onClick={() => setAberta((a) => !a)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-medio/50">
+          {titulo}
+        </span>
+        <ChevronRight
+          className={`h-4 w-4 text-medio/40 transition-transform ${aberta ? "rotate-90" : ""}`}
+        />
+      </button>
+      {aberta && <div className="space-y-3 px-3 pb-3">{children}</div>}
+    </div>
   );
 }
 
