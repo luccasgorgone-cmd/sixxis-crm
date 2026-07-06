@@ -147,6 +147,10 @@ function EditorOrcamento(props: EditorProps) {
     frete: null,
     fretePagoPelaEmpresa: false,
   });
+  // Cupom via SELECT com presets (SIXXIS05=5% / SIXXIS10=10%) + "Outro" (campos
+  // livres). cupomOutro lembra que o usuario escolheu "Outro" mesmo com os campos
+  // ainda vazios (senao o select voltaria a "Sem cupom"). Fatia 3.13.
+  const [cupomOutro, setCupomOutro] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -340,6 +344,30 @@ function EditorOrcamento(props: EditorProps) {
     salvarOrc(patch);
   }
 
+  // Cupons predefinidos (Fatia 3.13): escolher um preset preenche cupom + desconto
+  // correspondente (ambos seguem editaveis). "Outro" libera os campos livres.
+  const CUPONS_PRESET: Record<string, number> = { SIXXIS05: 5, SIXXIS10: 10 };
+  const cupomPreset = orc.cupom && orc.cupom in CUPONS_PRESET ? orc.cupom : "";
+  const modoCupom = cupomPreset
+    ? cupomPreset
+    : cupomOutro || orc.cupom || orc.descontoPct != null
+      ? "OUTRO"
+      : "";
+  function aoMudarCupom(v: string) {
+    if (v === "SIXXIS05" || v === "SIXXIS10") {
+      setCupomOutro(false);
+      mudarOrc({ cupom: v, descontoPct: CUPONS_PRESET[v] });
+    } else if (v === "OUTRO") {
+      setCupomOutro(true);
+      // Vindo de um preset: limpa o codigo para o usuario digitar o proprio
+      // (o desconto% fica como estava, editavel).
+      if (cupomPreset) mudarOrc({ cupom: null });
+    } else {
+      setCupomOutro(false);
+      mudarOrc({ cupom: null, descontoPct: null });
+    }
+  }
+
   const subtotal = (usos ?? [])
     .filter((u) => !u.garantia)
     .reduce((acc, u) => acc + u.quantidade * (u.precoSugerido ?? 0), 0);
@@ -394,148 +422,7 @@ function EditorOrcamento(props: EditorProps) {
         </p>
       )}
 
-      {usos && usos.length > 0 && (
-        <ul className="space-y-1.5">
-          {usos.map((u) => (
-            <li
-              key={u.id}
-              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
-                destacado === u.id ? "border-tiffany bg-tiffany/5" : "border-black/5 bg-fundo"
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-escuro">
-                  <span className="text-medio/60">{u.quantidade}x </span>
-                  {u.nome}
-                  {u.modelo && <span className="text-medio/50"> {u.modelo}</span>}
-                </p>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {mostrarGarantia && u.garantia ? (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-tiffany">
-                      <ShieldCheck className="h-3 w-3" /> Garantia
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-medio/50">
-                      {u.precoSugerido != null ? formatarBRL(u.quantidade * u.precoSugerido) : "—"}
-                    </span>
-                  )}
-                  {mostrarEstoque && u.quantidade > u.estoque && (
-                    <span className="rounded bg-erro/10 px-1.5 py-0.5 text-[10px] font-semibold text-erro">
-                      estoque insuficiente
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => void remover(u.id)}
-                disabled={removendo === u.id}
-                title="Remover"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-medio/50 hover:bg-black/5 hover:text-erro disabled:opacity-50"
-              >
-                {removendo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {usos && usos.length === 0 && (
-        <p className="text-xs text-medio/50">Nenhum item no orçamento ainda.</p>
-      )}
-
-      {/* RESUMO cupom/desconto/frete (so no orcamento do negocio) */}
-      {mostrarResumo && usos && (
-        <div className="space-y-2 rounded-lg border border-black/5 bg-fundo/50 p-2.5">
-          <div className="flex gap-2">
-            <label className="min-w-0 flex-1">
-              <span className="mb-0.5 block text-[11px] text-medio/60">Cupom</span>
-              <input
-                value={orc.cupom ?? ""}
-                onChange={(e) => mudarOrc({ cupom: e.target.value.slice(0, 40) || null })}
-                placeholder="Código"
-                className="campo w-full"
-              />
-            </label>
-            <label className="w-24 shrink-0">
-              <span className="mb-0.5 block text-[11px] text-medio/60">Desconto %</span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                value={orc.descontoPct ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)));
-                  mudarOrc({ descontoPct: v });
-                }}
-                placeholder="0"
-                className="campo w-full text-right"
-              />
-            </label>
-          </div>
-          <div className="flex items-end gap-2">
-            <label className="w-28 shrink-0">
-              <span className="mb-0.5 block text-[11px] text-medio/60">Frete R$</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={orc.frete ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
-                  mudarOrc({ frete: v });
-                }}
-                placeholder="0,00"
-                className="campo w-full text-right"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 pb-2 text-xs text-medio/70">
-              <input
-                type="checkbox"
-                checked={orc.fretePagoPelaEmpresa}
-                onChange={(e) => mudarOrc({ fretePagoPelaEmpresa: e.target.checked })}
-                className="h-3.5 w-3.5 accent-tiffany"
-              />
-              Pago pela empresa
-            </label>
-          </div>
-
-          <div className="space-y-0.5 border-t border-black/5 pt-2 text-xs">
-            <div className="flex justify-between text-medio/60">
-              <span>Subtotal</span>
-              <span>{formatarBRL(subtotal)}</span>
-            </div>
-            {descValor > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Desconto {orc.cupom ? `· cupom ${orc.cupom}` : ""}</span>
-                <span>− {formatarBRL(descValor)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-medio/60">
-              <span>Frete</span>
-              <span>{orc.fretePagoPelaEmpresa ? "empresa" : `+ ${formatarBRL(freteAplicado)}`}</span>
-            </div>
-            <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
-              <span>Total</span>
-              <span className="text-tiffany">{formatarBRL(totalFinal)}</span>
-            </div>
-            {mostrarGarantia && totalGarantia > 0 && (
-              <div className="flex justify-between text-[11px] text-medio/50">
-                <span>Garantia (não cobrado)</span>
-                <span className="line-through">{formatarBRL(totalGarantia)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!mostrarResumo && usos && usos.length > 0 && subtotal > 0 && (
-        <div className="flex items-center justify-between border-t border-black/5 pt-2 text-xs">
-          <span className="text-medio/60">Total (cobrável)</span>
-          <span className="font-semibold text-escuro">{formatarBRL(subtotal)}</span>
-        </div>
-      )}
-
-      {/* SELECAO de item */}
+      {/* 1. SELECAO de item (TOPO): chips/busca + lista de produtos/pecas. */}
       {sel ? (
         <div className="space-y-2 rounded-lg border border-tiffany/30 bg-tiffany/[0.03] p-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -649,6 +536,170 @@ function EditorOrcamento(props: EditorProps) {
           </div>
         </div>
       )}
+
+      {/* 2. CARRINHO: itens ja adicionados ao orcamento. */}
+      {usos && usos.length > 0 && (
+        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-medio/40">
+          No orçamento
+        </p>
+      )}
+      {usos && usos.length > 0 && (
+        <ul className="space-y-1.5">
+          {usos.map((u) => (
+            <li
+              key={u.id}
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                destacado === u.id ? "border-tiffany bg-tiffany/5" : "border-black/5 bg-fundo"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-escuro">
+                  <span className="text-medio/60">{u.quantidade}x </span>
+                  {u.nome}
+                  {u.modelo && <span className="text-medio/50"> {u.modelo}</span>}
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {mostrarGarantia && u.garantia ? (
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-tiffany">
+                      <ShieldCheck className="h-3 w-3" /> Garantia
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-medio/50">
+                      {u.precoSugerido != null ? formatarBRL(u.quantidade * u.precoSugerido) : "—"}
+                    </span>
+                  )}
+                  {mostrarEstoque && u.quantidade > u.estoque && (
+                    <span className="rounded bg-erro/10 px-1.5 py-0.5 text-[10px] font-semibold text-erro">
+                      estoque insuficiente
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => void remover(u.id)}
+                disabled={removendo === u.id}
+                title="Remover"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-medio/50 hover:bg-black/5 hover:text-erro disabled:opacity-50"
+              >
+                {removendo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {usos && usos.length === 0 && (
+        <p className="text-xs text-medio/50">Nenhum item no orçamento ainda.</p>
+      )}
+
+      {/* RESUMO cupom/desconto/frete (so no orcamento do negocio) */}
+      {mostrarResumo && usos && (
+        <div className="space-y-2 rounded-lg border border-black/5 bg-fundo/50 p-2.5">
+          <div className="flex gap-2">
+            <label className="min-w-0 flex-1">
+              <span className="mb-0.5 block text-[11px] text-medio/60">Cupom</span>
+              <select
+                value={modoCupom}
+                onChange={(e) => aoMudarCupom(e.target.value)}
+                className="campo w-full"
+              >
+                <option value="">Sem cupom</option>
+                <option value="SIXXIS05">SIXXIS05 (5%)</option>
+                <option value="SIXXIS10">SIXXIS10 (10%)</option>
+                <option value="OUTRO">Outro</option>
+              </select>
+            </label>
+            <label className="w-24 shrink-0">
+              <span className="mb-0.5 block text-[11px] text-medio/60">Desconto %</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={orc.descontoPct ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)));
+                  mudarOrc({ descontoPct: v });
+                }}
+                placeholder="0"
+                className="campo w-full text-right"
+              />
+            </label>
+          </div>
+          {modoCupom === "OUTRO" && (
+            <label className="block">
+              <span className="mb-0.5 block text-[11px] text-medio/60">Código do cupom</span>
+              <input
+                value={orc.cupom ?? ""}
+                onChange={(e) => mudarOrc({ cupom: e.target.value.slice(0, 40) || null })}
+                placeholder="Código"
+                className="campo w-full"
+              />
+            </label>
+          )}
+          <div className="flex items-end gap-2">
+            <label className="w-28 shrink-0">
+              <span className="mb-0.5 block text-[11px] text-medio/60">Frete R$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={orc.frete ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+                  mudarOrc({ frete: v });
+                }}
+                placeholder="0,00"
+                className="campo w-full text-right"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 pb-2 text-xs text-medio/70">
+              <input
+                type="checkbox"
+                checked={orc.fretePagoPelaEmpresa}
+                onChange={(e) => mudarOrc({ fretePagoPelaEmpresa: e.target.checked })}
+                className="h-3.5 w-3.5 accent-tiffany"
+              />
+              Pago pela empresa
+            </label>
+          </div>
+
+          <div className="space-y-0.5 border-t border-black/5 pt-2 text-xs">
+            <div className="flex justify-between text-medio/60">
+              <span>Subtotal</span>
+              <span>{formatarBRL(subtotal)}</span>
+            </div>
+            {descValor > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Desconto {orc.cupom ? `· cupom ${orc.cupom}` : ""}</span>
+                <span>− {formatarBRL(descValor)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-medio/60">
+              <span>Frete</span>
+              <span>{orc.fretePagoPelaEmpresa ? "empresa" : `+ ${formatarBRL(freteAplicado)}`}</span>
+            </div>
+            <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
+              <span>Total</span>
+              <span className="text-tiffany">{formatarBRL(totalFinal)}</span>
+            </div>
+            {mostrarGarantia && totalGarantia > 0 && (
+              <div className="flex justify-between text-[11px] text-medio/50">
+                <span>Garantia (não cobrado)</span>
+                <span className="line-through">{formatarBRL(totalGarantia)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!mostrarResumo && usos && usos.length > 0 && subtotal > 0 && (
+        <div className="flex items-center justify-between border-t border-black/5 pt-2 text-xs">
+          <span className="text-medio/60">Total (cobrável)</span>
+          <span className="font-semibold text-escuro">{formatarBRL(subtotal)}</span>
+        </div>
+      )}
+
+      {/* 4. ENVIAR orcamento + DECISOES — inseridos no Bloco 3 (Fatia 3.13). */}
     </section>
   );
 }
