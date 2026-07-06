@@ -55,14 +55,24 @@ function Form({ marca }: { marca: Marca }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-fundo px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-2">
-          <Logo
-            className="text-3xl"
-            temLogo={marca.temLogo}
-            logoEm={marca.logoEm}
-            nomeEmpresa={marca.nomeEmpresa}
-            alturaImg="h-12"
-          />
+        <div className="mb-8 flex flex-col items-center gap-3">
+          {marca.temLogo ? (
+            // A logo da marca e feita para a superficie ESCURA (sidebar): sobre o
+            // fundo claro do login ela sumia (contraste). Aqui a colocamos sobre a
+            // MESMA superficie escura da sidebar (bg-escuro + tom claro), onde ela
+            // renderiza corretamente em ambos os temas. Fatia 3.14.
+            <div className="flex items-center justify-center rounded-2xl bg-escuro px-6 py-4 shadow-sm">
+              <Logo
+                temLogo
+                logoEm={marca.logoEm}
+                nomeEmpresa={marca.nomeEmpresa}
+                tom="claro"
+                alturaImg="h-12"
+              />
+            </div>
+          ) : (
+            <Logo className="text-3xl" nomeEmpresa={marca.nomeEmpresa} />
+          )}
           <p className="text-sm text-medio/70">Atendimento WhatsApp</p>
         </div>
 
