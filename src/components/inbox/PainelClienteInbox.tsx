@@ -189,19 +189,14 @@ export function PainelClienteInbox({
             </div>
           )}
 
-          {/* Nivel cliente (sempre) */}
+          {/* (a) Dados do cliente (sempre) */}
           <BlocoCliente
             cliente={cliente}
             podeEditar={podeEditar}
             onAtualizado={() => void carregarCliente()}
           />
 
-          <BlocoProdutosInteresse leadId={leadId} />
-
-          {/* Assistencia (Local): nivel cliente, so para pos-venda. */}
-          <BlocoAssistencia leadId={leadId} />
-
-          {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+          {/* (b) Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
           {negocioId && detalhe?.finalidade && (
             <BlocoOrcamento
               negocioId={negocioId}
@@ -209,30 +204,31 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* Historico numerado de orcamentos do cliente (colapsado). */}
-          <OrcamentosAnteriores leadId={leadId} />
+          {/* (c) Decisoes / etapa / gestao — os mesmos controles do Kanban. */}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <NegocioAcoes
+              detalhe={detalhe}
+              ehAdmin={ehAdmin}
+              agenteIdAtual={agenteIdAtual}
+              agentes={agentes}
+              etiquetas={etiquetas}
+              etapas={etapasFunil}
+              negocioId={negocioId}
+              salvar={salvar}
+              recarregar={carregarNegocio}
+              onAtualizado={() => void carregarCliente()}
+              abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+            />
+          )}
 
-          {/* Nivel negocio (so quando ha negocio da finalidade da conversa) */}
+          {/* (f) Demais blocos, na sequencia natural */}
+          <BlocoProdutosInteresse leadId={leadId} />
+
+          {/* Assistencia (Local): nivel cliente, so para pos-venda. */}
+          <BlocoAssistencia leadId={leadId} />
+
           {detalhe && negocioId && (
             <>
-              {/* Acoes do negocio: ganho/pendente/perdido, valor, etapa, dono,
-                  etiquetas e peca/produtos — os mesmos controles do Kanban. */}
-              {podeAcoesNegocio && (
-                <NegocioAcoes
-                  detalhe={detalhe}
-                  ehAdmin={ehAdmin}
-                  agenteIdAtual={agenteIdAtual}
-                  agentes={agentes}
-                  etiquetas={etiquetas}
-                  etapas={etapasFunil}
-                  negocioId={negocioId}
-                  salvar={salvar}
-                  recarregar={carregarNegocio}
-                  onAtualizado={() => void carregarCliente()}
-                  abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
-                />
-              )}
-
               <BlocoAcompanhamento
                 detalhe={detalhe}
                 recarregar={carregarNegocio}
@@ -256,6 +252,9 @@ export function PainelClienteInbox({
               </div>
             </>
           )}
+
+          {/* Historico numerado de orcamentos do cliente (colapsado). */}
+          <OrcamentosAnteriores leadId={leadId} />
 
           {/* Historico do cliente (nivel cliente, sempre) */}
           <div>

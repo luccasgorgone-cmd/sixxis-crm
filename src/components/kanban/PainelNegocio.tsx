@@ -95,11 +95,6 @@ function dataHora(valor: string): string {
   });
 }
 
-function produtosParaLista(p: unknown): string[] {
-  if (Array.isArray(p)) return p.filter((x): x is string => typeof x === "string");
-  return [];
-}
-
 export function PainelNegocio({
   negocioId,
   papel,
@@ -455,6 +450,26 @@ export function PainelNegocio({
                   }}
                 />
 
+                {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+                <BlocoOrcamento
+                  negocioId={negocioId}
+                  finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+                />
+
+                <NegocioAcoes
+                  detalhe={detalhe}
+                  ehAdmin={ehAdmin}
+                  agenteIdAtual={agenteIdAtual}
+                  agentes={agentes}
+                  etiquetas={etiquetas}
+                  etapas={etapasFunil}
+                  negocioId={negocioId}
+                  salvar={salvar}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
+                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
+                />
+
                 <BlocoProdutosInteresse
                   leadId={detalhe.cliente.id}
                   onAtualizado={() => void carregar()}
@@ -480,28 +495,8 @@ export function PainelNegocio({
                 {/* Assistencia (Local): so para pos-venda; cliente continua no funil. */}
                 <BlocoAssistencia leadId={detalhe.cliente.id} />
 
-                {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
-                <BlocoOrcamento
-                  negocioId={negocioId}
-                  finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
-                />
-
                 {/* Historico numerado de orcamentos do cliente (colapsado). */}
                 <OrcamentosAnteriores leadId={detalhe.cliente.id} />
-
-                <NegocioAcoes
-                  detalhe={detalhe}
-                  ehAdmin={ehAdmin}
-                  agenteIdAtual={agenteIdAtual}
-                  agentes={agentes}
-                  etiquetas={etiquetas}
-                  etapas={etapasFunil}
-                  negocioId={negocioId}
-                  salvar={salvar}
-                  recarregar={carregar}
-                  onAtualizado={onAtualizado}
-                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
-                />
 
                 <BlocoAgendar detalhe={detalhe} recarregar={carregar} />
 
@@ -630,13 +625,11 @@ export function NegocioAcoes({
   const toast = useToast();
   const agente = useAgente();
   const [addEtiqueta, setAddEtiqueta] = useState(false);
-  const [novoProduto, setNovoProduto] = useState("");
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
   const [reativando, setReativando] = useState(false);
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const [moverAberto, setMoverAberto] = useState(false);
-  const produtos = produtosParaLista(detalhe.produtos);
 
   // Mover atendimento entre finalidades: destino = a oposta da atual. So aparece
   // para quem tem acesso a finalidade DESTINO (ou admin) — o endpoint tambem valida.
@@ -803,9 +796,78 @@ export function NegocioAcoes({
 
   return (
     <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-medio/50">
-        Negocio
-      </h4>
+      {/* DECISAO do orcamento (Fatia 3.07): Pendente e Perdido lado a lado
+          (secundarios, sutis); o GANHO em destaque abaixo, ocupando a largura dos
+          dois. Clicar um estado ativo desmarca (volta a ABERTO). */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <button
+            onClick={clicarPendente}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              ehPendente
+                ? "bg-amber-500 text-white hover:bg-amber-600"
+                : "border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+            }`}
+          >
+            <PauseCircle className="h-4 w-4" /> Pendente
+          </button>
+          {etapaPerda && (
+            <button
+              onClick={clicarPerdido}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                ehPerdido
+                  ? "bg-erro text-white hover:brightness-95"
+                  : "border border-erro/40 text-erro hover:bg-erro/10"
+              }`}
+            >
+              <XCircle className="h-4 w-4" /> Perdido
+            </button>
+          )}
+        </div>
+        {etapaGanho && (
+          <button
+            onClick={clicarGanho}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-100 ${
+              ehGanho ? "bg-tiffany-escuro" : "bg-tiffany hover:bg-tiffany-escuro"
+            }`}
+          >
+            <Trophy className="h-5 w-5" /> Ganho
+          </button>
+        )}
+      </div>
+
+      {/* Captura do motivo ao marcar pendente (mantida onde ja existia). */}
+      {pendAbrir && !ehPendente && (
+        <div className="space-y-2 rounded-lg border border-orange-200 bg-orange-50 p-3">
+          <textarea
+            value={pendMotivo}
+            onChange={(e) => setPendMotivo(e.target.value)}
+            rows={2}
+            autoFocus
+            placeholder="Motivo (ex.: aguardando peca, orcamento, pagamento...)"
+            className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setPendAbrir(false);
+                setPendMotivo("");
+              }}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-medio hover:bg-black/5"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => void confirmarPendente()}
+              disabled={mudandoPend || !pendMotivo.trim()}
+              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+            >
+              {mudandoPend && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Marcar pendente
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Motivo da perda + reativar (quando perdido) */}
       {detalhe.status === "PERDIDO" && (
@@ -837,48 +899,6 @@ export function NegocioAcoes({
         </div>
       )}
 
-      {/* Valor + temperatura */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <Rotulo>Valor</Rotulo>
-          {/* Somente leitura (Fatia 3.09): o valor nasce no orcamento e se
-              consolida na decisao (valorAjustado ?? valor, derivado no card). */}
-          <p className="text-sm font-semibold text-escuro">
-            {detalhe.valor != null ? formatarBRL(detalhe.valor) : "—"}
-          </p>
-          <p className="mt-0.5 text-[11px] text-medio/50">
-            Definido pelo orçamento no fechamento
-          </p>
-        </div>
-        {/* Temperatura so na VENDA. Pos-venda usa ganho/pendente/perdido +
-            garantia (o campo Negocio.temperatura permanece no banco). */}
-        {detalhe.finalidade !== "POS_VENDA" && (
-          <div>
-            <Rotulo>Temperatura</Rotulo>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
-                const ativo = detalhe.temperatura === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      if (!ativo) void salvar({ temperatura: t });
-                    }}
-                    className={`rounded-lg border px-1.5 py-1 transition-colors ${
-                      ativo
-                        ? "border-tiffany bg-tiffany/5"
-                        : "border-transparent hover:bg-black/5"
-                    }`}
-                  >
-                    <BadgeTemperatura temperatura={t} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Etapa */}
       <div>
         <Rotulo>Etapa</Rotulo>
@@ -894,9 +914,6 @@ export function NegocioAcoes({
           ))}
         </select>
       </div>
-
-      {/* Pendencia operacional */}
-      <BlocoPendencia detalhe={detalhe} salvar={salvar} />
 
       <Secao titulo="Gestão">
       {/* Dono / atribuicao / transferencia */}
@@ -1022,127 +1039,36 @@ export function NegocioAcoes({
       </div>
       </Secao>
 
-      {/* Produtos (venda) / Pecas necessarias (pos-venda) */}
-      <div>
-        <Rotulo>
-          {detalhe.finalidade === "POS_VENDA" ? "Pecas necessarias" : "Produtos"}
-        </Rotulo>
-        <div className="space-y-1.5">
-          {produtos.length === 0 && (
-            <p className="text-sm text-medio/50">
-              {detalhe.finalidade === "POS_VENDA" ? "Nenhuma peca indicada." : "Nenhum produto."}
-            </p>
-          )}
-          {produtos.map((p, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between rounded-lg bg-fundo px-3 py-1.5 text-sm"
-            >
-              <span>{p}</span>
-              <button
-                onClick={() =>
-                  void salvar({ produtos: produtos.filter((_, j) => j !== i) })
-                }
-                aria-label="Remover produto"
-                className="text-medio/50 hover:text-erro"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+      {/* Temperatura (so venda) */}
+        {/* Temperatura so na VENDA. Pos-venda usa ganho/pendente/perdido +
+            garantia (o campo Negocio.temperatura permanece no banco). */}
+        {detalhe.finalidade !== "POS_VENDA" && (
+          <div>
+            <Rotulo>Temperatura</Rotulo>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
+                const ativo = detalhe.temperatura === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      if (!ativo) void salvar({ temperatura: t });
+                    }}
+                    className={`rounded-lg border px-1.5 py-1 transition-colors ${
+                      ativo
+                        ? "border-tiffany bg-tiffany/5"
+                        : "border-transparent hover:bg-black/5"
+                    }`}
+                  >
+                    <BadgeTemperatura temperatura={t} />
+                  </button>
+                );
+              })}
             </div>
-          ))}
-          {detalhe.finalidade === "POS_VENDA" ? (
-            <AdicionarPeca
-              onAdicionar={(texto) => void salvar({ produtos: [...produtos, texto] })}
-            />
-          ) : (
-            <input
-              value={novoProduto}
-              onChange={(e) => setNovoProduto(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && novoProduto.trim()) {
-                  void salvar({ produtos: [...produtos, novoProduto.trim()] });
-                  setNovoProduto("");
-                }
-              }}
-              placeholder="Adicionar produto e Enter"
-              className="w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm outline-none focus:border-tiffany"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* DECISAO do orcamento (Fatia 3.07): Pendente e Perdido lado a lado
-          (secundarios, sutis); o GANHO em destaque abaixo, ocupando a largura dos
-          dois. Clicar um estado ativo desmarca (volta a ABERTO). */}
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <button
-            onClick={clicarPendente}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              ehPendente
-                ? "bg-amber-500 text-white hover:bg-amber-600"
-                : "border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10"
-            }`}
-          >
-            <PauseCircle className="h-4 w-4" /> Pendente
-          </button>
-          {etapaPerda && (
-            <button
-              onClick={clicarPerdido}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                ehPerdido
-                  ? "bg-erro text-white hover:brightness-95"
-                  : "border border-erro/40 text-erro hover:bg-erro/10"
-              }`}
-            >
-              <XCircle className="h-4 w-4" /> Perdido
-            </button>
-          )}
-        </div>
-        {etapaGanho && (
-          <button
-            onClick={clicarGanho}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-100 ${
-              ehGanho ? "bg-tiffany-escuro" : "bg-tiffany hover:bg-tiffany-escuro"
-            }`}
-          >
-            <Trophy className="h-5 w-5" /> {ehGanho ? "Ganho" : "Fechar como ganho"}
-          </button>
-        )}
-      </div>
-
-      {/* Captura do motivo ao marcar pendente (mantida onde ja existia). */}
-      {pendAbrir && !ehPendente && (
-        <div className="space-y-2 rounded-lg border border-orange-200 bg-orange-50 p-3">
-          <textarea
-            value={pendMotivo}
-            onChange={(e) => setPendMotivo(e.target.value)}
-            rows={2}
-            autoFocus
-            placeholder="Motivo (ex.: aguardando peca, orcamento, pagamento...)"
-            className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setPendAbrir(false);
-                setPendMotivo("");
-              }}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-medio hover:bg-black/5"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => void confirmarPendente()}
-              disabled={mudandoPend || !pendMotivo.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
-            >
-              {mudandoPend && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Marcar pendente
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      {/* Pendencia operacional */}
+      <BlocoPendencia detalhe={detalhe} salvar={salvar} />
 
       {moverAberto && (
         <ModalMoverFinalidade
@@ -1947,82 +1873,5 @@ function TimelineNegocio({ detalhe }: { detalhe: DetalheNegocio }) {
         );
       })}
     </ol>
-  );
-}
-
-// Indicacao de PECA necessaria (pos-venda): escolhe a peca do catalogo (por
-// categoria/modelo) + quantidade e adiciona a lista de pecas do negocio. Fatia 2.71.
-function AdicionarPeca({ onAdicionar }: { onAdicionar: (texto: string) => void }) {
-  const [pecas, setPecas] = useState<
-    { id: string; nome: string; categoria: string | null; modelo: string | null }[]
-  >([]);
-  const [sel, setSel] = useState("");
-  const [qtd, setQtd] = useState(1);
-
-  useEffect(() => {
-    fetch("/api/catalogo?tipo=PECA")
-      .then((r) => (r.ok ? r.json() : { itens: [] }))
-      .then((d) => setPecas(d.itens ?? []))
-      .catch(() => undefined);
-  }, []);
-
-  const grupos = new Map<string, typeof pecas>();
-  for (const p of pecas) {
-    const g = p.categoria ?? "Outros";
-    if (!grupos.has(g)) grupos.set(g, []);
-    grupos.get(g)!.push(p);
-  }
-
-  function add() {
-    const p = pecas.find((x) => x.id === sel);
-    if (!p) return;
-    const nome = [p.nome, p.modelo].filter(Boolean).join(" ");
-    onAdicionar(qtd > 1 ? `${nome} (${qtd}x)` : nome);
-    setSel("");
-    setQtd(1);
-  }
-
-  if (pecas.length === 0) {
-    return (
-      <p className="text-xs text-medio/50">
-        Nenhuma peca no catalogo. Cadastre em Admin &gt; Catalogo de pedidos.
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <select
-        value={sel}
-        onChange={(e) => setSel(e.target.value)}
-        className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-tiffany"
-      >
-        <option value="">Escolha a peca...</option>
-        {Array.from(grupos.entries()).map(([g, lista]) => (
-          <optgroup key={g} label={g}>
-            {lista.map((p) => (
-              <option key={p.id} value={p.id}>
-                {[p.nome, p.modelo].filter(Boolean).join(" ")}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <input
-        type="number"
-        min="1"
-        value={qtd}
-        onChange={(e) => setQtd(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-        className="w-14 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-tiffany"
-        title="Quantidade"
-      />
-      <button
-        onClick={add}
-        disabled={!sel}
-        className="shrink-0 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
-      >
-        Adicionar
-      </button>
-    </div>
   );
 }
