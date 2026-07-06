@@ -33,6 +33,12 @@ import {
 } from "lucide-react";
 import type { ConversaItem, MensagemItem, Finalidade } from "./tipos";
 import { Compositor, type ViaOtimista } from "./Compositor";
+import {
+  novoClientId,
+  criarBolhaOtimista,
+  enviarTextoOtimista,
+  ehTmp,
+} from "@/lib/otimista";
 import { useToast } from "@/components/ui/Toast";
 import { BadgeFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -88,22 +94,45 @@ export function Thread({
     }
   }
 
-  // Reenvia uma mensagem OUT que falhou (statusEnvio ERRO). Cria um novo envio
-  // com o mesmo texto; a bolha de erro anterior permanece. Fatia 2.89-C.
+  // Reenvia uma mensagem OUT que falhou (statusEnvio ERRO). Cria um NOVO envio
+  // com o mesmo texto, tambem otimista (Fatia 3.11): a nova bolha "enviando"
+  // aparece na hora. Se a bolha antiga era TEMPORARIA (client-only, ex.: rede
+  // caiu), ela some; se era REAL persistida como ERRO, permanece (um refetch a
+  // traria de volta). Sem via otimista (nao ocorre no Inbox/Kanban), cai no
+  // reenvio simples de 2.89-C.
   async function reenviar(m: MensagemItem) {
-    try {
-      const r = await fetch("/api/mensagens/enviar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversaId: conversa.id, texto: m.conteudo ?? "" }),
-      });
-      const d = await r.json().catch(() => null);
-      if (r.ok && d?.mensagem) {
-        onEnviada?.(d.mensagem as MensagemItem);
-      } else {
-        toast.erro(d?.erro ?? "Nao foi possivel reenviar.");
+    const texto = (m.conteudo ?? "").trim();
+    if (!texto) return;
+
+    if (!otimista) {
+      try {
+        const r = await fetch("/api/mensagens/enviar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversaId: conversa.id, texto }),
+        });
+        const d = await r.json().catch(() => null);
+        if (r.ok && d?.mensagem) onEnviada?.(d.mensagem as MensagemItem);
+        else toast.erro(d?.erro ?? "Nao foi possivel reenviar.");
+      } catch {
+        toast.erro("Falha de conexao.");
       }
-    } catch {
+      return;
+    }
+
+    if (ehTmp(m.id)) otimista.falhar(m.id, true);
+    const clientId = novoClientId();
+    otimista.adicionar(
+      criarBolhaOtimista({ clientId, texto, hora: new Date().toISOString() }),
+    );
+    const res = await enviarTextoOtimista(otimista, clientId, {
+      conversaId: conversa.id,
+      texto,
+      clientId,
+    });
+    if (res.tipo === "sem-bolha" || res.tipo === "erro-persistido") {
+      toast.erro(res.erro ?? "Nao foi possivel reenviar.");
+    } else if (res.tipo === "rede") {
       toast.erro("Falha de conexao.");
     }
   }

@@ -17,6 +17,16 @@
 
 import type { MensagemItem } from "@/components/inbox/tipos";
 
+// Via de render OTIMISTA: o dono da lista (Inbox/ConversaEmbed) expoe estas tres
+// acoes; o compositor e o Reenviar do Thread apenas as disparam. `adicionar`
+// injeta a bolha "enviando"; `reconciliar` troca tmp->real quando a API responde;
+// `falhar` marca ERRO (remover=false) ou remove a bolha (remover=true).
+export type ViaOtimista = {
+  adicionar: (msg: MensagemItem) => void;
+  reconciliar: (clientId: string, real: MensagemItem) => void;
+  falhar: (clientId: string, remover: boolean) => void;
+};
+
 // Prefixo do id temporario. `ehTmp` distingue bolha otimista da real.
 export const PREFIXO_TMP = "tmp-";
 
@@ -129,4 +139,47 @@ export function mesclarSocket(
     }
   }
   return prev.some((m) => m.id === ev.mensagemId) ? prev : [...prev, montar()];
+}
+
+// Resultado do POST otimista, para o caller ajustar a UI (banner/texto/toast):
+//  - "ok":             enviada; bolha real ENVIADA no lugar.
+//  - "erro-persistido": Evolution falhou mas a bolha foi gravada (502 + mensagem);
+//                       bolha real ERRO no lugar (mostra "Nao enviada"/Reenviar).
+//  - "sem-bolha":      falha "dura" sem gravar (sem numero valido, 400/404/422);
+//                       a bolha otimista foi REMOVIDA.
+//  - "rede":           resposta perdida; bolha marcada ERRO (o socket com clientId
+//                       pode reconciliar depois se o envio de fato ocorreu).
+export type ResultadoEnvio =
+  | { tipo: "ok" }
+  | { tipo: "erro-persistido"; erro?: string }
+  | { tipo: "sem-bolha"; erro?: string }
+  | { tipo: "rede" };
+
+// Dispara o POST /api/mensagens/enviar e reconcilia a bolha otimista, cobrindo
+// todos os desfechos. Centraliza a logica compartilhada pelo Compositor (envio)
+// e pelo Reenviar do Thread — o corpo (instancia/reply) vem do caller.
+export async function enviarTextoOtimista(
+  via: ViaOtimista,
+  clientId: string,
+  body: Record<string, unknown>,
+): Promise<ResultadoEnvio> {
+  try {
+    const r = await fetch("/api/mensagens/enviar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => null);
+    if (d?.mensagem) {
+      via.reconciliar(clientId, d.mensagem as MensagemItem);
+      return r.ok
+        ? { tipo: "ok" }
+        : { tipo: "erro-persistido", erro: d?.erro };
+    }
+    via.falhar(clientId, true);
+    return { tipo: "sem-bolha", erro: d?.erro };
+  } catch {
+    via.falhar(clientId, false);
+    return { tipo: "rede" };
+  }
 }

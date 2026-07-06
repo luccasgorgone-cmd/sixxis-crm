@@ -34,17 +34,16 @@ import {
   type LeadModelo,
 } from "@/lib/modelos";
 import { useAgente } from "@/components/shell/AgenteContext";
-import { novoClientId, criarBolhaOtimista } from "@/lib/otimista";
+import {
+  novoClientId,
+  criarBolhaOtimista,
+  enviarTextoOtimista,
+  type ViaOtimista,
+} from "@/lib/otimista";
 
-// Via de render OTIMISTA do texto (Fatia 3.11): o pai (Inbox/ConversaEmbed) e
-// dono da lista de mensagens; o compositor so dispara estas acoes. `adicionar`
-// injeta a bolha "enviando" na hora; `reconciliar` troca tmp->real quando a API
-// responde; `falhar` marca ERRO (remover=false) ou remove a bolha (remover=true).
-export type ViaOtimista = {
-  adicionar: (msg: MensagemItem) => void;
-  reconciliar: (clientId: string, real: MensagemItem) => void;
-  falhar: (clientId: string, remover: boolean) => void;
-};
+// Reexport para os consumidores existentes (Thread/Inbox/ConversaEmbed) que
+// importam o tipo daqui. A definicao vive em @/lib/otimista (Fatia 3.11).
+export type { ViaOtimista };
 
 type Resposta = {
   id: string;
@@ -685,39 +684,23 @@ export function Compositor({
     onCancelarResposta?.();
     ref.current?.focus();
 
-    // 2) POST em background: reconcilia tmp -> real.
-    try {
-      const r = await fetch("/api/mensagens/enviar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversaId,
-          texto: valor,
-          clientId,
-          ...(instanciaEnvio ? { instanciaId: instanciaEnvio } : {}),
-          ...(reply ? { respostaAId: reply.id } : {}),
-        }),
-      });
-      const d = await r.json().catch(() => null);
-      if (d?.mensagem) {
-        // Sucesso OU falha da Evolution com bolha JA persistida (502 + mensagem):
-        // a real ja traz o statusEnvio certo (ENVIADA/ERRO). Reconcilia no lugar.
-        otimista.reconciliar(clientId, d.mensagem as MensagemItem);
-      } else {
-        // Falha "dura" sem bolha (sem numero valido, 400/404/422): remove a
-        // bolha otimista e devolve o texto ao compositor para reenviar.
-        otimista.falhar(clientId, true);
-        setTexto((t) => (t.trim() ? t : valor));
-        setErro(d?.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.");
-      }
-    } catch {
-      // Rede caiu / resposta perdida: NAO remove a bolha (o envio pode ter ido).
-      // Marca ERRO com Reenviar; se de fato foi, o socket ("mensagem:nova" com
-      // clientId) reconcilia sozinho para ENVIADA. Nao devolve o texto (evita
-      // envio duplicado).
-      otimista.falhar(clientId, false);
+    // 2) POST em background: reconcilia tmp -> real (ou marca erro).
+    const res = await enviarTextoOtimista(otimista, clientId, {
+      conversaId,
+      texto: valor,
+      clientId,
+      ...(instanciaEnvio ? { instanciaId: instanciaEnvio } : {}),
+      ...(reply ? { respostaAId: reply.id } : {}),
+    });
+    if (res.tipo === "sem-bolha") {
+      // Falha "dura" sem bolha: devolve o texto ao compositor (se ainda vazio).
+      setTexto((t) => (t.trim() ? t : valor));
+      setErro(res.erro ?? "Falha ao enviar. Verifique a conexao com o WhatsApp.");
+    } else if (res.tipo === "rede") {
+      // Resposta perdida: a bolha ja mostra ERRO/Reenviar; avisa no banner.
       setErro("Nao foi possivel confirmar o envio. Se persistir, use Reenviar.");
     }
+    // "ok" / "erro-persistido": a propria bolha reflete o estado (nada a fazer).
   }
 
   function aoTeclar(e: KeyboardEvent<HTMLTextAreaElement>) {
