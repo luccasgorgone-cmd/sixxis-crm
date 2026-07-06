@@ -573,7 +573,7 @@ function EditorOrcamento(props: EditorProps) {
       )}
 
       {/* 2. CARRINHO: itens ja adicionados ao orcamento. */}
-      {usos && usos.length > 0 && (
+      {mostrarResumo && usos && usos.length > 0 && (
         <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-medio/40">
           No orçamento
         </p>
