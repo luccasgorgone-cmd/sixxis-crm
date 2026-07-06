@@ -247,6 +247,21 @@ function finalidadeDe(v?: string): Finalidade | undefined {
   return undefined;
 }
 
+// Soma o valor OFICIAL dos negocios que casam o `where`: COALESCE(valorAjustado,
+// valor) — o cobrado com desconto/frete quando ha ajuste, senao o valor. Feito em
+// dois agregados (base sem ajuste + os ajustes), sem buscar linhas. Fatia 3.10:
+// alinha o Oracle a derivacao oficial (excecao explicita a trava de leitura).
+async function somaValorDerivado(where: Prisma.NegocioWhereInput): Promise<number> {
+  const [base, ajuste] = await Promise.all([
+    prisma.negocio.aggregate({ _sum: { valor: true }, where: { ...where, valorAjustado: null } }),
+    prisma.negocio.aggregate({
+      _sum: { valorAjustado: true },
+      where: { ...where, valorAjustado: { not: null } },
+    }),
+  ]);
+  return num(base._sum.valor) + num(ajuste._sum.valorAjustado);
+}
+
 // ---------------------------------------------------------------------------
 // FERRAMENTAS DE LEITURA (cada uma escopada pelo usuario).
 // ---------------------------------------------------------------------------
@@ -258,19 +273,17 @@ async function consultarVendas(
   const base = escopoNegocio(agente);
   const fin = finalidadeDe(input.finalidade);
   const wfin = fin ? { finalidade: fin } : {};
-  const ganhos = await prisma.negocio.aggregate({
-    where: { ...base, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: inicio, lte: fim } },
-    _count: true,
-    _sum: { valor: true },
-  });
+  const whereGanho = { ...base, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: inicio, lte: fim } };
+  const ganhos = await prisma.negocio.count({ where: whereGanho });
   const perdidos = await prisma.negocio.count({
     where: { ...base, ...wfin, status: StatusNeg.PERDIDO, fechadoEm: { gte: inicio, lte: fim } },
   });
   const abertos = await prisma.negocio.count({
     where: { ...base, ...wfin, status: StatusNeg.ABERTO },
   });
-  const qtdGanhos = ganhos._count;
-  const valorGanhos = num(ganhos._sum.valor);
+  const qtdGanhos = ganhos;
+  // Valor OFICIAL: COALESCE(valorAjustado, valor) — Fatia 3.10.
+  const valorGanhos = await somaValorDerivado(whereGanho);
   return {
     escopo: ehAdmin(agente.papel) ? "empresa" : "sua carteira",
     periodo: { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) },
@@ -359,17 +372,18 @@ async function consultarDesempenhoVendedores(
   const numDe = async (agenteId: string) => {
     // Desempenho de VENDEDORES conta apenas VENDA: pedidos de pecas (pos-venda)
     // e itens de garantia NAO entram como venda de usuario (Fatia 3.02).
-    const agg = await prisma.negocio.aggregate({
-      where: {
-        agenteId,
-        finalidade: Finalidade.VENDA,
-        status: StatusNeg.GANHO,
-        fechadoEm: { gte: inicio, lte: fim },
-      },
-      _count: true,
-      _sum: { valor: true },
-    });
-    return { ganhos: agg._count, valorGanhos: num(agg._sum.valor) };
+    const w = {
+      agenteId,
+      finalidade: Finalidade.VENDA,
+      status: StatusNeg.GANHO,
+      fechadoEm: { gte: inicio, lte: fim },
+    };
+    // Valor OFICIAL: COALESCE(valorAjustado, valor) — Fatia 3.10.
+    const [qtd, valorGanhos] = await Promise.all([
+      prisma.negocio.count({ where: w }),
+      somaValorDerivado(w),
+    ]);
+    return { ganhos: qtd, valorGanhos };
   };
   // NAO-ADMIN: so o proprio desempenho (nunca de outro usuario).
   if (!ehAdmin(agente.papel)) {
@@ -1097,11 +1111,13 @@ async function compararPeriodos(
     const wfin = fin ? { finalidade: fin } : {};
     switch (metrica) {
       case "vendas": {
-        const g = await prisma.negocio.aggregate({
-          where: { ...bn, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: ini, lt: fim } },
-          _sum: { valor: true },
+        // Valor OFICIAL: COALESCE(valorAjustado, valor) — Fatia 3.10.
+        return somaValorDerivado({
+          ...bn,
+          ...wfin,
+          status: StatusNeg.GANHO,
+          fechadoEm: { gte: ini, lt: fim },
         });
-        return num(g._sum.valor);
       }
       case "negocios_ganhos":
         return prisma.negocio.count({
