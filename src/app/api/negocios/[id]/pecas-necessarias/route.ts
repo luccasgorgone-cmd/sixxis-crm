@@ -188,25 +188,42 @@ export async function POST(
     );
   }
 
-  const uso = await prisma.pecaUso.create({
-    data: {
-      origem: "NEGOCIO",
-      negocioId: id,
-      pecaId,
-      quantidade,
-      garantia: body.garantia === true,
-      agenteId: agente.id,
+  const garantia = body.garantia === true;
+  const selectUso = {
+    id: true,
+    quantidade: true,
+    garantia: true,
+    peca: {
+      select: { id: true, nome: true, modelo: true, precoSugerido: true, estoque: true },
     },
-    select: {
-      id: true,
-      quantidade: true,
-      garantia: true,
-      peca: {
-        select: { id: true, nome: true, modelo: true, precoSugerido: true, estoque: true },
-      },
-    },
+  } as const;
+
+  // MERGE (Fatia 3.16): adicionar o MESMO item (mesmo pecaId E mesmo estado de
+  // garantia) SOMA na quantidade em vez de duplicar a linha. Itens iguais com
+  // garantia DIFERENTE ficam SEPARADOS — cobravel e cortesia sao coisas distintas
+  // no orcamento. Teto de 99: se a soma passar, limita a 99 e sinaliza (limitado).
+  const existente = await prisma.pecaUso.findFirst({
+    where: { negocioId: id, origem: "NEGOCIO", pecaId, garantia },
+    select: { id: true, quantidade: true },
   });
-  return NextResponse.json({ peca: serializarUso(uso) });
+
+  let uso;
+  let limitado = false;
+  if (existente) {
+    const somada = existente.quantidade + quantidade;
+    limitado = somada > 99;
+    uso = await prisma.pecaUso.update({
+      where: { id: existente.id },
+      data: { quantidade: Math.min(99, somada) },
+      select: selectUso,
+    });
+  } else {
+    uso = await prisma.pecaUso.create({
+      data: { origem: "NEGOCIO", negocioId: id, pecaId, quantidade, garantia, agenteId: agente.id },
+      select: selectUso,
+    });
+  }
+  return NextResponse.json({ peca: serializarUso(uso), ...(limitado ? { limitado: true } : {}) });
 }
 
 type UsoRow = {
