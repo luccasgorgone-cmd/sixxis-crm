@@ -181,8 +181,8 @@ export async function POST(
       {
         erro:
           tipoEsperado === TipoCatalogo.PECA
-            ? "neste atendimento de pos-venda so entram pecas"
-            : "nesta venda so entram produtos",
+            ? "Neste atendimento de pós-venda só entram peças."
+            : "Nesta venda só entram produtos.",
       },
       { status: 400 },
     );

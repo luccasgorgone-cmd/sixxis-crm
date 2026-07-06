@@ -23,7 +23,7 @@ const CARD = rgb(0.963, 0.971, 0.97); // preenchimento do card do cliente
 // Dados da marca (cabecalho/rodape).
 const MARCA = {
   nome: "Sixxis",
-  endereco: "R. Anhanguera, 1711 - Icaray, Aracatuba/SP",
+  endereco: "R. Anhanguera, 1711 - Icaray, Araçatuba/SP",
   email: "sac@sixxis.com.br",
   site: "www.sixxis.com.br",
 };
@@ -132,7 +132,7 @@ export async function gerarPdfOrcamento(
   logo?: LogoEmbed | null,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Orcamento ${dados.numeroFormatado}`);
+  doc.setTitle(`Orçamento ${dados.numeroFormatado}`);
   doc.setProducer("Sixxis CRM");
   doc.setCreator("Sixxis CRM");
 
@@ -207,7 +207,7 @@ export async function gerarPdfOrcamento(
     // Wordmark textual (fallback quando a logo nao e PNG/JPEG embutivel).
     page.drawText(MARCA.nome, { x: xEsq, y: y - 30, size: 30, font: fonteBold, color: TIFFANY });
   }
-  textoDir(page, "ORCAMENTO", xDir, y - 8, 8, fonteBold, TIFFANY);
+  textoDir(page, "ORÇAMENTO", xDir, y - 8, 8, fonteBold, TIFFANY);
   textoDir(page, dados.numeroFormatado, xDir, y - 24, 15, fonteBold, ESCURO);
   textoDir(page, `Emitido em ${dados.dataFormatada}`, xDir, y - 38, 9, fonte, CINZA);
   y -= 52;
@@ -221,7 +221,7 @@ export async function gerarPdfOrcamento(
   y -= 26;
 
   // ---- TITULO ----
-  page.drawText("Orcamento", { x: xEsq, y: y - 4, size: 24, font: fonteBold, color: ESCURO });
+  page.drawText("Orçamento", { x: xEsq, y: y - 4, size: 24, font: fonteBold, color: ESCURO });
   y -= 28;
 
   // ---- CARD DO CLIENTE ----
@@ -275,7 +275,7 @@ export async function gerarPdfOrcamento(
     const hH = 22;
     page.drawRectangle({ x: xEsq, y: y - hH, width: larguraUtil, height: hH, color: TIFFANY_SUAVE });
     const base = y - hH + 7;
-    page.drawText("Descricao", { x: descL, y: base, size: 9, font: fonteBold, color: ESCURO });
+    page.drawText("Descrição", { x: descL, y: base, size: 9, font: fonteBold, color: ESCURO });
     textoDir(page, "Qtd", colQtdR, base, 9, fonteBold, ESCURO);
     textoDir(page, "Valor unit.", colUnitR, base, 9, fonteBold, ESCURO);
     textoDir(page, "Subtotal", colSubR, base, 9, fonteBold, ESCURO);
@@ -369,7 +369,7 @@ export async function gerarPdfOrcamento(
   if (dados.fretePagoPelaEmpresa) {
     linhaTot("Frete", "Cortesia Sixxis", TIFFANY, CINZA);
   } else {
-    linhaTot("Frete", dados.frete && dados.frete > 0 ? brl(dados.frete) : "Gratis");
+    linhaTot("Frete", dados.frete && dados.frete > 0 ? brl(dados.frete) : "Grátis");
   }
 
   // Caixa TIFFANY do TOTAL.
@@ -384,7 +384,7 @@ export async function gerarPdfOrcamento(
   y = boxY - 18;
 
   if (dados.totalGarantia > 0) {
-    page.drawText(`Itens em garantia - cortesia (nao cobrado): ${brl(dados.totalGarantia)}`, {
+    page.drawText(`Itens em garantia - cortesia (não cobrado): ${brl(dados.totalGarantia)}`, {
       x: totLabelX,
       y,
       size: 8.5,
@@ -397,7 +397,7 @@ export async function gerarPdfOrcamento(
   // ---- RODAPE (na base da ultima pagina) ----
   const yF = MARGEM + 28;
   linhaFina(yF + 16);
-  page.drawText("Orcamento valido por 7 dias   Duvidas? Chame no WhatsApp", {
+  page.drawText("Orçamento válido por 7 dias   Dúvidas? Chame no WhatsApp", {
     x: xEsq,
     y: yF,
     size: 9,
@@ -410,7 +410,7 @@ export async function gerarPdfOrcamento(
   const pages = doc.getPages();
   if (pages.length > 1) {
     pages.forEach((p, i) => {
-      const t = `Pagina ${i + 1} de ${pages.length}`;
+      const t = `Página ${i + 1} de ${pages.length}`;
       const w = fonte.widthOfTextAtSize(t, 8);
       p.drawText(t, { x: (LARGURA - w) / 2, y: 24, size: 8, font: fonte, color: CINZA_CLARO });
     });

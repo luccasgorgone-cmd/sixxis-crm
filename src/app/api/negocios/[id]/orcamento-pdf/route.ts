@@ -31,7 +31,7 @@ export async function POST(
   }
   if (!montagem.temItens) {
     return NextResponse.json(
-      { erro: "orcamento sem itens" },
+      { erro: "Orçamento sem itens." },
       { status: 422 },
     );
   }
@@ -44,7 +44,7 @@ export async function POST(
   const url = await enviarParaR2ComRetry(chave, buffer, "application/pdf");
   if (!url) {
     return NextResponse.json(
-      { erro: "falha ao salvar o PDF (R2 indisponivel)" },
+      { erro: "Falha ao salvar o PDF." },
       { status: 502 },
     );
   }

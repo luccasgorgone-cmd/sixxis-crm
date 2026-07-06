@@ -23,7 +23,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LEGENDA = "Segue seu orcamento, qualquer duvida estou a disposicao.";
+const LEGENDA = "Segue seu orçamento, qualquer dúvida estou à disposição.";
 
 export async function POST(
   _req: NextRequest,
@@ -43,7 +43,7 @@ export async function POST(
     return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
   }
   if (!montagem.temItens) {
-    return NextResponse.json({ erro: "orcamento sem itens" }, { status: 422 });
+    return NextResponse.json({ erro: "Orçamento sem itens." }, { status: 422 });
   }
 
   // Conversa ATIVA da finalidade do negocio (mesma que o Inbox/Kanban embutem):
@@ -61,13 +61,13 @@ export async function POST(
   });
   if (!conversa) {
     return NextResponse.json(
-      { erro: "cliente ainda nao tem conversa nesta finalidade" },
+      { erro: "O cliente ainda não tem conversa nesta finalidade." },
       { status: 422 },
     );
   }
   const numero = montagem.telefone.replace(/\D/g, "");
   if (!numero) {
-    return NextResponse.json({ erro: "cliente sem telefone valido" }, { status: 422 });
+    return NextResponse.json({ erro: "Cliente sem telefone válido." }, { status: 422 });
   }
 
   // Gera o PDF (com a logo da marca, se PNG/JPEG) e sobe no R2 (chave estavel).
@@ -157,7 +157,7 @@ export async function POST(
 
   if (!resultado.ok) {
     return NextResponse.json(
-      { ok: false, erro: "falha ao enviar o orcamento na Evolution", mensagem: payloadMsg },
+      { ok: false, erro: "Falha ao enviar o orçamento pelo WhatsApp.", mensagem: payloadMsg },
       { status: 502 },
     );
   }
