@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ReceiptText,
+  Send,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { InputBusca } from "@/components/ui/InputBusca";
@@ -73,6 +74,11 @@ type EditorProps = {
   movimentaEstoque: boolean;
   mostrarResumo: boolean;
   negocioId?: string;
+  // Envio do orcamento em PDF (so no orcamento do negocio). Nome/telefone do
+  // cliente sao usados apenas no texto da confirmacao. Fatia 3.13.
+  permitirEnvio?: boolean;
+  clienteNome?: string | null;
+  clienteTelefone?: string | null;
   onMudou?: () => void;
 };
 
@@ -118,6 +124,9 @@ function EditorOrcamento(props: EditorProps) {
     movimentaEstoque,
     mostrarResumo,
     negocioId,
+    permitirEnvio = false,
+    clienteNome,
+    clienteTelefone,
     onMudou,
   } = props;
   const ehVenda = modo === "VENDA";
@@ -151,6 +160,9 @@ function EditorOrcamento(props: EditorProps) {
   // livres). cupomOutro lembra que o usuario escolheu "Outro" mesmo com os campos
   // ainda vazios (senao o select voltaria a "Sem cupom"). Fatia 3.13.
   const [cupomOutro, setCupomOutro] = useState(false);
+  // Envio do orcamento em PDF: confirmacao leve (2 passos) + estado de envio.
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false);
+  const [enviandoOrc, setEnviandoOrc] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -310,6 +322,29 @@ function EditorOrcamento(props: EditorProps) {
       await carregarLista();
     } finally {
       setRemovendo(null);
+    }
+  }
+
+  // Envia o orcamento em PDF ao cliente (acao real). Gera+envia no servidor; a
+  // mensagem aparece na thread (OUT). Confirmacao leve de 2 passos no botao.
+  async function enviarOrcamento() {
+    if (!negocioId || enviandoOrc) return;
+    setEnviandoOrc(true);
+    setConfirmandoEnvio(false);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/enviar-orcamento`, {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.ok) {
+        toast.erro(d?.erro ?? "Não foi possível enviar o orçamento.");
+        return;
+      }
+      toast.sucesso(`Orçamento ${d.numeroFormatado ?? ""} enviado ao cliente.`.trim());
+    } catch {
+      toast.erro("Falha de conexão ao enviar.");
+    } finally {
+      setEnviandoOrc(false);
     }
   }
 
@@ -699,7 +734,49 @@ function EditorOrcamento(props: EditorProps) {
         </div>
       )}
 
-      {/* 4. ENVIAR orcamento + DECISOES — inseridos no Bloco 3 (Fatia 3.13). */}
+      {/* 4. ENVIAR orcamento ao cliente (PDF). As DECISOES (Pendente|Perdido +
+          Ganho) ficam logo abaixo, no NegocioAcoes que segue este bloco. */}
+      {permitirEnvio && negocioId && (
+        <div className="border-t border-black/5 pt-3">
+          {!confirmandoEnvio ? (
+            <button
+              onClick={() => setConfirmandoEnvio(true)}
+              disabled={!usos || usos.length === 0 || enviandoOrc}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-tiffany bg-tiffany/5 px-3 py-2 text-sm font-semibold text-tiffany transition-colors hover:bg-tiffany/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {enviandoOrc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Enviar orçamento ao cliente
+            </button>
+          ) : (
+            <div className="space-y-2 rounded-lg border border-tiffany/30 bg-tiffany/[0.03] p-2.5">
+              <p className="text-xs text-medio/70">
+                Enviar o orçamento em PDF para{" "}
+                <span className="font-semibold text-escuro">
+                  {clienteNome || clienteTelefone || "o cliente"}
+                </span>
+                ?
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmandoEnvio(false)}
+                  disabled={enviandoOrc}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-medio hover:bg-black/5 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void enviarOrcamento()}
+                  disabled={enviandoOrc}
+                  className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
+                >
+                  {enviandoOrc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  Enviar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -751,9 +828,13 @@ function GrupoPecas({
 export function BlocoOrcamento({
   negocioId,
   finalidade,
+  clienteNome,
+  clienteTelefone,
 }: {
   negocioId: string;
   finalidade: "VENDA" | "POS_VENDA";
+  clienteNome?: string | null;
+  clienteTelefone?: string | null;
 }) {
   const ehPos = finalidade === "POS_VENDA";
   const salvarModelo = useCallback(
@@ -787,6 +868,9 @@ export function BlocoOrcamento({
       movimentaEstoque={false}
       mostrarResumo
       negocioId={negocioId}
+      permitirEnvio
+      clienteNome={clienteNome}
+      clienteTelefone={clienteTelefone}
     />
   );
 }

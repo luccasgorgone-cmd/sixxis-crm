@@ -201,6 +201,8 @@ export function PainelClienteInbox({
             <BlocoOrcamento
               negocioId={negocioId}
               finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+              clienteNome={cliente.nomeEfetivo}
+              clienteTelefone={cliente.telefone}
             />
           )}
 

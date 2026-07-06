@@ -454,6 +454,8 @@ export function PainelNegocio({
                 <BlocoOrcamento
                   negocioId={negocioId}
                   finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+                  clienteNome={detalhe.cliente.nomeEfetivo}
+                  clienteTelefone={detalhe.cliente.telefone}
                 />
 
                 <NegocioAcoes
