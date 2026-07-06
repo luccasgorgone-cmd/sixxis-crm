@@ -1292,7 +1292,7 @@ export function BlocoAcompanhamento({
                   void salvar({ notaFiscal: nf.trim() });
                 }
               }}
-              placeholder="Numero da NF (opcional)"
+              placeholder="Número NF"
               className="w-full rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany"
             />
           </div>
@@ -1518,7 +1518,7 @@ export function BlocoRastreio({
                 void salvarTransporte({ transportadora: transportadora.trim() });
               }
             }}
-            placeholder="Ex.: Correios, Jadlog, transportadora propria..."
+            placeholder="Ex.: Correios, Jadlog..."
             className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           />
         </div>
@@ -1608,7 +1608,7 @@ export function BlocoRastreio({
               value={novaTransp}
               onChange={(e) => setNovaTransp(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void adicionarCodigo()}
-              placeholder="Transportadora (opcional)"
+              placeholder="Transportadora"
               className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
             />
           </div>
