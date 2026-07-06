@@ -1,6 +1,7 @@
 // Helpers de dominio do Negocio compartilhados por worker, backfill e APIs.
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
+import { campoDono } from "./dono";
 import {
   StatusNeg,
   TipoEtapa,
@@ -45,6 +46,17 @@ export async function garantirNegocioParaLead(
   const etapa = await primeiraEtapaAberta(finalidade);
   if (!etapa) return null; // funil ainda nao configurado
 
+  // Dono da finalidade -> agenteId do negocio (mesma regra do roteamento). Sem
+  // isto, negocios criados por "Conversar"/cadastro manual nasciam ORFAOS
+  // (agenteId null) e SUMIAM do Kanban do proprio colaborador, que filtra por
+  // agenteId = ele. Fatia 3.07 (bug do card que nao aparecia sem F5). null quando
+  // nao ha dono ainda (ex.: backfill) — segue o comportamento anterior.
+  const leadDono = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { donoId: true, donoPosVendaId: true },
+  });
+  const agenteId = leadDono ? leadDono[campoDono(finalidade)] : null;
+
   // LEAD PERDIDO QUE VOLTA: sem negocio aberto, mas ha um PERDIDO na finalidade ->
   // REABRE o mesmo negocio (nao cria duplicata). Preserva TODO o historico: o
   // registro da PERDA (HistoricoNegocio.PERDA) e os rastreios continuam ligados a
@@ -66,6 +78,9 @@ export async function garantirNegocioParaLead(
         // HistoricoNegocio, entao o registro da perda NAO some.
         motivoPerda: null,
         motivoPerdaObs: null,
+        // Reatribui ao dono da finalidade quando houver (nao apaga um agenteId ja
+        // definido se o lead estiver sem dono no momento).
+        ...(agenteId ? { agenteId } : {}),
         historicos: {
           create: {
             tipo: TipoHistorico.NOTA,
@@ -91,6 +106,7 @@ export async function garantirNegocioParaLead(
     data: {
       leadId,
       etapaId: etapa.id,
+      agenteId,
       status: StatusNeg.ABERTO,
       temperatura: Temperatura.MORNO,
       finalidade,

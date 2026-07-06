@@ -41,10 +41,18 @@ export function ModalEnviarContato({
         }),
       });
       const d = await r.json().catch(() => null);
-      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      // ERRO (ex.: 502 do fallback): NAO adiciona ao thread aqui (o card com erro
+      // ja chega pelo socket) e mantem o modal aberto com um erro claro. Fatia 3.07.
       if (!r.ok) {
         toast.erro(d?.erro ?? "Nao foi possivel enviar o contato.");
         return;
+      }
+      // SUCESSO: fecha SEMPRE. O onEnviada e protegido para nunca bloquear o
+      // fechamento (antes, um erro nele deixava o modal preso aberto).
+      try {
+        if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      } catch {
+        // ignora: a mensagem tambem chega pelo socket
       }
       toast.sucesso("Contato enviado.");
       onFechar();

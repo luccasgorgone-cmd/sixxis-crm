@@ -184,6 +184,20 @@ export function Kanban({
     void carregar();
   }, [carregar]);
 
+  // Recarrega ao voltar o foco/visibilidade: negocios criados enquanto o Kanban
+  // estava fora (ex.: "Conversar" no Inbox) aparecem sem F5 forcado. Fatia 3.07.
+  useEffect(() => {
+    function aoVoltar() {
+      if (document.visibilityState === "visible") void carregar();
+    }
+    window.addEventListener("focus", aoVoltar);
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      window.removeEventListener("focus", aoVoltar);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, [carregar]);
+
   // Listas auxiliares (uma vez).
   useEffect(() => {
     fetch("/api/etiquetas")
