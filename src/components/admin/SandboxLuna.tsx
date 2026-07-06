@@ -125,6 +125,27 @@ export function SandboxLuna() {
         nada e enviado a clientes nem gravado.
       </p>
 
+      {/* Casos rapidos de PECAS (Fatia 3.10): preenchem a entrada em POS-VENDA. */}
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-medium text-medio/50">Exemplos de peca:</span>
+        {[
+          "Tem filtro colmeia do SX100?",
+          "Quanto custa a rodinha do aspirador Bravo?",
+          "Essa peca serve no modelo X?",
+        ].map((ex) => (
+          <button
+            key={ex}
+            onClick={() => {
+              setFinalidade("POS_VENDA");
+              setInput(ex);
+            }}
+            className="rounded-full border border-black/10 px-2.5 py-0.5 text-[11px] text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-black/5 bg-white">
         {/* Barra: finalidade + limpar */}
         <div className="flex items-center gap-2 border-b border-black/5 px-3 py-2">
