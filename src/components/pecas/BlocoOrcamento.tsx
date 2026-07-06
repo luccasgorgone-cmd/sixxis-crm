@@ -67,6 +67,9 @@ type EditorProps = {
   listUrl: string;
   addUrl: string;
   removeUrl: (usoId: string) => string;
+  // Quando presente, habilita o stepper de quantidade na lista (PATCH staging).
+  // Ausente (ex.: Pecas aplicadas do Local) -> sem stepper. Fatia 3.16.
+  qtdUrl?: (usoId: string) => string;
   modeloEditavel: boolean;
   modeloFixo?: string | null;
   salvarModelo?: (modelo: string | null) => Promise<boolean>;
@@ -120,6 +123,7 @@ function EditorOrcamento(props: EditorProps) {
     listUrl,
     addUrl,
     removeUrl,
+    qtdUrl,
     modeloEditavel,
     modeloFixo = null,
     salvarModelo,
@@ -305,7 +309,8 @@ function EditorOrcamento(props: EditorProps) {
       }
       await carregarLista();
       onMudou?.();
-      toast.sucesso(ehVenda ? "Produto adicionado." : "Peça adicionada.");
+      if (d?.limitado) toast.sucesso("Quantidade somada (máximo de 99 atingido).");
+      else toast.sucesso(ehVenda ? "Produto adicionado." : "Peça adicionada.");
     } catch {
       toast.erro("Falha de conexão.");
     } finally {
@@ -328,6 +333,42 @@ function EditorOrcamento(props: EditorProps) {
     } finally {
       setRemovendo(null);
     }
+  }
+
+  // Ajuste de quantidade na lista (Fatia 3.16): otimista + PATCH com debounce por
+  // item. O total/resumo recalculam ao vivo (derivam de `usos`). Só ativo quando
+  // qtdUrl e fornecido (orcamento do negocio; staging, sem mexer em estoque).
+  const qtdDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  function salvarQtd(usoId: string, quantidade: number) {
+    if (!qtdUrl) return;
+    const timers = qtdDebounceRef.current;
+    const anterior = timers.get(usoId);
+    if (anterior) clearTimeout(anterior);
+    timers.set(
+      usoId,
+      setTimeout(async () => {
+        try {
+          const r = await fetch(qtdUrl(usoId), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quantidade }),
+          });
+          if (r.ok) onMudou?.();
+          else {
+            toast.erro("Não foi possível ajustar a quantidade.");
+            await carregarLista();
+          }
+        } catch {
+          await carregarLista();
+        }
+      }, 400),
+    );
+  }
+  function ajustarQtd(u: Uso, delta: number) {
+    const nova = Math.min(99, Math.max(1, u.quantidade + delta));
+    if (nova === u.quantidade) return;
+    setUsos((prev) => (prev ? prev.map((x) => (x.id === u.id ? { ...x, quantidade: nova } : x)) : prev));
+    salvarQtd(u.id, nova);
   }
 
   // Envia o orcamento em PDF ao cliente (acao real). Gera+envia no servidor; a
@@ -596,7 +637,7 @@ function EditorOrcamento(props: EditorProps) {
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-escuro">
-                  <span className="text-medio/60">{u.quantidade}x </span>
+                  {!qtdUrl && <span className="text-medio/60">{u.quantidade}x </span>}
                   {u.nome}
                   {u.modelo && <span className="text-medio/50"> {u.modelo}</span>}
                 </p>
@@ -617,6 +658,29 @@ function EditorOrcamento(props: EditorProps) {
                   )}
                 </div>
               </div>
+              {/* Stepper de quantidade (so no orcamento do negocio, via qtdUrl):
+                  ajuste otimista + PATCH com debounce; total recalcula ao vivo. */}
+              {qtdUrl && (
+                <div className="flex shrink-0 items-center rounded-lg border border-black/10">
+                  <button
+                    onClick={() => ajustarQtd(u, -1)}
+                    disabled={u.quantidade <= 1}
+                    aria-label="Diminuir quantidade"
+                    className="flex h-6 w-6 items-center justify-center text-medio/70 hover:bg-black/5 disabled:opacity-30"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <span className="w-6 text-center text-xs font-semibold text-escuro">{u.quantidade}</span>
+                  <button
+                    onClick={() => ajustarQtd(u, 1)}
+                    disabled={u.quantidade >= 99}
+                    aria-label="Aumentar quantidade"
+                    className="flex h-6 w-6 items-center justify-center text-medio/70 hover:bg-black/5 disabled:opacity-30"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => void remover(u.id)}
                 disabled={removendo === u.id}
@@ -870,6 +934,7 @@ export function BlocoOrcamento({
       listUrl={`/api/negocios/${negocioId}/pecas-necessarias`}
       addUrl={`/api/negocios/${negocioId}/pecas-necessarias`}
       removeUrl={(usoId) => `/api/negocios/${negocioId}/pecas-necessarias/${usoId}`}
+      qtdUrl={(usoId) => `/api/negocios/${negocioId}/pecas-necessarias/${usoId}`}
       modeloEditavel={ehPos}
       salvarModelo={ehPos ? salvarModelo : undefined}
       mostrarGarantia={ehPos}
