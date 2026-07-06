@@ -275,6 +275,7 @@ model Lead {
   atividades     Atividade[]
   lembretes      Lembrete[]
   campanhaDestinos CampanhaDestino[]
+  cotacoes       CotacaoProduto[]
   orcamentos     Orcamento[]
   enderecos      Endereco[]
   tarefas        Tarefa[]
@@ -592,7 +593,7 @@ model Negocio {
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
   lembretes     Lembrete[]
-  orcamentos    Orcamento[]
+  cotacoes      CotacaoProduto[]
   alertasSla    AlertaNegocio[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
@@ -779,9 +780,11 @@ model Notificacao {
   @@index([agenteId, lida, criadoEm])
 }
 
-// Orcamento de um cliente. Multiplos por cliente ficam todos armazenados
-// (historico). voltagem e opcional ("110V"/"220V"/"Bivolt"...).
-model Orcamento {
+// CotacaoProduto (ex-Orcamento, Fatia 2.24; renomeado na 3.07): cotacao simples
+// de produto do cliente (produto/valor/voltagem). Recurso APOSENTADO na UI — os
+// dados ficam preservados (zero DROP). O nome "Orcamento" passou ao recurso novo
+// (orcamento-decisao com numero de pedido). voltagem e opcional.
+model CotacaoProduto {
   id           String   @id @default(cuid())
   leadId       String
   lead         Lead     @relation(fields: [leadId], references: [id])
@@ -796,6 +799,45 @@ model Orcamento {
   atualizadoEm DateTime @updatedAt
 
   @@index([leadId])
+}
+
+// ORCAMENTO (Fatia 3.07): o orcamento-DECISAO do atendimento. Ao decidir (Ganho/
+// Pendente/Perdido) com itens no staging, gera-se um Orcamento com numero de
+// pedido sequencial (exibido "PED-000042"), snapshot dos itens e os totais. Um
+// mesmo negocio pode gerar varios (historico de versoes da proposta). total = soma
+// dos itens cobraveis; totalGarantia = soma dos itens em garantia (nao cobrados).
+model Orcamento {
+  id            String          @id @default(cuid())
+  numero        Int             @unique
+  negocioId     String
+  leadId        String
+  lead          Lead            @relation(fields: [leadId], references: [id])
+  finalidade    String
+  decisao       String // "GANHO" | "PERDIDO" | "PENDENTE"
+  total         Decimal         @db.Decimal(12, 2)
+  totalGarantia Decimal?        @db.Decimal(12, 2)
+  agenteId      String?
+  criadoEm      DateTime        @default(now())
+  itens         OrcamentoItem[]
+
+  @@index([leadId, criadoEm])
+  @@index([negocioId])
+  @@index([decisao, criadoEm])
+}
+
+// Item (snapshot imutavel) de um Orcamento. produtoCatalogoId e apenas referencia
+// (sem FK), como em ItemPedido.
+model OrcamentoItem {
+  id                String    @id @default(cuid())
+  orcamentoId       String
+  orcamento         Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  produtoCatalogoId String?
+  descricao         String
+  quantidade        Int
+  valorUnitario     Decimal   @db.Decimal(12, 2)
+  garantia          Boolean   @default(false)
+
+  @@index([orcamentoId])
 }
 
 // Campanha de envio em massa (multicanal). filtroJson guarda o recorte usado;
@@ -1080,9 +1122,12 @@ model MovimentacaoPeca {
   @@index([itemLocalId])
 }
 
-// Uso/planejamento de peca (Fatia 3.06). Duas origens:
-// - NEGOCIO: peca PLANEJADA no atendimento de pos-venda. NAO movimenta estoque —
-//   e staging; vira ItemPedido (e da baixa) no fechamento do negocio como ganho.
+// Uso/planejamento de peca (Fatia 3.06; virou o STAGING GENERICO do ORCAMENTO na
+// 3.07). Duas origens:
+// - NEGOCIO: item PLANEJADO no atendimento. NAO movimenta estoque — e staging;
+//   vira ItemPedido/Orcamento no fechamento. PECA quando o negocio e POS_VENDA;
+//   PRODUTO (tipo do ProdutoCatalogo) quando o negocio e VENDA — o pecaId aponta
+//   para qualquer ProdutoCatalogo (o nome do model ficou por compatibilidade).
 // - LOCAL: peca APLICADA no reparo (aba Local/assistencia). Movimenta o estoque
 //   IMEDIATAMENTE (SAIDA na criacao, ESTORNO na remocao).
 model PecaUso {

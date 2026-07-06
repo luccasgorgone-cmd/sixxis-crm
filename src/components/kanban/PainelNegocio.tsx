@@ -51,7 +51,6 @@ import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import { BlocoPecasCliente } from "@/components/pecas/BlocoPecasCliente";
 import { BlocoPecasNecessarias } from "@/components/pecas/BlocoPecasNecessarias";
 import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
-import { Orcamentos } from "@/components/cliente/Orcamentos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -497,11 +496,7 @@ export function PainelNegocio({
                   )}
                   {subAba === "negocio" && (
                     <div className="space-y-5">
-                      <Orcamentos
-                        leadId={detalhe.cliente.id}
-                        negocioId={negocioId}
-                      />
-                      <div className="border-t border-black/5 pt-4">
+                      <div>
                         <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
                           Linha do tempo
                         </h4>

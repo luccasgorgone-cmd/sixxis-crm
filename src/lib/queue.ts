@@ -168,8 +168,16 @@ async function processarCampanha(
           nomeManual: true,
           telefone: true,
           empresa: true,
-          // {produto} = produto do ultimo orcamento do lead (se houver).
+          // {produto} (Fatia 3.07): precedencia — 1) descricao de um item do
+          // ORCAMENTO novo mais recente; 2) produto da COTACAO legada mais recente
+          // (leads antigos seguem funcionando); 3) null -> fallback gracioso. So
+          // a ORIGEM do dado mudou; nao ativa a Sol nem toca luna.ts.
           orcamentos: {
+            orderBy: { criadoEm: "desc" },
+            take: 1,
+            select: { itens: { take: 1, select: { descricao: true } } },
+          },
+          cotacoes: {
             orderBy: { criadoEm: "desc" },
             take: 1,
             select: { produto: true },
@@ -191,7 +199,10 @@ async function processarCampanha(
       lead: {
         nomeEfetivo: nomeEfetivo(d.lead),
         empresa: d.lead.empresa,
-        produto: d.lead.orcamentos[0]?.produto ?? null,
+        produto:
+          d.lead.orcamentos[0]?.itens[0]?.descricao ??
+          d.lead.cotacoes[0]?.produto ??
+          null,
       },
       agente: { nome: campanha.agente?.nome ?? null },
       valoresDigitados: valores,

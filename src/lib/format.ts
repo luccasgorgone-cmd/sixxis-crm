@@ -212,3 +212,9 @@ export function iniciais(nome: string | null, telefone: string): string {
   const d = telefone.replace(/\D/g, "");
   return d.slice(-2) || "?";
 }
+
+// Numero de pedido (orcamento-decisao) SEMPRE exibido como "PED-######" (6
+// digitos), ex.: PED-000042. Compartilhado por UI e APIs. Fatia 3.07.
+export function formatarNumeroPedido(numero: number): string {
+  return `PED-${String(numero).padStart(6, "0")}`;
+}

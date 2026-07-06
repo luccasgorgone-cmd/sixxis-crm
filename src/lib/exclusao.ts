@@ -47,6 +47,7 @@ export async function excluirLeadsCompleto(
     await tx.lembrete.deleteMany({ where: { leadId: { in: ids } } });
     await tx.tarefa.deleteMany({ where: { leadId: { in: ids } } });
     await tx.orcamento.deleteMany({ where: { leadId: { in: ids } } });
+    await tx.cotacaoProduto.deleteMany({ where: { leadId: { in: ids } } });
     await tx.campanhaDestino.deleteMany({ where: { leadId: { in: ids } } });
     await tx.leadProdutoInteresse.deleteMany({ where: { leadId: { in: ids } } });
     await tx.endereco.deleteMany({ where: { leadId: { in: ids } } });
