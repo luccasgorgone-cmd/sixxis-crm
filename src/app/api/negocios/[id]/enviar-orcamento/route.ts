@@ -70,8 +70,8 @@ export async function POST(
     return NextResponse.json({ erro: "cliente sem telefone valido" }, { status: 422 });
   }
 
-  // Gera o PDF e sobe no R2 (chave estavel por negocio).
-  const bytes = await gerarPdfOrcamento(montagem.dados);
+  // Gera o PDF (com a logo da marca, se PNG/JPEG) e sobe no R2 (chave estavel).
+  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
   const buffer = Buffer.from(bytes);
   const chave = `orcamentos/orc-${id}.pdf`;
   const mediaUrl = await enviarParaR2ComRetry(chave, buffer, "application/pdf");

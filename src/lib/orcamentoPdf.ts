@@ -1,17 +1,22 @@
-// Geracao do PDF do ORCAMENTO (Fatia 3.13). pdf-lib (puro JS, sem Chromium) roda
-// no runtime nodejs do Railway. Layout A4 pensado para LEITURA NO CELULAR: uma
-// coluna, fontes >=10pt, margens generosas, hierarquia clara e cores da marca com
-// sobriedade. Sem emoji. Funcao pura: recebe os dados ja montados e devolve os
-// bytes do PDF (Uint8Array). A montagem dos dados (Prisma) fica em orcamentoDados.ts.
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+// Geracao do PDF do ORCAMENTO (Fatia 3.13 -> redesenhado na 3.15). pdf-lib (puro
+// JS, sem Chromium) roda no runtime nodejs do Railway. Layout A4 pensado para
+// LEITURA NO CELULAR: uma coluna, fontes >=10pt, respiro generoso, hierarquia
+// clara e cores da marca com sobriedade. Sem emoji. Funcao pura: recebe os dados
+// ja montados (+ a logo opcional em bytes) e devolve os bytes do PDF (Uint8Array).
+// A montagem dos dados e a leitura da logo (Prisma) ficam em orcamentoDados.ts.
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFImage } from "pdf-lib";
 
-// Cores da marca.
+// Cores da marca + superficies.
 const TIFFANY = rgb(0.235, 0.749, 0.702); // #3cbfb3
 const ESCURO = rgb(0.059, 0.18, 0.169); // #0f2e2b
 const CINZA = rgb(0.42, 0.42, 0.42);
-const CINZA_CLARO = rgb(0.6, 0.6, 0.6);
+const CINZA_CLARO = rgb(0.62, 0.62, 0.62);
 const LINHA = rgb(0.85, 0.85, 0.85);
 const VERDE = rgb(0.16, 0.55, 0.32);
+const BRANCO = rgb(1, 1, 1);
+const TIFFANY_SUAVE = rgb(0.886, 0.963, 0.955); // fundo do cabecalho da tabela
+const ZEBRA = rgb(0.969, 0.975, 0.974); // linha zebrada leve
+const CARD = rgb(0.963, 0.971, 0.97); // preenchimento do card do cliente
 
 // Dados da marca (cabecalho/rodape).
 const MARCA = {
@@ -49,6 +54,10 @@ export type DadosPdfOrcamento = {
   totalFinal: number;
   totalGarantia: number;
 };
+
+// Logo embutivel: pdf-lib so aceita PNG/JPEG. WEBP/SVG nao embutem -> o gerador
+// cai no wordmark textual "Sixxis". Os bytes vem do ConfiguracaoCRM (orcamentoDados).
+export type LogoEmbed = { bytes: Uint8Array; formato: "png" | "jpg" };
 
 // A fonte Helvetica usa encoding WinAnsi (CP1252) e LANCA em caracteres fora dele
 // (emoji, CJK, control chars). Texto dinamico (nome do cliente, descricao) pode
@@ -103,6 +112,7 @@ function quebrarTexto(
 
 export async function gerarPdfOrcamento(
   dados: DadosPdfOrcamento,
+  logo?: LogoEmbed | null,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`Orcamento ${dados.numeroFormatado}`);
@@ -112,14 +122,30 @@ export async function gerarPdfOrcamento(
   const fonte = await doc.embedFont(StandardFonts.Helvetica);
   const fonteBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  const A4: [number, number] = [595.28, 841.89];
-  const MARGEM = 50;
-  const larguraUtil = A4[0] - MARGEM * 2;
-  const xEsq = MARGEM;
-  const xDir = A4[0] - MARGEM;
+  // Logo (PNG/JPEG). Falha/formato nao suportado -> wordmark textual.
+  let logoImg: PDFImage | null = null;
+  if (logo) {
+    try {
+      logoImg =
+        logo.formato === "png"
+          ? await doc.embedPng(logo.bytes)
+          : await doc.embedJpg(logo.bytes);
+    } catch {
+      logoImg = null;
+    }
+  }
 
-  let page = doc.addPage(A4);
-  let y = A4[1] - MARGEM;
+  const LARGURA = 595.28;
+  const ALTURA = 841.89;
+  const MARGEM = 46;
+  const xEsq = MARGEM;
+  const xDir = LARGURA - MARGEM;
+  const larguraUtil = xDir - xEsq;
+  // Reserva na base para o rodape/paginacao (quebra de pagina respeita isto).
+  const RESERVA_BASE = MARGEM + 72;
+
+  let page = doc.addPage([LARGURA, ALTURA]);
+  let y = ALTURA - MARGEM;
 
   const textoDir = (
     p: PDFPage,
@@ -134,8 +160,8 @@ export async function gerarPdfOrcamento(
     p.drawText(texto, { x: xRight - w, y: yPos, size: tamanho, font, color });
   };
 
-  const linhaFina = (p: PDFPage, yPos: number, cor = LINHA) => {
-    p.drawLine({
+  const linhaFina = (yPos: number, cor = LINHA) => {
+    page.drawLine({
       start: { x: xEsq, y: yPos },
       end: { x: xDir, y: yPos },
       thickness: 0.7,
@@ -143,186 +169,231 @@ export async function gerarPdfOrcamento(
     });
   };
 
-  // ---- Cabecalho ----
-  page.drawText(MARCA.nome, { x: xEsq, y: y - 26, size: 30, font: fonteBold, color: TIFFANY });
-  textoDir(page, dados.numeroFormatado, xDir, y - 10, 13, fonteBold, ESCURO);
-  textoDir(page, dados.dataFormatada, xDir, y - 26, 10, fonte, CINZA);
-  y -= 46;
+  // ---- CABECALHO: logo (ou wordmark) + numero/data + faixa tiffany ----
+  const logoH = 42;
+  if (logoImg) {
+    const escala = logoH / logoImg.height;
+    let w = logoImg.width * escala;
+    let h = logoH;
+    const maxW = 220;
+    if (w > maxW) {
+      const k = maxW / w;
+      w = maxW;
+      h = logoH * k;
+    }
+    page.drawImage(logoImg, { x: xEsq, y: y - h, width: w, height: h });
+  } else {
+    // Wordmark textual (fallback quando a logo nao e PNG/JPEG embutivel).
+    page.drawText(MARCA.nome, { x: xEsq, y: y - 30, size: 30, font: fonteBold, color: TIFFANY });
+  }
+  textoDir(page, "ORCAMENTO", xDir, y - 8, 8, fonteBold, TIFFANY);
+  textoDir(page, dados.numeroFormatado, xDir, y - 24, 15, fonteBold, ESCURO);
+  textoDir(page, `Emitido em ${dados.dataFormatada}`, xDir, y - 38, 9, fonte, CINZA);
+  y -= 52;
+
   page.drawText(MARCA.endereco, { x: xEsq, y, size: 9, font: fonte, color: CINZA });
-  y -= 13;
-  page.drawText(`${MARCA.email}   ${MARCA.site}`, {
-    x: xEsq,
-    y,
-    size: 9,
-    font: fonte,
-    color: CINZA,
-  });
-  y -= 16;
-  linhaFina(page, y, TIFFANY);
+  y -= 12;
+  page.drawText(`${MARCA.email}   ${MARCA.site}`, { x: xEsq, y, size: 9, font: fonte, color: CINZA });
+  y -= 12;
+  y -= 6;
+  page.drawRectangle({ x: xEsq, y, width: larguraUtil, height: 3, color: TIFFANY });
   y -= 26;
 
-  // ---- Cliente ----
-  page.drawText("CLIENTE", { x: xEsq, y, size: 9, font: fonteBold, color: TIFFANY });
-  y -= 18;
-  page.drawText(sanitizar(dados.cliente.nome) || "Cliente", {
-    x: xEsq,
-    y,
-    size: 14,
-    font: fonteBold,
-    color: ESCURO,
-  });
-  y -= 17;
-  const linhasCliente: string[] = [];
-  if (dados.cliente.telefone) linhasCliente.push(dados.cliente.telefone);
-  const doc2 = dados.cliente.cnpj
+  // ---- TITULO ----
+  page.drawText("Orcamento", { x: xEsq, y: y - 4, size: 24, font: fonteBold, color: ESCURO });
+  y -= 28;
+
+  // ---- CARD DO CLIENTE ----
+  page.drawText("CLIENTE", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
+  y -= 14;
+  const partesInfo: string[] = [];
+  if (dados.cliente.telefone) partesInfo.push(dados.cliente.telefone);
+  const docTxt = dados.cliente.cnpj
     ? `CNPJ ${dados.cliente.cnpj}`
     : dados.cliente.cpf
       ? `CPF ${dados.cliente.cpf}`
       : null;
-  if (doc2) linhasCliente.push(doc2);
+  if (docTxt) partesInfo.push(docTxt);
   const local =
     dados.cliente.cidade && dados.cliente.uf
       ? `${dados.cliente.cidade}/${dados.cliente.uf}`
       : dados.cliente.cidade || dados.cliente.uf || null;
-  if (local) linhasCliente.push(local);
-  if (linhasCliente.length) {
-    page.drawText(sanitizar(linhasCliente.join("    ")), {
-      x: xEsq,
-      y,
-      size: 10,
-      font: fonte,
-      color: CINZA,
-    });
-    y -= 14;
+  if (local) partesInfo.push(local);
+  const nomeCliente = sanitizar(dados.cliente.nome) || "Cliente";
+  const infoLinha = sanitizar(partesInfo.join("     "));
+  const temInfo = infoLinha.length > 0;
+  const padY = 11;
+  const cardH = padY * 2 + 13 + (temInfo ? 15 : 0);
+  const cardTop = y;
+  const cardBottom = cardTop - cardH;
+  page.drawRectangle({
+    x: xEsq,
+    y: cardBottom,
+    width: larguraUtil,
+    height: cardH,
+    color: CARD,
+    borderColor: LINHA,
+    borderWidth: 0.7,
+  });
+  let yc = cardTop - padY - 11;
+  page.drawText(nomeCliente, { x: xEsq + 14, y: yc, size: 13, font: fonteBold, color: ESCURO });
+  if (temInfo) {
+    yc -= 15;
+    page.drawText(infoLinha, { x: xEsq + 14, y: yc, size: 9.5, font: fonte, color: CINZA });
   }
-  y -= 16;
+  y = cardBottom - 26;
 
-  // ---- Tabela de itens ----
-  // Colunas: descricao (esq) | qtd (centro) | unit (dir) | subtotal (dir).
-  const xQtd = xDir - 210;
-  const xUnit = xDir - 110;
-  const xSub = xDir;
-  const larguraDesc = xQtd - xEsq - 12;
+  // ---- TABELA DE ITENS ----
+  const colSubR = xDir; // Subtotal (direita)
+  const colUnitR = xDir - 92; // Valor unit. (direita)
+  const colQtdR = xDir - 178; // Qtd (direita)
+  const descL = xEsq + 12; // Descricao (esquerda, com padding)
+  const descMaxW = colQtdR - 34 - descL;
 
-  page.drawText("ITENS", { x: xEsq, y, size: 9, font: fonteBold, color: TIFFANY });
-  y -= 16;
-  page.drawText("Descricao", { x: xEsq, y, size: 8.5, font: fonteBold, color: CINZA_CLARO });
-  textoDir(page, "Qtd", xQtd + 16, y, 8.5, fonteBold, CINZA_CLARO);
-  textoDir(page, "Valor unit.", xUnit + 40, y, 8.5, fonteBold, CINZA_CLARO);
-  textoDir(page, "Subtotal", xSub, y, 8.5, fonteBold, CINZA_CLARO);
-  y -= 6;
-  linhaFina(page, y);
-  y -= 16;
-
-  const novaPaginaSePreciso = (alturaNecessaria: number) => {
-    if (y - alturaNecessaria < MARGEM + 90) {
-      page = doc.addPage(A4);
-      y = A4[1] - MARGEM;
-    }
+  const cabecalhoTabela = () => {
+    const hH = 22;
+    page.drawRectangle({ x: xEsq, y: y - hH, width: larguraUtil, height: hH, color: TIFFANY_SUAVE });
+    const base = y - hH + 7;
+    page.drawText("Descricao", { x: descL, y: base, size: 9, font: fonteBold, color: ESCURO });
+    textoDir(page, "Qtd", colQtdR, base, 9, fonteBold, ESCURO);
+    textoDir(page, "Valor unit.", colUnitR, base, 9, fonteBold, ESCURO);
+    textoDir(page, "Subtotal", colSubR, base, 9, fonteBold, ESCURO);
+    y -= hH + 2;
   };
 
-  for (const it of dados.itens) {
-    const linhasDesc = quebrarTexto(sanitizar(it.descricao) || "Item", fonte, 10, larguraDesc);
-    const alturaItem = Math.max(linhasDesc.length * 13, 13) + 6;
-    novaPaginaSePreciso(alturaItem);
+  page.drawText("ITENS", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
+  y -= 16;
+  cabecalhoTabela();
 
-    let yLinha = y;
-    for (const ln of linhasDesc) {
-      page.drawText(ln, { x: xEsq, y: yLinha, size: 10, font: fonte, color: ESCURO });
-      yLinha -= 13;
+  const topPad = 12;
+  const lineStep = 13;
+  const bottomPad = 8;
+  dados.itens.forEach((it, i) => {
+    const linhasDesc = quebrarTexto(sanitizar(it.descricao) || "Item", fonte, 10, descMaxW);
+    const rowH = topPad + (linhasDesc.length - 1) * lineStep + (it.garantia ? 12 : 0) + bottomPad;
+
+    // Quebra de pagina: preserva a reserva do rodape e redesenha o cabecalho.
+    if (y - rowH < RESERVA_BASE) {
+      page = doc.addPage([LARGURA, ALTURA]);
+      y = ALTURA - MARGEM;
+      cabecalhoTabela();
     }
-    // Qtd / unit / subtotal alinhados a primeira linha da descricao.
-    textoDir(page, String(it.quantidade), xQtd + 16, y, 10, fonte, ESCURO);
+
+    if (i % 2 === 1) {
+      page.drawRectangle({ x: xEsq, y: y - rowH, width: larguraUtil, height: rowH, color: ZEBRA });
+    }
+
+    const b1 = y - topPad;
+    let yl = b1;
+    for (const ln of linhasDesc) {
+      page.drawText(ln, { x: descL, y: yl, size: 10, font: fonte, color: ESCURO });
+      yl -= lineStep;
+    }
+    textoDir(page, String(it.quantidade), colQtdR, b1, 10, fonte, ESCURO);
+
     if (it.garantia) {
+      textoDir(page, brl(it.valorUnitario), colUnitR, b1, 10, fonte, CINZA_CLARO);
+      const sub = brl(it.quantidade * it.valorUnitario);
+      const wSub = fonte.widthOfTextAtSize(sub, 10);
+      page.drawText(sub, { x: colSubR - wSub, y: b1, size: 10, font: fonte, color: CINZA_CLARO });
+      // Risco sobre o subtotal (cortesia).
+      page.drawLine({
+        start: { x: colSubR - wSub, y: b1 + 3 },
+        end: { x: colSubR, y: b1 + 3 },
+        thickness: 0.7,
+        color: CINZA_CLARO,
+      });
       page.drawText("Garantia - sem custo", {
-        x: xEsq,
-        y: yLinha + 13 - 12,
+        x: descL,
+        y: yl + lineStep - 12,
         size: 8.5,
         font: fonteBold,
         color: TIFFANY,
       });
-      yLinha -= 12;
-      textoDir(page, "-", xUnit + 40, y, 10, fonte, CINZA_CLARO);
-      textoDir(page, "-", xSub, y, 10, fonte, CINZA_CLARO);
     } else {
-      textoDir(page, brl(it.valorUnitario), xUnit + 40, y, 10, fonte, ESCURO);
-      textoDir(page, brl(it.quantidade * it.valorUnitario), xSub, y, 10, fonteBold, ESCURO);
+      textoDir(page, brl(it.valorUnitario), colUnitR, b1, 10, fonte, ESCURO);
+      textoDir(page, brl(it.quantidade * it.valorUnitario), colSubR, b1, 10, fonteBold, ESCURO);
     }
-    y = Math.min(yLinha, y - 13) - 6;
+    y -= rowH;
+  });
+
+  linhaFina(y);
+  y -= 20;
+
+  // ---- BLOCO DE TOTAIS (direita) ----
+  if (y - 130 < RESERVA_BASE) {
+    page = doc.addPage([LARGURA, ALTURA]);
+    y = ALTURA - MARGEM;
   }
-
-  y -= 4;
-  linhaFina(page, y);
-  y -= 22;
-
-  // ---- Valores (bloco a direita) ----
-  novaPaginaSePreciso(120);
-  const xValLabel = xDir - 240;
-  const linhaValor = (
+  const totLabelX = xDir - 250;
+  const linhaTot = (
     label: string,
     valor: string,
-    opts?: { cor?: ReturnType<typeof rgb>; bold?: boolean; size?: number },
+    valorCor = ESCURO,
+    labelCor = CINZA,
   ) => {
-    const size = opts?.size ?? 10;
-    const f = opts?.bold ? fonteBold : fonte;
-    const cor = opts?.cor ?? CINZA;
-    page.drawText(label, { x: xValLabel, y, size, font: f, color: cor });
-    textoDir(page, valor, xDir, y, size, f, opts?.bold ? ESCURO : cor);
-    y -= size + 6;
+    page.drawText(label, { x: totLabelX, y, size: 10, font: fonte, color: labelCor });
+    textoDir(page, valor, xDir, y, 10, fonte, valorCor);
+    y -= 17;
   };
 
-  linhaValor("Subtotal", brl(dados.subtotal));
+  linhaTot("Subtotal", brl(dados.subtotal));
   if (dados.descontoValor > 0) {
     const cupomSan = dados.cupom ? sanitizar(dados.cupom) : "";
     const rot = cupomSan
-      ? `Desconto (cupom ${cupomSan}${dados.descontoPct ? ` - ${dados.descontoPct}%` : ""})`
+      ? `Desconto  Cupom ${cupomSan}${dados.descontoPct ? ` - ${dados.descontoPct}%` : ""}`
       : `Desconto${dados.descontoPct ? ` (${dados.descontoPct}%)` : ""}`;
-    linhaValor(rot, `- ${brl(dados.descontoValor)}`, { cor: VERDE });
+    linhaTot(rot, `- ${brl(dados.descontoValor)}`, VERDE, VERDE);
   }
   if (dados.fretePagoPelaEmpresa) {
-    linhaValor("Frete", "por conta da Sixxis", { cor: TIFFANY });
+    linhaTot("Frete", "Cortesia Sixxis", TIFFANY, CINZA);
   } else {
-    linhaValor("Frete", dados.frete && dados.frete > 0 ? brl(dados.frete) : "gratis");
+    linhaTot("Frete", dados.frete && dados.frete > 0 ? brl(dados.frete) : "Gratis");
   }
 
-  y -= 2;
-  page.drawLine({
-    start: { x: xValLabel, y: y + 6 },
-    end: { x: xDir, y: y + 6 },
-    thickness: 0.7,
-    color: LINHA,
-  });
-  y -= 8;
-  page.drawText("TOTAL", { x: xValLabel, y, size: 14, font: fonteBold, color: ESCURO });
-  textoDir(page, brl(dados.totalFinal), xDir, y, 16, fonteBold, TIFFANY);
-  y -= 24;
+  // Caixa TIFFANY do TOTAL.
+  y -= 4;
+  const boxH = 34;
+  const boxX = totLabelX - 6;
+  const boxY = y - boxH;
+  page.drawRectangle({ x: boxX, y: boxY, width: xDir - boxX, height: boxH, color: TIFFANY });
+  const baseBox = boxY + (boxH - 15) / 2 + 3;
+  page.drawText("TOTAL", { x: totLabelX + 4, y: baseBox, size: 13, font: fonteBold, color: BRANCO });
+  textoDir(page, brl(dados.totalFinal), xDir - 8, baseBox, 16, fonteBold, BRANCO);
+  y = boxY - 18;
 
   if (dados.totalGarantia > 0) {
-    page.drawText(
-      `Itens em garantia (cortesia, sem custo): ${brl(dados.totalGarantia)}`,
-      { x: xValLabel, y, size: 8.5, font: fonte, color: CINZA_CLARO },
-    );
-    y -= 16;
+    page.drawText(`Itens em garantia - cortesia (nao cobrado): ${brl(dados.totalGarantia)}`, {
+      x: totLabelX,
+      y,
+      size: 8.5,
+      font: fonte,
+      color: CINZA_CLARO,
+    });
+    y -= 14;
   }
 
-  // ---- Rodape (fixo na base da ultima pagina) ----
-  const yRodape = MARGEM + 30;
-  linhaFina(page, yRodape + 26);
-  page.drawText("Orcamento valido por 7 dias.", {
+  // ---- RODAPE (na base da ultima pagina) ----
+  const yF = MARGEM + 28;
+  linhaFina(yF + 16);
+  page.drawText("Orcamento valido por 7 dias   Duvidas? Chame no WhatsApp", {
     x: xEsq,
-    y: yRodape + 12,
+    y: yF,
     size: 9,
     font: fonteBold,
     color: ESCURO,
   });
-  page.drawText("Obrigado pela preferencia. Qualquer duvida, estamos a disposicao.", {
-    x: xEsq,
-    y: yRodape,
-    size: 9,
-    font: fonte,
-    color: CINZA,
-  });
-  textoDir(page, MARCA.site, xDir, yRodape + 6, 10, fonteBold, TIFFANY);
+  textoDir(page, MARCA.site, xDir, yF, 9.5, fonteBold, TIFFANY);
+
+  // ---- Numeracao de pagina (so quando passa de 1) ----
+  const pages = doc.getPages();
+  if (pages.length > 1) {
+    pages.forEach((p, i) => {
+      const t = `Pagina ${i + 1} de ${pages.length}`;
+      const w = fonte.widthOfTextAtSize(t, 8);
+      p.drawText(t, { x: (LARGURA - w) / 2, y: 24, size: 8, font: fonte, color: CINZA_CLARO });
+    });
+  }
 
   return doc.save();
 }

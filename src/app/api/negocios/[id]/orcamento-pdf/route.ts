@@ -36,7 +36,7 @@ export async function POST(
     );
   }
 
-  const bytes = await gerarPdfOrcamento(montagem.dados);
+  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
   const buffer = Buffer.from(bytes);
 
   // Chave estavel por negocio: re-gerar sobrescreve (proposta, nao versionado).

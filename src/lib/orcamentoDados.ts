@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularTotalFinal, formatarNumeroPedido, formatarTelefone } from "@/lib/format";
 import { nomeEfetivo } from "@/lib/cliente";
 import { podeAcessarNegocio, type SessaoAgente } from "@/lib/autorizacao";
-import type { DadosPdfOrcamento } from "@/lib/orcamentoPdf";
+import type { DadosPdfOrcamento, LogoEmbed } from "@/lib/orcamentoPdf";
 import { Finalidade } from "@/generated/prisma/enums";
 
 // Acesso de ESCRITA ao negocio (dono negocio / dono cliente na finalidade /
@@ -42,7 +42,34 @@ export type MontagemOrcamento = {
   nomeCliente: string;
   numeroFormatado: string;
   temItens: boolean;
+  // Logo da marca (mesma fonte do /api/logo) pronta para embutir no PDF. null
+  // quando nao ha logo OU o formato nao e PNG/JPEG (webp/svg -> wordmark textual).
+  logo: LogoEmbed | null;
 };
+
+// Le a logo do ConfiguracaoCRM e a converte em bytes embutiveis (PNG/JPEG). WEBP e
+// SVG NAO sao suportados por pdf-lib -> retorna null (o gerador cai no wordmark).
+// Nunca lanca (falha de leitura -> null, o PDF sai com o texto "Sixxis").
+async function carregarLogoEmbed(): Promise<LogoEmbed | null> {
+  try {
+    const cfg = await prisma.configuracaoCRM.findFirst({
+      select: { logoData: true, logoMime: true },
+    });
+    if (!cfg?.logoData || !cfg.logoData.startsWith("data:")) return null;
+    const mime = (cfg.logoMime ?? "").toLowerCase();
+    const formato: "png" | "jpg" | null = mime.includes("png")
+      ? "png"
+      : mime.includes("jpeg") || mime.includes("jpg")
+        ? "jpg"
+        : null;
+    if (!formato) return null; // webp/svg/outros: fallback textual
+    const b64 = cfg.logoData.split(",")[1] ?? "";
+    const bytes = Buffer.from(b64, "base64");
+    return bytes.length > 0 ? { bytes, formato } : null;
+  } catch {
+    return null;
+  }
+}
 
 function dataBR(d: Date): string {
   return d.toLocaleDateString("pt-BR", {
@@ -129,6 +156,7 @@ export async function montarDadosPdfOrcamento(
 
   const endereco = negocio.lead.enderecos[0];
   const nomeCliente = nomeEfetivo(negocio.lead);
+  const logo = await carregarLogoEmbed();
 
   const dados: DadosPdfOrcamento = {
     numeroFormatado,
@@ -160,5 +188,6 @@ export async function montarDadosPdfOrcamento(
     nomeCliente,
     numeroFormatado,
     temItens: itens.length > 0,
+    logo,
   };
 }
