@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { InputBusca } from "@/components/ui/InputBusca";
 import { formatarBRL, calcularTotalFinal } from "@/lib/format";
+import type { MensagemItem } from "@/components/inbox/tipos";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -79,6 +80,9 @@ type EditorProps = {
   permitirEnvio?: boolean;
   clienteNome?: string | null;
   clienteTelefone?: string | null;
+  // Injeta na thread a Mensagem OUT (documento) retornada pelo envio do orcamento,
+  // para a bolha do PDF aparecer NA HORA (sem refresh). Fatia 3.15.
+  onMensagemEnviada?: (msg: MensagemItem) => void;
   onMudou?: () => void;
 };
 
@@ -127,6 +131,7 @@ function EditorOrcamento(props: EditorProps) {
     permitirEnvio = false,
     clienteNome,
     clienteTelefone,
+    onMensagemEnviada,
     onMudou,
   } = props;
   const ehVenda = modo === "VENDA";
@@ -340,6 +345,8 @@ function EditorOrcamento(props: EditorProps) {
         toast.erro(d?.erro ?? "Não foi possível enviar o orçamento.");
         return;
       }
+      // Injeta a bolha do PDF na thread NA HORA (dedupe por id real com o socket).
+      if (d.mensagem) onMensagemEnviada?.(d.mensagem as MensagemItem);
       toast.sucesso(`Orçamento ${d.numeroFormatado ?? ""} enviado ao cliente.`.trim());
     } catch {
       toast.erro("Falha de conexão ao enviar.");
@@ -830,11 +837,13 @@ export function BlocoOrcamento({
   finalidade,
   clienteNome,
   clienteTelefone,
+  onMensagemEnviada,
 }: {
   negocioId: string;
   finalidade: "VENDA" | "POS_VENDA";
   clienteNome?: string | null;
   clienteTelefone?: string | null;
+  onMensagemEnviada?: (msg: MensagemItem) => void;
 }) {
   const ehPos = finalidade === "POS_VENDA";
   const salvarModelo = useCallback(
@@ -871,6 +880,7 @@ export function BlocoOrcamento({
       permitirEnvio
       clienteNome={clienteNome}
       clienteTelefone={clienteTelefone}
+      onMensagemEnviada={onMensagemEnviada}
     />
   );
 }

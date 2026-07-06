@@ -4,7 +4,7 @@
 // largas: esquerda = conversa (thread + compositor); direita = detalhes com
 // ROLAGEM PROPRIA (cliente, acoes, etiquetas, produtos, historico, loja, notas).
 // Header fixo. Em telas estreitas, empilha com abas Conversa | Detalhes.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   X,
   Loader2,
@@ -41,6 +41,7 @@ import {
   Truck,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
+import type { MensagemItem } from "@/components/inbox/tipos";
 import { ModalFechamento } from "./ModalFechamento";
 import { ModalMoverFinalidade } from "./ModalMoverFinalidade";
 import { LojaCliente } from "@/components/loja/LojaCliente";
@@ -135,6 +136,12 @@ export function PainelNegocio({
     };
   } | null>(null);
   const [iniciandoConversa, setIniciandoConversa] = useState(false);
+  // Injetor da thread embutida (ConversaEmbed): o BlocoOrcamento o usa para a bolha
+  // do PDF aparecer na hora do envio. Registrado por ConversaEmbed ao montar. 3.15.
+  const injetorThreadRef = useRef<((msg: MensagemItem) => void) | null>(null);
+  const registrarInjetorThread = useCallback((fn: (msg: MensagemItem) => void) => {
+    injetorThreadRef.current = fn;
+  }, []);
 
   // Repetir pedido: abre o compositor de ganho pre-carregado com os itens do
   // pedido escolhido (editavel). Alvo: a etapa de GANHO do funil.
@@ -414,6 +421,7 @@ export function PainelNegocio({
                   leadTelefone={detalhe.cliente.telefone}
                   atendidoPor={detalhe.atendidoPor}
                   ehAdmin={ehAdmin}
+                  onRegistrarInjetor={registrarInjetorThread}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-medio/50">
@@ -456,6 +464,7 @@ export function PainelNegocio({
                   finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
                   clienteNome={detalhe.cliente.nomeEfetivo}
                   clienteTelefone={detalhe.cliente.telefone}
+                  onMensagemEnviada={(msg) => injetorThreadRef.current?.(msg)}
                 />
 
                 <NegocioAcoes

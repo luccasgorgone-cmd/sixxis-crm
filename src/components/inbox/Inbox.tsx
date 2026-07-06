@@ -429,6 +429,7 @@ export function Inbox({
                 negocioId={conversaAberta.negocioId}
                 ehAdmin={ehAdmin}
                 agenteIdAtual={agenteIdAtual}
+                onMensagemEnviada={aoEnviada}
               />
             </aside>
           )}

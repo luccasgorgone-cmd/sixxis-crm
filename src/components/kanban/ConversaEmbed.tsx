@@ -2,7 +2,7 @@
 
 // Embute a conversa do WhatsApp do lead dentro do painel do negocio, reusando
 // o componente Thread da inbox (com compositor). Faz fetch + socket ao vivo.
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { getSocket } from "@/lib/socketClient";
 import { Thread } from "@/components/inbox/Thread";
 import type { ViaOtimista } from "@/components/inbox/Compositor";
@@ -27,12 +27,16 @@ export function ConversaEmbed({
   leadTelefone,
   atendidoPor,
   ehAdmin = false,
+  onRegistrarInjetor,
 }: {
   conversaId: string;
   leadNome: string | null;
   leadTelefone: string;
   atendidoPor: "HUMANO" | "IA" | null;
   ehAdmin?: boolean;
+  // Expoe ao painel pai (PainelNegocio) o injetor de mensagem OUT desta thread,
+  // para o BlocoOrcamento inserir a bolha do PDF na hora do envio. Fatia 3.15.
+  onRegistrarInjetor?: (fn: (msg: MensagemItem) => void) => void;
 }) {
   const [mensagens, setMensagens] = useState<MensagemItem[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -125,11 +129,18 @@ export function ConversaEmbed({
     finalidade,
   };
 
-  function aoEnviada(msg: MensagemItem) {
+  const aoEnviada = useCallback((msg: MensagemItem) => {
     setMensagens((prev) =>
       prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
     );
-  }
+  }, []);
+
+  // Registra o injetor no pai (uma vez / quando muda): o BlocoOrcamento chama-o
+  // para a bolha do PDF aparecer nesta thread na hora. Dedupe por id real com o
+  // socket "mensagem:nova" (mesclarSocket ja evita duplicar).
+  useEffect(() => {
+    onRegistrarInjetor?.(aoEnviada);
+  }, [onRegistrarInjetor, aoEnviada]);
 
   // Via otimista do texto (Fatia 3.11): mesma logica do Inbox, sem lista lateral.
   const otimista = useMemo<ViaOtimista>(

@@ -31,6 +31,7 @@ import type {
   AgenteResumo,
   EtiquetaChip,
 } from "@/components/kanban/tipos";
+import type { MensagemItem } from "@/components/inbox/tipos";
 
 export function PainelClienteInbox({
   leadId,
@@ -38,6 +39,7 @@ export function PainelClienteInbox({
   podeEditar = true,
   ehAdmin = false,
   agenteIdAtual = "",
+  onMensagemEnviada,
 }: {
   leadId: string;
   // Negocio da finalidade da conversa (null = sem negocio -> omite nivel negocio).
@@ -45,6 +47,8 @@ export function PainelClienteInbox({
   podeEditar?: boolean;
   ehAdmin?: boolean;
   agenteIdAtual?: string;
+  // Injeta na thread aberta do Inbox a bolha do PDF enviada pelo orcamento (3.15).
+  onMensagemEnviada?: (msg: MensagemItem) => void;
 }) {
   const toast = useToast();
   const [cliente, setCliente] = useState<ClientePainel | null>(null);
@@ -203,6 +207,7 @@ export function PainelClienteInbox({
               finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
               clienteNome={cliente.nomeEfetivo}
               clienteTelefone={cliente.telefone}
+              onMensagemEnviada={onMensagemEnviada}
             />
           )}
 
