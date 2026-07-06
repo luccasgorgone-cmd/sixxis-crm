@@ -241,3 +241,30 @@ Aspiradores|Reservatorio|Bravo|100
 Aspiradores|Carregador|Bravo|30
 Aspiradores|Motor|Bravo|250
 Aspiradores|Base|Bravo|50
+Climatizadores|Limpeza|M45 Trend|150
+Climatizadores|Limpeza|SX040 Trend|150
+Climatizadores|Limpeza|SX060 Prime|150
+Climatizadores|Limpeza|SX070 Trend|200
+Climatizadores|Limpeza|SX100 Trend|200
+Climatizadores|Limpeza|SX120 Prime|250
+Climatizadores|Limpeza|SX180 Trend|250
+Climatizadores|Limpeza|SX200 Trend|300
+Climatizadores|Limpeza|SX200 Prime|300
+Climatizadores|Motor|M45 Trend|550
+Climatizadores|Motor|SX040 Trend|550
+Climatizadores|Motor|SX060 Prime|650
+Climatizadores|Motor|SX070 Trend|800
+Climatizadores|Motor|SX100 Trend|950
+Climatizadores|Motor|SX120 Prime|1100
+Climatizadores|Motor|SX180 Trend|1100
+Climatizadores|Motor|SX200 Trend|1250
+Climatizadores|Motor|SX200 Prime|1400
+Climatizadores|Kit Colmeia|M45 Trend|550
+Climatizadores|Kit Colmeia|SX040 Trend|550
+Climatizadores|Kit Colmeia|SX060 Prime|650
+Climatizadores|Kit Colmeia|SX070 Trend|800
+Climatizadores|Kit Colmeia|SX100 Trend|950
+Climatizadores|Kit Colmeia|SX120 Prime|1100
+Climatizadores|Kit Colmeia|SX180 Trend|1100
+Climatizadores|Kit Colmeia|SX200 Trend|1250
+Climatizadores|Kit Colmeia|SX200 Prime|1400
