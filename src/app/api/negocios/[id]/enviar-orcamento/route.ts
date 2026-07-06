@@ -70,10 +70,12 @@ export async function POST(
     return NextResponse.json({ erro: "Cliente sem telefone válido." }, { status: 422 });
   }
 
-  // Gera o PDF (com a logo da marca, se PNG/JPEG) e sobe no R2 (chave estavel).
+  // Gera o PDF (logo da marca, se PNG/JPEG/WEBP) e sobe no R2 com chave VERSIONADA
+  // por geracao (epoch): cada envio vira um objeto novo -> o WhatsApp/navegador
+  // sempre baixa a versao atual, nunca um PDF antigo em cache (Fatia 3.16).
   const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
   const buffer = Buffer.from(bytes);
-  const chave = `orcamentos/orc-${id}.pdf`;
+  const chave = `orcamentos/orc-${id}-${Date.now()}.pdf`;
   const mediaUrl = await enviarParaR2ComRetry(chave, buffer, "application/pdf");
   const midiaParaEnviar = mediaUrl ?? buffer.toString("base64");
 

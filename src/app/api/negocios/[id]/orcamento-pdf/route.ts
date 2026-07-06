@@ -39,8 +39,9 @@ export async function POST(
   const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
   const buffer = Buffer.from(bytes);
 
-  // Chave estavel por negocio: re-gerar sobrescreve (proposta, nao versionado).
-  const chave = `orcamentos/orc-${id}.pdf`;
+  // Chave VERSIONADA por geracao (epoch): cada PDF vira um objeto novo no R2, entao
+  // a URL muda sempre e o navegador nunca serve uma versao antiga em cache (3.16).
+  const chave = `orcamentos/orc-${id}-${Date.now()}.pdf`;
   const url = await enviarParaR2ComRetry(chave, buffer, "application/pdf");
   if (!url) {
     return NextResponse.json(
