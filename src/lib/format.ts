@@ -218,3 +218,18 @@ export function iniciais(nome: string | null, telefone: string): string {
 export function formatarNumeroPedido(numero: number): string {
   return `PED-${String(numero).padStart(6, "0")}`;
 }
+
+// totalFinal do orcamento (Fatia 3.09): aplica desconto % sobre os cobraveis e
+// soma o frete apenas se NAO for pago pela empresa. Arredonda a 2 casas. Mesma
+// formula no cliente (resumo ao vivo) e no servidor (snapshot da decisao).
+export function calcularTotalFinal(args: {
+  totalCobravel: number;
+  descontoPct?: number | null;
+  frete?: number | null;
+  fretePagoPelaEmpresa?: boolean;
+}): number {
+  const bruto = Math.max(0, args.totalCobravel || 0);
+  const desc = Math.min(100, Math.max(0, args.descontoPct ?? 0));
+  const frete = args.fretePagoPelaEmpresa ? 0 : Math.max(0, args.frete ?? 0);
+  return Math.round((bruto * (1 - desc / 100) + frete) * 100) / 100;
+}

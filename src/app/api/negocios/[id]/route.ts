@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { serializarClientePainel } from "@/lib/cliente";
-import { parseDataNascimento } from "@/lib/format";
+import { parseDataNascimento, calcularTotalFinal } from "@/lib/format";
 import { getIO } from "@/lib/socket";
 import { Prisma } from "@/generated/prisma/client";
 import {
@@ -250,6 +250,11 @@ export async function PATCH(
     valorAjustado?: number | null;
     // Pos-venda: modelo do aparelho do cliente (marcado no atendimento).
     modeloProdutoCliente?: string | null;
+    // Rascunho do orcamento (Fatia 3.09): cupom/desconto/frete.
+    orcCupom?: string | null;
+    orcDescontoPct?: number | null;
+    orcFrete?: number | null;
+    orcFretePagoPelaEmpresa?: boolean;
   };
   try {
     body = await req.json();
@@ -268,6 +273,11 @@ export async function PATCH(
       motivoPerda: true,
       finalidade: true,
       pendente: true,
+      // Rascunho do orcamento (Fatia 3.09) -> congela no snapshot da decisao.
+      orcCupom: true,
+      orcDescontoPct: true,
+      orcFrete: true,
+      orcFretePagoPelaEmpresa: true,
       // Donos do lead por finalidade: o DONO edita o negocio do proprio cliente,
       // inclusive quando o negocio ainda nao tem agenteId (criado ao abrir a
       // conversa/cadastro manual). Fatia 2.86.
@@ -602,6 +612,37 @@ export async function PATCH(
     data.modeloProdutoCliente = m;
   }
 
+  // ---- Rascunho do orcamento (Fatia 3.09): cupom / desconto% / frete ----
+  if (body.orcCupom !== undefined) {
+    data.orcCupom =
+      body.orcCupom === null ? null : String(body.orcCupom).trim().slice(0, 40) || null;
+  }
+  if (body.orcDescontoPct !== undefined) {
+    if (body.orcDescontoPct === null) {
+      data.orcDescontoPct = null;
+    } else {
+      const p = Number(body.orcDescontoPct);
+      if (!Number.isFinite(p) || p < 0 || p > 100) {
+        return NextResponse.json({ erro: "desconto invalido (0 a 100)" }, { status: 400 });
+      }
+      data.orcDescontoPct = p;
+    }
+  }
+  if (body.orcFrete !== undefined) {
+    if (body.orcFrete === null) {
+      data.orcFrete = null;
+    } else {
+      const f = Number(body.orcFrete);
+      if (!Number.isFinite(f) || f < 0) {
+        return NextResponse.json({ erro: "frete invalido" }, { status: 400 });
+      }
+      data.orcFrete = f;
+    }
+  }
+  if (body.orcFretePagoPelaEmpresa !== undefined) {
+    data.orcFretePagoPelaEmpresa = body.orcFretePagoPelaEmpresa === true;
+  }
+
   if (
     Object.keys(data).length === 0 &&
     historicos.length === 0 &&
@@ -731,6 +772,18 @@ export async function PATCH(
             const totalGar = fonte
               .filter((i) => i.garantia)
               .reduce((a, i) => a + i.quantidade * i.valorUnitario, 0);
+            // Cupom/desconto/frete do rascunho -> congela no snapshot. totalFinal
+            // aplica a formula compartilhada (Fatia 3.09).
+            const descontoPct =
+              negocio.orcDescontoPct != null ? Number(negocio.orcDescontoPct) : null;
+            const frete = negocio.orcFrete != null ? Number(negocio.orcFrete) : null;
+            const fretePagoEmpresa = negocio.orcFretePagoPelaEmpresa === true;
+            const totalFinal = calcularTotalFinal({
+              totalCobravel,
+              descontoPct,
+              frete,
+              fretePagoPelaEmpresa: fretePagoEmpresa,
+            });
             const numero = await proximoNumeroOrcamento(tx);
             await tx.orcamento.create({
               data: {
@@ -741,6 +794,11 @@ export async function PATCH(
                 decisao,
                 total: totalCobravel,
                 totalGarantia: totalGar > 0 ? totalGar : null,
+                cupom: negocio.orcCupom ?? null,
+                descontoPct,
+                frete,
+                fretePagoPelaEmpresa: fretePagoEmpresa,
+                totalFinal,
                 agenteId: agente.id,
                 itens: {
                   create: fonte.map((i) => ({

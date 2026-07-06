@@ -20,6 +20,10 @@ async function negocioComAcesso(agenteId: string, negocioId: string) {
       finalidade: true,
       leadId: true,
       modeloProdutoCliente: true,
+      orcCupom: true,
+      orcDescontoPct: true,
+      orcFrete: true,
+      orcFretePagoPelaEmpresa: true,
       lead: { select: { donoId: true, donoPosVendaId: true } },
     },
   });
@@ -64,6 +68,13 @@ export async function GET(
   return NextResponse.json({
     pecas: usos.map(serializarUso),
     modeloProdutoCliente: negocio.modeloProdutoCliente,
+    // Rascunho do orcamento (Fatia 3.09).
+    orc: {
+      cupom: negocio.orcCupom,
+      descontoPct: negocio.orcDescontoPct != null ? Number(negocio.orcDescontoPct) : null,
+      frete: negocio.orcFrete != null ? Number(negocio.orcFrete) : null,
+      fretePagoPelaEmpresa: negocio.orcFretePagoPelaEmpresa,
+    },
   });
 }
 
