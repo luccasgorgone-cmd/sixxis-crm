@@ -545,6 +545,11 @@ export function PainelNegocio({
               ...(detalhe.pendente ? { pendente: false } : {}),
             });
             if (!ok) throw new Error("falha");
+            // Confirmacao da decisao (o toast do numero do orcamento, quando ha
+            // itens, ja saiu no salvar). Fatia 3.07.
+            toast.sucesso(
+              modal.tipo === "ganho" ? "Pedido fechado como ganho." : "Negócio marcado como perdido.",
+            );
             setModal(null);
           }}
           onCancelar={() => setModal(null)}
@@ -691,19 +696,31 @@ export function NegocioAcoes({
 
   async function aplicarEtiqueta(etiquetaId: string) {
     setAddEtiqueta(false);
-    await fetch(`/api/negocios/${negocioId}/etiquetas`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etiquetaId }),
-    });
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/etiquetas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ etiquetaId }),
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Etiqueta aplicada.");
+    } catch {
+      toast.erro("Não foi possível aplicar a etiqueta.");
+    }
     await recarregar();
     onAtualizado();
   }
 
   async function removerEtiqueta(etiquetaId: string) {
-    await fetch(`/api/negocios/${negocioId}/etiquetas/${etiquetaId}`, {
-      method: "DELETE",
-    });
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/etiquetas/${etiquetaId}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Etiqueta removida.");
+    } catch {
+      toast.erro("Não foi possível remover a etiqueta.");
+    }
     await recarregar();
     onAtualizado();
   }
@@ -731,11 +748,17 @@ export function NegocioAcoes({
 
   async function transferir() {
     if (!destino) return;
-    await fetch(`/api/leads/${detalhe.cliente.id}/transferir`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agenteId: destino, finalidade: detalhe.finalidade }),
-    });
+    try {
+      const r = await fetch(`/api/leads/${detalhe.cliente.id}/transferir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agenteId: destino, finalidade: detalhe.finalidade }),
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Cliente transferido.");
+    } catch {
+      toast.erro("Não foi possível transferir.");
+    }
     setTransferindo(false);
     setDestino("");
     await recarregar();
@@ -1259,6 +1282,7 @@ export function BlocoAcompanhamento({
       if (r.ok) {
         await recarregar();
         onAtualizado();
+        toast.sucesso("Salvo.");
       } else {
         const d = await r.json().catch(() => null);
         if (!(r.status === 400 && d?.erro === "nada a atualizar")) {
@@ -1432,6 +1456,7 @@ export function BlocoRastreio({
       if (r.ok) {
         await recarregar();
         onAtualizado();
+        toast.sucesso("Salvo.");
       } else {
         const d = await r.json().catch(() => null);
         if (!(r.status === 400 && d?.erro === "nada a atualizar")) {
@@ -1463,6 +1488,7 @@ export function BlocoRastreio({
         setNovaTransp("");
         await recarregar();
         onAtualizado();
+        toast.sucesso("Código adicionado.");
       } else {
         const d = await r.json().catch(() => null);
         toast.erro(d?.erro ?? "Nao foi possivel adicionar o codigo.");
