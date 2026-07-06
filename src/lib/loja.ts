@@ -70,6 +70,29 @@ export async function buscarProdutos(busca: string): Promise<ProdutoLoja[]> {
   return dados;
 }
 
+// ---- Lista completa de produtos ATIVOS do site (cache curto de 60s) ----
+// Mesma fonte da Sol (buscarProdutos), sem termo: usada pelo orcamento de VENDA
+// para mostrar os MESMOS produtos do site. Cache proprio, curto, para nao martelar.
+let cacheLista: { dados: ProdutoLoja[]; expira: number } | null = null;
+const TTL_LISTA_MS = 60 * 1000;
+
+export async function listarProdutosLoja(): Promise<ProdutoLoja[]> {
+  const agora = Date.now();
+  if (cacheLista && cacheLista.expira > agora) return cacheLista.dados;
+  const d = await chamar<{ produtos: ProdutoLoja[] }>("/api/interno/produtos");
+  const dados = (d.produtos ?? []).filter((p) => p.ativo);
+  cacheLista = { dados, expira: agora + TTL_LISTA_MS };
+  return dados;
+}
+
+// Preco ATUAL de venda (promocional quando houver).
+export function precoAtualLoja(p: {
+  preco: number;
+  precoPromo: number | null;
+}): number {
+  return p.precoPromo != null && p.precoPromo > 0 ? p.precoPromo : p.preco;
+}
+
 export async function buscarCliente(telefone: string): Promise<ClienteLoja> {
   return chamar<ClienteLoja>(
     `/api/interno/cliente?telefone=${encodeURIComponent(telefone)}`,

@@ -90,10 +90,68 @@ export async function POST(
   } catch {
     return NextResponse.json({ erro: "corpo invalido" }, { status: 400 });
   }
-  const pecaId = typeof body.pecaId === "string" ? body.pecaId : "";
+  let pecaId = typeof body.pecaId === "string" ? body.pecaId : "";
   const quantidade = Math.round(Number(body.quantidade));
-  if (!pecaId || !Number.isFinite(quantidade) || quantidade < 1 || quantidade > 99) {
-    return NextResponse.json({ erro: "peca/quantidade invalida" }, { status: 400 });
+  if (!Number.isFinite(quantidade) || quantidade < 1 || quantidade > 99) {
+    return NextResponse.json({ erro: "quantidade invalida" }, { status: 400 });
+  }
+
+  // LAZY-SYNC loja->catalogo (Fatia 3.09): produto do SITE na VENDA. Ao adicionar,
+  // fazemos upsert no ProdutoCatalogo por (tipo=PRODUTO, chaveLoja=slug) com o
+  // preco ATUAL do site (promocional se houver) e usamos o id resultante como
+  // pecaId. O staging/Orcamento sempre referencia o catalogo; o snapshot na
+  // decisao congela o preco. Produto nao movimenta estoque.
+  const loja = body.produtoLoja as
+    | { slug?: string; nome?: string; categoria?: string; preco?: number; precoPromo?: number | null }
+    | undefined;
+  if (
+    !pecaId &&
+    negocio.finalidade === Finalidade.VENDA &&
+    loja &&
+    typeof loja.slug === "string" &&
+    loja.slug.trim() &&
+    typeof loja.nome === "string" &&
+    loja.nome.trim()
+  ) {
+    const precoAtual =
+      loja.precoPromo != null && loja.precoPromo > 0
+        ? loja.precoPromo
+        : Number(loja.preco) || 0;
+    const slug = loja.slug.trim();
+    const nome = loja.nome.trim();
+    const categoria = loja.categoria?.trim() || null;
+    const existente = await prisma.produtoCatalogo.findFirst({
+      where: { tipo: TipoCatalogo.PRODUTO, chaveLoja: slug },
+      select: { id: true },
+    });
+    if (existente) {
+      await prisma.produtoCatalogo.update({
+        where: { id: existente.id },
+        data: { nome, categoria, precoSugerido: precoAtual, ativo: true },
+      });
+      pecaId = existente.id;
+    } else {
+      const ultima = await prisma.produtoCatalogo.findFirst({
+        orderBy: { ordem: "desc" },
+        select: { ordem: true },
+      });
+      const novo = await prisma.produtoCatalogo.create({
+        data: {
+          nome,
+          categoria,
+          precoSugerido: precoAtual,
+          tipo: TipoCatalogo.PRODUTO,
+          chaveLoja: slug,
+          ordem: (ultima?.ordem ?? 0) + 1,
+        },
+        select: { id: true },
+      });
+      pecaId = novo.id;
+    }
+  }
+
+  if (!pecaId) {
+    return NextResponse.json({ erro: "item invalido" }, { status: 400 });
   }
   const peca = await prisma.produtoCatalogo.findUnique({
     where: { id: pecaId },

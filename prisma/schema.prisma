@@ -1089,11 +1089,16 @@ model ProdutoCatalogo {
   // baixa nunca trava a operacao; a UI sinaliza). estoqueMinimo null = sem alerta.
   estoque       Int          @default(0)
   estoqueMinimo Int?
+  // Chave estavel do produto no SITE (slug), para o lazy-sync loja->catalogo
+  // (Fatia 3.09): ao adicionar um produto do site ao orcamento, fazemos upsert por
+  // (tipo=PRODUTO, chaveLoja) e mantemos precoSugerido fresco. null = item manual.
+  chaveLoja     String?
   movimentacoes MovimentacaoPeca[]
   usos          PecaUso[]
   criadoEm      DateTime     @default(now())
 
   @@index([tipo, ativo, ordem])
+  @@index([chaveLoja])
 }
 
 // Movimentacao de estoque de uma peca (Fatia 3.01). Cada linha e um evento
