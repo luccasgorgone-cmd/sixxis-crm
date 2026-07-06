@@ -36,24 +36,42 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const janela = janelaDeParams(sp);
   if (janela) base.criadoEm = { gte: janela.inicio, lte: janela.fim };
 
+  // Filtros avancados (Fatia 3.09): UF via endereco do lead; DDD via telefone.
+  const leadAnd: Prisma.LeadWhereInput[] = [];
+  const uf = sp.get("uf")?.trim().toUpperCase();
+  if (uf && /^[A-Z]{2}$/.test(uf)) {
+    leadAnd.push({ enderecos: { some: { uf: { equals: uf, mode: "insensitive" } } } });
+  }
+  const ddd = sp.get("ddd")?.replace(/\D/g, "");
+  if (ddd && ddd.length === 2) {
+    // Telefone BR normalizado: "55" + DDD + numero -> DDD sao os digitos 3-4.
+    leadAnd.push({ telefone: { startsWith: `55${ddd}` } });
+  }
+
   const busca = sp.get("busca")?.trim();
+  const andWhere: Prisma.OrcamentoWhereInput[] = [];
   if (busca) {
     const orBusca: Prisma.OrcamentoWhereInput[] = [];
     // Numero: aceita "PED-000042", "000042" ou "42".
     const digitos = busca.replace(/\D/g, "");
     if (digitos) orBusca.push({ numero: Number(digitos) });
-    // Nome do cliente (nomeManual/pushName/nome), insensitive.
+    // Nome do cliente (nomeManual/pushName/nome) OU CPF/CNPJ (por digitos).
     orBusca.push({
       lead: {
         OR: [
           { nome: { contains: busca, mode: "insensitive" } },
           { nomeManual: { contains: busca, mode: "insensitive" } },
           { pushName: { contains: busca, mode: "insensitive" } },
+          ...(digitos.length >= 3
+            ? [{ cpf: { contains: digitos } }, { cnpj: { contains: digitos } }]
+            : []),
         ],
       },
     });
-    base.AND = [{ OR: orBusca }];
+    andWhere.push({ OR: orBusca });
   }
+  if (leadAnd.length > 0) andWhere.push({ lead: { AND: leadAnd } });
+  if (andWhere.length > 0) base.AND = andWhere;
 
   // where da LISTA (com decisao). Agregados usam base SEM decisao (os 3 cards
   // mostram todas as decisoes dentro dos demais filtros).
@@ -79,6 +97,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         decisao: true,
         total: true,
         totalGarantia: true,
+        totalFinal: true,
         agenteId: true,
         criadoEm: true,
         lead: {
@@ -99,7 +118,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       by: ["decisao"],
       where: base,
       _count: true,
-      _sum: { total: true },
+      _sum: { totalFinal: true },
     }),
   ]);
 
@@ -132,7 +151,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (resumo[g.decisao]) {
       resumo[g.decisao] = {
         quantidade: g._count,
-        somaTotal: num(g._sum.total) ?? 0,
+        somaTotal: num(g._sum.totalFinal) ?? 0,
       };
     }
   }
@@ -145,6 +164,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       finalidade: o.finalidade,
       decisao: o.decisao,
       total: num(o.total),
+      totalFinal: num(o.totalFinal),
       totalGarantia: num(o.totalGarantia),
       qtdItens: o.itens.length,
       criadoEm: o.criadoEm,

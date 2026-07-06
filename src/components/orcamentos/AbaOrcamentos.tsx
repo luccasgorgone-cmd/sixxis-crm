@@ -1,13 +1,24 @@
 "use client";
 
-// Aba ORCAMENTOS (Fatia 3.07): lista gerencial dos orcamentos-decisao com chips
-// de decisao, filtro de finalidade e periodo (reusa FiltroPeriodoEntrada), busca
-// por numero/cliente e 3 mini-cards de resumo sincronizados com os filtros.
-import { useCallback, useEffect, useMemo, useState } from "react";
+// Aba ORCAMENTOS (Fatia 3.07/3.09): lista gerencial com chips de decisao, filtro
+// de finalidade, periodo (FiltroPeriodoEntrada), busca (numero/cliente/CPF/CNPJ),
+// filtros avancados (UF/DDD) e 3 mini-cards de resumo. Clicar numa linha abre o
+// DRAWER com a ficha completa (substitui a expansao inline da 3.07).
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ReceiptText, Loader2, ChevronRight, Search, ShieldCheck } from "lucide-react";
+import {
+  ReceiptText,
+  Loader2,
+  ChevronRight,
+  ShieldCheck,
+  SlidersHorizontal,
+  X,
+  MessageCircle,
+} from "lucide-react";
 import { EstadoErro } from "@/components/ui/Estado";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { InputBusca } from "@/components/ui/InputBusca";
+import { useClickFora } from "@/lib/useClickFora";
 import {
   FiltroPeriodoEntrada,
   paramsPeriodo,
@@ -16,29 +27,20 @@ import {
 } from "@/components/ui/FiltroPeriodoEntrada";
 import { formatarBRL } from "@/lib/format";
 
-type Item = {
-  id: string;
-  descricao: string;
-  quantidade: number;
-  valorUnitario: number;
-  garantia: boolean;
-};
 type Orcamento = {
   id: string;
-  numero: number;
   numeroFormatado: string;
   finalidade: string;
   decisao: string;
   total: number | null;
+  totalFinal: number | null;
   totalGarantia: number | null;
   qtdItens: number;
   criadoEm: string;
   cliente: { leadId: string; nome: string };
   agente?: { nome: string | null };
-  itens: Item[];
 };
 type Resumo = Record<string, { quantidade: number; somaTotal: number }>;
-
 type Decisao = "" | "GANHO" | "PENDENTE" | "PERDIDO";
 
 const CHIPS: { v: Decisao; r: string; ativoClasse: string }[] = [
@@ -47,19 +49,15 @@ const CHIPS: { v: Decisao; r: string; ativoClasse: string }[] = [
   { v: "PENDENTE", r: "Pendentes", ativoClasse: "bg-amber-500 text-white" },
   { v: "PERDIDO", r: "Perdidos", ativoClasse: "bg-erro text-white" },
 ];
-
 const DECISAO_META: Record<string, { rotulo: string; classe: string }> = {
   GANHO: { rotulo: "Ganho", classe: "bg-green-600/10 text-green-700" },
   PENDENTE: { rotulo: "Pendente", classe: "bg-amber-500/10 text-amber-600" },
   PERDIDO: { rotulo: "Perdido", classe: "bg-erro/10 text-erro" },
 };
+const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 
 function dataCurta(iso: string): string {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
@@ -68,6 +66,11 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
   const [periodo, setPeriodo] = useState<PeriodoEntrada>(PERIODO_TODOS);
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [uf, setUf] = useState("");
+  const [ddd, setDdd] = useState("");
+  const [filtrosAberto, setFiltrosAberto] = useState(false);
+  const filtrosRef = useRef<HTMLDivElement>(null);
+  useClickFora(() => setFiltrosAberto(false), filtrosAberto, [filtrosRef]);
 
   const [orcs, setOrcs] = useState<Orcamento[]>([]);
   const [resumo, setResumo] = useState<Resumo>({});
@@ -75,7 +78,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
   const [carregando, setCarregando] = useState(true);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [erro, setErro] = useState(false);
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [drawerId, setDrawerId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setBuscaAplicada(busca), 300);
@@ -88,8 +91,10 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
     if (finalidade) p.set("finalidade", finalidade);
     for (const [k, v] of Object.entries(paramsPeriodo(periodo))) p.set(k, v);
     if (buscaAplicada.trim()) p.set("busca", buscaAplicada.trim());
+    if (uf) p.set("uf", uf);
+    if (ddd.length === 2) p.set("ddd", ddd);
     return p;
-  }, [decisao, finalidade, periodo, buscaAplicada]);
+  }, [decisao, finalidade, periodo, buscaAplicada, uf, ddd]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -136,6 +141,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
     { v: "PENDENTE", r: "Pendentes", classe: "border-amber-500/20 bg-amber-500/[0.05]", ponto: "text-amber-600" },
     { v: "PERDIDO", r: "Perdidos", classe: "border-erro/20 bg-erro/[0.04]", ponto: "text-erro" },
   ];
+  const temFiltroAvancado = Boolean(uf || ddd.length === 2);
 
   return (
     <div className="scroll-fino h-full space-y-4 overflow-y-auto p-4 md:p-6">
@@ -169,24 +175,67 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
             </button>
           ))}
         </div>
-        <select
-          value={finalidade}
-          onChange={(e) => setFinalidade(e.target.value)}
-          className="campo"
-        >
+        <select value={finalidade} onChange={(e) => setFinalidade(e.target.value)} className="campo">
           <option value="">Todas finalidades</option>
           <option value="VENDA">Venda</option>
           <option value="POS_VENDA">Pós-venda</option>
         </select>
         <FiltroPeriodoEntrada valor={periodo} onChange={setPeriodo} />
-        <div className="relative min-w-0 flex-1 sm:flex-none">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Número ou cliente"
-            className="campo w-full pl-8 sm:w-52"
-          />
+        <InputBusca
+          valor={busca}
+          onChange={setBusca}
+          placeholder="Número, cliente, CPF ou CNPJ"
+          className="min-w-0 flex-1 sm:w-64 sm:flex-none"
+        />
+        {/* Filtros avancados (UF/DDD) */}
+        <div className="relative" ref={filtrosRef}>
+          <button
+            onClick={() => setFiltrosAberto((a) => !a)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              temFiltroAvancado
+                ? "border-tiffany/40 bg-tiffany/10 text-tiffany"
+                : "border-black/10 text-medio/80 hover:bg-black/5"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Filtros
+            {temFiltroAvancado && <span className="text-xs">·</span>}
+          </button>
+          {filtrosAberto && (
+            <div className="fade-in absolute right-0 top-full z-30 mt-1 w-56 space-y-3 rounded-lg border border-black/10 bg-white p-3 shadow-lg dark:bg-escuro">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-medio/70">UF</span>
+                <select value={uf} onChange={(e) => setUf(e.target.value)} className="campo w-full">
+                  <option value="">Todas</option>
+                  {UFS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-medio/70">DDD</span>
+                <input
+                  value={ddd}
+                  onChange={(e) => setDdd(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  inputMode="numeric"
+                  placeholder="Ex.: 18"
+                  className="campo w-full"
+                />
+              </label>
+              {temFiltroAvancado && (
+                <button
+                  onClick={() => {
+                    setUf("");
+                    setDdd("");
+                  }}
+                  className="text-xs font-medium text-medio hover:text-erro"
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -206,9 +255,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
               <p className={`text-xs font-semibold ${c.ponto}`}>
                 {c.r} · {dados.quantidade}
               </p>
-              <p className="mt-0.5 truncate text-sm font-bold text-escuro">
-                {formatarBRL(dados.somaTotal)}
-              </p>
+              <p className="mt-0.5 truncate text-sm font-bold text-escuro">{formatarBRL(dados.somaTotal)}</p>
             </button>
           );
         })}
@@ -227,72 +274,39 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
         <div className="space-y-1.5">
           {orcs.map((o) => {
             const dec = DECISAO_META[o.decisao] ?? { rotulo: o.decisao, classe: "bg-black/5 text-medio" };
-            const exp = expandido === o.id;
             return (
-              <div key={o.id} className="overflow-hidden rounded-lg border border-black/5 bg-white">
+              <button
+                key={o.id}
+                onClick={() => setDrawerId(o.id)}
+                className="w-full rounded-lg border border-black/5 bg-white text-left transition-colors hover:border-tiffany/30"
+              >
                 <div className="flex items-center gap-2 px-3 py-2">
-                  <button
-                    onClick={() => setExpandido(exp ? null : o.id)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  <span className="shrink-0 font-mono text-xs font-semibold text-escuro">{o.numeroFormatado}</span>
+                  <span className="shrink-0 text-[11px] text-medio/50">{dataCurta(o.criadoEm)}</span>
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                      o.finalidade === "POS_VENDA" ? "bg-tiffany/10 text-tiffany" : "bg-sky-500/10 text-sky-600"
+                    }`}
                   >
-                    <ChevronRight
-                      className={`h-4 w-4 shrink-0 text-medio/40 transition-transform ${exp ? "rotate-90" : ""}`}
-                    />
-                    <span className="shrink-0 font-mono text-xs font-semibold text-escuro">
-                      {o.numeroFormatado}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-medio/50">{dataCurta(o.criadoEm)}</span>
-                    <span
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                        o.finalidade === "POS_VENDA" ? "bg-tiffany/10 text-tiffany" : "bg-sky-500/10 text-sky-600"
-                      }`}
-                    >
-                      {o.finalidade === "POS_VENDA" ? "Pós-venda" : "Venda"}
-                    </span>
-                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${dec.classe}`}>
-                      {dec.rotulo}
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 flex-col items-end">
-                    <span className="text-sm font-semibold text-escuro">{formatarBRL(o.total ?? 0)}</span>
+                    {o.finalidade === "POS_VENDA" ? "Pós-venda" : "Venda"}
+                  </span>
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${dec.classe}`}>
+                    {dec.rotulo}
+                  </span>
+                  <div className="ml-auto flex shrink-0 flex-col items-end">
+                    <span className="text-sm font-semibold text-escuro">{formatarBRL(o.totalFinal ?? 0)}</span>
                     {o.totalGarantia != null && o.totalGarantia > 0 && (
                       <span className="text-[10px] text-medio/50">Garantia {formatarBRL(o.totalGarantia)}</span>
                     )}
                   </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-medio/30" />
                 </div>
-                {/* Linha secundaria: cliente + qtd + agente (admin) */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-2 pl-9 text-[11px] text-medio/50">
-                  <Link
-                    href={`/inbox?lead=${o.cliente.leadId}`}
-                    className="font-medium text-medio/80 hover:text-tiffany"
-                  >
-                    {o.cliente.nome}
-                  </Link>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-2 text-[11px] text-medio/50">
+                  <span className="font-medium text-medio/80">{o.cliente.nome}</span>
                   <span>· {o.qtdItens} {o.qtdItens === 1 ? "item" : "itens"}</span>
                   {ehAdmin && o.agente?.nome && <span>· {o.agente.nome}</span>}
                 </div>
-                {exp && o.itens.length > 0 && (
-                  <ul className="space-y-1 border-t border-black/5 bg-fundo/40 px-3 py-2 pl-9">
-                    {o.itens.map((it) => (
-                      <li key={it.id} className="flex items-center gap-2 text-[11px]">
-                        <span className="min-w-0 flex-1 truncate text-medio/70">
-                          <span className="text-medio/50">{it.quantidade}x </span>
-                          {it.descricao}
-                        </span>
-                        {it.garantia ? (
-                          <span className="flex shrink-0 items-center gap-0.5 text-tiffany">
-                            <ShieldCheck className="h-3 w-3" /> Garantia
-                          </span>
-                        ) : (
-                          <span className="shrink-0 text-medio/60">
-                            {formatarBRL(it.quantidade * it.valorUnitario)}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              </button>
             );
           })}
 
@@ -308,6 +322,204 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
           )}
         </div>
       )}
+
+      {drawerId && <DrawerOrcamento id={drawerId} onFechar={() => setDrawerId(null)} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Drawer com a ficha completa do orcamento.
+// ---------------------------------------------------------------------------
+type Ficha = {
+  numeroFormatado: string;
+  decisao: string;
+  finalidade: string;
+  criadoEm: string;
+  cliente: {
+    leadId: string;
+    nome: string;
+    telefone: string;
+    cpf: string | null;
+    cnpj: string | null;
+    cidade: string | null;
+    uf: string | null;
+  };
+  contexto: { finalidade: string; etapa: string | null; dono: string | null };
+  valores: {
+    subtotal: number | null;
+    cupom: string | null;
+    descontoPct: number | null;
+    frete: number | null;
+    fretePagoPelaEmpresa: boolean;
+    totalFinal: number | null;
+    totalGarantia: number | null;
+    valorNegocio: number | null;
+  };
+  itens: {
+    id: string;
+    descricao: string;
+    quantidade: number;
+    valorUnitario: number;
+    subtotal: number;
+    garantia: boolean;
+  }[];
+};
+
+function DrawerOrcamento({ id, onFechar }: { id: string; onFechar: () => void }) {
+  const [ficha, setFicha] = useState<Ficha | null>(null);
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/orcamentos/${id}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        if (vivo) setFicha(d.orcamento);
+      })
+      .catch(() => {
+        if (vivo) setErro(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [id]);
+
+  const dec = ficha ? DECISAO_META[ficha.decisao] ?? { rotulo: ficha.decisao, classe: "bg-black/5 text-medio" } : null;
+  const v = ficha?.valores;
+  const descValor = v && v.subtotal != null && v.descontoPct ? v.subtotal * (v.descontoPct / 100) : 0;
+
+  return (
+    <div className="fade-in fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onFechar}>
+      <div
+        className="modal-in scroll-fino h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-black/5 bg-white px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-semibold text-escuro">
+              {ficha?.numeroFormatado ?? "…"}
+            </span>
+            {dec && (
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${dec.classe}`}>{dec.rotulo}</span>
+            )}
+          </div>
+          <button onClick={onFechar} className="rounded-lg p-1 text-medio/60 hover:bg-black/5">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {erro ? (
+          <p className="p-6 text-sm text-medio/50">Não foi possível carregar a ficha.</p>
+        ) : !ficha ? (
+          <div className="flex justify-center py-16 text-medio/40">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4 p-5">
+            {/* Cliente */}
+            <div className="rounded-xl border border-black/5 bg-fundo/50 p-3">
+              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">Cliente</h4>
+              <p className="text-sm font-medium text-escuro">{ficha.cliente.nome}</p>
+              <p className="text-xs text-medio/60">{ficha.cliente.telefone}</p>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-medio/60">
+                {ficha.cliente.cpf && <span>CPF {ficha.cliente.cpf}</span>}
+                {ficha.cliente.cnpj && <span>CNPJ {ficha.cliente.cnpj}</span>}
+                {(ficha.cliente.cidade || ficha.cliente.uf) && (
+                  <span>
+                    {[ficha.cliente.cidade, ficha.cliente.uf].filter(Boolean).join("/")}
+                  </span>
+                )}
+              </div>
+              <Link
+                href={`/inbox?lead=${ficha.cliente.leadId}`}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-tiffany px-2.5 py-1 text-xs font-semibold text-white hover:bg-tiffany-escuro"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> Abrir conversa
+              </Link>
+            </div>
+
+            {/* Itens */}
+            <div>
+              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">Itens</h4>
+              <ul className="space-y-1">
+                {ficha.itens.map((it) => (
+                  <li
+                    key={it.id}
+                    className="flex items-center gap-2 rounded-lg border border-black/5 bg-white px-2.5 py-1.5 text-xs"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-escuro">
+                      <span className="text-medio/50">{it.quantidade}x </span>
+                      {it.descricao}
+                    </span>
+                    {it.garantia ? (
+                      <span className="flex shrink-0 items-center gap-0.5 text-tiffany">
+                        <ShieldCheck className="h-3 w-3" /> Garantia
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-medio/60">
+                        {formatarBRL(it.valorUnitario)} · {formatarBRL(it.subtotal)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Valores */}
+            {v && (
+              <div className="rounded-xl border border-black/5 bg-fundo/50 p-3 text-xs">
+                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">Valores</h4>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between text-medio/60">
+                    <span>Subtotal</span>
+                    <span>{formatarBRL(v.subtotal ?? 0)}</span>
+                  </div>
+                  {descValor > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <span>
+                        {v.cupom ? `Cupom ${v.cupom} · ` : ""}−{v.descontoPct}%
+                      </span>
+                      <span>− {formatarBRL(descValor)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-medio/60">
+                    <span>Frete</span>
+                    <span>{v.fretePagoPelaEmpresa ? "pago pela empresa" : `+ ${formatarBRL(v.frete ?? 0)}`}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
+                    <span>Total</span>
+                    <span className="text-tiffany">{formatarBRL(v.totalFinal ?? 0)}</span>
+                  </div>
+                  {v.totalGarantia != null && v.totalGarantia > 0 && (
+                    <div className="flex justify-between text-[11px] text-medio/50">
+                      <span>Garantia (não cobrado)</span>
+                      <span className="line-through">{formatarBRL(v.totalGarantia)}</span>
+                    </div>
+                  )}
+                  {v.valorNegocio != null && (
+                    <div className="flex justify-between border-t border-black/10 pt-1 text-medio/70">
+                      <span>Valor consolidado (ganho)</span>
+                      <span className="font-semibold text-escuro">{formatarBRL(v.valorNegocio)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Contexto */}
+            <div className="rounded-xl border border-black/5 bg-fundo/50 p-3 text-xs text-medio/70">
+              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">Contexto</h4>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                <span>{ficha.finalidade === "POS_VENDA" ? "Pós-venda" : "Venda"}</span>
+                {ficha.contexto.etapa && <span>· {ficha.contexto.etapa}</span>}
+                {ficha.contexto.dono && <span>· {ficha.contexto.dono}</span>}
+                <span>· {new Date(ficha.criadoEm).toLocaleString("pt-BR")}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
