@@ -531,7 +531,8 @@ export function IAAdmin() {
               </ul>
               <p className="mt-1.5">
                 PRECO e LINK vem da ferramenta ao vivo (buscar_produto) — NAO
-                escreva na base. A secao{" "}
+                escreva na base. PRECO e DISPONIBILIDADE de PEÇAS tambem vem da
+                ferramenta ao vivo (buscar_peca) — nao escreva na base. A secao{" "}
                 <code>=== GUIA DE ATENDIMENTO (Oracle) ===</code> e gerida pelo
                 Oracle.
               </p>

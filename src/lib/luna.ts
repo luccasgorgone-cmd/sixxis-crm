@@ -16,6 +16,9 @@
 // base de conhecimento, sem inventar preco).
 
 import { buscarProdutos } from "./loja";
+import { prisma } from "./prisma";
+import { formatarBRL } from "./format";
+import { TipoCatalogo } from "../generated/prisma/enums";
 
 export type LunaFinalidade = "VENDA" | "POS_VENDA";
 export type LunaMensagem = { autor: "cliente" | "luna"; texto: string };
@@ -120,6 +123,95 @@ async function executarBuscarProduto(termo: string): Promise<string> {
   }
 }
 
+// Ferramenta de PECAS (pos-venda, Fatia 3.10): mesma mecanica do buscar_produto,
+// lendo o catalogo de PECAS (ProdutoCatalogo tipo PECA ATIVA). Retorna preco e
+// disponibilidade honesta — NUNCA expoe numero de estoque nem promete prazo.
+const FERRAMENTA_BUSCAR_PECA = {
+  name: "buscar_peca",
+  description:
+    "Consulta o catalogo de PECAS de reposicao da Sixxis e retorna nome, modelo, " +
+    "PRECO e disponibilidade REAIS. Use no POS-VENDA quando o cliente pedir uma " +
+    "peca/filtro/componente. Passe o MODELO do aparelho para filtrar. NUNCA invente " +
+    "preco, NUNCA prometa prazo de envio e NUNCA afirme compatibilidade com um " +
+    "modelo diferente do listado. Se vier vazio, nao invente — oriente handoff.",
+  input_schema: {
+    type: "object",
+    properties: {
+      termo: {
+        type: "string",
+        description: "Nome/tipo da peca (ex.: filtro colmeia, rodizio, bomba d'agua).",
+      },
+      modelo: {
+        type: "string",
+        description: "Modelo do aparelho do cliente (ex.: SX100 Trend), quando souber.",
+      },
+    },
+    required: ["termo"],
+  },
+} as const;
+
+// Executa a busca de pecas. NUNCA lanca: em falha, instrui handoff.
+async function executarBuscarPeca(termo: string, modelo?: string): Promise<string> {
+  const alvo = String(termo ?? "").trim();
+  const mdl = String(modelo ?? "").trim();
+  try {
+    const pecas = await prisma.produtoCatalogo.findMany({
+      where: {
+        tipo: TipoCatalogo.PECA,
+        ativo: true,
+        ...(alvo
+          ? {
+              OR: [
+                { nome: { contains: alvo, mode: "insensitive" } },
+                { modelo: { contains: alvo, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+        ...(mdl ? { modelo: { contains: mdl, mode: "insensitive" } } : {}),
+      },
+      orderBy: { nome: "asc" },
+      take: 6,
+      select: { nome: true, modelo: true, precoSugerido: true, estoque: true },
+    });
+    if (pecas.length === 0) {
+      return JSON.stringify({
+        ok: true,
+        pecas: [],
+        instrucao:
+          "Nenhuma peca encontrada. NAO invente peca, preco nem compatibilidade. " +
+          "Colete o modelo do aparelho + a peca desejada e faca handoff para a equipe.",
+      });
+    }
+    // Disponibilidade honesta: nunca expor o numero de estoque nem prometer prazo.
+    const enxuto = pecas.map((p) => ({
+      nome: p.nome,
+      modelo: p.modelo,
+      preco: p.precoSugerido != null ? formatarBRL(Number(p.precoSugerido)) : null,
+      disponibilidade: p.estoque > 0 ? "disponivel" : "sob consulta",
+    }));
+    return JSON.stringify({
+      ok: true,
+      pecas: enxuto,
+      instrucao:
+        "Informe nome e PRECO da peca com honestidade sobre a disponibilidade " +
+        "('disponivel' ou 'sob consulta'). NUNCA exponha o numero de estoque nem " +
+        "prometa prazo de envio. Para FECHAR a compra da peca, escolha handoff " +
+        "informando no texto o modelo + a peca + a quantidade — a equipe monta o " +
+        "orcamento oficial (PED) e conclui.",
+    });
+  } catch (e) {
+    console.error(
+      `[luna] buscar_peca falhou (termo="${alvo}"): ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return JSON.stringify({
+      ok: false,
+      erro: "catalogo indisponivel",
+      instrucao:
+        "Nao consegui consultar as pecas agora. Colete o modelo + a peca e faca handoff.",
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // BASE FIXA DE SEGURANCA (as TRAVAS). Embutida no codigo, NUNCA editavel pelo
 // dono, SEMPRE aplicada. Define quem a Luna e, do que ela pode e nao pode falar,
@@ -148,6 +240,10 @@ discuta que e uma IA alem do minimo necessario.
 
 SE NAO SOUBER com certeza (ex.: especificacao tecnica que nao esta na base de
 conhecimento): NAO invente. Diga que vai verificar com um atendente.
+
+RED LINE PECAS (Fatia 3.10): NUNCA afirme que uma peca serve/e compativel com um
+modelo DIFERENTE do que a ferramenta listou; e NUNCA prometa prazo de envio de
+peca. Em duvida de compatibilidade, faca handoff.
 
 DECISAO (voce escolhe UMA acao a cada resposta):
 - "responder": atendimento normal — voce responde o cliente.
@@ -284,6 +380,18 @@ CASOS FREQUENTES (dados reais do atendimento):
 - Peca de reposicao/filtro (ex.: "filtro colmeia", "rodinhas do aspirador"):
   colete o MODELO do aparelho + a peca exata e escolha "handoff" com essas
   informacoes no texto. E recompra facil: trate com prioridade e cordialidade.
+
+PECAS DE REPOSICAO (Fatia 3.10) — quando o cliente pedir peca/filtro/componente:
+1) Identifique o MODELO do aparelho do cliente (pergunte com gentileza se ainda
+   nao souber — a peca depende do modelo).
+2) Use a ferramenta "buscar_peca" com o termo da peca e o modelo.
+3) Informe o NOME e o PRECO da peca encontrada, com honestidade sobre a
+   disponibilidade ("disponivel" ou "sob consulta"). Nunca cite numero de estoque
+   nem prometa prazo de envio.
+4) Para FECHAR a compra da peca, escolha "handoff" informando no texto o modelo +
+   a peca + a quantidade — a equipe monta o orcamento oficial (PED) e conclui.
+5) Peca NAO encontrada, ou duvida de compatibilidade/tecnica: "handoff" imediato,
+   sem chutar compatibilidade.
 `.trim();
 
 // Monta o system prompt em blocos: base fixa + persona + catalogo (estaveis,
@@ -515,7 +623,11 @@ export async function gerarRespostaLuna(entrada: {
           max_tokens: MAX_TOKENS,
           system,
           messages: mensagens,
-          tools: [FERRAMENTA_BUSCAR_PRODUTO],
+          // Pos-venda tambem tem a busca de PECAS (Fatia 3.10).
+          tools:
+            finalidade === "POS_VENDA"
+              ? [FERRAMENTA_BUSCAR_PRODUTO, FERRAMENTA_BUSCAR_PECA]
+              : [FERRAMENTA_BUSCAR_PRODUTO],
         }),
         signal: controller.signal,
       });
@@ -557,6 +669,12 @@ export async function gerarRespostaLuna(entrada: {
           if (uso.name === "buscar_produto") {
             const entradaFerr = (uso.input ?? {}) as { termo?: unknown };
             saida = await executarBuscarProduto(String(entradaFerr.termo ?? ""));
+          } else if (uso.name === "buscar_peca") {
+            const entradaFerr = (uso.input ?? {}) as { termo?: unknown; modelo?: unknown };
+            saida = await executarBuscarPeca(
+              String(entradaFerr.termo ?? ""),
+              entradaFerr.modelo != null ? String(entradaFerr.modelo) : undefined,
+            );
           }
           resultados.push({
             type: "tool_result",
