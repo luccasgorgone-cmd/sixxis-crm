@@ -23,6 +23,7 @@ import {
   Trash2,
   Zap,
   ScanLine,
+  Stethoscope,
   History,
   Plus,
   BookmarkPlus,
@@ -36,7 +37,14 @@ import { useToast } from "@/components/ui/Toast";
 
 // Comandos rapidos (chips acima do compositor): atalhos de periodo e acoes.
 // `Icone`/`destaque` opcionais dao enfase a um atalho especial (ex.: varredura).
-const COMANDOS: { rotulo: string; pergunta: string; Icone?: LucideIcon; destaque?: boolean }[] = [
+const COMANDOS: { rotulo: string; pergunta: string; Icone?: LucideIcon; destaque?: boolean; admin?: boolean }[] = [
+  {
+    rotulo: "Diagnóstico do sistema",
+    Icone: Stethoscope,
+    admin: true,
+    pergunta:
+      "Rode a ferramenta diagnosticar_sistema e interprete os resultados. Para cada ALERTA, explique em linguagem de negocio o que significa e o impacto, e sugira a correcao (processo ou ajuste no sistema). Ao final, liste as PRIORIDADES de melhoria em ordem de importancia.",
+  },
   {
     rotulo: "Varredura de atendimentos",
     Icone: ScanLine,
@@ -578,7 +586,7 @@ export function ChatOracle({ papel }: { papel: string }) {
       <div className="border-t border-black/5 bg-white px-4 pt-2.5 sm:px-6">
         <div className="scroll-fino mx-auto flex max-w-3xl items-center gap-1.5 overflow-x-auto pb-0.5">
           <Zap className="h-3.5 w-3.5 shrink-0 text-tiffany" />
-          {COMANDOS.map((c) => (
+          {COMANDOS.filter((c) => !c.admin || ehAdmin).map((c) => (
             <button
               key={c.rotulo}
               onClick={() => void perguntar(c.pergunta)}

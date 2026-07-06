@@ -29,6 +29,7 @@ import {
   DirecaoMsg,
   Segmento,
   MetricaMeta,
+  TipoCatalogo,
 } from "../generated/prisma/enums";
 
 export type OracleMensagem = { autor: "user" | "oracle"; texto: string };
@@ -1213,6 +1214,295 @@ async function consultarMotivosPerda(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Fatia 3.10: ORCAMENTOS, ESTOQUE de pecas e DIAGNOSTICO (todas SO LEITURA).
+// ---------------------------------------------------------------------------
+
+// consultar_orcamentos: propostas/decisoes/descontos/conversao no periodo.
+// Escopo: nao-admin so orcamentos de leads proprios (relacao lead, como a aba).
+async function consultarOrcamentos(
+  agente: SessaoAgente,
+  input: { periodo?: number; finalidade?: string; decisao?: string },
+) {
+  const admin = ehAdmin(agente.papel);
+  const dias = Math.min(365, Math.max(1, Math.round(input.periodo ?? 30)));
+  const inicio = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  const fin = finalidadeDe(input.finalidade);
+  const finStr =
+    fin === Finalidade.POS_VENDA ? "POS_VENDA" : fin === Finalidade.VENDA ? "VENDA" : undefined;
+  const base: Prisma.OrcamentoWhereInput = {
+    lead: escopoLead(agente),
+    criadoEm: { gte: inicio },
+    ...(finStr ? { finalidade: finStr } : {}),
+  };
+  const decisaoFiltro = ["GANHO", "PENDENTE", "PERDIDO"].includes(String(input.decisao))
+    ? String(input.decisao)
+    : undefined;
+
+  const [porDecisaoRaw, ganhoAgg, comDescAgg, cuponsRaw, pendentes, ganhos] = await Promise.all([
+    prisma.orcamento.groupBy({
+      by: ["decisao"],
+      where: { ...base, ...(decisaoFiltro ? { decisao: decisaoFiltro } : {}) },
+      _count: true,
+      _sum: { totalFinal: true },
+    }),
+    prisma.orcamento.aggregate({
+      where: { ...base, decisao: "GANHO" },
+      _count: true,
+      _sum: { totalFinal: true, totalGarantia: true },
+    }),
+    prisma.orcamento.aggregate({
+      where: { ...base, descontoPct: { gt: 0 } },
+      _count: true,
+      _avg: { descontoPct: true },
+    }),
+    prisma.orcamento.groupBy({
+      by: ["cupom"],
+      where: { ...base, cupom: { not: null } },
+      _count: true,
+      orderBy: { _count: { cupom: "desc" } },
+      take: 10,
+    }),
+    prisma.orcamento.findMany({
+      where: { ...base, decisao: "PENDENTE" },
+      select: { leadId: true },
+      distinct: ["leadId"],
+      take: 5000,
+    }),
+    prisma.orcamento.findMany({
+      where: { ...base, decisao: "GANHO" },
+      select: { leadId: true },
+      distinct: ["leadId"],
+      take: 5000,
+    }),
+  ]);
+
+  const qtdGanhos = ganhoAgg._count;
+  const somaGanhos = num(ganhoAgg._sum.totalFinal);
+  const setGanho = new Set(ganhos.map((g) => g.leadId));
+  const leadsPendente = pendentes.length;
+  const convertidos = pendentes.filter((p) => setGanho.has(p.leadId)).length;
+
+  return {
+    escopo: admin ? "empresa" : "sua carteira",
+    periodoDias: dias,
+    finalidade: input.finalidade ?? "todas",
+    decisaoFiltro: decisaoFiltro ?? "todas",
+    porDecisao: porDecisaoRaw.map((g) => ({
+      decisao: g.decisao,
+      quantidade: g._count,
+      somaTotalFinal: num(g._sum.totalFinal),
+    })),
+    ticketMedioGanhos: qtdGanhos > 0 ? Math.round(somaGanhos / qtdGanhos) : 0,
+    qtdGanhos,
+    descontoMedioPct:
+      comDescAgg._avg.descontoPct != null ? Math.round(Number(comDescAgg._avg.descontoPct)) : 0,
+    orcamentosComDesconto: comDescAgg._count,
+    topCupons: cuponsRaw.filter((c) => c.cupom).map((c) => ({ cupom: c.cupom, usos: c._count })),
+    valorGarantiaConcedida: num(ganhoAgg._sum.totalGarantia),
+    conversaoPropostas: {
+      leadsComPendente: leadsPendente,
+      convertidosEmGanho: convertidos,
+      taxaPct: leadsPendente > 0 ? Math.round((convertidos / leadsPendente) * 100) : null,
+    },
+    nota:
+      leadsPendente > 0 && leadsPendente < 30
+        ? "amostra pequena de propostas — a taxa de conversao pode ser ruido"
+        : undefined,
+  };
+}
+
+// consultar_estoque_pecas: criticas, giro e imobilizado. ADMIN-ONLY (dado global).
+async function consultarEstoquePecas(
+  agente: SessaoAgente,
+  input: { categoria?: string; apenasCriticas?: boolean },
+) {
+  if (!ehAdmin(agente.papel)) {
+    return {
+      restrito: true,
+      mensagem:
+        "O estoque de pecas e um dado operacional global — disponivel apenas para administradores.",
+    };
+  }
+  const cat = input.categoria?.trim();
+  const pecas = await prisma.produtoCatalogo.findMany({
+    where: {
+      tipo: TipoCatalogo.PECA,
+      ativo: true,
+      ...(cat ? { categoria: { equals: cat, mode: "insensitive" } } : {}),
+    },
+    select: { id: true, nome: true, modelo: true, estoque: true, estoqueMinimo: true, precoSugerido: true },
+  });
+  const ehCritica = (p: (typeof pecas)[number]) =>
+    p.estoque < 0 || (p.estoqueMinimo != null && p.estoque <= p.estoqueMinimo);
+  const criticas = pecas.filter(ehCritica);
+  const topCriticas = criticas
+    .sort((a, b) => a.estoque - (a.estoqueMinimo ?? 0) - (b.estoque - (b.estoqueMinimo ?? 0)))
+    .slice(0, 20)
+    .map((p) => ({ nome: p.nome, modelo: p.modelo, estoque: p.estoque, minimo: p.estoqueMinimo }));
+  const valorImobilizado = pecas.reduce(
+    (s, p) => s + Math.max(0, p.estoque) * num(p.precoSugerido),
+    0,
+  );
+
+  let maisMovimentadas: unknown[] = [];
+  if (!input.apenasCriticas) {
+    const inicio = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const movs = await prisma.movimentacaoPeca.findMany({
+      where: { criadoEm: { gte: inicio }, motivo: { in: ["venda", "garantia", "assistencia local"] } },
+      select: { pecaId: true, motivo: true, quantidade: true },
+      take: 5000,
+    });
+    const porPeca = new Map<string, { total: number; venda: number; garantia: number; assistencia: number }>();
+    for (const m of movs) {
+      const e = porPeca.get(m.pecaId) ?? { total: 0, venda: 0, garantia: 0, assistencia: 0 };
+      e.total += m.quantidade;
+      if (m.motivo === "venda") e.venda += m.quantidade;
+      else if (m.motivo === "garantia") e.garantia += m.quantidade;
+      else if (m.motivo === "assistencia local") e.assistencia += m.quantidade;
+      porPeca.set(m.pecaId, e);
+    }
+    const top15 = [...porPeca.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 15);
+    const nomes = top15.length
+      ? await prisma.produtoCatalogo.findMany({
+          where: { id: { in: top15.map((x) => x[0]) } },
+          select: { id: true, nome: true, modelo: true },
+        })
+      : [];
+    const nomeMap = new Map(nomes.map((n) => [n.id, n]));
+    maisMovimentadas = top15.map(([id, e]) => ({
+      nome: nomeMap.get(id)?.nome ?? "(peca)",
+      modelo: nomeMap.get(id)?.modelo ?? null,
+      total: e.total,
+      venda: e.venda,
+      garantia: e.garantia,
+      assistenciaLocal: e.assistencia,
+    }));
+  }
+
+  return {
+    escopo: "empresa",
+    categoria: cat ?? "todas",
+    totalPecasAtivas: pecas.length,
+    qtdCriticas: criticas.length,
+    topCriticas,
+    maisMovimentadas90d: maisMovimentadas,
+    valorImobilizadoAprox: Math.round(valorImobilizado),
+    notaImobilizado:
+      "aproximacao: soma de (estoque x preco sugerido) das pecas ativas, ignorando estoque negativo",
+  };
+}
+
+// diagnosticar_sistema: bateria de checagens de integridade. ADMIN-ONLY.
+async function diagnosticarSistema(agente: SessaoAgente, _input: { detalhado?: boolean }) {
+  if (!ehAdmin(agente.papel)) {
+    return {
+      restrito: true,
+      mensagem:
+        "O diagnostico do sistema e uma verificacao global — disponivel apenas para administradores.",
+    };
+  }
+  const ha30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const ha24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // Cada checagem: contagem + amostra de ate 5 ids. status ALERTA quando > 0.
+  async function checar(
+    check: string,
+    contar: () => Promise<number>,
+    amostrar: () => Promise<{ id: string }[]>,
+  ) {
+    const [quantidade, amostra] = await Promise.all([contar(), amostrar()]);
+    return {
+      check,
+      status: quantidade > 0 ? "ALERTA" : "OK",
+      quantidade,
+      amostraIds: amostra.map((x) => x.id),
+    };
+  }
+
+  const wAbertoSemDono: Prisma.NegocioWhereInput = { status: StatusNeg.ABERTO, agenteId: null };
+  const wStagingParado: Prisma.PecaUsoWhereInput = { origem: "NEGOCIO", criadoEm: { lt: ha30d } };
+  const wOrcSemItens: Prisma.OrcamentoWhereInput = { itens: { none: {} } };
+  const wItemPedidoNaoGanho: Prisma.ItemPedidoWhereInput = {
+    negocio: { status: { not: StatusNeg.GANHO } },
+  };
+  const wEstoqueNeg: Prisma.ProdutoCatalogoWhereInput = { tipo: TipoCatalogo.PECA, estoque: { lt: 0 } };
+  const wAjusteNaoGanho: Prisma.NegocioWhereInput = {
+    valorAjustado: { not: null },
+    status: { not: StatusNeg.GANHO },
+  };
+  const wSemResposta: Prisma.ConversaWhereInput = {
+    status: "aberta",
+    naoLidas: { gt: 0 },
+    ultimaMensagemEm: { lt: ha24h },
+  };
+  const wLeadSemConversa: Prisma.LeadWhereInput = { conversas: { none: {} } };
+  const wGanhoVendaZero: Prisma.NegocioWhereInput = {
+    status: StatusNeg.GANHO,
+    finalidade: Finalidade.VENDA,
+    valorAjustado: null,
+    OR: [{ valor: null }, { valor: 0 }],
+  };
+
+  const s5 = { select: { id: true }, take: 5 } as const;
+  const checks = await Promise.all([
+    checar(
+      "negocios abertos sem dono",
+      () => prisma.negocio.count({ where: wAbertoSemDono }),
+      () => prisma.negocio.findMany({ where: wAbertoSemDono, ...s5 }),
+    ),
+    checar(
+      "staging de orcamento (PecaUso NEGOCIO) parado ha mais de 30 dias",
+      () => prisma.pecaUso.count({ where: wStagingParado }),
+      () => prisma.pecaUso.findMany({ where: wStagingParado, ...s5 }),
+    ),
+    checar(
+      "orcamentos sem itens",
+      () => prisma.orcamento.count({ where: wOrcSemItens }),
+      () => prisma.orcamento.findMany({ where: wOrcSemItens, ...s5 }),
+    ),
+    checar(
+      "itens de pedido em negocio nao-GANHO",
+      () => prisma.itemPedido.count({ where: wItemPedidoNaoGanho }),
+      () => prisma.itemPedido.findMany({ where: wItemPedidoNaoGanho, ...s5 }),
+    ),
+    checar(
+      "pecas com estoque negativo",
+      () => prisma.produtoCatalogo.count({ where: wEstoqueNeg }),
+      () => prisma.produtoCatalogo.findMany({ where: wEstoqueNeg, ...s5 }),
+    ),
+    checar(
+      "valorAjustado preenchido em negocio nao-GANHO",
+      () => prisma.negocio.count({ where: wAjusteNaoGanho }),
+      () => prisma.negocio.findMany({ where: wAjusteNaoGanho, ...s5 }),
+    ),
+    checar(
+      "conversas com cliente aguardando resposta ha mais de 24h",
+      () => prisma.conversa.count({ where: wSemResposta }),
+      () => prisma.conversa.findMany({ where: wSemResposta, ...s5 }),
+    ),
+    checar(
+      "leads sem nenhuma conversa",
+      () => prisma.lead.count({ where: wLeadSemConversa }),
+      () => prisma.lead.findMany({ where: wLeadSemConversa, ...s5 }),
+    ),
+    checar(
+      "GANHOs de venda com valor zero",
+      () => prisma.negocio.count({ where: wGanhoVendaZero }),
+      () => prisma.negocio.findMany({ where: wGanhoVendaZero, ...s5 }),
+    ),
+  ]);
+
+  const alertas = checks.filter((c) => c.status === "ALERTA").length;
+  return {
+    escopo: "empresa",
+    verificacoes: checks.length,
+    comAlerta: alertas,
+    resultados: checks,
+    nota: "diagnostico SOMENTE LEITURA: nada foi alterado. Interprete cada ALERTA e sugira a correcao.",
+  };
+}
+
 // Dispatcher: executa a ferramenta escopada e devolve JSON compacto. NUNCA lanca.
 async function executarFerramenta(
   nome: string,
@@ -1287,6 +1577,24 @@ async function executarFerramenta(
             agente,
             input as { periodo?: number; finalidade?: string },
           ),
+        );
+      case "consultar_orcamentos":
+        return JSON.stringify(
+          await consultarOrcamentos(
+            agente,
+            input as { periodo?: number; finalidade?: string; decisao?: string },
+          ),
+        );
+      case "consultar_estoque_pecas":
+        return JSON.stringify(
+          await consultarEstoquePecas(
+            agente,
+            input as { categoria?: string; apenasCriticas?: boolean },
+          ),
+        );
+      case "diagnosticar_sistema":
+        return JSON.stringify(
+          await diagnosticarSistema(agente, input as { detalhado?: boolean }),
         );
       default:
         return JSON.stringify({ erro: "ferramenta desconhecida" });
@@ -1518,6 +1826,51 @@ const FERRAMENTAS = [
       properties: {
         periodo: { type: "number", description: "Janela em DIAS (padrao 90, max 365)." },
         finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional." },
+      },
+    },
+  },
+  {
+    name: "consultar_orcamentos",
+    description:
+      "Orcamentos/PROPOSTAS no periodo (SO LEITURA, escopo do usuario): por decisao " +
+      "(quantidade e soma do totalFinal), taxa de CONVERSAO de propostas (leads com " +
+      "PENDENTE que viraram GANHO), ticket medio dos ganhos, desconto medio, top cupons " +
+      "e valor em GARANTIA concedida. Use para propostas, descontos/cupons e conversao.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "number", description: "Janela em DIAS (padrao 30, max 365)." },
+        finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"], description: "Opcional." },
+        decisao: { type: "string", enum: ["GANHO", "PENDENTE", "PERDIDO"], description: "Opcional." },
+      },
+    },
+  },
+  {
+    name: "consultar_estoque_pecas",
+    description:
+      "Estoque de PECAS (ADMIN-ONLY; dado operacional global): total de pecas ativas, " +
+      "quantas criticas (<= minimo ou negativo, com top 20), top 15 mais movimentadas em " +
+      "90 dias por motivo (venda/garantia/assistencia local) e valor imobilizado aproximado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        categoria: { type: "string", description: "Filtra por categoria da peca." },
+        apenasCriticas: { type: "boolean", description: "So as criticas (omite o giro)." },
+      },
+    },
+  },
+  {
+    name: "diagnosticar_sistema",
+    description:
+      "Bateria de checagens de INTEGRIDADE do sistema (ADMIN-ONLY, SO LEITURA): negocios " +
+      "sem dono, staging parado, orcamentos sem itens, itens de pedido orfaos, estoque " +
+      "negativo, valorAjustado indevido, conversas sem resposta >24h, leads sem conversa e " +
+      "ganhos de venda com valor zero. Cada check traz status OK/ALERTA, quantidade e amostra. " +
+      "Interprete os alertas e sugira a correcao (nao executa nada).",
+    input_schema: {
+      type: "object",
+      properties: {
+        detalhado: { type: "boolean", description: "Reservado; nao altera a checagem." },
       },
     },
   },
