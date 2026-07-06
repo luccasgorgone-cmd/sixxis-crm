@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Shield,
   Wrench,
+  UserCog,
   Megaphone,
   PackageOpen,
   type LucideIcon,
@@ -101,7 +102,7 @@ export function Sidebar({
     ...(podePosVenda
       ? [
           { rotulo: "Pecas", href: "/pecas", icone: Wrench },
-          { rotulo: "Parceiros", href: "/parceiros", icone: Wrench },
+          { rotulo: "Parceiros", href: "/parceiros", icone: UserCog },
           { rotulo: "Local", href: "/local", icone: PackageOpen },
         ]
       : []),
