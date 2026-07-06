@@ -57,7 +57,7 @@ export function ModalEnviarContato({
       toast.sucesso("Contato enviado.");
       onFechar();
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setEnviando(false);
     }

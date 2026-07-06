@@ -247,7 +247,7 @@ export function PainelNegocio({
         }
         return r.ok;
       } catch {
-        toast.erro("Falha de conexao ao salvar.");
+        toast.erro("Falha de conexão ao salvar.");
         return false;
       }
     },
@@ -740,7 +740,7 @@ export function NegocioAcoes({
         toast.erro(d?.erro ?? "Nao foi possivel reativar.");
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setReativando(false);
     }
@@ -871,7 +871,7 @@ export function NegocioAcoes({
       {/* Pendencia operacional */}
       <BlocoPendencia detalhe={detalhe} salvar={salvar} />
 
-      <Secao titulo="Gestao">
+      <Secao titulo="Gestão">
       {/* Dono / atribuicao / transferencia */}
       <div>
         <Rotulo>Dono</Rotulo>
@@ -1290,7 +1290,7 @@ export function BlocoAcompanhamento({
         }
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -1464,7 +1464,7 @@ export function BlocoRastreio({
         }
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -1494,7 +1494,7 @@ export function BlocoRastreio({
         toast.erro(d?.erro ?? "Nao foi possivel adicionar o codigo.");
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -1515,7 +1515,7 @@ export function BlocoRastreio({
         await recarregar();
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
       await recarregar();
     } finally {
       setRemovendo(null);
@@ -1698,7 +1698,7 @@ function BlocoAgendar({
         toast.erro(d?.erro ?? "Nao foi possivel agendar.");
       }
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }

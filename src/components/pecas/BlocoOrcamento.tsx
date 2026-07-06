@@ -4,7 +4,7 @@
 // orcamento na conversa: PECAS no pos-venda (com modelo do produto do cliente,
 // garantia e estoque) e PRODUTOS na venda (busca simples, sem garantia/estoque).
 // Reutilizado como "Pecas aplicadas" na aba Local (movimenta estoque na hora).
-// Abaixo, "Orcamentos anteriores" lista o historico numerado do cliente.
+// Abaixo, "Orçamentos anteriores" lista o historico numerado do cliente.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wrench,
@@ -158,7 +158,7 @@ function EditorOrcamento({
     const ok = await salvarModelo(novo || null);
     setSalvandoModelo(false);
     if (ok) toast.sucesso("Modelo salvo.");
-    else toast.erro("Nao foi possivel salvar o modelo.");
+    else toast.erro("Não foi possível salvar o modelo.");
   }
 
   async function adicionar() {
@@ -172,7 +172,7 @@ function EditorOrcamento({
       });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
-        toast.erro(d?.erro ?? "Nao foi possivel adicionar o item.");
+        toast.erro(d?.erro ?? "Não foi possível adicionar o item.");
         return;
       }
       setSel(null);
@@ -181,9 +181,9 @@ function EditorOrcamento({
       setGarantia(false);
       await carregarLista();
       onMudou?.();
-      toast.sucesso(mostrarGarantia ? "Peca adicionada ao orcamento." : "Produto adicionado ao orcamento.");
+      toast.sucesso(mostrarGarantia ? "Peça adicionada ao orçamento." : "Produto adicionado ao orçamento.");
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvandoAdd(false);
     }
@@ -197,9 +197,9 @@ function EditorOrcamento({
       if (!r.ok) throw new Error();
       onMudou?.();
       if (movimentaEstoque) await carregarLista();
-      toast.sucesso("Item removido do orcamento.");
+      toast.sucesso("Item removido do orçamento.");
     } catch {
-      toast.erro("Nao foi possivel remover.");
+      toast.erro("Não foi possível remover.");
       await carregarLista();
     } finally {
       setRemovendo(null);
@@ -230,7 +230,7 @@ function EditorOrcamento({
             onChange={(e) => void aoSalvarModelo(e.target.value)}
             className="campo min-w-0 flex-1"
           >
-            <option value="">Nao informado</option>
+            <option value="">Não informado</option>
             {modelos.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -250,7 +250,7 @@ function EditorOrcamento({
       {movimentaEstoque && (
         <p className="flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-          Adicionar aqui da baixa no estoque na hora; remover devolve.
+          Adicionar aqui dá baixa no estoque na hora; remover devolve.
         </p>
       )}
 
@@ -307,18 +307,18 @@ function EditorOrcamento({
       )}
 
       {usos && usos.length === 0 && (
-        <p className="text-xs text-medio/50">Nenhum item no orcamento ainda.</p>
+        <p className="text-xs text-medio/50">Nenhum item no orçamento ainda.</p>
       )}
 
       {usos && usos.length > 0 && (totalCobravel > 0 || totalGarantia > 0) && (
         <div className="space-y-0.5 border-t border-black/5 pt-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-medio/60">Total (cobravel)</span>
+            <span className="text-medio/60">Total (cobrável)</span>
             <span className="font-semibold text-escuro">{formatarBRL(totalCobravel)}</span>
           </div>
           {mostrarGarantia && totalGarantia > 0 && (
             <div className="flex items-center justify-between text-medio/50">
-              <span>Garantia (nao cobrado)</span>
+              <span>Garantia (não cobrado)</span>
               <span className="line-through">{formatarBRL(totalGarantia)}</span>
             </div>
           )}
@@ -388,14 +388,14 @@ function EditorOrcamento({
             <input
               value={buscaAdd}
               onChange={(e) => setBuscaAdd(e.target.value)}
-              placeholder={mostrarGarantia ? "Adicionar peca (nome ou modelo)" : "Adicionar produto"}
+              placeholder={mostrarGarantia ? "Adicionar peça (nome ou modelo)" : "Adicionar produto"}
               className="campo w-full pl-8"
             />
           </div>
           {buscaAdd.trim() && (
             <div className="scroll-fino max-h-44 overflow-y-auto rounded-lg border border-black/5">
               {compativeis.length === 0 ? (
-                <p className="px-2.5 py-2 text-xs text-medio/50">Nenhum item compativel.</p>
+                <p className="px-2.5 py-2 text-xs text-medio/50">Nenhum item compatível.</p>
               ) : (
                 compativeis.map((p) => (
                   <button
@@ -460,7 +460,7 @@ export function BlocoOrcamento({
 
   return (
     <EditorOrcamento
-      titulo="Orcamento"
+      titulo="Orçamento"
       icone={ehPos ? "peca" : "carrinho"}
       listUrl={`/api/negocios/${negocioId}/pecas-necessarias`}
       addUrl={`/api/negocios/${negocioId}/pecas-necessarias`}
@@ -487,7 +487,7 @@ export function BlocoPecasLocal({
 }) {
   return (
     <EditorOrcamento
-      titulo="Pecas aplicadas"
+      titulo="Peças aplicadas"
       icone="peca"
       listUrl={`/api/local/${itemLocalId}/pecas`}
       addUrl={`/api/local/${itemLocalId}/pecas`}
@@ -504,7 +504,7 @@ export function BlocoPecasLocal({
 }
 
 // ---------------------------------------------------------------------------
-// "Orcamentos anteriores" (historico numerado do cliente). Colapsado por padrao.
+// "Orçamentos anteriores" (historico numerado do cliente). Colapsado por padrao.
 // ---------------------------------------------------------------------------
 type OrcamentoHist = {
   id: string;
@@ -551,7 +551,7 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
       >
         <ReceiptText className="h-3.5 w-3.5 text-medio/50" />
         <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-medio/50">
-          Orcamentos anteriores
+          Orçamentos anteriores
         </span>
         <ChevronRight
           className={`h-4 w-4 text-medio/40 transition-transform ${aberto ? "rotate-90" : ""}`}
@@ -565,7 +565,7 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           ) : orcs.length === 0 ? (
-            <p className="py-2 text-xs text-medio/50">Nenhum orcamento registrado ainda.</p>
+            <p className="py-2 text-xs text-medio/50">Nenhum orçamento registrado ainda.</p>
           ) : (
             <ul className="space-y-1.5">
               {orcs.map((o) => {
@@ -614,7 +614,7 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
                         ))}
                         {o.totalGarantia != null && o.totalGarantia > 0 && (
                           <li className="pt-0.5 text-[11px] text-medio/40">
-                            Garantia (nao cobrado): {formatarBRL(o.totalGarantia)}
+                            Garantia (não cobrado): {formatarBRL(o.totalGarantia)}
                           </li>
                         )}
                       </ul>

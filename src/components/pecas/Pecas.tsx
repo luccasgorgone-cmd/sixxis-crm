@@ -67,7 +67,7 @@ export function Pecas() {
       if (incluirInativas) p.set("incluirInativas", "1");
       const r = await fetch(`/api/pecas?${p.toString()}`);
       if (r.status === 403) {
-        setErro("Voce nao tem acesso a esta area.");
+        setErro("Você não tem acesso a esta área.");
         return;
       }
       if (!r.ok) throw new Error();
@@ -76,7 +76,7 @@ export function Pecas() {
       setPodeEditar(Boolean(d.podeEditar));
       setErro(null);
     } catch {
-      setErro("Nao foi possivel carregar as pecas.");
+      setErro("Não foi possível carregar as pecas.");
     } finally {
       setCarregando(false);
     }
@@ -151,7 +151,7 @@ export function Pecas() {
       });
       if (!r.ok) throw new Error();
     } catch {
-      toast.erro("Nao foi possivel atualizar.");
+      toast.erro("Não foi possível atualizar.");
       await carregar();
     }
   }
@@ -165,9 +165,9 @@ export function Pecas() {
             <Wrench className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold text-escuro">Pecas</h2>
+            <h2 className="text-lg font-semibold text-escuro">Peças</h2>
             <p className="text-sm text-medio/60">
-              Estoque de pecas ({filtrados.length}
+              Estoque de peças ({filtrados.length}
               {filtrados.length === 1 ? " item" : " itens"})
             </p>
           </div>
@@ -177,7 +177,7 @@ export function Pecas() {
             onClick={() => setEditando("novo")}
             className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro"
           >
-            <Plus className="h-4 w-4" /> Nova peca
+            <Plus className="h-4 w-4" /> Nova peça
           </button>
         )}
       </div>
@@ -226,7 +226,7 @@ export function Pecas() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : grupos.length === 0 ? (
-        <EmptyState icone={Wrench} titulo="Nenhuma peca" texto="Ajuste a busca ou o filtro de categoria." />
+        <EmptyState icone={Wrench} titulo="Nenhuma peça" texto="Ajuste a busca ou o filtro de categoria." />
       ) : (
         <div className="space-y-4">
           {grupos.map((g) => (
@@ -439,7 +439,7 @@ function ModalPeca({
       toast.sucesso("Peca reativada.");
       onSalvo();
     } catch {
-      toast.erro("Nao foi possivel reativar.");
+      toast.erro("Não foi possível reativar.");
     } finally {
       setReativando(false);
     }
@@ -481,12 +481,12 @@ function ModalPeca({
         return;
       }
       if (!r.ok) {
-        toast.erro("Nao foi possivel salvar.");
+        toast.erro("Não foi possível salvar.");
         return;
       }
       onSalvo();
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -497,7 +497,7 @@ function ModalPeca({
       <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-escuro">
-            {peca ? "Editar peca" : "Nova peca"}
+            {peca ? "Editar peça" : "Nova peça"}
           </h3>
           <button onClick={onFechar} className="rounded-lg p-1 text-medio/60 hover:bg-black/5">
             <X className="h-4 w-4" />
@@ -578,7 +578,7 @@ function ModalPeca({
           )}
           {!peca && (
             <p className="rounded-md bg-fundo px-2.5 py-1.5 text-[11px] text-medio/60">
-              O estoque comeca em 0. Use "Movimentar" para dar entrada.
+              O estoque começa em 0. Use "Movimentar" para dar entrada.
             </p>
           )}
           {erroDup && (
@@ -591,7 +591,7 @@ function ModalPeca({
                   className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-xs font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
                 >
                   {reativando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Reativar peca existente
+                  Reativar peça existente
                 </button>
               )}
             </div>
@@ -648,13 +648,13 @@ function ModalMovimentar({
         body: JSON.stringify({ tipo, quantidade: q, motivo: motivo.trim() || null }),
       });
       if (!r.ok) {
-        toast.erro("Nao foi possivel movimentar.");
+        toast.erro("Não foi possível movimentar.");
         return;
       }
       toast.sucesso("Estoque atualizado.");
       onSalvo();
     } catch {
-      toast.erro("Falha de conexao.");
+      toast.erro("Falha de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -683,7 +683,7 @@ function ModalMovimentar({
                   tipo === t ? "bg-tiffany text-white" : "bg-fundo text-medio hover:bg-black/5"
                 }`}
               >
-                {t === "ENTRADA" ? "Entrada" : t === "SAIDA" ? "Saida" : "Ajuste"}
+                {t === "ENTRADA" ? "Entrada" : t === "SAIDA" ? "Saída" : "Ajuste"}
               </button>
             ))}
           </div>
@@ -742,7 +742,7 @@ type Movimentacao = {
 
 const ROTULO_TIPO: Record<string, string> = {
   ENTRADA: "Entrada",
-  SAIDA: "Saida",
+  SAIDA: "Saída",
   AJUSTE: "Ajuste",
   ESTORNO: "Estorno",
 };
@@ -780,7 +780,7 @@ function DrawerHistorico({ peca, onFechar }: { peca: Peca; onFechar: () => void 
               {[peca.nome, peca.modelo].filter(Boolean).join(" ")}
             </h3>
             <p className="text-xs text-medio/60">
-              Historico · estoque atual {peca.estoque}
+              Histórico · estoque atual {peca.estoque}
             </p>
           </div>
           <button onClick={onFechar} className="rounded-lg p-1 text-medio/60 hover:bg-black/5">
@@ -790,7 +790,7 @@ function DrawerHistorico({ peca, onFechar }: { peca: Peca; onFechar: () => void 
         <div className="p-4">
           {erro ? (
             <p className="py-8 text-center text-sm text-medio/50">
-              Nao foi possivel carregar o historico.
+              Nao foi possivel carregar o histórico.
             </p>
           ) : movs === null ? (
             <div className="flex items-center justify-center py-12 text-medio/40">
@@ -798,7 +798,7 @@ function DrawerHistorico({ peca, onFechar }: { peca: Peca; onFechar: () => void 
             </div>
           ) : movs.length === 0 ? (
             <p className="py-8 text-center text-sm text-medio/50">
-              Nenhuma movimentacao ainda.
+              Nenhuma movimentação ainda.
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -838,7 +838,7 @@ function DrawerHistorico({ peca, onFechar }: { peca: Peca; onFechar: () => void 
                         })}
                       </span>
                       {m.agente && <span>· {m.agente}</span>}
-                      {m.assistenciaLocal && <span>· Assistencia local</span>}
+                      {m.assistenciaLocal && <span>· Assistência local</span>}
                       {m.cliente && <span>· cliente {m.cliente}</span>}
                     </div>
                     {m.motivo && (
