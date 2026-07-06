@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wrench,
   Plus,
-  Search,
   MapPin,
   Phone,
   Truck,
@@ -18,6 +17,7 @@ import {
   Loader2,
   Info,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { MapaBrasil } from "@/components/inteligencia/MapaBrasil";
 import { LegendaGradiente } from "@/components/ui/LegendaGradiente";
 import {
@@ -198,15 +198,12 @@ export function Parceiros({ papel }: { papel: string }) {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-          <input
-            value={filtros.q}
-            onChange={(e) => setFiltros((f) => ({ ...f, q: e.target.value }))}
-            placeholder="Buscar nome ou cidade"
-            className="campo w-52 pl-8"
-          />
-        </div>
+        <InputBusca
+          valor={filtros.q}
+          onChange={(v) => setFiltros((f) => ({ ...f, q: v }))}
+          placeholder="Buscar nome ou cidade"
+          className="w-52"
+        />
         <select
           value={filtros.uf}
           onChange={(e) => setFiltros((f) => ({ ...f, uf: e.target.value }))}

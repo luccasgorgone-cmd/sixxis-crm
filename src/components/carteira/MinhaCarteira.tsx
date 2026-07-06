@@ -29,10 +29,10 @@ import {
   Megaphone,
   TrendingUp,
   Clock,
-  Search,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { EstadoErro } from "@/components/ui/Estado";
 import { FiltroPeriodo, type ValorPeriodo } from "@/components/ui/FiltroPeriodo";
@@ -567,15 +567,12 @@ export function MinhaCarteira({
                   {clientesFiltrados.length}
                 </span>
               </h3>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar cliente"
-                  className="campo w-56 pl-8"
-                />
-              </div>
+              <InputBusca
+                valor={busca}
+                onChange={setBusca}
+                placeholder="Buscar cliente"
+                className="w-56"
+              />
             </div>
             <div className="scroll-fino max-h-96 space-y-1.5 overflow-y-auto">
               {clientesFiltrados.length === 0 ? (

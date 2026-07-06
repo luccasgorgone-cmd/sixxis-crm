@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wrench,
-  Search,
   Plus,
   Loader2,
   Pencil,
@@ -15,6 +14,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -184,15 +184,12 @@ export function Pecas() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:flex-none">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar nome ou modelo"
-            className="campo w-full pl-8 sm:w-60"
-          />
-        </div>
+        <InputBusca
+          valor={busca}
+          onChange={setBusca}
+          placeholder="Buscar nome ou modelo"
+          className="min-w-0 flex-1 sm:w-60 sm:flex-none"
+        />
         <select
           value={categoria}
           onChange={(e) => setCategoria(e.target.value)}

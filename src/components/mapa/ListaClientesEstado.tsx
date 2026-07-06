@@ -12,7 +12,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Search,
   Users,
   ExternalLink,
   Briefcase,
@@ -23,6 +22,7 @@ import {
   Truck,
   Loader2,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
 import { BadgeStatusNegocio, BadgePendente } from "@/components/badges";
 import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
@@ -369,15 +369,12 @@ export function ListaClientesEstado({
 
   return (
     <div>
-      <div className="relative mb-3">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/50" />
-        <input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou telefone"
-          className="w-full rounded-lg border border-black/10 bg-white py-1.5 pl-8 pr-3 text-sm outline-none focus:border-tiffany"
-        />
-      </div>
+      <InputBusca
+        valor={busca}
+        onChange={setBusca}
+        placeholder="Buscar por nome ou telefone"
+        className="mb-3"
+      />
 
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         {categoriasPresentes.length > 0 && (

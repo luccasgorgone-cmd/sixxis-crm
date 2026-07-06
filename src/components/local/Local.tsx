@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   PackageOpen,
-  Search,
   Plus,
   Loader2,
   Pencil,
@@ -20,6 +19,7 @@ import {
   Mail,
   IdCard,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -221,15 +221,12 @@ export function Local() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar cliente, modelo ou serie"
-            className="campo w-60 pl-8"
-          />
-        </div>
+        <InputBusca
+          valor={busca}
+          onChange={setBusca}
+          placeholder="Buscar cliente, modelo ou serie"
+          className="w-60"
+        />
         <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="campo">
           {FILTROS_PERIODO.map((f) => (
             <option key={f.v} value={f.v}>

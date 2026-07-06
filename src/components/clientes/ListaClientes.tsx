@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
-  Search,
   Tag,
   Plus,
   X,
@@ -28,6 +27,7 @@ import {
   Trash2,
   Ban,
 } from "lucide-react";
+import { InputBusca } from "@/components/ui/InputBusca";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -790,15 +790,12 @@ export function ListaClientes({
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-medio/40" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar nome ou telefone"
-            className="campo w-56 pl-8"
-          />
-        </div>
+        <InputBusca
+          valor={busca}
+          onChange={setBusca}
+          placeholder="Buscar nome ou telefone"
+          className="w-56"
+        />
         <select value={etiquetaF} onChange={(e) => setEtiquetaF(e.target.value)} className="campo">
           <option value="">Etiqueta: todas</option>
           {todasEtiquetas.map((e) => (
