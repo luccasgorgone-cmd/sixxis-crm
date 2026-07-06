@@ -48,8 +48,7 @@ import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
-import { BlocoPecasCliente } from "@/components/pecas/BlocoPecasCliente";
-import { BlocoPecasNecessarias } from "@/components/pecas/BlocoPecasNecessarias";
+import { BlocoOrcamento, OrcamentosAnteriores } from "@/components/pecas/BlocoOrcamento";
 import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
@@ -69,7 +68,7 @@ import {
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
-import { formatarBRL, formatarTelefone, dataNascParaInput } from "@/lib/format";
+import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
 type AbaMobile = "conversa" | "detalhes";
@@ -234,11 +233,15 @@ export function PainelNegocio({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        const d = await r.json().catch(() => null);
         if (r.ok) {
           await carregar();
           onAtualizado();
+          // Decisao gerou um orcamento numerado: confirma com o numero (Fatia 3.07).
+          if (typeof d?.orcamentoNumero === "number") {
+            toast.sucesso(`Orcamento ${formatarNumeroPedido(d.orcamentoNumero)} registrado.`);
+          }
         } else {
-          const d = await r.json().catch(() => null);
           toast.erro(d?.erro ?? "Nao foi possivel salvar a alteracao.");
         }
         return r.ok;
@@ -441,13 +444,14 @@ export function PainelNegocio({
                 {/* Assistencia (Local): so para pos-venda; cliente continua no funil. */}
                 <BlocoAssistencia leadId={detalhe.cliente.id} />
 
-                {/* Pecas necessarias (planejamento): so POS_VENDA com negocio. */}
-                {detalhe.finalidade === "POS_VENDA" && (
-                  <BlocoPecasNecessarias negocioId={negocioId} />
-                )}
+                {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+                <BlocoOrcamento
+                  negocioId={negocioId}
+                  finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+                />
 
-                {/* Pecas do cliente (pedidos pos-venda): so pos-venda. */}
-                <BlocoPecasCliente leadId={detalhe.cliente.id} />
+                {/* Historico numerado de orcamentos do cliente (colapsado). */}
+                <OrcamentosAnteriores leadId={detalhe.cliente.id} />
 
                 <NegocioAcoes
                   detalhe={detalhe}
@@ -1014,42 +1018,42 @@ export function NegocioAcoes({
         </div>
       </div>
 
-      {/* Estado do negocio: Ganho / Pendente / Perdido (toggle exclusivo). O
-          botao Pendente fica ENTRE Ganho e Perdido. Clicar um estado ativo
-          desmarca (volta a ABERTO). */}
-      <div className="flex gap-2">
+      {/* DECISAO do orcamento (Fatia 3.07): Pendente e Perdido lado a lado
+          (secundarios, sutis); o GANHO em destaque abaixo, ocupando a largura dos
+          dois. Clicar um estado ativo desmarca (volta a ABERTO). */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <button
+            onClick={clicarPendente}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              ehPendente
+                ? "bg-amber-500 text-white hover:bg-amber-600"
+                : "border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+            }`}
+          >
+            <PauseCircle className="h-4 w-4" /> Pendente
+          </button>
+          {etapaPerda && (
+            <button
+              onClick={clicarPerdido}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                ehPerdido
+                  ? "bg-erro text-white hover:brightness-95"
+                  : "border border-erro/40 text-erro hover:bg-erro/10"
+              }`}
+            >
+              <XCircle className="h-4 w-4" /> Perdido
+            </button>
+          )}
+        </div>
         {etapaGanho && (
           <button
             onClick={clicarGanho}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              ehGanho
-                ? "bg-sucesso text-white hover:brightness-95"
-                : "border border-sucesso/40 text-sucesso hover:bg-sucesso/10"
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-100 ${
+              ehGanho ? "bg-tiffany-escuro" : "bg-tiffany hover:bg-tiffany-escuro"
             }`}
           >
-            <Trophy className="h-4 w-4" /> Ganho
-          </button>
-        )}
-        <button
-          onClick={clicarPendente}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-            ehPendente
-              ? "bg-orange-500 text-white hover:bg-orange-600"
-              : "border border-orange-300 text-orange-700 hover:bg-orange-50"
-          }`}
-        >
-          <PauseCircle className="h-4 w-4" /> Pendente
-        </button>
-        {etapaPerda && (
-          <button
-            onClick={clicarPerdido}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              ehPerdido
-                ? "bg-erro text-white hover:brightness-95"
-                : "border border-erro/40 text-erro hover:bg-erro/10"
-            }`}
-          >
-            <XCircle className="h-4 w-4" /> Perdido
+            <Trophy className="h-5 w-5" /> {ehGanho ? "Ganho" : "Fechar como ganho"}
           </button>
         )}
       </div>

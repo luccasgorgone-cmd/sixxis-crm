@@ -14,8 +14,7 @@ import { Loader2, UserX } from "lucide-react";
 import { BlocoCliente, type ClientePainel } from "@/components/cliente/BlocoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
-import { BlocoPecasCliente } from "@/components/pecas/BlocoPecasCliente";
-import { BlocoPecasNecessarias } from "@/components/pecas/BlocoPecasNecessarias";
+import { BlocoOrcamento, OrcamentosAnteriores } from "@/components/pecas/BlocoOrcamento";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
@@ -202,13 +201,16 @@ export function PainelClienteInbox({
           {/* Assistencia (Local): nivel cliente, so para pos-venda. */}
           <BlocoAssistencia leadId={leadId} />
 
-          {/* Pecas necessarias (planejamento): so POS_VENDA com negocio da conversa. */}
-          {negocioId && detalhe?.finalidade === "POS_VENDA" && (
-            <BlocoPecasNecessarias negocioId={negocioId} />
+          {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+          {negocioId && detalhe?.finalidade && (
+            <BlocoOrcamento
+              negocioId={negocioId}
+              finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+            />
           )}
 
-          {/* Pecas do cliente (pedidos pos-venda): nivel cliente, so pos-venda. */}
-          <BlocoPecasCliente leadId={leadId} />
+          {/* Historico numerado de orcamentos do cliente (colapsado). */}
+          <OrcamentosAnteriores leadId={leadId} />
 
           {/* Nivel negocio (so quando ha negocio da finalidade da conversa) */}
           {detalhe && negocioId && (

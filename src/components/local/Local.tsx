@@ -26,7 +26,7 @@ import { EstadoErro } from "@/components/ui/Estado";
 import { mascararCep, mascararCpf, formatarTelefone } from "@/lib/format";
 import { buscarViaCep } from "@/lib/viacep";
 import { STATUS_ORDEM, STATUS_META } from "@/lib/assistencia";
-import { BlocoPecasLocal } from "@/components/pecas/BlocoPecasNecessarias";
+import { BlocoPecasLocal } from "@/components/pecas/BlocoOrcamento";
 
 type Item = {
   id: string;
