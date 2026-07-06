@@ -118,7 +118,8 @@ export async function calcularMetricas(
     abertos,
     finalizados,
     ganhos,
-    somaValor,
+    somaBase,
+    somaAjuste,
     pendentes,
     msgEnviadas,
     msgRecebidas,
@@ -135,9 +136,16 @@ export async function calcularMetricas(
     prisma.negocio.count({
       where: negocioWhere(p, e, [StatusNeg.GANHO], true),
     }),
+    // Valor vendido = SUM(COALESCE(valorAjustado, valor)) — Fatia 3.09: o cobrado
+    // real (com desconto/frete) quando ha ajuste, senao o valor. Feito em dois
+    // agregados para nao buscar linhas: base (sem ajuste) + os ajustes.
     prisma.negocio.aggregate({
       _sum: { valor: true },
-      where: negocioWhere(p, e, [StatusNeg.GANHO], true),
+      where: { ...negocioWhere(p, e, [StatusNeg.GANHO], true), valorAjustado: null },
+    }),
+    prisma.negocio.aggregate({
+      _sum: { valorAjustado: true },
+      where: { ...negocioWhere(p, e, [StatusNeg.GANHO], true), valorAjustado: { not: null } },
     }),
     // Pendentes: conversa aberta com cliente aguardando (nao lidas>0) ou sem
     // resposta ha mais de 24h.
@@ -199,9 +207,9 @@ export async function calcularMetricas(
     }),
   ]);
 
-  const valorVendido = somaValor._sum.valor
-    ? Number(somaValor._sum.valor)
-    : 0;
+  const valorVendido =
+    (somaBase._sum.valor ? Number(somaBase._sum.valor) : 0) +
+    (somaAjuste._sum.valorAjustado ? Number(somaAjuste._sum.valorAjustado) : 0);
   const perdidos = finalizados - ganhos;
   const conversao = finalizados > 0 ? ganhos / finalizados : 0;
   const ticketMedio = ganhos > 0 ? valorVendido / ganhos : 0;
