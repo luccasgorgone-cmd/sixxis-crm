@@ -59,6 +59,7 @@ export async function GET(
           id: true,
           nome: true,
           modelo: true,
+          voltagem: true,
           precoSugerido: true,
           estoque: true,
         },
@@ -194,7 +195,14 @@ export async function POST(
     quantidade: true,
     garantia: true,
     peca: {
-      select: { id: true, nome: true, modelo: true, precoSugerido: true, estoque: true },
+      select: {
+        id: true,
+        nome: true,
+        modelo: true,
+        voltagem: true,
+        precoSugerido: true,
+        estoque: true,
+      },
     },
   } as const;
 
@@ -234,6 +242,7 @@ type UsoRow = {
     id: string;
     nome: string;
     modelo: string | null;
+    voltagem: string | null;
     precoSugerido: unknown;
     estoque: number;
   };
@@ -247,6 +256,7 @@ export function serializarUso(u: UsoRow) {
     pecaId: u.peca.id,
     nome: u.peca.nome,
     modelo: u.peca.modelo,
+    voltagem: u.peca.voltagem,
     precoSugerido: u.peca.precoSugerido != null ? Number(u.peca.precoSugerido) : null,
     estoque: u.peca.estoque,
   };

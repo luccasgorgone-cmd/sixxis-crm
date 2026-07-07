@@ -182,7 +182,7 @@ export function PainelNegocio({
           if (p.pecaId && jaTem.has(p.pecaId)) continue;
           base.push({
             produtoCatalogoId: p.pecaId,
-            descricao: [p.nome, p.modelo].filter(Boolean).join(" "),
+            descricao: [p.nome, p.modelo, p.voltagem].filter(Boolean).join(" "),
             quantidade: p.quantidade,
             valorUnitario: p.precoSugerido ?? 0,
             garantia: p.garantia,

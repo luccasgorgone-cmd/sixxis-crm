@@ -793,12 +793,12 @@ export async function PATCH(
                 pecaId: true,
                 quantidade: true,
                 garantia: true,
-                peca: { select: { nome: true, modelo: true, precoSugerido: true } },
+                peca: { select: { nome: true, modelo: true, voltagem: true, precoSugerido: true } },
               },
             });
             fonte = staging.map((s) => ({
               produtoCatalogoId: s.pecaId,
-              descricao: [s.peca.nome, s.peca.modelo].filter(Boolean).join(" "),
+              descricao: [s.peca.nome, s.peca.modelo, s.peca.voltagem].filter(Boolean).join(" "),
               quantidade: s.quantidade,
               valorUnitario:
                 s.peca.precoSugerido != null ? Number(s.peca.precoSugerido) : 0,

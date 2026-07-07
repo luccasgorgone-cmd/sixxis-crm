@@ -38,6 +38,8 @@ type PecaCat = {
   nome: string;
   categoria: string | null;
   modelo: string | null;
+  // Voltagem da peca eletrica (Fatia 3.19): "110V" | "220V" | null (sem voltagem).
+  voltagem: string | null;
   precoSugerido: number | null;
   estoque?: number;
   ativo?: boolean;
@@ -49,9 +51,14 @@ type Uso = {
   pecaId: string;
   nome: string;
   modelo: string | null;
+  voltagem: string | null;
   precoSugerido: number | null;
   estoque: number;
 };
+
+// Categoria dos modelos ANTIGOS (assistencia pos-venda). O agrupamento no select
+// vem daqui (sem flag booleana). Fatia 3.19.
+const CATEGORIA_ANTIGOS = "Climatizadores (Antigos)";
 type OrcDraft = {
   cupom: string | null;
   descontoPct: number | null;
@@ -152,7 +159,9 @@ function EditorOrcamento(props: EditorProps) {
 
   const [busca, setBusca] = useState("");
   const [catFiltro, setCatFiltro] = useState("");
-  const [sel, setSel] = useState<{ nome: string; modelo: string | null; estoque?: number } | null>(null);
+  // Voltagem escolhida no pos-venda (Fatia 3.19). "" = nenhuma ainda.
+  const [voltagem, setVoltagem] = useState("");
+  const [sel, setSel] = useState<{ nome: string; modelo: string | null; voltagem?: string | null; estoque?: number } | null>(null);
   const [selPayload, setSelPayload] = useState<Record<string, unknown> | null>(null);
   const [qtd, setQtd] = useState(1);
   const [garantia, setGarantia] = useState(false);
@@ -219,13 +228,48 @@ function EditorOrcamento(props: EditorProps) {
     void carregarLista();
   }, [carregarLista]);
 
-  const modelos = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of pecas) if (p.modelo && p.modelo.trim()) set.add(p.modelo.trim());
-    return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  // Modelos agrupados: "Atuais" e "Antigos" (categoria "Climatizadores (Antigos)"),
+  // Antigos DEPOIS. Cada modelo herda a categoria da 1a peca vista. Fatia 3.19.
+  const modelosAgrupados = useMemo(() => {
+    const catDe = new Map<string, string | null>();
+    for (const p of pecas) {
+      const m = p.modelo?.trim();
+      if (m && !catDe.has(m)) catDe.set(m, p.categoria ?? null);
+    }
+    const atuais: string[] = [];
+    const antigos: string[] = [];
+    for (const [m, cat] of catDe) {
+      if ((cat ?? "") === CATEGORIA_ANTIGOS) antigos.push(m);
+      else atuais.push(m);
+    }
+    const ord = (a: string, b: string) => a.localeCompare(b, "pt-BR");
+    return { atuais: atuais.sort(ord), antigos: antigos.sort(ord) };
   }, [pecas]);
 
   const modeloFiltro = modeloEditavel ? modelo : (modeloFixo ?? "");
+
+  // Voltagens disponiveis do modelo escolhido (pecas eletricas ativas). Vazio =>
+  // modelo sem peca eletrica (nao exige voltagem). Fatia 3.19.
+  const voltagensModelo = useMemo(() => {
+    if (!modeloFiltro) return [] as string[];
+    const set = new Set<string>();
+    for (const p of pecas) {
+      if (p.ativo !== false && p.modelo?.trim() === modeloFiltro && p.voltagem) {
+        set.add(p.voltagem);
+      }
+    }
+    return [...set].sort(); // ["110V","220V"] ou ["220V"]
+  }, [pecas, modeloFiltro]);
+  const exigeVoltagem = voltagensModelo.length > 0;
+  const voltagensKey = voltagensModelo.join(",");
+
+  // Ao trocar de modelo/voltagens: fixa a unica opcao (so-220V), ou limpa (pede
+  // escolha quando ha 110V e 220V).
+  useEffect(() => {
+    if (voltagensModelo.length === 1) setVoltagem(voltagensModelo[0]);
+    else setVoltagem("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeloFiltro, voltagensKey]);
 
   const { doModelo, gerais } = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -238,11 +282,17 @@ function EditorOrcamento(props: EditorProps) {
     const ge: PecaCat[] = [];
     for (const p of ativas) {
       if (!casaBusca(p)) continue;
-      if (modeloFiltro && p.modelo && p.modelo.trim() === modeloFiltro) dm.push(p);
-      else if (!p.modelo) ge.push(p);
+      if (modeloFiltro && p.modelo && p.modelo.trim() === modeloFiltro) {
+        // Peca do modelo: nao-eletrica (voltagem null) sempre entra; eletrica so na
+        // voltagem selecionada (se nenhuma selecionada, a UI pede a escolha).
+        if (!p.voltagem) dm.push(p);
+        else if (voltagem && p.voltagem === voltagem) dm.push(p);
+      } else if (!p.modelo) {
+        ge.push(p);
+      }
     }
     return { doModelo: dm, gerais: ge };
-  }, [pecas, modeloFiltro, busca]);
+  }, [pecas, modeloFiltro, busca, voltagem]);
 
   const produtosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -278,7 +328,7 @@ function EditorOrcamento(props: EditorProps) {
     setGarantia(false);
   }
   function escolherPeca(p: PecaCat) {
-    setSel({ nome: p.nome, modelo: p.modelo, estoque: p.estoque });
+    setSel({ nome: p.nome, modelo: p.modelo, voltagem: p.voltagem, estoque: p.estoque });
     setSelPayload({ pecaId: p.id });
     setQtd(1);
     setGarantia(false);
@@ -484,13 +534,49 @@ function EditorOrcamento(props: EditorProps) {
             className="campo min-w-0 flex-1"
           >
             <option value="">Não informado</option>
-            {modelos.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
+            {/* Atuais primeiro; Antigos (assistencia) depois. Fatia 3.19. */}
+            <optgroup label="Atuais">
+              {modelosAgrupados.atuais.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </optgroup>
+            {modelosAgrupados.antigos.length > 0 && (
+              <optgroup label="Antigos">
+                {modelosAgrupados.antigos.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           {salvandoModelo && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-tiffany" />}
+        </label>
+      )}
+
+      {/* Seletor de VOLTAGEM (Fatia 3.19): so quando o modelo tem pecas eletricas.
+          So-220V (>100) ja fixado; com 110V e 220V, o atendente escolhe. */}
+      {modeloEditavel && modeloFiltro && exigeVoltagem && (
+        <label className="flex items-center gap-2 text-xs text-medio/70">
+          <span className="shrink-0">Voltagem</span>
+          <div className="flex gap-1.5">
+            {voltagensModelo.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVoltagem(v)}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  voltagem === v
+                    ? "border-tiffany bg-tiffany/10 text-tiffany"
+                    : "border-black/10 text-medio hover:bg-black/5"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </label>
       )}
       {!modeloEditavel && modeloFixo && (
@@ -511,6 +597,11 @@ function EditorOrcamento(props: EditorProps) {
           <div className="flex items-center justify-between gap-2">
             <p className="min-w-0 flex-1 truncate text-sm font-medium text-escuro">
               {[sel.nome, sel.modelo].filter(Boolean).join(" ")}
+              {sel.voltagem && (
+                <span className="ml-1 rounded bg-tiffany/10 px-1 py-0.5 text-[10px] font-semibold text-tiffany">
+                  {sel.voltagem}
+                </span>
+              )}
             </p>
             {mostrarEstoque && sel.estoque != null && (
               <span className="shrink-0 text-[11px] text-medio/50">estoque {sel.estoque}</span>
@@ -606,6 +697,11 @@ function EditorOrcamento(props: EditorProps) {
       ) : (
         <div className="space-y-2">
           <InputBusca valor={busca} onChange={setBusca} placeholder="Buscar peça" />
+          {exigeVoltagem && !voltagem && (
+            <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
+              Selecione a voltagem para ver as peças elétricas.
+            </p>
+          )}
           <div className="scroll-fino max-h-56 space-y-2 overflow-y-auto">
             {doModelo.length === 0 && gerais.length === 0 && (
               <p className="px-1 py-2 text-xs text-medio/50">Nenhuma peça compatível.</p>
@@ -640,6 +736,11 @@ function EditorOrcamento(props: EditorProps) {
                   {!qtdUrl && <span className="text-medio/60">{u.quantidade}x </span>}
                   {u.nome}
                   {u.modelo && <span className="text-medio/50"> {u.modelo}</span>}
+                  {u.voltagem && (
+                    <span className="ml-1 rounded bg-tiffany/10 px-1 py-0.5 text-[10px] font-semibold text-tiffany">
+                      {u.voltagem}
+                    </span>
+                  )}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {mostrarGarantia && u.garantia ? (
@@ -877,6 +978,11 @@ function GrupoPecas({
               {p.nome}
               {p.modelo && <span className="text-medio/50"> {p.modelo}</span>}
             </span>
+            {p.voltagem && (
+              <span className="shrink-0 rounded bg-tiffany/10 px-1.5 py-0.5 text-[10px] font-semibold text-tiffany">
+                {p.voltagem}
+              </span>
+            )}
             <span className="shrink-0 text-xs text-medio/60">
               {p.precoSugerido != null ? formatarBRL(p.precoSugerido) : "—"}
             </span>

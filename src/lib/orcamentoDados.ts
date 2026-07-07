@@ -140,12 +140,13 @@ export async function montarDadosPdfOrcamento(
     select: {
       quantidade: true,
       garantia: true,
-      peca: { select: { nome: true, modelo: true, precoSugerido: true } },
+      peca: { select: { nome: true, modelo: true, voltagem: true, precoSugerido: true } },
     },
   });
 
   const itens = usos.map((u) => ({
-    descricao: [u.peca.nome, u.peca.modelo].filter(Boolean).join(" "),
+    // Voltagem entra na descricao das eletricas (Fatia 3.19) — visivel no PDF.
+    descricao: [u.peca.nome, u.peca.modelo, u.peca.voltagem].filter(Boolean).join(" "),
     quantidade: u.quantidade,
     valorUnitario: u.peca.precoSugerido != null ? Number(u.peca.precoSugerido) : 0,
     garantia: u.garantia,
