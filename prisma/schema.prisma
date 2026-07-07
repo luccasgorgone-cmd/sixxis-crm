@@ -586,6 +586,10 @@ model Negocio {
   // pagamento...). motivoPendencia descreve o porque para a carteira/tooltip.
   pendente        Boolean          @default(false)
   motivoPendencia String?          @db.Text
+  // Motivo ESTRUTURADO da pendencia (Fatia 3.17): code = motivo predefinido (ver
+  // lib/motivosPendencia) usado para agregacao/rastreio; motivoPendencia (acima)
+  // guarda a observacao livre (obrigatoria em OUTRO, complemento nos demais).
+  motivoPendenciaCode String?
   // motivoPerda guarda o CODE (ver lib/motivosPerda); obs e a observacao livre.
   motivoPerda   String?
   motivoPerdaObs String?           @db.Text
@@ -928,6 +932,13 @@ model ConfiguracaoCRM {
   faviconData        String?   @db.Text
   faviconMime        String?
   faviconEm          DateTime?
+  // Logo DEDICADA ao PDF de orcamento (Fatia 3.17): independente da logo do
+  // sistema (que e clara, feita p/ fundo escuro). O dono sobe aqui uma versao
+  // escura/colorida p/ fundo claro. Mesmo padrao da logo: data URL/SVG + mime +
+  // versao de cache (logoOrcamentoEm). null = usa a logo do sistema como fallback.
+  logoOrcamentoData  String?   @db.Text
+  logoOrcamentoMime  String?
+  logoOrcamentoEm    DateTime?
   // Meta Conversions API (server-side). Token guardado aqui (nunca exposto ao
   // browser). testEventCode usa o modo de teste do Gerenciador de Eventos.
   metaPixelId        String?
