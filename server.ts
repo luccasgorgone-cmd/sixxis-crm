@@ -21,6 +21,7 @@ import {
   seedConfiguracoes,
   seedAssistenteEscrita,
   seedPecas,
+  seedVoltagemPecasEletricas,
   backfillAcesso,
   purgarDadosTeste,
   backfillNegocios,
@@ -50,6 +51,7 @@ async function main(): Promise<void> {
   await seedConfiguracoes();
   await seedAssistenteEscrita();
   await seedPecas();
+  await seedVoltagemPecasEletricas();
   await backfillAcesso();
   await purgarDadosTeste();
   await backfillNegocios();

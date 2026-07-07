@@ -1086,6 +1086,117 @@ export async function seedPecas(): Promise<void> {
   }
 }
 
+// Pecas ELETRICAS (tem voltagem). Match por nome EXATO — "Motor" != "Motor Swing"
+// != "Motor Resistencia" (esta ultima NAO tem voltagem). Alternativa da linha:
+// Inversor (Prime) OU Capacitor (nao-Prime), que nunca coexistem no mesmo modelo.
+const NOMES_ELETRICOS = new Set([
+  "Motor",
+  "Motor Swing",
+  "Placa de Painel",
+  "Placa de Comando",
+  "Bomba d'água",
+  "Inversor",
+  "Capacitor",
+]);
+
+// Numero do modelo (primeiro run de digitos): "M45 Trend"=>45, "SX040 Trend"=>40,
+// "SX200 Prime"=>200. Regra de voltagem: <=100 => 110V e 220V; >100 => so 220V.
+function numeroModelo(modelo: string | null): number | null {
+  if (!modelo) return null;
+  const m = modelo.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Versiona por VOLTAGEM as pecas eletricas dos modelos ATUAIS (categoria
+// "Climatizadores"), que hoje tem voltagem null (Fatia 3.19). ADITIVO e reversivel:
+// para cada peca eletrica atual ativa e sem voltagem, CRIA as variantes de voltagem
+// (<=100 => 110V+220V; >100 => 220V) e DESATIVA (ativo=false) a versao sem voltagem
+// — NUNCA deleta (preserva historico/estoque). Idempotente: apos a 1a rodada as
+// versoes null ficam inativas e saem do alvo; variantes ja existentes nao recriam.
+// Os ANTIGOS ("Climatizadores (Antigos)") ja vem com voltagem do arquivo (fora daqui).
+export async function seedVoltagemPecasEletricas(): Promise<void> {
+  try {
+    const alvos = await prisma.produtoCatalogo.findMany({
+      where: {
+        tipo: TipoCatalogo.PECA,
+        categoria: "Climatizadores",
+        voltagem: null,
+        ativo: true,
+        nome: { in: [...NOMES_ELETRICOS] },
+      },
+      select: { id: true, nome: true, categoria: true, modelo: true, precoSugerido: true },
+    });
+    if (alvos.length === 0) {
+      console.log("[seed] voltagem-eletricas: 0 a versionar (ja aplicado ou vazio)");
+      return;
+    }
+
+    const existentes = await prisma.produtoCatalogo.findMany({
+      where: { tipo: TipoCatalogo.PECA },
+      select: { nome: true, categoria: true, modelo: true, voltagem: true },
+    });
+    const chave = (
+      n: string,
+      c: string | null,
+      m: string | null,
+      v: string | null,
+    ) => `${n}|||${c ?? ""}|||${m ?? ""}|||${v ?? ""}`;
+    const jaTem = new Set(
+      existentes.map((e) => chave(e.nome, e.categoria, e.modelo, e.voltagem)),
+    );
+    const ultima = await prisma.produtoCatalogo.findFirst({
+      orderBy: { ordem: "desc" },
+      select: { ordem: true },
+    });
+    let ordem = ultima?.ordem ?? 0;
+
+    let versionadas = 0;
+    let variantesCriadas = 0;
+    for (const p of alvos) {
+      const num = numeroModelo(p.modelo);
+      if (num == null) continue; // modelo sem numero (ex.: Bravo/Sixxis Life): nao versiona
+      const volts = num <= 100 ? ["110V", "220V"] : ["220V"];
+      for (const v of volts) {
+        const k = chave(p.nome, p.categoria, p.modelo, v);
+        if (jaTem.has(k)) continue;
+        await prisma.produtoCatalogo.create({
+          data: {
+            nome: p.nome,
+            categoria: p.categoria,
+            modelo: p.modelo,
+            voltagem: v,
+            tipo: TipoCatalogo.PECA,
+            precoSugerido: p.precoSugerido,
+            estoque: ESTOQUE_INICIAL_PECA,
+            estoqueMinimo: null,
+            ativo: true,
+            ordem: ++ordem,
+            movimentacoes: {
+              create: {
+                tipo: "ENTRADA",
+                quantidade: ESTOQUE_INICIAL_PECA,
+                motivo: "estoque inicial (variante de voltagem)",
+              },
+            },
+          },
+        });
+        jaTem.add(k);
+        variantesCriadas++;
+      }
+      // Desativa a versao sem voltagem (preserva historico/estoque; nao deleta).
+      await prisma.produtoCatalogo.update({ where: { id: p.id }, data: { ativo: false } });
+      versionadas++;
+    }
+    console.log(
+      `[seed] voltagem-eletricas: ${versionadas} pecas atuais versionadas, ${variantesCriadas} variantes criadas`,
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao versionar voltagem das eletricas: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill: garante um negocio aberto para cada lead que ainda nao tem.
 // Roda no boot, sem emitir socket (io ainda nao tem clientes / ruido).
 export async function backfillNegocios(): Promise<void> {
