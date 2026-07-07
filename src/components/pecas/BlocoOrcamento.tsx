@@ -23,6 +23,13 @@ import { useToast } from "@/components/ui/Toast";
 import { InputBusca } from "@/components/ui/InputBusca";
 import { formatarBRL, calcularTotalFinal } from "@/lib/format";
 import type { MensagemItem } from "@/components/inbox/tipos";
+import {
+  SecaoPagamento,
+  paraUI,
+  paraPersistir,
+  type LinhaPagamentoUI,
+} from "@/components/pecas/SecaoPagamento";
+import { lerPagamentos } from "@/lib/pagamento";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -178,6 +185,8 @@ function EditorOrcamento(props: EditorProps) {
   // livres). cupomOutro lembra que o usuario escolheu "Outro" mesmo com os campos
   // ainda vazios (senao o select voltaria a "Sem cupom"). Fatia 3.13.
   const [cupomOutro, setCupomOutro] = useState(false);
+  // Formas de pagamento do rascunho (Fatia 3.18). null = ainda carregando.
+  const [pagamentos, setPagamentos] = useState<LinhaPagamentoUI[]>([]);
   // Envio do orcamento em PDF: confirmacao leve (2 passos) + estado de envio.
   const [confirmandoEnvio, setConfirmandoEnvio] = useState(false);
   const [enviandoOrc, setEnviandoOrc] = useState(false);
@@ -216,6 +225,7 @@ function EditorOrcamento(props: EditorProps) {
           setModelo(d.modeloProdutoCliente ?? "");
         }
         if (d.orc) setOrc(d.orc);
+        if (Array.isArray(d.pagamentos)) setPagamentos(paraUI(lerPagamentos(d.pagamentos)));
       } else {
         setUsos([]);
       }
@@ -476,6 +486,30 @@ function EditorOrcamento(props: EditorProps) {
     setOrc((prev) => ({ ...prev, ...patch }));
     salvarOrc(patch);
   }
+
+  // Formas de pagamento (Fatia 3.18): persistencia com debounce + toast discreto.
+  // Envia so as linhas com valor > 0 (paraPersistir); array vazio limpa.
+  const pagDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mudarPagamentos = useCallback(
+    (novas: LinhaPagamentoUI[]) => {
+      setPagamentos(novas);
+      if (!negocioId) return;
+      if (pagDebounceRef.current) clearTimeout(pagDebounceRef.current);
+      pagDebounceRef.current = setTimeout(async () => {
+        try {
+          const r = await fetch(`/api/negocios/${negocioId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orcPagamentos: paraPersistir(novas) }),
+          });
+          if (r.ok) toast.sucesso("Salvo.");
+        } catch {
+          // silencioso
+        }
+      }, 600);
+    },
+    [negocioId, toast],
+  );
 
   // Cupons predefinidos (Fatia 3.13): escolher um preset preenche cupom + desconto
   // correspondente (ambos seguem editaveis). "Outro" libera os campos livres.
@@ -904,6 +938,16 @@ function EditorOrcamento(props: EditorProps) {
           <span className="text-medio/60">Total (cobrável)</span>
           <span className="font-semibold text-escuro">{formatarBRL(subtotal)}</span>
         </div>
+      )}
+
+      {/* 3. FORMA DE PAGAMENTO (Fatia 3.18): so no orcamento do negocio, abaixo do
+          resumo e acima do envio. Metadado — nao altera o total. */}
+      {mostrarResumo && negocioId && usos && (
+        <SecaoPagamento
+          linhas={pagamentos}
+          onChange={mudarPagamentos}
+          totalFinal={totalFinal}
+        />
       )}
 
       {/* 4. ENVIAR orcamento ao cliente (PDF). As DECISOES (Pendente|Perdido +

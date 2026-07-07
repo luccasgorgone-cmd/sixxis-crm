@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
 import { Finalidade, TipoCatalogo } from "@/generated/prisma/enums";
+import { lerPagamentos } from "@/lib/pagamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ async function negocioComAcesso(agenteId: string, negocioId: string) {
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcPagamentos: true,
       lead: { select: { donoId: true, donoPosVendaId: true } },
     },
   });
@@ -76,6 +78,8 @@ export async function GET(
       frete: negocio.orcFrete != null ? Number(negocio.orcFrete) : null,
       fretePagoPelaEmpresa: negocio.orcFretePagoPelaEmpresa,
     },
+    // Formas de pagamento do rascunho (Fatia 3.18): array validado.
+    pagamentos: lerPagamentos(negocio.orcPagamentos),
   });
 }
 
