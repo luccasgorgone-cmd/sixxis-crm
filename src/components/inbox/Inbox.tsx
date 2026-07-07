@@ -430,6 +430,7 @@ export function Inbox({
                 ehAdmin={ehAdmin}
                 agenteIdAtual={agenteIdAtual}
                 onMensagemEnviada={aoEnviada}
+                onTransferido={() => void carregarConversas()}
               />
             </aside>
           )}

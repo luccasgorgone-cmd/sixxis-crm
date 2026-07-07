@@ -40,6 +40,7 @@ export function PainelClienteInbox({
   ehAdmin = false,
   agenteIdAtual = "",
   onMensagemEnviada,
+  onTransferido,
 }: {
   leadId: string;
   // Negocio da finalidade da conversa (null = sem negocio -> omite nivel negocio).
@@ -49,6 +50,9 @@ export function PainelClienteInbox({
   agenteIdAtual?: string;
   // Injeta na thread aberta do Inbox a bolha do PDF enviada pelo orcamento (3.15).
   onMensagemEnviada?: (msg: MensagemItem) => void;
+  // Transferencia de dono/setor concluida: o Inbox reconsulta a lista de conversas
+  // (sem depender do socket) para o card sair/entrar do setor certo (Fatia 3.20).
+  onTransferido?: () => void;
 }) {
   const toast = useToast();
   const [cliente, setCliente] = useState<ClientePainel | null>(null);
@@ -238,6 +242,7 @@ export function PainelClienteInbox({
               salvar={salvar}
               recarregar={carregarNegocio}
               onAtualizado={() => void carregarCliente()}
+              onTransferido={onTransferido}
               abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
             />
           )}

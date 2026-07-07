@@ -623,6 +623,7 @@ export function NegocioAcoes({
   salvar,
   recarregar,
   onAtualizado,
+  onTransferido,
   abrirModal,
 }: {
   detalhe: DetalheNegocio;
@@ -635,6 +636,10 @@ export function NegocioAcoes({
   salvar: (body: Record<string, unknown>) => Promise<boolean>;
   recarregar: () => Promise<void>;
   onAtualizado: () => void;
+  // Chamado apos transferir DONO ou mover SETOR com sucesso — o pai reconsulta a
+  // LISTA (conversas do Inbox / board do Kanban) sem depender do socket (Fatia
+  // 3.20). Opcional: onde a lista ja se atualiza por onAtualizado, pode ser omitido.
+  onTransferido?: () => void;
   abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
   const toast = useToast();
@@ -818,6 +823,7 @@ export function NegocioAcoes({
     setDestino("");
     await recarregar();
     onAtualizado();
+    onTransferido?.();
   }
 
   return (
@@ -1122,6 +1128,7 @@ export function NegocioAcoes({
             setMoverAberto(false);
             void recarregar();
             onAtualizado();
+            onTransferido?.();
           }}
         />
       )}
