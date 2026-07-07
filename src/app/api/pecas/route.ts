@@ -25,6 +25,13 @@ function txt(v: unknown): string | null {
   const s = typeof v === "string" ? v.trim() : "";
   return s || null;
 }
+// Voltagem: "110V" | "220V" | null (vazio/ausente). ok:false = valor invalido.
+function parseVoltagem(v: unknown): { ok: true; valor: string | null } | { ok: false } {
+  if (v == null || v === "") return { ok: true, valor: null };
+  const s = String(v).trim().toUpperCase();
+  if (s === "110V" || s === "220V") return { ok: true, valor: s };
+  return { ok: false };
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -60,6 +67,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       nome: true,
       categoria: true,
       modelo: true,
+      voltagem: true,
       precoSugerido: true,
       estoque: true,
       estoqueMinimo: true,
@@ -91,15 +99,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!nome) return NextResponse.json({ erro: "nome obrigatorio" }, { status: 400 });
   const categoria = txt(body.categoria);
   const modelo = txt(body.modelo);
+  const volt = parseVoltagem(body.voltagem);
+  if (!volt.ok) {
+    return NextResponse.json({ erro: "voltagem invalida (110V, 220V ou vazio)" }, { status: 400 });
+  }
 
-  // Guarda de duplicata: mesma (nome, categoria, modelo) case-insensitive. Ativa
-  // -> 409; inativa -> 409 com inativaId para o front oferecer "Reativar".
+  // Guarda de duplicata: mesma (nome, categoria, modelo, voltagem) case-insensitive.
+  // Voltagem entra na chave (Fatia 3.19): "Motor 110V" e "Motor 220V" do mesmo
+  // modelo sao itens distintos. Ativa -> 409; inativa -> 409 com inativaId.
   const dup = await prisma.produtoCatalogo.findFirst({
     where: {
       tipo: TipoCatalogo.PECA,
       nome: { equals: nome, mode: "insensitive" },
       categoria: categoria === null ? null : { equals: categoria, mode: "insensitive" },
       modelo: modelo === null ? null : { equals: modelo, mode: "insensitive" },
+      voltagem: volt.valor,
     },
     select: { id: true, ativo: true },
   });
@@ -124,6 +138,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       nome,
       categoria,
       modelo,
+      voltagem: volt.valor,
       precoSugerido: precoNum(body.precoSugerido),
       estoqueMinimo: intOuNull(body.estoqueMinimo),
       tipo: TipoCatalogo.PECA,

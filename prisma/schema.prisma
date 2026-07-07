@@ -1107,6 +1107,11 @@ model ProdutoCatalogo {
   nome          String
   categoria     String?
   modelo        String?
+  // Voltagem da PECA eletrica (Fatia 3.19): "110V" | "220V". null = peca sem
+  // voltagem (serve em ambas). O agrupamento "Antigos" vem da CATEGORIA
+  // "Climatizadores (Antigos)" (sem flag booleana). Motor/Motor Swing/Placas/
+  // Bomba d'agua e Inversor|Capacitor sao eletricas; demais pecas ficam null.
+  voltagem      String?
   precoSugerido Decimal?     @db.Decimal(12, 2)
   tipo          TipoCatalogo @default(PRODUTO)
   ativo         Boolean      @default(true)
@@ -1125,6 +1130,8 @@ model ProdutoCatalogo {
 
   @@index([tipo, ativo, ordem])
   @@index([chaveLoja])
+  // Query do pos-venda: pecas de um modelo na voltagem escolhida (Fatia 3.19).
+  @@index([modelo, voltagem])
 }
 
 // Movimentacao de estoque de uma peca (Fatia 3.01). Cada linha e um evento

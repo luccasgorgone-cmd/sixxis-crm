@@ -46,6 +46,21 @@ export async function PATCH(
   }
   if (body.categoria !== undefined) data.categoria = txt(body.categoria);
   if (body.modelo !== undefined) data.modelo = txt(body.modelo);
+  if (body.voltagem !== undefined) {
+    // "110V" | "220V" | null (vazio). Valor invalido -> 400.
+    if (body.voltagem == null || body.voltagem === "") {
+      data.voltagem = null;
+    } else {
+      const s = String(body.voltagem).trim().toUpperCase();
+      if (s !== "110V" && s !== "220V") {
+        return NextResponse.json(
+          { erro: "voltagem invalida (110V, 220V ou vazio)" },
+          { status: 400 },
+        );
+      }
+      data.voltagem = s;
+    }
+  }
   if (body.precoSugerido !== undefined) {
     const n = Number(body.precoSugerido);
     data.precoSugerido =
