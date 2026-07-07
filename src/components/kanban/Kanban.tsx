@@ -641,6 +641,7 @@ export function Kanban({
 
       {drawerId && (
         <PainelNegocio
+          key={drawerId}
           negocioId={drawerId}
           papel={papel}
           agenteIdAtual={agenteIdAtual}

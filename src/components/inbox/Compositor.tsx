@@ -131,11 +131,13 @@ export function Compositor({
     return i ? `${i.nome}${i.numero ? ` (${i.numero})` : ""}` : "outro numero";
   }
 
-  // Troca de conversa: descarta anexos/audio pendentes (nao envia para a conversa
-  // errada — o compositor nao remonta ao trocar de conversa). Fatia 2.85.
+  // Troca de conversa: descarta anexos/audio E o rascunho de texto pendentes (nao
+  // envia para a conversa errada — o compositor nao remonta ao trocar de conversa).
+  // Fatia 2.85; setTexto("") adicionado na 3.20 (rascunho residual entre conversas).
   useEffect(() => {
     limparFila();
     descartarAudio();
+    setTexto("");
     // limparFila/descartarAudio sao estaveis (declaracoes); dependem so do id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaId]);

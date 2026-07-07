@@ -84,6 +84,15 @@ export function Thread({
   // Forward: mensagem sendo encaminhada (abre o seletor de conversa).
   const [encaminhando, setEncaminhando] = useState<MensagemItem | null>(null);
 
+  // Troca de conversa: zera reply/forward/confirmacao pendentes — sao mensagens da
+  // conversa ANTERIOR e nao devem vazar para a nova (o Thread nao remonta ao trocar
+  // de conversa no Inbox). Fatia 3.20.
+  useEffect(() => {
+    setRespondendoA(null);
+    setEncaminhando(null);
+    setConfirmarExcluir(false);
+  }, [conversa.id]);
+
   // Rola ate a mensagem citada (clique na citacao), destacando-a brevemente.
   function irParaMensagem(id: string) {
     const el = document.getElementById(`msg-${id}`);

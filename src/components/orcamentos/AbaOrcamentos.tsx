@@ -324,7 +324,9 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
         </div>
       )}
 
-      {drawerId && <DrawerOrcamento id={drawerId} onFechar={() => setDrawerId(null)} />}
+      {drawerId && (
+        <DrawerOrcamento key={drawerId} id={drawerId} onFechar={() => setDrawerId(null)} />
+      )}
     </div>
   );
 }

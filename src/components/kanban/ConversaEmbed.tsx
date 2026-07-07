@@ -47,6 +47,10 @@ export function ConversaEmbed({
   useEffect(() => {
     let vivo = true;
     setCarregando(true);
+    // Zera as mensagens/finalidade ANTES do fetch: ao trocar de conversa, nao
+    // mostra a thread da conversa ANTERIOR enquanto a nova carrega (Fatia 3.20).
+    setMensagens([]);
+    setFinalidade(undefined);
     fetch(`/api/conversas/${conversaId}/mensagens`)
       .then((r) => (r.ok ? r.json() : { mensagens: [] }))
       .then((d) => {

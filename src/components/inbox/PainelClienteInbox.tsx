@@ -104,6 +104,14 @@ export function PainelClienteInbox({
     setCarregando(true);
   }, [leadId]);
 
+  // Ao TROCAR de negocio SEM trocar de lead (ex.: mover setor do MESMO cliente
+  // muda o negocioId), zera o detalhe antes do refetch para nao exibir o negocio
+  // ANTERIOR. Prop-driven (nao dispara nos saves, que mantem o mesmo negocioId).
+  // Fatia 3.20.
+  useEffect(() => {
+    setDetalhe(null);
+  }, [negocioId]);
+
   const carregarNegocio = useCallback(async () => {
     if (!negocioId) {
       setDetalhe(null);
