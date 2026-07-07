@@ -400,6 +400,30 @@ type EventoEvolution = {
   };
 };
 
+// ---------------------------------------------------------------------------
+// DIAGNOSTICO de ingestao (Fatia 3.20 B4). SO instrumentacao — NAO altera o
+// fluxo. Loga, de forma estruturada e prefixada ([ingest-diag]), mensagens IN
+// com jid de sufixo NAO-padrao (ex.: @lid de contato nao salvo, cujo telefone
+// extraido pode NAO ser o numero real) e descartes por filtro, para o dono
+// quantificar o problema nos logs do Railway.
+// ---------------------------------------------------------------------------
+
+// Sufixo do jid (parte apos o "@"), para classificar a origem. "(sem-sufixo)"
+// quando nao ha "@" (jid ja e so digitos).
+function sufixoJid(jid: string): string {
+  const at = jid.indexOf("@");
+  return at >= 0 ? jid.slice(at + 1) : "(sem-sufixo)";
+}
+
+// Emite uma linha estruturada de diagnostico (nunca lanca).
+function logIngestDiag(campos: Record<string, unknown>): void {
+  try {
+    console.log(`[ingest-diag] ${JSON.stringify(campos)}`);
+  } catch {
+    // ignore
+  }
+}
+
 // Mapeia o messageType da Evolution para o enum TipoMsg do dominio.
 // Envelopes do WhatsApp que embrulham o message real (ephemeral/view-once/doc com
 // legenda). O conteudo verdadeiro (sticker/imagem/etc.) fica em `.message`. 2.95.
@@ -1726,6 +1750,16 @@ async function processarEvento(
   // Clientes normais (@s.whatsapp.net) seguem o fluxo. Anuncios (Click-to-
   // WhatsApp) chegam por @s.whatsapp.net e continuam entrando.
   if (jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) {
+    // DIAGNOSTICO (B4): so mensagens IN descartadas por filtro (nao o eco fromMe).
+    if (!fromMe) {
+      logIngestDiag({
+        evento: "descarte-filtro",
+        motivo: sufixoJid(jid),
+        instancia: payload?.instance ?? null,
+        externalId,
+        temPushName: !!data?.pushName,
+      });
+    }
     return;
   }
 
@@ -1742,7 +1776,55 @@ async function processarEvento(
   const telefone = normalizarJid(jid);
   if (!telefone) {
     console.warn(`[ingest] jid sem digitos ignorado: ${jid}`);
+    if (!fromMe) {
+      logIngestDiag({
+        evento: "descarte-filtro",
+        motivo: "jid-sem-digitos",
+        instancia: payload?.instance ?? null,
+        sufixo: sufixoJid(jid),
+        externalId,
+      });
+    }
     return;
+  }
+
+  // DIAGNOSTICO (B4): mensagem IN com jid de sufixo NAO-padrao (nao @s.whatsapp.net)
+  // — tipicamente @lid de contato nao salvo. O `telefone` extraido pode NAO ser o
+  // numero real (sao os digitos do LID). Loga estruturado com: se casou um lead ja
+  // existente e os CAMPOS ALTERNATIVOS candidatos ao numero real (Baileys/Evolution
+  // v2: senderPn/participantPn/remoteJidAlt/participant), para o dono confirmar nos
+  // logs do Railway se o numero real vem em algum deles. NAO altera a ingestao.
+  if (!fromMe && !jid.endsWith("@s.whatsapp.net")) {
+    try {
+      const keyRaw = (data?.key ?? {}) as Record<string, unknown>;
+      const leadExistente = await prisma.lead.findFirst({
+        where: { telefone },
+        select: { id: true },
+      });
+      logIngestDiag({
+        evento: "in-jid-nao-padrao",
+        instancia: payload?.instance ?? null,
+        sufixo: sufixoJid(jid),
+        jid,
+        externalId,
+        telefoneExtraido: telefone,
+        tamanhoTelefone: telefone.length,
+        temPushName: !!pushName,
+        casouLeadExistente: !!leadExistente,
+        // Candidatos ao numero REAL do @lid (podem nao existir — por isso logamos):
+        senderPn: keyRaw.senderPn ?? null,
+        participantPn: keyRaw.participantPn ?? null,
+        remoteJidAlt: keyRaw.remoteJidAlt ?? null,
+        participant: keyRaw.participant ?? null,
+        verifiedName:
+          (data as { verifiedBizName?: unknown; verifiedName?: unknown } | undefined)
+            ?.verifiedName ??
+          (data as { verifiedBizName?: unknown } | undefined)?.verifiedBizName ??
+          null,
+      });
+    } catch {
+      // diagnostico best-effort: nunca quebra a ingestao
+    }
   }
 
   // Desembrulha envelopes antes de mapear tipo/conteudo/midia. Fatia 2.95.
