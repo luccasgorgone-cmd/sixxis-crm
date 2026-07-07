@@ -1,0 +1,356 @@
+categoria|nome|modelo|preco|voltagem
+Climatizadores (Antigos)|Aleta Horizontal|SX015 Trend (A)|15|
+Climatizadores (Antigos)|Aleta Vertical|SX015 Trend (A)|15|
+Climatizadores (Antigos)|Bomba d'água|SX015 Trend (A)|150|110V
+Climatizadores (Antigos)|Bomba d'água|SX015 Trend (A)|150|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX015 Trend (A)|30|
+Climatizadores (Antigos)|Capacitor|SX015 Trend (A)|50|110V
+Climatizadores (Antigos)|Capacitor|SX015 Trend (A)|50|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX015 Trend (A)|150|
+Climatizadores (Antigos)|Colmeia Traseira|SX015 Trend (A)|200|
+Climatizadores (Antigos)|Controle Remoto|SX015 Trend (A)|50|
+Climatizadores (Antigos)|Dreno|SX015 Trend (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX015 Trend (A)|150|
+Climatizadores (Antigos)|Estrutura Lateral|SX015 Trend (A)|100|
+Climatizadores (Antigos)|Estrutura Superior|SX015 Trend (A)|100|
+Climatizadores (Antigos)|Estrutura Traseira|SX015 Trend (A)|150|
+Climatizadores (Antigos)|Filtro Lateral|SX015 Trend (A)|70|
+Climatizadores (Antigos)|Filtro Traseiro|SX015 Trend (A)|90|
+Climatizadores (Antigos)|Hélice|SX015 Trend (A)|200|
+Climatizadores (Antigos)|Kit Colmeia|SX015 Trend (A)|550|
+Climatizadores (Antigos)|Limpeza|SX015 Trend (A)|150|
+Climatizadores (Antigos)|Motor|SX015 Trend (A)|550|110V
+Climatizadores (Antigos)|Motor|SX015 Trend (A)|550|220V
+Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|500|110V
+Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|500|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX015 Trend (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX015 Trend (A)|250|110V
+Climatizadores (Antigos)|Placa de Comando|SX015 Trend (A)|250|220V
+Climatizadores (Antigos)|Placa de Painel|SX015 Trend (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX015 Trend (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX015 Trend (A)|150|
+Climatizadores (Antigos)|Rodízios|SX015 Trend (A)|20|
+Climatizadores (Antigos)|Swing Aleta|SX015 Trend (A)|25|
+Climatizadores (Antigos)|Tampa Superior|SX015 Trend (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX035 (A)|15|
+Climatizadores (Antigos)|Aleta Vertical|SX035 (A)|15|
+Climatizadores (Antigos)|Bomba d'água|SX035 (A)|150|110V
+Climatizadores (Antigos)|Bomba d'água|SX035 (A)|150|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX035 (A)|30|
+Climatizadores (Antigos)|Capacitor|SX035 (A)|50|110V
+Climatizadores (Antigos)|Capacitor|SX035 (A)|50|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX035 (A)|150|
+Climatizadores (Antigos)|Colmeia Traseira|SX035 (A)|200|
+Climatizadores (Antigos)|Controle Remoto|SX035 (A)|50|
+Climatizadores (Antigos)|Dreno|SX035 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX035 (A)|150|
+Climatizadores (Antigos)|Estrutura Lateral|SX035 (A)|100|
+Climatizadores (Antigos)|Estrutura Superior|SX035 (A)|100|
+Climatizadores (Antigos)|Estrutura Traseira|SX035 (A)|150|
+Climatizadores (Antigos)|Filtro Lateral|SX035 (A)|70|
+Climatizadores (Antigos)|Filtro Traseiro|SX035 (A)|90|
+Climatizadores (Antigos)|Hélice|SX035 (A)|200|
+Climatizadores (Antigos)|Kit Colmeia|SX035 (A)|550|
+Climatizadores (Antigos)|Limpeza|SX035 (A)|150|
+Climatizadores (Antigos)|Motor|SX035 (A)|550|110V
+Climatizadores (Antigos)|Motor|SX035 (A)|550|220V
+Climatizadores (Antigos)|Motor Swing|SX035 (A)|500|110V
+Climatizadores (Antigos)|Motor Swing|SX035 (A)|500|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX035 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX035 (A)|250|110V
+Climatizadores (Antigos)|Placa de Comando|SX035 (A)|250|220V
+Climatizadores (Antigos)|Placa de Painel|SX035 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX035 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX035 (A)|150|
+Climatizadores (Antigos)|Rodízios|SX035 (A)|20|
+Climatizadores (Antigos)|Swing Aleta|SX035 (A)|25|
+Climatizadores (Antigos)|Tampa Superior|SX035 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX040 (A)|15|
+Climatizadores (Antigos)|Aleta Vertical|SX040 (A)|15|
+Climatizadores (Antigos)|Bomba d'água|SX040 (A)|150|110V
+Climatizadores (Antigos)|Bomba d'água|SX040 (A)|150|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX040 (A)|30|
+Climatizadores (Antigos)|Capacitor|SX040 (A)|50|110V
+Climatizadores (Antigos)|Capacitor|SX040 (A)|50|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX040 (A)|150|
+Climatizadores (Antigos)|Colmeia Traseira|SX040 (A)|200|
+Climatizadores (Antigos)|Controle Remoto|SX040 (A)|50|
+Climatizadores (Antigos)|Dreno|SX040 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX040 (A)|150|
+Climatizadores (Antigos)|Estrutura Lateral|SX040 (A)|100|
+Climatizadores (Antigos)|Estrutura Superior|SX040 (A)|100|
+Climatizadores (Antigos)|Estrutura Traseira|SX040 (A)|150|
+Climatizadores (Antigos)|Filtro Lateral|SX040 (A)|70|
+Climatizadores (Antigos)|Filtro Traseiro|SX040 (A)|90|
+Climatizadores (Antigos)|Hélice|SX040 (A)|200|
+Climatizadores (Antigos)|Kit Colmeia|SX040 (A)|550|
+Climatizadores (Antigos)|Limpeza|SX040 (A)|150|
+Climatizadores (Antigos)|Motor|SX040 (A)|550|110V
+Climatizadores (Antigos)|Motor|SX040 (A)|550|220V
+Climatizadores (Antigos)|Motor Swing|SX040 (A)|500|110V
+Climatizadores (Antigos)|Motor Swing|SX040 (A)|500|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX040 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX040 (A)|250|110V
+Climatizadores (Antigos)|Placa de Comando|SX040 (A)|250|220V
+Climatizadores (Antigos)|Placa de Painel|SX040 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX040 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX040 (A)|150|
+Climatizadores (Antigos)|Rodízios|SX040 (A)|20|
+Climatizadores (Antigos)|Swing Aleta|SX040 (A)|25|
+Climatizadores (Antigos)|Tampa Superior|SX040 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX045 (A)|15|
+Climatizadores (Antigos)|Aleta Vertical|SX045 (A)|15|
+Climatizadores (Antigos)|Bomba d'água|SX045 (A)|150|110V
+Climatizadores (Antigos)|Bomba d'água|SX045 (A)|150|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX045 (A)|30|
+Climatizadores (Antigos)|Capacitor|SX045 (A)|50|110V
+Climatizadores (Antigos)|Capacitor|SX045 (A)|50|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX045 (A)|150|
+Climatizadores (Antigos)|Colmeia Traseira|SX045 (A)|200|
+Climatizadores (Antigos)|Controle Remoto|SX045 (A)|50|
+Climatizadores (Antigos)|Dreno|SX045 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX045 (A)|150|
+Climatizadores (Antigos)|Estrutura Lateral|SX045 (A)|100|
+Climatizadores (Antigos)|Estrutura Superior|SX045 (A)|100|
+Climatizadores (Antigos)|Estrutura Traseira|SX045 (A)|150|
+Climatizadores (Antigos)|Filtro Lateral|SX045 (A)|70|
+Climatizadores (Antigos)|Filtro Traseiro|SX045 (A)|90|
+Climatizadores (Antigos)|Hélice|SX045 (A)|200|
+Climatizadores (Antigos)|Kit Colmeia|SX045 (A)|550|
+Climatizadores (Antigos)|Limpeza|SX045 (A)|150|
+Climatizadores (Antigos)|Motor|SX045 (A)|550|110V
+Climatizadores (Antigos)|Motor|SX045 (A)|550|220V
+Climatizadores (Antigos)|Motor Swing|SX045 (A)|500|110V
+Climatizadores (Antigos)|Motor Swing|SX045 (A)|500|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX045 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX045 (A)|250|110V
+Climatizadores (Antigos)|Placa de Comando|SX045 (A)|250|220V
+Climatizadores (Antigos)|Placa de Painel|SX045 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX045 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX045 (A)|150|
+Climatizadores (Antigos)|Rodízios|SX045 (A)|20|
+Climatizadores (Antigos)|Swing Aleta|SX045 (A)|25|
+Climatizadores (Antigos)|Tampa Superior|SX045 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX050 (A)|15|
+Climatizadores (Antigos)|Aleta Vertical|SX050 (A)|15|
+Climatizadores (Antigos)|Bomba d'água|SX050 (A)|150|110V
+Climatizadores (Antigos)|Bomba d'água|SX050 (A)|150|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX050 (A)|30|
+Climatizadores (Antigos)|Capacitor|SX050 (A)|50|110V
+Climatizadores (Antigos)|Capacitor|SX050 (A)|50|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX050 (A)|150|
+Climatizadores (Antigos)|Colmeia Traseira|SX050 (A)|200|
+Climatizadores (Antigos)|Controle Remoto|SX050 (A)|50|
+Climatizadores (Antigos)|Dreno|SX050 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX050 (A)|150|
+Climatizadores (Antigos)|Estrutura Lateral|SX050 (A)|100|
+Climatizadores (Antigos)|Estrutura Superior|SX050 (A)|100|
+Climatizadores (Antigos)|Estrutura Traseira|SX050 (A)|150|
+Climatizadores (Antigos)|Filtro Lateral|SX050 (A)|70|
+Climatizadores (Antigos)|Filtro Traseiro|SX050 (A)|90|
+Climatizadores (Antigos)|Hélice|SX050 (A)|200|
+Climatizadores (Antigos)|Kit Colmeia|SX050 (A)|550|
+Climatizadores (Antigos)|Limpeza|SX050 (A)|150|
+Climatizadores (Antigos)|Motor|SX050 (A)|550|110V
+Climatizadores (Antigos)|Motor|SX050 (A)|550|220V
+Climatizadores (Antigos)|Motor Swing|SX050 (A)|500|110V
+Climatizadores (Antigos)|Motor Swing|SX050 (A)|500|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX050 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX050 (A)|250|110V
+Climatizadores (Antigos)|Placa de Comando|SX050 (A)|250|220V
+Climatizadores (Antigos)|Placa de Painel|SX050 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX050 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX050 (A)|150|
+Climatizadores (Antigos)|Rodízios|SX050 (A)|20|
+Climatizadores (Antigos)|Swing Aleta|SX050 (A)|25|
+Climatizadores (Antigos)|Tampa Superior|SX050 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX065 (A)|20|
+Climatizadores (Antigos)|Aleta Vertical|SX065 (A)|20|
+Climatizadores (Antigos)|Boia|SX065 (A)|50|
+Climatizadores (Antigos)|Bomba d'água|SX065 (A)|200|110V
+Climatizadores (Antigos)|Bomba d'água|SX065 (A)|200|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX065 (A)|40|
+Climatizadores (Antigos)|Capacitor|SX065 (A)|60|110V
+Climatizadores (Antigos)|Capacitor|SX065 (A)|60|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX065 (A)|200|
+Climatizadores (Antigos)|Colmeia Traseira|SX065 (A)|250|
+Climatizadores (Antigos)|Controle Remoto|SX065 (A)|50|
+Climatizadores (Antigos)|Dreno|SX065 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX065 (A)|250|
+Climatizadores (Antigos)|Estrutura Lateral|SX065 (A)|200|
+Climatizadores (Antigos)|Estrutura Superior|SX065 (A)|200|
+Climatizadores (Antigos)|Estrutura Traseira|SX065 (A)|250|
+Climatizadores (Antigos)|Filtro Colmeia|SX065 (A)|80|
+Climatizadores (Antigos)|Hélice|SX065 (A)|250|
+Climatizadores (Antigos)|Kit Colmeia|SX065 (A)|950|
+Climatizadores (Antigos)|Limpeza|SX065 (A)|200|
+Climatizadores (Antigos)|Motor|SX065 (A)|950|110V
+Climatizadores (Antigos)|Motor|SX065 (A)|950|220V
+Climatizadores (Antigos)|Motor Swing|SX065 (A)|750|110V
+Climatizadores (Antigos)|Motor Swing|SX065 (A)|750|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX065 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX065 (A)|300|110V
+Climatizadores (Antigos)|Placa de Comando|SX065 (A)|300|220V
+Climatizadores (Antigos)|Placa de Painel|SX065 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX065 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX065 (A)|250|
+Climatizadores (Antigos)|Rodízios|SX065 (A)|35|
+Climatizadores (Antigos)|Suporte Rodízios|SX065 (A)|60|
+Climatizadores (Antigos)|Swing Aleta|SX065 (A)|30|
+Climatizadores (Antigos)|Tampa Superior|SX065 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX070 (A)|20|
+Climatizadores (Antigos)|Aleta Vertical|SX070 (A)|20|
+Climatizadores (Antigos)|Boia|SX070 (A)|50|
+Climatizadores (Antigos)|Bomba d'água|SX070 (A)|200|110V
+Climatizadores (Antigos)|Bomba d'água|SX070 (A)|200|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX070 (A)|40|
+Climatizadores (Antigos)|Capacitor|SX070 (A)|60|110V
+Climatizadores (Antigos)|Capacitor|SX070 (A)|60|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX070 (A)|200|
+Climatizadores (Antigos)|Colmeia Traseira|SX070 (A)|250|
+Climatizadores (Antigos)|Controle Remoto|SX070 (A)|50|
+Climatizadores (Antigos)|Dreno|SX070 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX070 (A)|250|
+Climatizadores (Antigos)|Estrutura Lateral|SX070 (A)|200|
+Climatizadores (Antigos)|Estrutura Superior|SX070 (A)|200|
+Climatizadores (Antigos)|Estrutura Traseira|SX070 (A)|250|
+Climatizadores (Antigos)|Filtro Colmeia|SX070 (A)|80|
+Climatizadores (Antigos)|Hélice|SX070 (A)|250|
+Climatizadores (Antigos)|Kit Colmeia|SX070 (A)|950|
+Climatizadores (Antigos)|Limpeza|SX070 (A)|200|
+Climatizadores (Antigos)|Motor|SX070 (A)|950|110V
+Climatizadores (Antigos)|Motor|SX070 (A)|950|220V
+Climatizadores (Antigos)|Motor Swing|SX070 (A)|750|110V
+Climatizadores (Antigos)|Motor Swing|SX070 (A)|750|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX070 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX070 (A)|300|110V
+Climatizadores (Antigos)|Placa de Comando|SX070 (A)|300|220V
+Climatizadores (Antigos)|Placa de Painel|SX070 (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX070 (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX070 (A)|250|
+Climatizadores (Antigos)|Rodízios|SX070 (A)|35|
+Climatizadores (Antigos)|Suporte Rodízios|SX070 (A)|60|
+Climatizadores (Antigos)|Swing Aleta|SX070 (A)|30|
+Climatizadores (Antigos)|Tampa Superior|SX070 (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX080 Prime (A)|20|
+Climatizadores (Antigos)|Aleta Vertical|SX080 Prime (A)|20|
+Climatizadores (Antigos)|Boia|SX080 Prime (A)|50|
+Climatizadores (Antigos)|Bomba d'água|SX080 Prime (A)|200|110V
+Climatizadores (Antigos)|Bomba d'água|SX080 Prime (A)|200|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX080 Prime (A)|40|
+Climatizadores (Antigos)|Colmeia Lateral|SX080 Prime (A)|200|
+Climatizadores (Antigos)|Colmeia Traseira|SX080 Prime (A)|250|
+Climatizadores (Antigos)|Controle Remoto|SX080 Prime (A)|50|
+Climatizadores (Antigos)|Dreno|SX080 Prime (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX080 Prime (A)|250|
+Climatizadores (Antigos)|Estrutura Lateral|SX080 Prime (A)|200|
+Climatizadores (Antigos)|Estrutura Superior|SX080 Prime (A)|200|
+Climatizadores (Antigos)|Estrutura Traseira|SX080 Prime (A)|250|
+Climatizadores (Antigos)|Filtro Colmeia|SX080 Prime (A)|80|
+Climatizadores (Antigos)|Hélice|SX080 Prime (A)|250|
+Climatizadores (Antigos)|Inversor|SX080 Prime (A)|950|110V
+Climatizadores (Antigos)|Inversor|SX080 Prime (A)|950|220V
+Climatizadores (Antigos)|Kit Colmeia|SX080 Prime (A)|950|
+Climatizadores (Antigos)|Limpeza|SX080 Prime (A)|200|
+Climatizadores (Antigos)|Motor|SX080 Prime (A)|950|110V
+Climatizadores (Antigos)|Motor|SX080 Prime (A)|950|220V
+Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|750|110V
+Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|750|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX080 Prime (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX080 Prime (A)|300|110V
+Climatizadores (Antigos)|Placa de Comando|SX080 Prime (A)|300|220V
+Climatizadores (Antigos)|Placa de Painel|SX080 Prime (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX080 Prime (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX080 Prime (A)|250|
+Climatizadores (Antigos)|Rodízios|SX080 Prime (A)|35|
+Climatizadores (Antigos)|Suporte Rodízios|SX080 Prime (A)|60|
+Climatizadores (Antigos)|Swing Aleta|SX080 Prime (A)|30|
+Climatizadores (Antigos)|Tampa Superior|SX080 Prime (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX090 Plus (A)|20|
+Climatizadores (Antigos)|Aleta Vertical|SX090 Plus (A)|20|
+Climatizadores (Antigos)|Boia|SX090 Plus (A)|50|
+Climatizadores (Antigos)|Bomba d'água|SX090 Plus (A)|200|110V
+Climatizadores (Antigos)|Bomba d'água|SX090 Plus (A)|200|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX090 Plus (A)|40|
+Climatizadores (Antigos)|Capacitor|SX090 Plus (A)|60|110V
+Climatizadores (Antigos)|Capacitor|SX090 Plus (A)|60|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX090 Plus (A)|200|
+Climatizadores (Antigos)|Colmeia Traseira|SX090 Plus (A)|250|
+Climatizadores (Antigos)|Controle Remoto|SX090 Plus (A)|50|
+Climatizadores (Antigos)|Dreno|SX090 Plus (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX090 Plus (A)|250|
+Climatizadores (Antigos)|Estrutura Lateral|SX090 Plus (A)|200|
+Climatizadores (Antigos)|Estrutura Superior|SX090 Plus (A)|200|
+Climatizadores (Antigos)|Estrutura Traseira|SX090 Plus (A)|250|
+Climatizadores (Antigos)|Filtro Colmeia|SX090 Plus (A)|80|
+Climatizadores (Antigos)|Hélice|SX090 Plus (A)|250|
+Climatizadores (Antigos)|Kit Colmeia|SX090 Plus (A)|950|
+Climatizadores (Antigos)|Limpeza|SX090 Plus (A)|200|
+Climatizadores (Antigos)|Motor|SX090 Plus (A)|950|110V
+Climatizadores (Antigos)|Motor|SX090 Plus (A)|950|220V
+Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|750|110V
+Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|750|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX090 Plus (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX090 Plus (A)|300|110V
+Climatizadores (Antigos)|Placa de Comando|SX090 Plus (A)|300|220V
+Climatizadores (Antigos)|Placa de Painel|SX090 Plus (A)|250|110V
+Climatizadores (Antigos)|Placa de Painel|SX090 Plus (A)|250|220V
+Climatizadores (Antigos)|Reservatório|SX090 Plus (A)|250|
+Climatizadores (Antigos)|Rodízios|SX090 Plus (A)|35|
+Climatizadores (Antigos)|Suporte Rodízios|SX090 Plus (A)|60|
+Climatizadores (Antigos)|Swing Aleta|SX090 Plus (A)|30|
+Climatizadores (Antigos)|Tampa Superior|SX090 Plus (A)|200|
+Climatizadores (Antigos)|Aleta Horizontal|SX150 (A)|25|
+Climatizadores (Antigos)|Aleta Vertical|SX150 (A)|25|
+Climatizadores (Antigos)|Boia|SX150 (A)|60|
+Climatizadores (Antigos)|Bomba d'água|SX150 (A)|250|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX150 (A)|50|
+Climatizadores (Antigos)|Capacitor|SX150 (A)|70|220V
+Climatizadores (Antigos)|Colmeia Lateral|SX150 (A)|300|
+Climatizadores (Antigos)|Colmeia Traseira|SX150 (A)|350|
+Climatizadores (Antigos)|Controle Remoto|SX150 (A)|50|
+Climatizadores (Antigos)|Dreno|SX150 (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX150 (A)|300|
+Climatizadores (Antigos)|Estrutura Lateral|SX150 (A)|250|
+Climatizadores (Antigos)|Estrutura Superior|SX150 (A)|250|
+Climatizadores (Antigos)|Estrutura Traseira|SX150 (A)|300|
+Climatizadores (Antigos)|Filtro Colmeia|SX150 (A)|90|
+Climatizadores (Antigos)|Hélice|SX150 (A)|450|
+Climatizadores (Antigos)|Kit Colmeia|SX150 (A)|1250|
+Climatizadores (Antigos)|Limpeza|SX150 (A)|300|
+Climatizadores (Antigos)|Motor|SX150 (A)|1250|220V
+Climatizadores (Antigos)|Motor Swing|SX150 (A)|950|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX150 (A)|25|
+Climatizadores (Antigos)|Placa de Comando|SX150 (A)|400|220V
+Climatizadores (Antigos)|Placa de Painel|SX150 (A)|350|220V
+Climatizadores (Antigos)|Reservatório|SX150 (A)|300|
+Climatizadores (Antigos)|Rodízios|SX150 (A)|40|
+Climatizadores (Antigos)|Swing Aleta|SX150 (A)|35|
+Climatizadores (Antigos)|Tampa Superior|SX150 (A)|150|
+Climatizadores (Antigos)|Aleta Horizontal|SX200 Prime (A)|30|
+Climatizadores (Antigos)|Aleta Vertical|SX200 Prime (A)|30|
+Climatizadores (Antigos)|Boia|SX200 Prime (A)|60|
+Climatizadores (Antigos)|Bomba d'água|SX200 Prime (A)|250|220V
+Climatizadores (Antigos)|Cabo de Alimentação|SX200 Prime (A)|65|
+Climatizadores (Antigos)|Colmeia Lateral|SX200 Prime (A)|350|
+Climatizadores (Antigos)|Colmeia Traseira|SX200 Prime (A)|400|
+Climatizadores (Antigos)|Controle Remoto|SX200 Prime (A)|65|
+Climatizadores (Antigos)|Dreno|SX200 Prime (A)|25|
+Climatizadores (Antigos)|Estrutura Frontal|SX200 Prime (A)|300|
+Climatizadores (Antigos)|Estrutura Lateral|SX200 Prime (A)|250|
+Climatizadores (Antigos)|Estrutura Superior|SX200 Prime (A)|250|
+Climatizadores (Antigos)|Estrutura Traseira|SX200 Prime (A)|300|
+Climatizadores (Antigos)|Filtro Colmeia|SX200 Prime (A)|100|
+Climatizadores (Antigos)|Hélice|SX200 Prime (A)|450|
+Climatizadores (Antigos)|Inversor|SX200 Prime (A)|950|220V
+Climatizadores (Antigos)|Kit Colmeia|SX200 Prime (A)|1400|
+Climatizadores (Antigos)|Limpeza|SX200 Prime (A)|300|
+Climatizadores (Antigos)|Motor|SX200 Prime (A)|1400|220V
+Climatizadores (Antigos)|Motor Swing|SX200 Prime (A)|1000|220V
+Climatizadores (Antigos)|Pino Eixo Swing|SX200 Prime (A)|25|
+Climatizadores (Antigos)|Placa de Painel|SX200 Prime (A)|350|220V
+Climatizadores (Antigos)|Reservatório|SX200 Prime (A)|300|
+Climatizadores (Antigos)|Rodízios|SX200 Prime (A)|50|
+Climatizadores (Antigos)|Suporte Rodízios|SX200 Prime (A)|150|
+Climatizadores (Antigos)|Swing Aleta|SX200 Prime (A)|45|
+Climatizadores (Antigos)|Tampa Superior|SX200 Prime (A)|150|

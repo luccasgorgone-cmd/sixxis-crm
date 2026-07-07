@@ -974,88 +974,111 @@ export async function purgarDadosTeste(): Promise<void> {
 // Estoque inicial de TODAS as pecas na criacao pelo seed (informado pelo dono).
 const ESTOQUE_INICIAL_PECA = 20;
 
-// Seed do catalogo real de PECAS (Fatia 3.01) a partir de prisma/seed-data/
-// pecas.txt (cabecalho "categoria|nome|modelo|preco"). Idempotente: cria por
-// (nome, categoria, modelo) SOMENTE o que ainda nao existe; NUNCA sobrescreve
-// preco/estoque/ativo de pecas ja existentes (as edicoes do admin sao soberanas).
-// Na criacao: tipo PECA, precoSugerido=preco, estoque=20, estoqueMinimo=null,
-// ativo=true e UMA MovimentacaoPeca ENTRADA de 20 ("estoque inicial (seed)").
+// Seed do catalogo real de PECAS (Fatia 3.01/3.19) a partir de prisma/seed-data/:
+//   - pecas.txt          "categoria|nome|modelo|preco"           (voltagem => null)
+//   - pecas-antigos.txt  "categoria|nome|modelo|preco|voltagem"  (modelos "(A)")
+// Idempotente: cria por (nome, categoria, modelo, VOLTAGEM) SOMENTE o que ainda
+// nao existe; NUNCA sobrescreve preco/estoque/ativo de pecas ja existentes (as
+// edicoes do admin sao soberanas). A voltagem entra na chave (Fatia 3.19): "Motor
+// 110V" e "Motor 220V" do mesmo modelo sao itens distintos — e as 269 pecas
+// legadas (todas com voltagem null) continuam casando (nao recriam nem duplicam).
+// Na criacao: tipo PECA, precoSugerido=preco, voltagem (do arquivo), estoque=20,
+// estoqueMinimo=null, ativo=true + UMA MovimentacaoPeca ENTRADA 20 (estoque inicial).
 export async function seedPecas(): Promise<void> {
   try {
-    let bruto: string;
-    try {
-      bruto = readFileSync(
-        join(process.cwd(), "prisma", "seed-data", "pecas.txt"),
-        "utf8",
-      );
-    } catch {
-      console.warn("[seed] pecas: arquivo pecas.txt nao encontrado; ignorado");
-      return;
-    }
-
-    const linhas = bruto.split(/\r?\n/).map((l) => l.trim());
-    // Descarta cabecalho e linhas vazias.
-    const dados = linhas
-      .filter((l) => l.length > 0)
-      .filter((l) => l !== "categoria|nome|modelo|preco");
-
-    // Chave (nome|||categoria|||modelo) das pecas ja existentes, para nao duplicar.
+    // Chave (nome|||categoria|||modelo|||voltagem) das pecas ja existentes.
     const existentes = await prisma.produtoCatalogo.findMany({
       where: { tipo: TipoCatalogo.PECA },
-      select: { nome: true, categoria: true, modelo: true },
+      select: { nome: true, categoria: true, modelo: true, voltagem: true },
     });
-    const chave = (nome: string, categoria: string | null, modelo: string | null) =>
-      `${nome}|||${categoria ?? ""}|||${modelo ?? ""}`;
+    const chave = (
+      nome: string,
+      categoria: string | null,
+      modelo: string | null,
+      voltagem: string | null,
+    ) => `${nome}|||${categoria ?? ""}|||${modelo ?? ""}|||${voltagem ?? ""}`;
     const jaTem = new Set(
-      existentes.map((e) => chave(e.nome, e.categoria, e.modelo)),
+      existentes.map((e) => chave(e.nome, e.categoria, e.modelo, e.voltagem)),
     );
 
-    // Proxima ordem (continua a sequencia do catalogo existente).
+    // Proxima ordem (continua a sequencia do catalogo existente; compartilhada
+    // pelos dois arquivos).
     const ultima = await prisma.produtoCatalogo.findFirst({
       orderBy: { ordem: "desc" },
       select: { ordem: true },
     });
     let ordem = ultima?.ordem ?? 0;
 
-    let criadas = 0;
-    let jaExistiam = 0;
-    for (const linha of dados) {
-      const partes = linha.split("|");
-      if (partes.length < 4) continue;
-      const categoria = partes[0].trim() || null;
-      const nome = partes[1].trim();
-      const modelo = partes[2].trim() || null;
-      const preco = Number(partes[3].trim());
-      if (!nome || !Number.isFinite(preco)) continue;
+    const arquivos = [
+      { arquivo: "pecas.txt", rotulo: "pecas", cabecalho: "categoria|nome|modelo|preco" },
+      {
+        arquivo: "pecas-antigos.txt",
+        rotulo: "pecas-antigos",
+        cabecalho: "categoria|nome|modelo|preco|voltagem",
+      },
+    ];
 
-      if (jaTem.has(chave(nome, categoria, modelo))) {
-        jaExistiam++;
+    for (const { arquivo, rotulo, cabecalho } of arquivos) {
+      let bruto: string;
+      try {
+        bruto = readFileSync(
+          join(process.cwd(), "prisma", "seed-data", arquivo),
+          "utf8",
+        );
+      } catch {
+        console.warn(`[seed] ${rotulo}: arquivo ${arquivo} nao encontrado; ignorado`);
         continue;
       }
-      await prisma.produtoCatalogo.create({
-        data: {
-          nome,
-          categoria,
-          modelo,
-          tipo: TipoCatalogo.PECA,
-          precoSugerido: preco,
-          estoque: ESTOQUE_INICIAL_PECA,
-          estoqueMinimo: null,
-          ativo: true,
-          ordem: ++ordem,
-          movimentacoes: {
-            create: {
-              tipo: "ENTRADA",
-              quantidade: ESTOQUE_INICIAL_PECA,
-              motivo: "estoque inicial (seed)",
+      const dados = bruto
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && l !== cabecalho);
+
+      let criadas = 0;
+      let jaExistiam = 0;
+      for (const linha of dados) {
+        const partes = linha.split("|");
+        if (partes.length < 4) continue;
+        const categoria = partes[0].trim() || null;
+        const nome = partes[1].trim();
+        const modelo = partes[2].trim() || null;
+        const preco = Number(partes[3].trim());
+        // 5o campo (voltagem) so existe no arquivo dos antigos; ausente/vazio = null.
+        const voltagem =
+          partes.length >= 5 ? partes[4].trim().toUpperCase() || null : null;
+        if (!nome || !Number.isFinite(preco)) continue;
+
+        const k = chave(nome, categoria, modelo, voltagem);
+        if (jaTem.has(k)) {
+          jaExistiam++;
+          continue;
+        }
+        await prisma.produtoCatalogo.create({
+          data: {
+            nome,
+            categoria,
+            modelo,
+            voltagem,
+            tipo: TipoCatalogo.PECA,
+            precoSugerido: preco,
+            estoque: ESTOQUE_INICIAL_PECA,
+            estoqueMinimo: null,
+            ativo: true,
+            ordem: ++ordem,
+            movimentacoes: {
+              create: {
+                tipo: "ENTRADA",
+                quantidade: ESTOQUE_INICIAL_PECA,
+                motivo: "estoque inicial (seed)",
+              },
             },
           },
-        },
-      });
-      jaTem.add(chave(nome, categoria, modelo));
-      criadas++;
+        });
+        jaTem.add(k);
+        criadas++;
+      }
+      console.log(`[seed] ${rotulo}: ${criadas} criadas, ${jaExistiam} ja existiam`);
     }
-    console.log(`[seed] pecas: ${criadas} criadas, ${jaExistiam} ja existiam`);
   } catch (erro) {
     console.error(
       `[seed] falha ao semear pecas: ${erro instanceof Error ? erro.message : String(erro)}`,
