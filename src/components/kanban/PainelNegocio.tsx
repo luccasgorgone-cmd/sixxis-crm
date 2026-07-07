@@ -646,15 +646,14 @@ export function NegocioAcoes({
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const [moverAberto, setMoverAberto] = useState(false);
 
-  // Mover atendimento entre finalidades: destino = a oposta da atual. So aparece
-  // para quem tem acesso a finalidade DESTINO (ou admin) — o endpoint tambem valida.
+  // Mover atendimento entre finalidades: destino = a oposta da atual. Aparece para
+  // quem tem acesso a finalidade DESTINO ou a de ORIGEM (a atual) — ou admin. Assim
+  // o atendente que recebeu o cliente no setor errado (so tem acesso a origem) pode
+  // corrigir. Mesma regra do endpoint. Fatia 3.18.
   const finalidadeDestino =
     detalhe.finalidade === "POS_VENDA" ? "VENDA" : "POS_VENDA";
   const podeMover =
-    ehAdmin ||
-    (finalidadeDestino === "POS_VENDA"
-      ? !!agente?.acessoPosVenda
-      : !!agente?.acessoVenda);
+    ehAdmin || !!agente?.acessoVenda || !!agente?.acessoPosVenda;
 
   const etapaGanho = etapas.find((e) => e.tipo === "GANHO");
   const etapaPerda = etapas.find((e) => e.tipo === "PERDIDO");

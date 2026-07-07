@@ -11,8 +11,12 @@
 //  - Nao dispara conversao Meta (nao fecha negocio; so garante um ABERTO no
 //    destino e ajusta dono).
 //
-// AUTORIZACAO (liberado aos usuarios): pode executar quem tem ACESSO a finalidade
-// DESTINO (admin sempre). Um usuario que so tem Venda nao empurra pra Pos-venda.
+// AUTORIZACAO (Fatia 3.18): pode executar quem tem ACESSO a finalidade DESTINO
+// OU a de ORIGEM (admin sempre). Motivo: o atendente que RECEBE um cliente no
+// setor errado normalmente so tem acesso ao PROPRIO setor (origem) — precisa
+// poder redireciona-lo. Como so ha duas finalidades, isto equivale a "qualquer
+// usuario com acesso a pelo menos um setor", mantendo o guardrail (nao libera a
+// quem nao atende nenhum dos dois).
 //
 // CONVERSA — casos:
 //  1) Nao existe conversa ativa no DESTINO: MOVE a conversa de origem (update
@@ -74,10 +78,16 @@ export async function POST(
   }
   const origem = oposta(destino);
 
-  // AUTORIZACAO: executor precisa ter acesso a finalidade DESTINO (ou admin).
-  if (!ehAdmin(agente.papel) && !temAcesso(agente, destino)) {
+  // AUTORIZACAO: executor precisa ter acesso a finalidade DESTINO ou a de ORIGEM
+  // (ou admin). Ver nota no topo: corrige o mis-channel do atendente que so tem
+  // acesso ao setor de origem.
+  if (
+    !ehAdmin(agente.papel) &&
+    !temAcesso(agente, destino) &&
+    !temAcesso(agente, origem)
+  ) {
     return NextResponse.json(
-      { erro: "voce nao tem acesso a finalidade de destino" },
+      { erro: "voce nao tem acesso a nenhuma das finalidades" },
       { status: 403 },
     );
   }
