@@ -23,6 +23,7 @@ import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { dispararPurchase } from "@/lib/metaCapi";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
+import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -258,6 +259,8 @@ export async function PATCH(
     orcDescontoPct?: number | null;
     orcFrete?: number | null;
     orcFretePagoPelaEmpresa?: boolean;
+    // Formas de pagamento do rascunho (Fatia 3.18): array de { metodo, valor, parcelas }.
+    orcPagamentos?: unknown;
   };
   try {
     body = await req.json();
@@ -281,6 +284,7 @@ export async function PATCH(
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcPagamentos: true,
       // Donos do lead por finalidade: o DONO edita o negocio do proprio cliente,
       // inclusive quando o negocio ainda nao tem agenteId (criado ao abrir a
       // conversa/cadastro manual). Fatia 2.86.
@@ -683,6 +687,20 @@ export async function PATCH(
     data.orcFretePagoPelaEmpresa = body.orcFretePagoPelaEmpresa === true;
   }
 
+  // ---- Formas de pagamento do rascunho (Fatia 3.18) ----
+  // Metadado (nao altera total/Meta). Valida code/valor/parcelas; array vazio ou
+  // null limpa. Persiste como Json (JsonNull quando vazio).
+  if (body.orcPagamentos !== undefined) {
+    const norm = normalizarPagamentos(body.orcPagamentos);
+    if (!norm.ok) {
+      return NextResponse.json({ erro: norm.erro }, { status: 400 });
+    }
+    data.orcPagamentos =
+      norm.linhas.length > 0
+        ? (norm.linhas as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
+  }
+
   if (
     Object.keys(data).length === 0 &&
     historicos.length === 0 &&
@@ -825,6 +843,13 @@ export async function PATCH(
               fretePagoPelaEmpresa: fretePagoEmpresa,
             });
             const numero = await proximoNumeroOrcamento(tx);
+            // Formas de pagamento CONGELADAS: usa as enviadas neste PATCH (ex.: modal
+            // de GANHO editou) e, na ausencia, o rascunho armazenado. Metadado —
+            // nao afeta total/Meta. Opcional (pode nao haver nenhuma).
+            const pagamentosSnapshot =
+              body.orcPagamentos !== undefined
+                ? lerPagamentos(body.orcPagamentos)
+                : lerPagamentos(negocio.orcPagamentos);
             await tx.orcamento.create({
               data: {
                 numero,
@@ -839,6 +864,10 @@ export async function PATCH(
                 frete,
                 fretePagoPelaEmpresa: fretePagoEmpresa,
                 totalFinal,
+                pagamentos:
+                  pagamentosSnapshot.length > 0
+                    ? (pagamentosSnapshot as unknown as Prisma.InputJsonValue)
+                    : Prisma.JsonNull,
                 agenteId: agente.id,
                 itens: {
                   create: fonte.map((i) => ({
