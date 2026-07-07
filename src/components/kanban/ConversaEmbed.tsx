@@ -12,6 +12,7 @@ import {
   marcarErroOtimista,
   removerOtimista,
   mesclarSocket,
+  ehTmp,
 } from "@/lib/otimista";
 import type {
   MensagemItem,
@@ -54,10 +55,16 @@ export function ConversaEmbed({
     fetch(`/api/conversas/${conversaId}/mensagens`)
       .then((r) => (r.ok ? r.json() : { mensagens: [] }))
       .then((d) => {
-        if (vivo) {
-          setMensagens(d.mensagens ?? []);
-          setFinalidade(d.conversa?.finalidade);
-        }
+        if (!vivo) return;
+        const fetched = (d.mensagens ?? []) as MensagemItem[];
+        // Reconciliacao fetch vs socket (Fatia 3.20): preserva mensagens que
+        // chegaram via "mensagem:nova" durante o fetch (nao estao no snapshot).
+        setMensagens((prev) => {
+          const ids = new Set(fetched.map((m) => m.id));
+          const extras = prev.filter((m) => !ids.has(m.id) && !ehTmp(m.id));
+          return extras.length ? [...fetched, ...extras] : fetched;
+        });
+        setFinalidade(d.conversa?.finalidade);
       })
       .catch(() => undefined)
       .finally(() => {

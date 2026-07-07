@@ -16,6 +16,7 @@ import {
   marcarErroOtimista,
   removerOtimista,
   mesclarSocket,
+  ehTmp,
 } from "@/lib/otimista";
 import { PainelClienteInbox } from "./PainelClienteInbox";
 import {
@@ -128,7 +129,16 @@ export function Inbox({
       const r = await fetch(`/api/conversas/${id}/mensagens`);
       if (!r.ok) throw new Error();
       const d = await r.json();
-      setMensagens(d.mensagens as MensagemItem[]);
+      const fetched = d.mensagens as MensagemItem[];
+      // Reconciliacao fetch vs socket (Fatia 3.20): se uma "mensagem:nova" chegou
+      // DURANTE o fetch, ela foi anexada ao estado mas NAO esta no snapshot do
+      // servidor. Preserva essas extras (por id real, ignorando bolhas tmp) no fim
+      // — cronologicamente corretas — em vez de sobrescrever e perder a mensagem.
+      setMensagens((prev) => {
+        const ids = new Set(fetched.map((m) => m.id));
+        const extras = prev.filter((m) => !ids.has(m.id) && !ehTmp(m.id));
+        return extras.length ? [...fetched, ...extras] : fetched;
+      });
     } catch {
       setMensagens([]);
     } finally {
