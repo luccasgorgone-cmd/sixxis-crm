@@ -25,6 +25,7 @@ type Peca = {
   nome: string;
   categoria: string | null;
   modelo: string | null;
+  voltagem: string | null;
   precoSugerido: number | null;
   estoque: number;
   estoqueMinimo: number | null;
@@ -344,6 +345,11 @@ function LinhaModelo({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-escuro">
           {peca.modelo || peca.nome}
+          {peca.voltagem && (
+            <span className="ml-1.5 rounded bg-tiffany/10 px-1 py-0.5 text-[10px] font-semibold text-tiffany">
+              {peca.voltagem}
+            </span>
+          )}
           {!peca.ativo && <span className="ml-1.5 text-[11px] text-medio/50">inativo</span>}
         </p>
       </div>
@@ -414,6 +420,7 @@ function ModalPeca({
   const [nome, setNome] = useState(peca?.nome ?? "");
   const [categoria, setCategoria] = useState(peca?.categoria ?? "");
   const [modelo, setModelo] = useState(peca?.modelo ?? "");
+  const [voltagem, setVoltagem] = useState(peca?.voltagem ?? "");
   const [preco, setPreco] = useState(peca?.precoSugerido != null ? String(peca.precoSugerido) : "");
   const [estoqueMinimo, setEstoqueMinimo] = useState(
     peca?.estoqueMinimo != null ? String(peca.estoqueMinimo) : "",
@@ -453,6 +460,7 @@ function ModalPeca({
       nome: nome.trim(),
       categoria: categoria.trim() || null,
       modelo: modelo.trim() || null,
+      voltagem: voltagem || null,
       precoSugerido: preco.trim() === "" ? null : Number(preco),
       estoqueMinimo: estoqueMinimo.trim() === "" ? null : Number(estoqueMinimo),
       ...(peca ? { ativo } : {}),
@@ -536,6 +544,20 @@ function ModalPeca({
               />
             </label>
           </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-medio/70">
+              Voltagem (peças elétricas)
+            </span>
+            <select
+              value={voltagem}
+              onChange={(e) => setVoltagem(e.target.value)}
+              className="campo w-full"
+            >
+              <option value="">Sem voltagem (serve em ambas)</option>
+              <option value="110V">110V</option>
+              <option value="220V">220V</option>
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-medio/70">Preco (R$)</span>
