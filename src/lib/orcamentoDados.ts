@@ -6,6 +6,7 @@ import { calcularTotalFinal, formatarNumeroPedido, formatarTelefone } from "@/li
 import { nomeEfetivo } from "@/lib/cliente";
 import { podeAcessarNegocio, type SessaoAgente } from "@/lib/autorizacao";
 import type { DadosPdfOrcamento, LogoEmbed } from "@/lib/orcamentoPdf";
+import { lerPagamentos } from "@/lib/pagamento";
 import { Finalidade } from "@/generated/prisma/enums";
 
 // Acesso de ESCRITA ao negocio (dono negocio / dono cliente na finalidade /
@@ -113,6 +114,7 @@ export async function montarDadosPdfOrcamento(
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcPagamentos: true,
       lead: {
         select: {
           id: true,
@@ -199,6 +201,8 @@ export async function montarDadosPdfOrcamento(
     fretePagoPelaEmpresa,
     totalFinal,
     totalGarantia,
+    // Formas de pagamento do rascunho (Fatia 3.18): preview do orcamento em aberto.
+    pagamentos: lerPagamentos(negocio.orcPagamentos),
   };
 
   return {

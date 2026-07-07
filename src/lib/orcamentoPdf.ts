@@ -7,6 +7,7 @@
 import crypto from "node:crypto";
 import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFImage } from "pdf-lib";
+import { labelMetodo, ehParcelavel, type LinhaPagamento } from "@/lib/pagamento";
 
 // Cores da marca + superficies.
 const TIFFANY = rgb(0.235, 0.749, 0.702); // #3cbfb3
@@ -55,6 +56,9 @@ export type DadosPdfOrcamento = {
   fretePagoPelaEmpresa: boolean;
   totalFinal: number;
   totalGarantia: number;
+  // Formas de pagamento (Fatia 3.18): rascunho (preview) ou snapshot (decidido).
+  // Vazio -> o bloco e omitido no PDF.
+  pagamentos: LinhaPagamento[];
 };
 
 // Logo embutivel. pdf-lib so aceita PNG/JPEG nativamente; WEBP e convertido para
@@ -392,6 +396,30 @@ export async function gerarPdfOrcamento(
       color: CINZA_CLARO,
     });
     y -= 14;
+  }
+
+  // ---- FORMA(S) DE PAGAMENTO (Fatia 3.18) — omitido com elegancia se vazio ----
+  if (dados.pagamentos.length > 0) {
+    // Espaco do bloco: titulo + linhas. Quebra de pagina se nao couber.
+    const alturaBloco = 20 + dados.pagamentos.length * 14 + 8;
+    if (y - alturaBloco < RESERVA_BASE) {
+      page = doc.addPage([LARGURA, ALTURA]);
+      y = ALTURA - MARGEM;
+    }
+    y -= 10;
+    page.drawText("FORMA DE PAGAMENTO", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
+    y -= 16;
+    for (const p of dados.pagamentos) {
+      const label = labelMetodo(p.metodo);
+      const parcelas = Math.max(1, Math.floor(p.parcelas || 1));
+      const texto =
+        ehParcelavel(p.metodo) && parcelas > 1
+          ? `${label} - ${parcelas}x de ${brl(p.valor / parcelas)} (total ${brl(p.valor)})`
+          : `${label} - ${brl(p.valor)}`;
+      page.drawText(sanitizar(texto), { x: xEsq + 12, y, size: 10, font: fonte, color: ESCURO });
+      y -= 14;
+    }
+    y -= 4;
   }
 
   // ---- RODAPE (na base da ultima pagina) ----
