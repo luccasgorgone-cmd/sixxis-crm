@@ -424,6 +424,48 @@ function logIngestDiag(campos: Record<string, unknown>): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Resolucao do numero REAL de contatos "@lid" (Fatia 3.21).
+//
+// Contatos NAO salvos na agenda chegam com key.remoteJid mascarado ("...@lid").
+// Os digitos do LID NAO sao o telefone do cliente (viram um lead-fantasma de ~15
+// digitos, sem casar com o cadastro nem com mensagens futuras). A 3.20 confirmou,
+// nos logs [ingest-diag], que o numero REAL vem no payload em key.senderPn (chat
+// 1:1) — Baileys/Evolution v2 preenchem esse campo em mensagens enderecadas por
+// LID. Por robustez tentamos, em ordem: senderPn, participantPn e remoteJidAlt
+// (variacoes conhecidas), aceitando o 1o que normalize a um telefone plausivel.
+//
+// Retorna o jid EFETIVO a usar para computar o telefone: quando resolve, um jid
+// "<numero>@s.whatsapp.net" (tratado como contato normal pelo resto do pipeline);
+// senao, o jid ORIGINAL inalterado (fallback = comportamento atual, nunca quebra).
+// So atua em ENTRADA @lid — o fluxo @s.whatsapp.net normal passa intocado.
+const CAMPOS_NUMERO_REAL_LID = ["senderPn", "participantPn", "remoteJidAlt"] as const;
+
+function resolverJidReal(
+  jid: string,
+  key: Record<string, unknown> | undefined,
+  fromMe: boolean,
+): { jidEfetivo: string; resolvidoDe: string | null } {
+  if (fromMe || !jid.endsWith("@lid") || !key) {
+    return { jidEfetivo: jid, resolvidoDe: null };
+  }
+  for (const campo of CAMPOS_NUMERO_REAL_LID) {
+    const bruto = key[campo];
+    if (typeof bruto !== "string" || !bruto) continue;
+    // Se o proprio candidato tambem e um LID, nao resolve nada — ignora.
+    if (bruto.endsWith("@lid")) continue;
+    // Aceita so se normalizar a um telefone plausivel (padrao BR com DDI: o mesmo
+    // 12-13 digitos que o fluxo @s.whatsapp.net produz), evitando lixo.
+    const digitos = normalizarJid(bruto);
+    if (digitos.length >= 12 && digitos.length <= 13) {
+      // Reconstroi um jid normal para o restante do pipeline (mesma normalizacao/
+      // upsert de lead do fluxo padrao) casar com o cadastro e mensagens futuras.
+      return { jidEfetivo: `${digitos}@s.whatsapp.net`, resolvidoDe: campo };
+    }
+  }
+  return { jidEfetivo: jid, resolvidoDe: null };
+}
+
 // Mapeia o messageType da Evolution para o enum TipoMsg do dominio.
 // Envelopes do WhatsApp que embrulham o message real (ephemeral/view-once/doc com
 // legenda). O conteudo verdadeiro (sticker/imagem/etc.) fica em `.message`. 2.95.
@@ -1773,7 +1815,15 @@ async function processarEvento(
   // (fromMe), o WhatsApp envia "Voce"/nome da propria conta, que NAO e o nome
   // do cliente — usa-lo renomearia o cliente para "Voce".
   const pushNameCliente = fromMe ? undefined : (pushName ?? undefined);
-  const telefone = normalizarJid(jid);
+  // Fatia 3.21: para ENTRADA "@lid" (contato nao salvo), resolve o numero REAL a
+  // partir de key.senderPn (fallback participantPn/remoteJidAlt) ANTES de extrair
+  // o telefone. Fora desse caso, jidEfetivo == jid (fluxo @s.whatsapp.net intocado).
+  const { jidEfetivo, resolvidoDe } = resolverJidReal(
+    jid,
+    data?.key as Record<string, unknown> | undefined,
+    fromMe,
+  );
+  const telefone = normalizarJid(jidEfetivo);
   if (!telefone) {
     console.warn(`[ingest] jid sem digitos ignorado: ${jid}`);
     if (!fromMe) {
@@ -1811,6 +1861,9 @@ async function processarEvento(
         tamanhoTelefone: telefone.length,
         temPushName: !!pushName,
         casouLeadExistente: !!leadExistente,
+        // Fatia 3.21: campo do qual o numero real foi resolvido (null = fallback).
+        resolvidoDe,
+        jidResolvido: jidEfetivo !== jid ? jidEfetivo : null,
         // Candidatos ao numero REAL do @lid (podem nao existir — por isso logamos):
         senderPn: keyRaw.senderPn ?? null,
         participantPn: keyRaw.participantPn ?? null,
