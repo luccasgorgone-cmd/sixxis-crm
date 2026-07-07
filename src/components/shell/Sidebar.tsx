@@ -25,6 +25,7 @@ import {
   ReceiptText,
   Megaphone,
   PackageOpen,
+  PauseCircle,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -96,6 +97,7 @@ export function Sidebar({
     { rotulo: "Orçamentos", href: "/orcamentos", icone: ReceiptText },
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
+    { rotulo: "Pendências", href: "/pendencias", icone: PauseCircle },
     { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
     { rotulo: "Google Trends", href: "/google-trends", icone: TrendingUp },
     { rotulo: "Mapa", href: "/mapa", icone: MapPin },
