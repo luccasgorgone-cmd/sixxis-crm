@@ -26,6 +26,7 @@ import {
   type PeriodoEntrada,
 } from "@/components/ui/FiltroPeriodoEntrada";
 import { formatarBRL } from "@/lib/format";
+import { formatarLinhaPagamento, type LinhaPagamento } from "@/lib/pagamento";
 
 type Orcamento = {
   id: string;
@@ -364,6 +365,7 @@ type Ficha = {
     subtotal: number;
     garantia: boolean;
   }[];
+  pagamentos: LinhaPagamento[];
 };
 
 function DrawerOrcamento({ id, onFechar }: { id: string; onFechar: () => void }) {
@@ -504,6 +506,20 @@ function DrawerOrcamento({ id, onFechar }: { id: string; onFechar: () => void })
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Forma(s) de pagamento (Fatia 3.18) — so quando houver no snapshot. */}
+            {ficha.pagamentos.length > 0 && (
+              <div className="rounded-xl border border-black/5 bg-fundo/50 p-3 text-xs">
+                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">
+                  Forma de pagamento
+                </h4>
+                <ul className="space-y-0.5 text-medio/70">
+                  {ficha.pagamentos.map((p, i) => (
+                    <li key={i}>{formatarLinhaPagamento(p)}</li>
+                  ))}
+                </ul>
               </div>
             )}
 

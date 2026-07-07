@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { formatarNumeroPedido, formatarTelefone } from "@/lib/format";
 import { nomeEfetivo } from "@/lib/cliente";
+import { lerPagamentos } from "@/lib/pagamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export async function GET(
       frete: true,
       fretePagoPelaEmpresa: true,
       totalFinal: true,
+      pagamentos: true,
       agenteId: true,
       negocioId: true,
       criadoEm: true,
@@ -126,6 +128,8 @@ export async function GET(
         subtotal: it.quantidade * Number(it.valorUnitario),
         garantia: it.garantia,
       })),
+      // Formas de pagamento congeladas no snapshot (Fatia 3.18).
+      pagamentos: lerPagamentos(o.pagamentos),
     },
   });
 }

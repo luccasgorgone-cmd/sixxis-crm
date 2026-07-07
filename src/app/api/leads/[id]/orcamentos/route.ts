@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
 import { formatarNumeroPedido } from "@/lib/format";
+import { lerPagamentos } from "@/lib/pagamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function GET(
       decisao: true,
       total: true,
       totalGarantia: true,
+      pagamentos: true,
       criadoEm: true,
       itens: {
         select: {
@@ -64,6 +66,7 @@ export async function GET(
       decisao: o.decisao,
       total: Number(o.total),
       totalGarantia: o.totalGarantia != null ? Number(o.totalGarantia) : null,
+      pagamentos: lerPagamentos(o.pagamentos),
       qtdItens: o.itens.length,
       criadoEm: o.criadoEm,
       itens: o.itens.map((it) => ({

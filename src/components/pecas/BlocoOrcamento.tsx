@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ReceiptText,
   Send,
+  CreditCard,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { InputBusca } from "@/components/ui/InputBusca";
@@ -29,7 +30,7 @@ import {
   paraPersistir,
   type LinhaPagamentoUI,
 } from "@/components/pecas/SecaoPagamento";
-import { lerPagamentos } from "@/lib/pagamento";
+import { lerPagamentos, formatarLinhaPagamento, type LinhaPagamento } from "@/lib/pagamento";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -1138,6 +1139,7 @@ type OrcamentoHist = {
   decisao: string;
   total: number;
   totalGarantia: number | null;
+  pagamentos: LinhaPagamento[];
   qtdItens: number;
   criadoEm: string;
   itens: {
@@ -1215,25 +1217,40 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
                       </span>
                     </button>
                     {exp && (
-                      <ul className="space-y-1 border-t border-black/5 px-2.5 py-2 pl-7">
-                        {o.itens.map((it) => (
-                          <li key={it.id} className="flex items-center gap-2 text-[11px]">
-                            <span className="min-w-0 flex-1 truncate text-medio/70">
-                              <span className="text-medio/50">{it.quantidade}x </span>
-                              {it.descricao}
-                            </span>
-                            {it.garantia ? (
-                              <span className="flex shrink-0 items-center gap-0.5 text-tiffany">
-                                <ShieldCheck className="h-3 w-3" /> Garantia
+                      <div className="border-t border-black/5">
+                        <ul className="space-y-1 px-2.5 py-2 pl-7">
+                          {o.itens.map((it) => (
+                            <li key={it.id} className="flex items-center gap-2 text-[11px]">
+                              <span className="min-w-0 flex-1 truncate text-medio/70">
+                                <span className="text-medio/50">{it.quantidade}x </span>
+                                {it.descricao}
                               </span>
-                            ) : (
-                              <span className="shrink-0 text-medio/60">
-                                {formatarBRL(it.quantidade * it.valorUnitario)}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                              {it.garantia ? (
+                                <span className="flex shrink-0 items-center gap-0.5 text-tiffany">
+                                  <ShieldCheck className="h-3 w-3" /> Garantia
+                                </span>
+                              ) : (
+                                <span className="shrink-0 text-medio/60">
+                                  {formatarBRL(it.quantidade * it.valorUnitario)}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        {/* Forma(s) de pagamento do snapshot (Fatia 3.18). */}
+                        {o.pagamentos.length > 0 && (
+                          <div className="border-t border-black/5 px-2.5 py-2 pl-7">
+                            <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-medio/40">
+                              <CreditCard className="h-3 w-3" /> Pagamento
+                            </p>
+                            <ul className="space-y-0.5 text-[11px] text-medio/60">
+                              {o.pagamentos.map((p, i) => (
+                                <li key={i}>{formatarLinhaPagamento(p)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </li>
                 );
