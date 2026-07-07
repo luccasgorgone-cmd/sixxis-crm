@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import type { MensagemItem } from "@/components/inbox/tipos";
+import { MOTIVOS_PENDENCIA } from "@/lib/motivosPendencia";
 import { ModalFechamento } from "./ModalFechamento";
 import { ModalMoverFinalidade } from "./ModalMoverFinalidade";
 import { LojaCliente } from "@/components/loja/LojaCliente";
@@ -328,7 +329,9 @@ export function PainelNegocio({
                       <BadgeFinalidade finalidade={detalhe.finalidade} />
                       <BadgeStatusNegocio status={detalhe.status} />
                       {detalhe.pendente && (
-                        <BadgePendente motivo={detalhe.motivoPendencia} />
+                        <BadgePendente
+                          motivo={detalhe.motivoPendenciaLabel ?? detalhe.motivoPendencia}
+                        />
                       )}
                     </>
                   )}
@@ -661,7 +664,9 @@ export function NegocioAcoes({
   const ehPerdido = detalhe.status === "PERDIDO";
   const ehPendente = detalhe.pendente;
   const [pendAbrir, setPendAbrir] = useState(false);
-  const [pendMotivo, setPendMotivo] = useState("");
+  // Motivo ESTRUTURADO da pendencia (Fatia 3.17): code predefinido + observacao.
+  const [pendCode, setPendCode] = useState("");
+  const [pendObs, setPendObs] = useState("");
   const [mudandoPend, setMudandoPend] = useState(false);
 
   // Reabre o negocio (volta a primeira etapa ABERTA => status ABERTO).
@@ -692,24 +697,34 @@ export function NegocioAcoes({
       void salvar({ pendente: false });
       return;
     }
-    setPendMotivo("");
+    setPendCode("");
+    setPendObs("");
     setPendAbrir(true);
   }
   async function confirmarPendente() {
-    const m = pendMotivo.trim();
-    if (!m) {
-      toast.erro("Descreva o motivo da pendencia.");
+    if (!pendCode) {
+      toast.erro("Escolha o motivo da pendência.");
+      return;
+    }
+    const obs = pendObs.trim();
+    if (pendCode === "OUTRO" && !obs) {
+      toast.erro("Descreva o motivo (Outro).");
       return;
     }
     setMudandoPend(true);
-    const body: Record<string, unknown> = { pendente: true, motivoPendencia: m };
+    const body: Record<string, unknown> = {
+      pendente: true,
+      motivoPendenciaCode: pendCode,
+      motivoPendencia: obs || null,
+    };
     if ((ehGanho || ehPerdido) && etapaAberta) body.etapaId = etapaAberta.id;
     const ok = await salvar(body);
     setMudandoPend(false);
     if (ok) {
       setPendAbrir(false);
-      setPendMotivo("");
-      toast.sucesso("Negocio marcado como pendente.");
+      setPendCode("");
+      setPendObs("");
+      toast.sucesso("Negócio marcado como pendente.");
     }
   }
 
@@ -847,31 +862,50 @@ export function NegocioAcoes({
         )}
       </div>
 
-      {/* Captura do motivo ao marcar pendente (mantida onde ja existia). */}
+      {/* Captura do MOTIVO da pendencia (Fatia 3.17): superficie escura da casa
+          (nao branca), motivos predefinidos + observacao (obrigatoria em Outro). */}
       {pendAbrir && !ehPendente && (
-        <div className="space-y-2 rounded-lg border border-orange-200 bg-orange-50 p-3">
-          <textarea
-            value={pendMotivo}
-            onChange={(e) => setPendMotivo(e.target.value)}
-            rows={2}
+        <div className="space-y-2.5 rounded-lg border border-white/10 bg-escuro p-3">
+          <p className="text-xs font-semibold text-white/90">Motivo da pendência</p>
+          <select
+            value={pendCode}
+            onChange={(e) => setPendCode(e.target.value)}
             autoFocus
-            placeholder="Motivo (ex.: aguardando peca, orcamento, pagamento...)"
-            className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+            className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-tiffany"
+          >
+            <option value="" className="text-escuro">
+              Selecione um motivo...
+            </option>
+            {MOTIVOS_PENDENCIA.map((m) => (
+              <option key={m.code} value={m.code} className="text-escuro">
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <textarea
+            value={pendObs}
+            onChange={(e) => setPendObs(e.target.value)}
+            rows={2}
+            placeholder={
+              pendCode === "OUTRO" ? "Descreva o motivo" : "Observação (opcional)"
+            }
+            className="scroll-fino w-full resize-none rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-tiffany"
           />
           <div className="flex justify-end gap-2">
             <button
               onClick={() => {
                 setPendAbrir(false);
-                setPendMotivo("");
+                setPendCode("");
+                setPendObs("");
               }}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-medio hover:bg-black/5"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10"
             >
               Cancelar
             </button>
             <button
               onClick={() => void confirmarPendente()}
-              disabled={mudandoPend || !pendMotivo.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              disabled={mudandoPend || !pendCode || (pendCode === "OUTRO" && !pendObs.trim())}
+              className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
             >
               {mudandoPend && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Marcar pendente
@@ -1166,7 +1200,7 @@ function BlocoPendencia({
           <PauseCircle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-orange-700">
-              Negocio pendente
+              {detalhe.motivoPendenciaLabel ?? "Negócio pendente"}
             </p>
             {detalhe.motivoPendencia && (
               <p className="mt-0.5 whitespace-pre-wrap text-xs text-orange-900/80">

@@ -18,6 +18,7 @@ import {
 } from "@/generated/prisma/enums";
 import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
+import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { dispararPurchase } from "@/lib/metaCapi";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
@@ -232,6 +233,8 @@ export async function PATCH(
     produtos?: unknown;
     pendente?: boolean;
     motivoPendencia?: string | null;
+    // Motivo estruturado da pendencia (Fatia 3.17): code predefinido + observacao.
+    motivoPendenciaCode?: string | null;
     transportadora?: string | null;
     dataEnvio?: string | null;
     previsaoChegada?: string | null;
@@ -561,27 +564,63 @@ export async function PATCH(
         : (body.produtos as Prisma.InputJsonValue);
   }
 
-  // ---- Pendencia operacional (marcar/desmarcar com motivo) ----
+  // ---- Pendencia operacional (marcar/desmarcar com MOTIVO ESTRUTURADO) ----
+  // Fatia 3.17: motivoPendenciaCode = CODE predefinido (obrigatorio); motivoPendencia
+  // = observacao livre (obrigatoria em OUTRO). Compatibilidade: se vier so texto
+  // (fluxo antigo), aceita o texto como motivo sem code.
   if (body.pendente !== undefined) {
     const pendente = Boolean(body.pendente);
     data.pendente = pendente;
     if (pendente) {
-      const motivo = (body.motivoPendencia ?? "").trim();
-      if (!motivo) {
+      const code = (body.motivoPendenciaCode ?? "").trim();
+      const obs = (body.motivoPendencia ?? "").trim();
+      if (!code && !obs) {
         return NextResponse.json(
-          { erro: "motivo e obrigatorio para marcar como pendente" },
+          { erro: "Escolha o motivo da pendência." },
           { status: 422 },
         );
       }
-      data.motivoPendencia = motivo;
-      atividadePendencia = `Negocio marcado como pendente: ${motivo}`;
+      if (code && !ehCodigoPendencia(code)) {
+        return NextResponse.json(
+          { erro: "Motivo de pendência inválido." },
+          { status: 422 },
+        );
+      }
+      if (code === "OUTRO" && !obs) {
+        return NextResponse.json(
+          { erro: "Descreva o motivo (Outro)." },
+          { status: 422 },
+        );
+      }
+      data.motivoPendenciaCode = code || null;
+      data.motivoPendencia = obs || null;
+      const rotulo = code ? rotuloPendencia(code) : obs;
+      atividadePendencia = `Negocio marcado como pendente: ${rotulo}${
+        obs && code ? ` — ${obs}` : ""
+      }`;
     } else {
       data.motivoPendencia = null;
+      data.motivoPendenciaCode = null;
       atividadePendencia = "Pendencia removida";
     }
-  } else if (body.motivoPendencia !== undefined) {
+  } else if (
+    body.motivoPendencia !== undefined ||
+    body.motivoPendenciaCode !== undefined
+  ) {
     // Edicao do motivo sem alternar o estado.
-    data.motivoPendencia = body.motivoPendencia?.trim() || null;
+    if (body.motivoPendencia !== undefined) {
+      data.motivoPendencia = body.motivoPendencia?.trim() || null;
+    }
+    if (body.motivoPendenciaCode !== undefined) {
+      const c = body.motivoPendenciaCode?.trim() || null;
+      if (c && !ehCodigoPendencia(c)) {
+        return NextResponse.json(
+          { erro: "Motivo de pendência inválido." },
+          { status: 422 },
+        );
+      }
+      data.motivoPendenciaCode = c;
+    }
   }
 
   // ---- Transporte (transportadora principal + datas de envio/previsao) ----

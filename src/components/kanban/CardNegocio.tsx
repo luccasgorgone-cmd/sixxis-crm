@@ -87,7 +87,7 @@ export function CardNegocio({
 
       {card.pendente && (
         <div className="mb-2">
-          <BadgePendente motivo={card.motivoPendencia} />
+          <BadgePendente motivo={card.motivoPendenciaLabel ?? card.motivoPendencia} />
         </div>
       )}
 

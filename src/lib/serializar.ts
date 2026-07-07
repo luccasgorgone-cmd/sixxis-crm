@@ -3,6 +3,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { nomeEfetivo } from "./cliente";
 import { rotuloMotivo } from "./motivosPerda";
+import { rotuloPendencia } from "./motivosPendencia";
 
 // Include padrao usado nas consultas que viram "card".
 export const includeCard = {
@@ -48,6 +49,10 @@ export function cardNegocio(n: NegocioCard) {
     garantia: n.lead.garantia,
     pendente: n.pendente,
     motivoPendencia: n.motivoPendencia,
+    // Motivo estruturado da pendencia (Fatia 3.17): code + label; motivoPendencia
+    // segue como observacao livre.
+    motivoPendenciaCode: n.motivoPendenciaCode,
+    motivoPendenciaLabel: n.motivoPendenciaCode ? rotuloPendencia(n.motivoPendenciaCode) : null,
     motivoPerda: n.motivoPerda,
     motivoPerdaLabel: n.motivoPerda ? rotuloMotivo(n.motivoPerda) : null,
     motivoPerdaObs: n.motivoPerdaObs,

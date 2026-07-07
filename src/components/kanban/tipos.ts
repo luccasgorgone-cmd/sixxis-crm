@@ -41,6 +41,8 @@ export type CardNegocio = {
   garantia: boolean | null;
   pendente: boolean;
   motivoPendencia: string | null;
+  motivoPendenciaCode: string | null;
+  motivoPendenciaLabel: string | null;
   motivoPerda: string | null;
   motivoPerdaLabel: string | null;
   motivoPerdaObs: string | null;
