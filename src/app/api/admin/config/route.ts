@@ -45,6 +45,8 @@ export async function GET(): Promise<NextResponse> {
       logoEm: config.logoEm?.getTime() ?? 0,
       temFavicon: Boolean(config.faviconData),
       faviconEm: config.faviconEm?.getTime() ?? 0,
+      temLogoOrcamento: Boolean(config.logoOrcamentoData),
+      logoOrcamentoEm: config.logoOrcamentoEm?.getTime() ?? 0,
     },
     abertoAgora: estaAbertoAgora(horarios as DiaHorario[], config.fuso),
   });
@@ -66,6 +68,10 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     logoMime?: unknown;
     // Sinal explicito para remover a logo atual.
     removerLogo?: boolean;
+    // Logo dedicada do orcamento (Fatia 3.17): mesmos validadores da logo.
+    logoOrcamentoData?: unknown;
+    logoOrcamentoMime?: unknown;
+    removerLogoOrcamento?: boolean;
     faviconData?: unknown;
     faviconMime?: unknown;
     removerFavicon?: boolean;
@@ -114,6 +120,29 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         data.logoData = logoData;
         data.logoMime = mime;
         data.logoEm = new Date();
+      } catch (e) {
+        return NextResponse.json(
+          { erro: e instanceof Error ? e.message : "logo invalida" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Logo do ORCAMENTO (Fatia 3.17): mesma validacao/sanitizacao da logo do
+    // sistema, salva em campos proprios e versionada por logoOrcamentoEm.
+    if (body.removerLogoOrcamento === true) {
+      data.logoOrcamentoData = null;
+      data.logoOrcamentoMime = null;
+      data.logoOrcamentoEm = null;
+    } else if (body.logoOrcamentoData !== undefined) {
+      try {
+        const { data: logoData, mime } = validarLogo(
+          body.logoOrcamentoData,
+          body.logoOrcamentoMime,
+        );
+        data.logoOrcamentoData = logoData;
+        data.logoOrcamentoMime = mime;
+        data.logoOrcamentoEm = new Date();
       } catch (e) {
         return NextResponse.json(
           { erro: e instanceof Error ? e.message : "logo invalida" },

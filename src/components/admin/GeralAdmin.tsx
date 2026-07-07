@@ -24,6 +24,8 @@ type Config = {
   logoEm: number;
   temFavicon: boolean;
   faviconEm: number;
+  temLogoOrcamento: boolean;
+  logoOrcamentoEm: number;
 };
 
 const NOMES = [
@@ -222,6 +224,24 @@ export function GeralAdmin() {
           onChange={() => {
             // Recarrega o estado local e revalida os server components (sidebar,
             // login, favicon) para refletir a troca sem reload manual.
+            void carregar();
+            router.refresh();
+          }}
+        />
+
+        {/* Logo DEDICADA ao PDF de orcamento (Fatia 3.17): fundo claro no preview
+            (o PDF e claro); prefira uma versao escura/colorida. Fallback: se vazia,
+            o PDF usa a logo do sistema. */}
+        <LogoUploader
+          temLogo={config.temLogoOrcamento}
+          logoEm={config.logoOrcamentoEm}
+          titulo="Logo do orçamento (PDF)"
+          descricao="Usada no PDF de orçamento enviado ao cliente. Prefira uma versão escura/colorida sobre fundo claro. Se vazia, usa a logo do sistema."
+          previewUrl={(v) => `/api/logo?tipo=orcamento&v=${v}`}
+          fundoPreview="claro"
+          corpoSalvar={(data, mime) => ({ logoOrcamentoData: data, logoOrcamentoMime: mime })}
+          corpoRemover={() => ({ removerLogoOrcamento: true })}
+          onChange={() => {
             void carregar();
             router.refresh();
           }}

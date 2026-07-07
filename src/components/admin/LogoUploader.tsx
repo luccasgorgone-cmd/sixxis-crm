@@ -86,10 +86,24 @@ export function LogoUploader({
   temLogo,
   logoEm,
   onChange,
+  // Parametrizavel (Fatia 3.17): reusado para a logo do sistema E a do orcamento,
+  // sem duplicar. Defaults = logo do sistema (compatibilidade).
+  titulo = "Logo da empresa",
+  descricao = "PNG ou SVG com fundo transparente, usada em todo o sistema.",
+  previewUrl = (v: number) => `/api/logo?v=${v}`,
+  fundoPreview = "escuro",
+  corpoSalvar = (data: string, mime: string) => ({ logoData: data, logoMime: mime }),
+  corpoRemover = () => ({ removerLogo: true }),
 }: {
   temLogo: boolean;
   logoEm: number;
   onChange: () => void;
+  titulo?: string;
+  descricao?: string;
+  previewUrl?: (v: number) => string;
+  fundoPreview?: "escuro" | "claro";
+  corpoSalvar?: (data: string, mime: string) => Record<string, unknown>;
+  corpoRemover?: () => Record<string, unknown>;
 }) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +132,7 @@ export function LogoUploader({
       const r = await fetch("/api/admin/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logoData: pendente.data, logoMime: pendente.mime }),
+        body: JSON.stringify(corpoSalvar(pendente.data, pendente.mime)),
       });
       if (r.ok) {
         setPendente(null);
@@ -141,7 +155,7 @@ export function LogoUploader({
       const r = await fetch("/api/admin/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ removerLogo: true }),
+        body: JSON.stringify(corpoRemover()),
       });
       if (r.ok) {
         setPendente(null);
@@ -161,15 +175,14 @@ export function LogoUploader({
   const srcAtual = pendente
     ? previewSrc(pendente)
     : temLogo
-      ? `/api/logo?v=${logoEm}`
+      ? previewUrl(logoEm)
       : null;
+  const claro = fundoPreview === "claro";
 
   return (
     <div>
-      <p className="mb-1 text-sm font-medium text-escuro">Logo da empresa</p>
-      <p className="mb-2 text-xs text-medio/60">
-        PNG ou SVG com fundo transparente, usada em todo o sistema.
-      </p>
+      <p className="mb-1 text-sm font-medium text-escuro">{titulo}</p>
+      <p className="mb-2 text-xs text-medio/60">{descricao}</p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         {/* Area de drop / clique */}
@@ -215,7 +228,11 @@ export function LogoUploader({
 
         {/* Preview ao vivo */}
         <div className="flex w-full flex-col items-center gap-2 sm:w-48">
-          <div className="flex h-28 w-full items-center justify-center rounded-xl border border-black/5 bg-escuro p-3">
+          <div
+            className={`flex h-28 w-full items-center justify-center rounded-xl border border-black/5 p-3 ${
+              claro ? "bg-white" : "bg-escuro"
+            }`}
+          >
             {srcAtual ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -224,13 +241,15 @@ export function LogoUploader({
                 className="max-h-full max-w-full object-contain"
               />
             ) : (
-              <span className="flex flex-col items-center gap-1 text-white/40">
+              <span className={`flex flex-col items-center gap-1 ${claro ? "text-black/30" : "text-white/40"}`}>
                 <ImageUp className="h-6 w-6" />
                 <span className="text-xs">Sem logo</span>
               </span>
             )}
           </div>
-          <p className="text-[11px] text-medio/50">Pre-visualizacao sobre fundo escuro</p>
+          <p className="text-[11px] text-medio/50">
+            {claro ? "Pré-visualização sobre fundo claro (como no PDF)" : "Pré-visualização sobre fundo escuro"}
+          </p>
         </div>
       </div>
 
