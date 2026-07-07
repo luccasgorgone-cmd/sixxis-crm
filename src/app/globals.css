@@ -150,6 +150,21 @@ body {
   color: var(--color-escuro);
 }
 
+/* Opcoes de <select>: o dropdown NATIVO do SO nao herda o tema. Em selects com
+   texto claro (ex.: sobre bg-escuro no painel), as <option> herdavam a cor clara
+   e o SO desenhava texto claro sobre o fundo claro padrao -> ilegivel. Fixamos
+   fundo escuro + texto claro em TODAS as options/optgroups do sistema (uma regra,
+   sem repetir className em cada option). O campo FECHADO segue usando a cor do
+   proprio <select> (nao e afetado). Fatia 3.17-B. */
+option {
+  background-color: #0f2e2b;
+  color: #fff;
+}
+optgroup {
+  background-color: #0f2e2b;
+  color: var(--color-tiffany);
+}
+
 /* Entrada do drawer (painel lateral) e do overlay. */
 @keyframes deslizar-dir {
   from {

@@ -873,11 +873,9 @@ export function NegocioAcoes({
             autoFocus
             className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-tiffany"
           >
-            <option value="" className="text-escuro">
-              Selecione um motivo...
-            </option>
+            <option value="">Selecione um motivo...</option>
             {MOTIVOS_PENDENCIA.map((m) => (
-              <option key={m.code} value={m.code} className="text-escuro">
+              <option key={m.code} value={m.code}>
                 {m.label}
               </option>
             ))}
