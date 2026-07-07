@@ -279,6 +279,7 @@ export function PainelClienteInbox({
           tipo={modal.tipo}
           valorInicial={detalhe.valor}
           finalidade={detalhe.finalidade}
+          negocioId={negocioId ?? undefined}
           onConfirmar={async (dados: DadosFechamento) => {
             // Ganho/Perdido limpam a pendencia (estados mutuamente exclusivos).
             const ok = await salvar({

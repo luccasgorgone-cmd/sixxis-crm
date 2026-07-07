@@ -6,9 +6,16 @@
 // Sem itens, cai no modo simples (so valor). PERDIDO pede o motivo. O total do
 // pedido vira o `valor` do negocio (usado inclusive pela conversao Meta).
 import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { X, Loader2, Plus, Trash2, ShieldCheck, Info } from "lucide-react";
 import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
 import { formatarBRL } from "@/lib/format";
+import {
+  SecaoPagamento,
+  paraUI,
+  paraPersistir,
+  type LinhaPagamentoUI,
+} from "@/components/pecas/SecaoPagamento";
+import { lerPagamentos, type LinhaPagamento } from "@/lib/pagamento";
 
 type CatalogoItem = {
   id: string;
@@ -44,6 +51,8 @@ export type DadosFechamento = {
   fretePagoPelaEmpresa?: boolean;
   // Pos-venda: valor final cobrado quando difere do calculado (null = calculado).
   valorAjustado?: number | null;
+  // Formas de pagamento congeladas no snapshot (Fatia 3.18): array validado.
+  orcPagamentos?: LinhaPagamento[];
 };
 
 export function ModalFechamento({
@@ -55,12 +64,18 @@ export function ModalFechamento({
   valorFinalInicial,
   descontoInfo,
   itensIniciais,
+  negocioId,
+  pagamentosIniciais,
   onConfirmar,
   onCancelar,
 }: {
   tipo: "ganho" | "perdido";
   valorInicial?: number | null;
   finalidade?: "VENDA" | "POS_VENDA";
+  // Quando presente (ganho), carrega o rascunho de pagamentos do negocio.
+  negocioId?: string;
+  // Pre-carga direta das formas de pagamento (sobrepoe o fetch por negocioId).
+  pagamentosIniciais?: LinhaPagamento[];
   freteInicial?: number | null;
   // Pre-carga do orcamento (Fatia 3.09): frete/empresa e o valor final (totalFinal).
   fretePagoPelaEmpresaInicial?: boolean;
@@ -110,6 +125,12 @@ export function ModalFechamento({
   // Frete pago pela empresa: sai do total (vira despesa rastreavel).
   const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(fretePagoPelaEmpresaInicial);
 
+  // Formas de pagamento (Fatia 3.18): editaveis no GANHO. Pre-carrega do rascunho
+  // (prop direta ou fetch por negocioId). Congela no snapshot ao confirmar.
+  const [pagamentos, setPagamentos] = useState<LinhaPagamentoUI[]>(
+    pagamentosIniciais ? paraUI(pagamentosIniciais) : [],
+  );
+
   useEffect(() => {
     if (!ehGanho) return;
     fetch(`/api/catalogo?tipo=${ehPeca ? "PECA" : "PRODUTO"}`)
@@ -117,6 +138,23 @@ export function ModalFechamento({
       .then((d) => setCatalogo(d.itens ?? []))
       .catch(() => undefined);
   }, [ehGanho, ehPeca]);
+
+  // Carrega o rascunho de pagamentos do negocio quando nao veio por prop.
+  useEffect(() => {
+    if (!ehGanho || !negocioId || pagamentosIniciais) return;
+    let vivo = true;
+    fetch(`/api/negocios/${negocioId}/pecas-necessarias`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (vivo && d && Array.isArray(d.pagamentos)) {
+          setPagamentos(paraUI(lerPagamentos(d.pagamentos)));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [ehGanho, negocioId, pagamentosIniciais]);
 
   // Catalogo agrupado por categoria (para os optgroups).
   const grupos = new Map<string, CatalogoItem[]>();
@@ -177,6 +215,11 @@ export function ModalFechamento({
   const valorFinal = Math.max(0, Number((valorFinalStr || "0").replace(",", ".")) || 0);
   const diferenca = total - valorFinal; // >0 desconto, <0 acrescimo
   const temAjuste = Math.abs(diferenca) > 0.005;
+  // Total de referencia para o resumo "Pago vs Total" das formas de pagamento:
+  // com itens, o valor final cobrado; sem itens (modo simples), o valor digitado.
+  const totalPagamento =
+    itens.length > 0 ? valorFinal : Math.max(0, Number((valor || "0").replace(",", ".")) || 0);
+  const semPagamento = paraPersistir(pagamentos).length === 0;
 
   async function confirmar() {
     setErro(null);
@@ -202,6 +245,8 @@ export function ModalFechamento({
             // Valor final cobrado (com desconto/frete) -> valorAjustado, venda e
             // pos-venda. `valor` (base da conversao Meta) permanece o total calculado.
             valorAjustado: temAjuste ? valorFinal : null,
+            // Formas de pagamento (opcional; congela no snapshot). Metadado.
+            orcPagamentos: paraPersistir(pagamentos),
             itens: validos.map((i) => ({
               produtoCatalogoId: i.produtoCatalogoId,
               descricao: i.descricao.trim(),
@@ -224,7 +269,7 @@ export function ModalFechamento({
       }
       setSalvando(true);
       try {
-        await onConfirmar({ valor: v });
+        await onConfirmar({ valor: v, orcPagamentos: paraPersistir(pagamentos) });
       } catch {
         setErro("Nao foi possivel concluir.");
         setSalvando(false);
@@ -496,6 +541,20 @@ export function ModalFechamento({
                     Ou adicione produtos acima para montar o pedido item a item.
                   </p>
                 </div>
+              )}
+
+              {/* Forma(s) de pagamento (Fatia 3.18): editaveis; congela no snapshot.
+                  OPCIONAL — aviso nao-bloqueante quando vazio (nao trava o ganho). */}
+              <SecaoPagamento
+                linhas={pagamentos}
+                onChange={setPagamentos}
+                totalFinal={totalPagamento}
+              />
+              {semPagamento && (
+                <p className="flex items-center gap-1.5 text-[11px] text-medio/50">
+                  <Info className="h-3.5 w-3.5" />
+                  Nenhuma forma de pagamento informada (opcional).
+                </p>
               )}
             </div>
           ) : (
