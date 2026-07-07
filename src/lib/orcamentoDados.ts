@@ -47,27 +47,45 @@ export type MontagemOrcamento = {
   logo: LogoEmbed | null;
 };
 
-// Le a logo do ConfiguracaoCRM e a converte em bytes embutiveis. PNG/JPEG embutem
-// direto; WEBP e convertido para PNG no gerador (sharp). SVG segue sem suporte ->
-// null (o gerador cai no wordmark). Nunca lanca (falha -> null, PDF com "Sixxis").
+// Formato embutivel a partir do mime (PNG/JPEG direto; WEBP convertido no gerador
+// por sharp). SVG/outros -> null (fallback textual).
+function formatoEmbed(mime: string | null | undefined): "png" | "jpg" | "webp" | null {
+  const m = (mime ?? "").toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("jpeg") || m.includes("jpg")) return "jpg";
+  if (m.includes("webp")) return "webp";
+  return null;
+}
+
+// Converte um data URL raster em LogoEmbed, ou null (nao e data URL / formato sem
+// suporte / vazio).
+function paraLogoEmbed(data: string | null, mime: string | null): LogoEmbed | null {
+  if (!data || !data.startsWith("data:")) return null;
+  const formato = formatoEmbed(mime);
+  if (!formato) return null;
+  const bytes = Buffer.from(data.split(",")[1] ?? "", "base64");
+  return bytes.length > 0 ? { bytes, formato } : null;
+}
+
+// Le a logo para o PDF com PRECEDENCIA (Fatia 3.17): 1) logo DEDICADA do orcamento
+// (logoOrcamento*, escura p/ fundo claro); 2) fallback para a logo do SISTEMA
+// (logoData); 3) nenhuma -> wordmark textual. PNG/JPEG embutem direto; WEBP e
+// convertido para PNG no gerador (sharp). Nunca lanca (falha -> null).
 async function carregarLogoEmbed(): Promise<LogoEmbed | null> {
   try {
     const cfg = await prisma.configuracaoCRM.findFirst({
-      select: { logoData: true, logoMime: true },
+      select: {
+        logoData: true,
+        logoMime: true,
+        logoOrcamentoData: true,
+        logoOrcamentoMime: true,
+      },
     });
-    if (!cfg?.logoData || !cfg.logoData.startsWith("data:")) return null;
-    const mime = (cfg.logoMime ?? "").toLowerCase();
-    const formato: "png" | "jpg" | "webp" | null = mime.includes("png")
-      ? "png"
-      : mime.includes("jpeg") || mime.includes("jpg")
-        ? "jpg"
-        : mime.includes("webp")
-          ? "webp"
-          : null;
-    if (!formato) return null; // svg/outros: fallback textual
-    const b64 = cfg.logoData.split(",")[1] ?? "";
-    const bytes = Buffer.from(b64, "base64");
-    return bytes.length > 0 ? { bytes, formato } : null;
+    if (!cfg) return null;
+    return (
+      paraLogoEmbed(cfg.logoOrcamentoData, cfg.logoOrcamentoMime) ??
+      paraLogoEmbed(cfg.logoData, cfg.logoMime)
+    );
   } catch {
     return null;
   }
