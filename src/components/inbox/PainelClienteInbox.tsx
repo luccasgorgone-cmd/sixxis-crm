@@ -88,6 +88,18 @@ export function PainelClienteInbox({
     etapaId: string;
   } | null>(null);
 
+  // Ao TROCAR de cliente (leadId muda), zera IMEDIATAMENTE cliente/detalhe/erro —
+  // assim o painel nao exibe a foto/dados do cliente ANTERIOR enquanto o fetch do
+  // novo esta em voo (bug do avatar residual, Fatia 3.18). Efeito separado dos de
+  // fetch para NAO piscar o skeleton nos recarregamentos por salvamento (mesmo
+  // leadId). Os efeitos de fetch abaixo repovoam.
+  useEffect(() => {
+    setCliente(null);
+    setDetalhe(null);
+    setErro(false);
+    setCarregando(true);
+  }, [leadId]);
+
   const carregarNegocio = useCallback(async () => {
     if (!negocioId) {
       setDetalhe(null);
@@ -193,8 +205,10 @@ export function PainelClienteInbox({
             </div>
           )}
 
-          {/* (a) Dados do cliente (sempre) */}
+          {/* (a) Dados do cliente (sempre). key por lead forca remontagem ao trocar
+              de cliente — reforca o reset do avatar residual (Fatia 3.18). */}
           <BlocoCliente
+            key={cliente.id}
             cliente={cliente}
             podeEditar={podeEditar}
             onAtualizado={() => void carregarCliente()}

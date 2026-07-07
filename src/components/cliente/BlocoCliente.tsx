@@ -3,7 +3,7 @@
 // Bloco de dados do CLIENTE no painel/supervisao: avatar (com refresh da foto),
 // nome efetivo + telefone, e edicao inline de nome, email, empresa, CPF e
 // anotacoes. CTA "Adicionar nome" em destaque quando so ha o numero.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pencil,
   RefreshCw,
@@ -92,6 +92,12 @@ export function BlocoCliente({
   const [editando, setEditando] = useState(false);
   const [foto, setFoto] = useState(cliente.fotoUrl);
   const [atualizandoFoto, setAtualizandoFoto] = useState(false);
+  // Sincroniza a foto ao TROCAR de cliente (id) ou quando a foto do lead muda.
+  // Sem isto, o useState inicial nao re-executa e o componente reaproveitado
+  // mostraria a foto do cliente ANTERIOR (bug do avatar residual, Fatia 3.18).
+  useEffect(() => {
+    setFoto(cliente.fotoUrl);
+  }, [cliente.id, cliente.fotoUrl]);
 
   // Sem nome real (so o numero/telefone). Checa os campos crus — nomeEfetivo
   // agora vem formatado, entao NAO comparar com o telefone.
