@@ -28,9 +28,11 @@ export type CriarCobrancaResp = {
 // Consulta de status de um pagamento no MP, via Loja (que detem o token). READ-ONLY.
 export type ConsultarPagamentoResp = {
   ok: boolean;
+  encontrado?: boolean; // true quando a Loja achou um pagamento no MP
   status?: string | null; // status do MP: "approved" | "pending" | "rejected" | ...
   externalReference?: string | null;
   valor?: number | null;
+  mpPaymentId?: string | null; // id do pagamento no MP (util na busca por referencia)
   mensagem?: string;
 };
 
@@ -84,6 +86,19 @@ export async function consultarPagamento(
   const d = await postInterno<ConsultarPagamentoResp>(
     "/api/interno/pagamento/consultar",
     { mpPaymentId },
+  );
+  if (!d) return { ok: false, mensagem: "consulta indisponível" };
+  return { ...d, ok: d.ok === true };
+}
+
+// Confirma o status pelo external_reference ("crm-{id}"), quando o CRM ainda NAO
+// tem o mpPaymentId (webhook nunca chegou). A Loja busca no MP por referencia.
+export async function consultarPorReferencia(
+  externalReference: string,
+): Promise<ConsultarPagamentoResp> {
+  const d = await postInterno<ConsultarPagamentoResp>(
+    "/api/interno/pagamento/consultar",
+    { externalReference },
   );
   if (!d) return { ok: false, mensagem: "consulta indisponível" };
   return { ...d, ok: d.ok === true };
