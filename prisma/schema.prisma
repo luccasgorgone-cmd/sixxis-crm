@@ -608,6 +608,8 @@ model Negocio {
   dataEnvio       DateTime?
   previsaoChegada DateTime?
   rastreios     RastreioNegocio[]
+  // Cobrancas de pagamento (link Mercado Pago) geradas para o orcamento (Fase 3).
+  pagamentos    Pagamento[]
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
   historicos    HistoricoNegocio[]
@@ -871,6 +873,35 @@ model OrcamentoItem {
   garantia          Boolean   @default(false)
 
   @@index([orcamentoId])
+}
+
+// Cobranca de pagamento (link Mercado Pago) de um orcamento (Fase 3). A Loja gera
+// a PREFERENCIA (Checkout Pro) via /api/interno/pagamento/criar-cobranca; o CRM
+// guarda o link e recebe a confirmacao "pago" DIRETO do Mercado Pago no webhook
+// /api/webhook/mercadopago. Cobranca AVULSA: nao cria Pedido nem venda na Loja.
+// Ligada ao NEGOCIO (o snapshot Orcamento so existe apos a decisao; o link pode
+// ser gerado antes). externalReference "crm-{negocioId}" e UNICO -> uma cobranca
+// ativa por negocio (regenerar atualiza a linha enquanto nao estiver paga).
+model Pagamento {
+  id                String    @id @default(cuid())
+  negocioId         String
+  negocio           Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  // Rotulo do PED para exibicao/descricao (ex.: "PED-000123"). Nao e chave.
+  referencia        String
+  mpPreferenceId    String?
+  mpPaymentId       String?
+  // "crm-{negocioId}": casa a notificacao do MP com esta cobranca. Unico.
+  externalReference String    @unique
+  valor             Decimal   @db.Decimal(12, 2)
+  // "pendente" | "pago" | "cancelado" | "erro".
+  status            String    @default("pendente")
+  initPoint         String?   @db.Text
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
+  pagoEm            DateTime?
+
+  @@index([negocioId])
+  @@index([externalReference])
 }
 
 // Campanha de envio em massa (multicanal). filtroJson guarda o recorte usado;
