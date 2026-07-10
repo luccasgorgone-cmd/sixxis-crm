@@ -5,7 +5,7 @@
 // o STATUS (Pendente ambar / Pago verde). Se o valor mudou apos gerar, permite
 // gerar um novo link. Padrao da casa (dark, tiffany, Lucide).
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Link2, Copy, Check, Send, CreditCard } from "lucide-react";
+import { Loader2, Link2, Copy, Check, Send, CreditCard, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatarBRL } from "@/lib/format";
 import type { MensagemItem } from "@/components/inbox/tipos";
@@ -56,6 +56,7 @@ export function SecaoLinkPagamento({
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [verificando, setVerificando] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -122,6 +123,27 @@ export function SecaoLinkPagamento({
       toast.erro("Falha de conexão ao enviar.");
     } finally {
       setEnviando(false);
+    }
+  }
+
+  async function verificar() {
+    if (verificando) return;
+    setVerificando(true);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/verificar-pagamento`, { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.ok) {
+        toast.erro(d?.erro ?? "Não foi possível verificar o pagamento agora.");
+        return;
+      }
+      await carregar();
+      if (d.status === "pago") toast.sucesso("Pagamento confirmado!");
+      else if (d.status === "cancelado") toast.erro("Pagamento cancelado ou recusado.");
+      else toast.info("Ainda não identificamos o pagamento.");
+    } catch {
+      toast.erro("Falha de conexão ao verificar.");
+    } finally {
+      setVerificando(false);
     }
   }
 
@@ -193,15 +215,31 @@ export function SecaoLinkPagamento({
           )}
 
           {pag.status !== "pago" && pag.initPoint && (
-            <button
-              type="button"
-              onClick={() => void enviarWhatsApp()}
-              disabled={enviando}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
-            >
-              {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Enviar link no WhatsApp
-            </button>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => void enviarWhatsApp()}
+                disabled={enviando}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
+              >
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Enviar no WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => void verificar()}
+                disabled={verificando}
+                title="Verificar se o pagamento foi confirmado"
+                className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-tiffany/40 px-3 py-2 text-sm font-semibold text-tiffany transition-colors hover:bg-tiffany/10 disabled:opacity-60"
+              >
+                {verificando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Verificar
+              </button>
+            </div>
           )}
 
           {/* Valor mudou -> permite gerar novo link (nao sobrescreve sozinho). */}
