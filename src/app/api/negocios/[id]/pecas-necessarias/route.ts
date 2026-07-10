@@ -27,7 +27,18 @@ async function negocioComAcesso(agenteId: string, negocioId: string) {
       orcFretePagoPelaEmpresa: true,
       orcFreteTransportadora: true,
       orcPagamentos: true,
-      lead: { select: { donoId: true, donoPosVendaId: true } },
+      lead: {
+        select: {
+          donoId: true,
+          donoPosVendaId: true,
+          // Endereco principal para pre-preencher o CEP do frete (Fase 2).
+          enderecos: {
+            orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
+            take: 1,
+            select: { cep: true },
+          },
+        },
+      },
     },
   });
   return negocio;
@@ -80,6 +91,8 @@ export async function GET(
       fretePagoPelaEmpresa: negocio.orcFretePagoPelaEmpresa,
       freteTransportadora: negocio.orcFreteTransportadora,
     },
+    // CEP do endereco principal do lead (pre-preenche o campo de frete). Fase 2.
+    cepDestino: negocio.lead.enderecos[0]?.cep ?? null,
     // Formas de pagamento do rascunho (Fatia 3.18): array validado.
     pagamentos: lerPagamentos(negocio.orcPagamentos),
   });

@@ -31,6 +31,7 @@ import {
   type LinhaPagamentoUI,
 } from "@/components/pecas/SecaoPagamento";
 import { lerPagamentos, formatarLinhaPagamento, type LinhaPagamento } from "@/lib/pagamento";
+import { SecaoFrete } from "@/components/pecas/SecaoFrete";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -72,6 +73,8 @@ type OrcDraft = {
   descontoPct: number | null;
   frete: number | null;
   fretePagoPelaEmpresa: boolean;
+  // Transportadora escolhida na cotacao da Loja (Fase 2). null = frete manual.
+  freteTransportadora: string | null;
 };
 type Modo = "VENDA" | "POS_VENDA" | "LOCAL";
 
@@ -181,7 +184,10 @@ function EditorOrcamento(props: EditorProps) {
     descontoPct: null,
     frete: null,
     fretePagoPelaEmpresa: false,
+    freteTransportadora: null,
   });
+  // CEP do endereco do lead (pre-preenche a cotacao de frete). Fase 2.
+  const [cepDestino, setCepDestino] = useState<string | null>(null);
   // Cupom via SELECT com presets (SIXXIS05=5% / SIXXIS10=10%) + "Outro" (campos
   // livres). cupomOutro lembra que o usuario escolheu "Outro" mesmo com os campos
   // ainda vazios (senao o select voltaria a "Sem cupom"). Fatia 3.13.
@@ -225,7 +231,8 @@ function EditorOrcamento(props: EditorProps) {
         if (modeloEditavel && typeof d.modeloProdutoCliente !== "undefined") {
           setModelo(d.modeloProdutoCliente ?? "");
         }
-        if (d.orc) setOrc(d.orc);
+        if (d.orc) setOrc({ freteTransportadora: null, ...d.orc });
+        if (typeof d.cepDestino !== "undefined") setCepDestino(d.cepDestino ?? null);
         if (Array.isArray(d.pagamentos)) setPagamentos(paraUI(lerPagamentos(d.pagamentos)));
       } else {
         setUsos([]);
@@ -470,6 +477,7 @@ function EditorOrcamento(props: EditorProps) {
           if ("descontoPct" in patch) body.orcDescontoPct = patch.descontoPct;
           if ("frete" in patch) body.orcFrete = patch.frete;
           if ("fretePagoPelaEmpresa" in patch) body.orcFretePagoPelaEmpresa = patch.fretePagoPelaEmpresa;
+          if ("freteTransportadora" in patch) body.orcFreteTransportadora = patch.freteTransportadora;
           const r = await fetch(`/api/negocios/${negocioId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -878,9 +886,23 @@ function EditorOrcamento(props: EditorProps) {
               />
             </label>
           )}
+          {/* Cotacao automatica de frete via Loja (Fase 2). VENDA aplica a mais
+              barata; POS_VENDA mostra as duas e o atendente escolhe. Fallback:
+              o campo manual abaixo segue editavel. */}
+          {negocioId && modo !== "LOCAL" && (
+            <SecaoFrete
+              negocioId={negocioId}
+              modo={modo === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
+              cepInicial={cepDestino}
+              freteTransportadora={orc.freteTransportadora}
+              onAplicar={(preco, transportadora) =>
+                mudarOrc({ frete: preco, freteTransportadora: transportadora })
+              }
+            />
+          )}
           <div className="flex items-end gap-2">
             <label className="w-28 shrink-0">
-              <span className="mb-0.5 block text-[11px] text-medio/60">Frete R$</span>
+              <span className="mb-0.5 block text-[11px] text-medio/60">Frete R$ (manual)</span>
               <input
                 type="number"
                 min="0"
@@ -888,7 +910,8 @@ function EditorOrcamento(props: EditorProps) {
                 value={orc.frete ?? ""}
                 onChange={(e) => {
                   const v = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
-                  mudarOrc({ frete: v });
+                  // Edicao manual descola da cotacao: limpa a transportadora.
+                  mudarOrc({ frete: v, freteTransportadora: null });
                 }}
                 placeholder="0,00"
                 className="campo w-full text-right"
@@ -917,7 +940,12 @@ function EditorOrcamento(props: EditorProps) {
               </div>
             )}
             <div className="flex justify-between text-medio/60">
-              <span>Frete</span>
+              <span>
+                Frete
+                {orc.freteTransportadora && (
+                  <span className="ml-1 text-medio/45">· {orc.freteTransportadora}</span>
+                )}
+              </span>
               <span>{orc.fretePagoPelaEmpresa ? "empresa" : `+ ${formatarBRL(freteAplicado)}`}</span>
             </div>
             <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
