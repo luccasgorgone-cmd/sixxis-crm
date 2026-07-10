@@ -32,6 +32,7 @@ import {
 } from "@/components/pecas/SecaoPagamento";
 import { lerPagamentos, formatarLinhaPagamento, type LinhaPagamento } from "@/lib/pagamento";
 import { SecaoFrete } from "@/components/pecas/SecaoFrete";
+import { SecaoLinkPagamento } from "@/components/pecas/SecaoLinkPagamento";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -976,6 +977,17 @@ function EditorOrcamento(props: EditorProps) {
           linhas={pagamentos}
           onChange={mudarPagamentos}
           totalFinal={totalFinal}
+        />
+      )}
+
+      {/* 3b. LINK DE PAGAMENTO (Fase 3): gerar/enviar link MP + status. Junto do
+          envio do orcamento; so no orcamento do negocio, com itens e total > 0. */}
+      {permitirEnvio && negocioId && usos && (
+        <SecaoLinkPagamento
+          negocioId={negocioId}
+          totalFinal={totalFinal}
+          temItens={usos.length > 0}
+          onMensagemEnviada={onMensagemEnviada}
         />
       )}
 

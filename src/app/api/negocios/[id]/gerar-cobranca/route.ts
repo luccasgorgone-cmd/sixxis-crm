@@ -24,6 +24,42 @@ function webhookUrl(): string | null {
   return `${base}/api/webhook/mercadopago`;
 }
 
+// GET: status atual da cobranca do negocio (para a UI exibir o selo/link).
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const agente = await obterAgente();
+  if (!agente) return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
+  const { id } = await ctx.params;
+  const acesso = await checarAcessoNegocio(agente, id);
+  if (!acesso.ok) return NextResponse.json({ erro: acesso.erro }, { status: acesso.status });
+
+  const pag = await prisma.pagamento.findUnique({
+    where: { externalReference: `crm-${id}` },
+    select: {
+      status: true,
+      initPoint: true,
+      referencia: true,
+      valor: true,
+      pagoEm: true,
+      atualizadoEm: true,
+    },
+  });
+  return NextResponse.json({
+    pagamento: pag
+      ? {
+          status: pag.status,
+          initPoint: pag.initPoint,
+          referencia: pag.referencia,
+          valor: pag.valor != null ? Number(pag.valor) : null,
+          pagoEm: pag.pagoEm,
+          atualizadoEm: pag.atualizadoEm,
+        }
+      : null,
+  });
+}
+
 export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
