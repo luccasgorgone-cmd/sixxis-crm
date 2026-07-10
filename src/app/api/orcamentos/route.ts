@@ -71,6 +71,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     andWhere.push({ OR: orBusca });
   }
   if (leadAnd.length > 0) andWhere.push({ lead: { AND: leadAnd } });
+
+  // Filtro por status do LINK de pagamento (Fase 3): restringe aos negocios que
+  // tem uma cobranca no status pedido. Orcamento nao tem relation direta com
+  // Pagamento, entao resolvemos os negocioIds e filtramos por eles.
+  const pagFiltro = sp.get("pagamento");
+  if (pagFiltro === "pago" || pagFiltro === "pendente") {
+    const negs = await prisma.pagamento.findMany({
+      where: { status: pagFiltro },
+      select: { negocioId: true },
+    });
+    const ids = [...new Set(negs.map((n) => n.negocioId))];
+    // Sem nenhum negocio no status -> lista vazia (id impossivel).
+    andWhere.push({ negocioId: { in: ids.length ? ids : ["__sem_pagamento__"] } });
+  }
+
   if (andWhere.length > 0) base.AND = andWhere;
 
   // where da LISTA (com decisao). Agregados usam base SEM decisao (os 3 cards
@@ -93,6 +108,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       select: {
         id: true,
         numero: true,
+        negocioId: true,
         finalidade: true,
         decisao: true,
         total: true,
@@ -139,6 +155,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Status do LINK de pagamento (Fase 3) por negocio da pagina atual.
+  const negocioIds = [...new Set(pagina.map((o) => o.negocioId))];
+  const pagsLink = negocioIds.length
+    ? await prisma.pagamento.findMany({
+        where: { negocioId: { in: negocioIds } },
+        select: { negocioId: true, status: true, pagoEm: true },
+      })
+    : [];
+  const pagPorNegocio = new Map(pagsLink.map((p) => [p.negocioId, p]));
+
   const num = (v: unknown) => (v != null ? Number(v) : null);
 
   // Agregados: garante as 3 chaves (mesmo com 0).
@@ -166,6 +192,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       total: num(o.total),
       totalFinal: num(o.totalFinal),
       totalGarantia: num(o.totalGarantia),
+      statusPagamento: pagPorNegocio.get(o.negocioId)?.status ?? null,
+      pagamentoPagoEm: pagPorNegocio.get(o.negocioId)?.pagoEm ?? null,
       qtdItens: o.itens.length,
       criadoEm: o.criadoEm,
       cliente: { leadId: o.lead.id, nome: nomeEfetivo(o.lead) },

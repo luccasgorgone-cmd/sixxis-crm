@@ -1180,6 +1180,8 @@ type OrcamentoHist = {
   total: number;
   totalGarantia: number | null;
   pagamentos: LinhaPagamento[];
+  statusPagamento: string | null;
+  pagamentoPagoEm: string | null;
   qtdItens: number;
   criadoEm: string;
   itens: {
@@ -1252,6 +1254,23 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
                         {new Date(o.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                       </span>
                       <span className={`shrink-0 text-[11px] font-semibold ${dec.classe}`}>{dec.rotulo}</span>
+                      {o.statusPagamento && (
+                        <span
+                          className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold ${
+                            o.statusPagamento === "pago"
+                              ? "bg-green-600/10 text-green-700"
+                              : o.statusPagamento === "pendente"
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-black/5 text-medio/60"
+                          }`}
+                        >
+                          {o.statusPagamento === "pago"
+                            ? "Pago"
+                            : o.statusPagamento === "pendente"
+                              ? "A pagar"
+                              : o.statusPagamento}
+                        </span>
+                      )}
                       <span className="ml-auto shrink-0 text-xs font-medium text-escuro">
                         {formatarBRL(o.total)}
                       </span>

@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   X,
   MessageCircle,
+  CreditCard,
 } from "lucide-react";
 import { EstadoErro } from "@/components/ui/Estado";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -40,7 +41,27 @@ type Orcamento = {
   criadoEm: string;
   cliente: { leadId: string; nome: string };
   agente?: { nome: string | null };
+  // Status do link de pagamento (Fase 3): "pago" | "pendente" | ... | null.
+  statusPagamento: string | null;
+  pagamentoPagoEm: string | null;
 };
+
+// Selo do status do link de pagamento (Fase 3). Nulo = sem cobranca (nao renderiza).
+function SeloPagamento({ status }: { status: string | null }) {
+  if (!status) return null;
+  const pago = status === "pago";
+  const cor = pago
+    ? "bg-green-600/10 text-green-700"
+    : status === "pendente"
+      ? "bg-amber-500/10 text-amber-600"
+      : "bg-black/5 text-medio/60";
+  const rotulo = pago ? "Pago" : status === "pendente" ? "A pagar" : status;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold ${cor}`}>
+      <CreditCard className="h-2.5 w-2.5" /> {rotulo}
+    </span>
+  );
+}
 type Resumo = Record<string, { quantidade: number; somaTotal: number }>;
 type Decisao = "" | "GANHO" | "PENDENTE" | "PERDIDO";
 
@@ -69,6 +90,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [uf, setUf] = useState("");
   const [ddd, setDdd] = useState("");
+  const [pagamento, setPagamento] = useState(""); // "" | "pago" | "pendente"
   const [filtrosAberto, setFiltrosAberto] = useState(false);
   const filtrosRef = useRef<HTMLDivElement>(null);
   useClickFora(() => setFiltrosAberto(false), filtrosAberto, [filtrosRef]);
@@ -94,8 +116,9 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
     if (buscaAplicada.trim()) p.set("busca", buscaAplicada.trim());
     if (uf) p.set("uf", uf);
     if (ddd.length === 2) p.set("ddd", ddd);
+    if (pagamento) p.set("pagamento", pagamento);
     return p;
-  }, [decisao, finalidade, periodo, buscaAplicada, uf, ddd]);
+  }, [decisao, finalidade, periodo, buscaAplicada, uf, ddd, pagamento]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -142,7 +165,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
     { v: "PENDENTE", r: "Pendentes", classe: "border-amber-500/20 bg-amber-500/[0.05]", ponto: "text-amber-600" },
     { v: "PERDIDO", r: "Perdidos", classe: "border-erro/20 bg-erro/[0.04]", ponto: "text-erro" },
   ];
-  const temFiltroAvancado = Boolean(uf || ddd.length === 2);
+  const temFiltroAvancado = Boolean(uf || ddd.length === 2 || pagamento);
 
   return (
     <div className="scroll-fino h-full space-y-4 overflow-y-auto p-4 md:p-6">
@@ -224,11 +247,24 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
                   className="campo w-full"
                 />
               </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-medio/70">Pagamento</span>
+                <select
+                  value={pagamento}
+                  onChange={(e) => setPagamento(e.target.value)}
+                  className="campo w-full"
+                >
+                  <option value="">Todos</option>
+                  <option value="pago">Pago</option>
+                  <option value="pendente">A pagar (pendente)</option>
+                </select>
+              </label>
               {temFiltroAvancado && (
                 <button
                   onClick={() => {
                     setUf("");
                     setDdd("");
+                    setPagamento("");
                   }}
                   className="text-xs font-medium text-medio hover:text-erro"
                 >
@@ -294,6 +330,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${dec.classe}`}>
                     {dec.rotulo}
                   </span>
+                  <SeloPagamento status={o.statusPagamento} />
                   <div className="ml-auto flex shrink-0 flex-col items-end">
                     <span className="text-sm font-semibold text-escuro">{formatarBRL(o.totalFinal ?? 0)}</span>
                     {o.totalGarantia != null && o.totalGarantia > 0 && (

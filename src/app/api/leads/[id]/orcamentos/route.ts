@@ -39,6 +39,7 @@ export async function GET(
     select: {
       id: true,
       numero: true,
+      negocioId: true,
       finalidade: true,
       decisao: true,
       total: true,
@@ -57,6 +58,17 @@ export async function GET(
     },
   });
 
+  // Status do LINK de pagamento (Fase 3) por negocio: uma cobranca ativa por
+  // negocio (externalReference "crm-{negocioId}"). Mapeia negocioId -> status.
+  const negocioIds = [...new Set(orcamentos.map((o) => o.negocioId))];
+  const pagsLink = negocioIds.length
+    ? await prisma.pagamento.findMany({
+        where: { negocioId: { in: negocioIds } },
+        select: { negocioId: true, status: true, pagoEm: true },
+      })
+    : [];
+  const pagPorNegocio = new Map(pagsLink.map((p) => [p.negocioId, p]));
+
   return NextResponse.json({
     orcamentos: orcamentos.map((o) => ({
       id: o.id,
@@ -67,6 +79,8 @@ export async function GET(
       total: Number(o.total),
       totalGarantia: o.totalGarantia != null ? Number(o.totalGarantia) : null,
       pagamentos: lerPagamentos(o.pagamentos),
+      statusPagamento: pagPorNegocio.get(o.negocioId)?.status ?? null,
+      pagamentoPagoEm: pagPorNegocio.get(o.negocioId)?.pagoEm ?? null,
       qtdItens: o.itens.length,
       criadoEm: o.criadoEm,
       itens: o.itens.map((it) => ({
