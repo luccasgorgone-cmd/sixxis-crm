@@ -114,6 +114,7 @@ export async function montarDadosPdfOrcamento(
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcFreteTransportadora: true,
       orcPagamentos: true,
       lead: {
         select: {
@@ -199,6 +200,7 @@ export async function montarDadosPdfOrcamento(
     descontoValor,
     frete,
     fretePagoPelaEmpresa,
+    transportadora: negocio.orcFreteTransportadora ?? null,
     totalFinal,
     totalGarantia,
     // Formas de pagamento do rascunho (Fatia 3.18): preview do orcamento em aberto.

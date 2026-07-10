@@ -54,6 +54,8 @@ export type DadosPdfOrcamento = {
   descontoValor: number;
   frete: number | null;
   fretePagoPelaEmpresa: boolean;
+  // Transportadora da cotacao (Fase 2): exibida junto do frete quando houver.
+  transportadora?: string | null;
   totalFinal: number;
   totalGarantia: number;
   // Formas de pagamento (Fatia 3.18): rascunho (preview) ou snapshot (decidido).
@@ -370,10 +372,13 @@ export async function gerarPdfOrcamento(
       : `Desconto${dados.descontoPct ? ` (${dados.descontoPct}%)` : ""}`;
     linhaTot(rot, `- ${brl(dados.descontoValor)}`, VERDE, VERDE);
   }
+  // Rotulo do frete com a transportadora quando houver (ex.: "Frete - Braspress").
+  const transp = dados.transportadora ? sanitizar(dados.transportadora) : "";
+  const rotuloFrete = transp ? `Frete - ${transp}` : "Frete";
   if (dados.fretePagoPelaEmpresa) {
-    linhaTot("Frete", "Cortesia Sixxis", TIFFANY, CINZA);
+    linhaTot(rotuloFrete, "Cortesia Sixxis", TIFFANY, CINZA);
   } else {
-    linhaTot("Frete", dados.frete && dados.frete > 0 ? brl(dados.frete) : "Grátis");
+    linhaTot(rotuloFrete, dados.frete && dados.frete > 0 ? brl(dados.frete) : "Grátis");
   }
 
   // Caixa TIFFANY do TOTAL.
