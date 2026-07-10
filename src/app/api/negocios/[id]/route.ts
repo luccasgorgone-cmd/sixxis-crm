@@ -259,6 +259,8 @@ export async function PATCH(
     orcDescontoPct?: number | null;
     orcFrete?: number | null;
     orcFretePagoPelaEmpresa?: boolean;
+    // Transportadora escolhida na cotacao da Loja (Fase 2). null limpa.
+    orcFreteTransportadora?: string | null;
     // Formas de pagamento do rascunho (Fatia 3.18): array de { metodo, valor, parcelas }.
     orcPagamentos?: unknown;
   };
@@ -284,6 +286,7 @@ export async function PATCH(
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcFreteTransportadora: true,
       orcPagamentos: true,
       // Donos do lead por finalidade: o DONO edita o negocio do proprio cliente,
       // inclusive quando o negocio ainda nao tem agenteId (criado ao abrir a
@@ -686,6 +689,13 @@ export async function PATCH(
   if (body.orcFretePagoPelaEmpresa !== undefined) {
     data.orcFretePagoPelaEmpresa = body.orcFretePagoPelaEmpresa === true;
   }
+  // Transportadora do frete (Fase 2): string curta (nome da cotacao) ou null.
+  if (body.orcFreteTransportadora !== undefined) {
+    data.orcFreteTransportadora =
+      body.orcFreteTransportadora === null
+        ? null
+        : String(body.orcFreteTransportadora).trim().slice(0, 60) || null;
+  }
 
   // ---- Formas de pagamento do rascunho (Fatia 3.18) ----
   // Metadado (nao altera total/Meta). Valida code/valor/parcelas; array vazio ou
@@ -863,6 +873,8 @@ export async function PATCH(
                 descontoPct,
                 frete,
                 fretePagoPelaEmpresa: fretePagoEmpresa,
+                // Transportadora do frete CONGELADA no snapshot (Fase 2).
+                freteTransportadora: negocio.orcFreteTransportadora ?? null,
                 totalFinal,
                 pagamentos:
                   pagamentosSnapshot.length > 0

@@ -25,6 +25,7 @@ async function negocioComAcesso(agenteId: string, negocioId: string) {
       orcDescontoPct: true,
       orcFrete: true,
       orcFretePagoPelaEmpresa: true,
+      orcFreteTransportadora: true,
       orcPagamentos: true,
       lead: { select: { donoId: true, donoPosVendaId: true } },
     },
@@ -77,6 +78,7 @@ export async function GET(
       descontoPct: negocio.orcDescontoPct != null ? Number(negocio.orcDescontoPct) : null,
       frete: negocio.orcFrete != null ? Number(negocio.orcFrete) : null,
       fretePagoPelaEmpresa: negocio.orcFretePagoPelaEmpresa,
+      freteTransportadora: negocio.orcFreteTransportadora,
     },
     // Formas de pagamento do rascunho (Fatia 3.18): array validado.
     pagamentos: lerPagamentos(negocio.orcPagamentos),

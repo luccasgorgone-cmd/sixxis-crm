@@ -572,6 +572,10 @@ model Negocio {
   orcDescontoPct       Decimal?      @db.Decimal(5, 2)
   orcFrete             Decimal?      @db.Decimal(12, 2)
   orcFretePagoPelaEmpresa Boolean    @default(false)
+  // Transportadora escolhida para o frete do rascunho (Fase 2): nome vindo da
+  // cotacao da Loja (ex.: "Braspress", "Melhor Envio"). null = frete manual/sem
+  // cotacao. Congela no snapshot Orcamento.freteTransportadora na decisao.
+  orcFreteTransportadora String?
   // Rascunho VIVO das FORMAS de pagamento (Fatia 3.18): array de
   // { metodo, valor, parcelas } (ver lib/pagamento). Descreve COMO o cliente paga
   // (split permitido); NAO altera o total nem a conversao Meta. Congela no
@@ -837,6 +841,8 @@ model Orcamento {
   descontoPct   Decimal?        @db.Decimal(5, 2)
   frete         Decimal?        @db.Decimal(12, 2)
   fretePagoPelaEmpresa Boolean   @default(false)
+  // Transportadora do frete CONGELADA no snapshot (Fase 2). null = frete manual.
+  freteTransportadora String?
   // totalFinal = round2( total_cobravel * (1 - descontoPct/100) + frete_se_nao_empresa ).
   // `total` continua sendo o bruto dos cobraveis; totalGarantia fica a parte.
   totalFinal    Decimal         @db.Decimal(12, 2)
