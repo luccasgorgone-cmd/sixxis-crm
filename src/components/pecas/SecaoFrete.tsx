@@ -105,18 +105,12 @@ export function SecaoFrete({
       const lista = (d.cotacoes ?? []).filter((c) => c);
       setCotacoes(lista);
 
-      if (!ehPos) {
-        // VENDA: aplica AUTOMATICO a mais barata.
-        if (d.maisBarata) {
-          onAplicar(d.maisBarata.preco, d.maisBarata.transportadora);
-          toast.sucesso(
-            `Frete: ${formatarBRL(d.maisBarata.preco)} via ${d.maisBarata.transportadora}`,
-          );
-        } else {
-          setAviso("Nenhuma transportadora cotou este envio. Use o frete manual.");
-        }
+      // Em AMBOS os modos (venda e pos-venda) NADA e aplicado automaticamente: a
+      // lista renderiza e o ATENDENTE clica na transportadora que quiser (a mais
+      // barata ganha so um selo, sem auto-selecao). Sem cotacao valida -> aviso.
+      if (!lista.some((c) => c.ok && c.preco != null)) {
+        setAviso("Nenhuma transportadora cotou este envio. Use o frete manual.");
       }
-      // POS_VENDA: nao aplica — o atendente clica na escolhida (abaixo).
     } catch {
       setCotacoes(null);
       setAviso("Falha ao cotar o frete. Use o frete manual.");
@@ -131,11 +125,17 @@ export function SecaoFrete({
     toast.sucesso(`Frete ${c.transportadora} aplicado: ${formatarBRL(c.preco)}`);
   }
 
+  // carrierId da MAIS BARATA entre as que cotaram — so para o selo (nao auto-aplica).
+  const oks = (cotacoes ?? []).filter((c) => c.ok && c.preco != null);
+  const maisBarataId = oks.length
+    ? oks.reduce((a, b) => ((b.preco as number) < (a.preco as number) ? b : a)).carrierId
+    : null;
+
   return (
     <div className="space-y-2 rounded-lg border border-tiffany/20 bg-tiffany/[0.03] p-2.5">
       <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-tiffany/80">
         <Truck className="h-3.5 w-3.5" />
-        {ehPos ? "Frete da caixa" : "Frete automático"}
+        Escolha o frete{ehPos ? " (caixa)" : ""}
       </p>
 
       {/* Dimensoes da caixa (POS_VENDA). */}
@@ -211,11 +211,14 @@ export function SecaoFrete({
 
       {aviso && <p className="text-[11px] text-amber-600">{aviso}</p>}
 
-      {/* POS_VENDA: lista das cotacoes por transportadora — clicar escolhe. */}
-      {ehPos && cotacoes && cotacoes.length > 0 && (
+      {/* Lista das cotacoes por transportadora — COMUM a venda e pos-venda. O
+          atendente CLICA na escolhida; nada e aplicado automaticamente. A mais
+          barata ganha so um selo. */}
+      {cotacoes && cotacoes.length > 0 && (
         <ul className="space-y-1">
           {cotacoes.map((c) => {
             const aplicada = c.ok && c.transportadora === freteTransportadora;
+            const barata = c.ok && c.preco != null && c.carrierId === maisBarataId;
             return (
               <li key={c.carrierId}>
                 <button
@@ -230,9 +233,14 @@ export function SecaoFrete({
                         : "border-black/5 opacity-60"
                   }`}
                 >
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-escuro">
-                    {c.transportadora}
-                    {aplicada && <span className="ml-1 text-tiffany">✓</span>}
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-xs font-medium text-escuro">
+                    <span className="truncate">{c.transportadora}</span>
+                    {aplicada && <span className="shrink-0 text-tiffany">✓</span>}
+                    {barata && (
+                      <span className="shrink-0 rounded bg-green-600/10 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-600">
+                        mais barato
+                      </span>
+                    )}
                   </span>
                   {c.ok && c.preco != null ? (
                     <span className="shrink-0 text-right text-xs">
