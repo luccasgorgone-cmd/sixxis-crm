@@ -65,26 +65,6 @@ async function postInterno<T>(caminho: string, corpo: unknown): Promise<T | null
   }
 }
 
-async function getInterno<T>(caminho: string): Promise<T | null> {
-  const cfg = baseConfig();
-  if (!cfg) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const resp = await fetch(`${cfg.base}${caminho}`, {
-      headers: { "x-internal-key": cfg.key },
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    if (!resp.ok) return null;
-    return (await resp.json()) as T;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 // Gera o LINK de pagamento (Checkout Pro) na Loja. Nunca lança.
 export async function criarCobranca(body: CriarCobrancaBody): Promise<CriarCobrancaResp> {
   const d = await postInterno<CriarCobrancaResp>(
@@ -97,11 +77,13 @@ export async function criarCobranca(body: CriarCobrancaBody): Promise<CriarCobra
 
 // Confirma o status de um pagamento no MP via Loja (read-only). Nunca lança.
 // Usado pelo webhook do CRM para NAO confiar cegamente na notificacao do MP.
+// A Loja expoe POST /api/interno/pagamento/consultar { mpPaymentId }.
 export async function consultarPagamento(
   mpPaymentId: string,
 ): Promise<ConsultarPagamentoResp> {
-  const d = await getInterno<ConsultarPagamentoResp>(
-    `/api/interno/pagamento/consultar?mpPaymentId=${encodeURIComponent(mpPaymentId)}`,
+  const d = await postInterno<ConsultarPagamentoResp>(
+    "/api/interno/pagamento/consultar",
+    { mpPaymentId },
   );
   if (!d) return { ok: false, mensagem: "consulta indisponível" };
   return { ...d, ok: d.ok === true };
