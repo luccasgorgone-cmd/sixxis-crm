@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { enviarTexto } from "@/lib/evolution";
 import { checarAcessoNegocio } from "@/lib/orcamentoDados";
+import { formatarBRL } from "@/lib/format";
 import { Finalidade } from "@/generated/prisma/enums";
 import { DirecaoMsg, TipoMsg, StatusEnvio, Prisma } from "@/generated/prisma/client";
 
@@ -29,7 +30,7 @@ export async function POST(
   // Cobranca ativa do negocio (precisa existir: gerar o link primeiro).
   const pagamento = await prisma.pagamento.findUnique({
     where: { externalReference: `crm-${id}` },
-    select: { initPoint: true, referencia: true },
+    select: { initPoint: true, referencia: true, valor: true },
   });
   if (!pagamento?.initPoint) {
     return NextResponse.json(
@@ -40,7 +41,13 @@ export async function POST(
 
   const negocio = await prisma.negocio.findUnique({
     where: { id },
-    select: { leadId: true, finalidade: true, lead: { select: { telefone: true } } },
+    select: {
+      leadId: true,
+      finalidade: true,
+      lead: {
+        select: { telefone: true, nome: true, nomeManual: true, pushName: true },
+      },
+    },
   });
   if (!negocio) return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
 
@@ -69,8 +76,24 @@ export async function POST(
 
   const instanciaEvolution =
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
+
+  // Saudacao com o PRIMEIRO nome do cliente quando houver; senao "Olá!" (elegante).
+  const nomeBruto = (
+    negocio.lead.nomeManual ||
+    negocio.lead.pushName ||
+    negocio.lead.nome ||
+    ""
+  ).trim();
+  const primeiroNome = nomeBruto ? nomeBruto.split(/\s+/)[0] : "";
+  const saudacao = primeiroNome ? `Olá, ${primeiroNome}!` : "Olá!";
+  const valorFmt = formatarBRL(Number(pagamento.valor));
+
+  // Mensagem profissional (Caminho A): link do Mercado Pago em linha propria para
+  // o WhatsApp gerar o preview da marca (confianca). Padrao da casa: sem emoji.
   const texto =
-    `Segue o link para pagamento do orçamento ${pagamento.referencia}:\n${pagamento.initPoint}\n\n` +
+    `${saudacao} Segue o link para o pagamento do seu orçamento ${pagamento.referencia} ` +
+    `no valor de ${valorFmt}:\n\n` +
+    `${pagamento.initPoint}\n\n` +
     `Pagamento seguro via Mercado Pago. Qualquer dúvida, estou à disposição.`;
 
   const resultado = await enviarTexto(numero, texto, instanciaEvolution);
