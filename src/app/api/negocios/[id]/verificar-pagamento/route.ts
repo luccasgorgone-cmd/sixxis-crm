@@ -58,7 +58,12 @@ export async function POST(
     return NextResponse.json({ ok: true, status: pagamento.status, encontrado: false });
   }
 
-  const mpPaymentId = consulta.mpPaymentId ?? pagamento.mpPaymentId ?? null;
+  // Defensivo: o MP devolve o id do pagamento como NUMERO; o campo e String.
+  // Converte na borda (dado externo) para nao quebrar o update do Prisma.
+  const mpPaymentId =
+    consulta.mpPaymentId != null
+      ? String(consulta.mpPaymentId)
+      : (pagamento.mpPaymentId ?? null);
 
   if (consulta.status === "approved") {
     await prisma.pagamento.update({
