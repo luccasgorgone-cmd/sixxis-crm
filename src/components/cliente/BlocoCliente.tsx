@@ -509,7 +509,7 @@ function Formulario({
         <select
           value={segmento}
           onChange={(e) => setSegmento(e.target.value)}
-          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          className="campo w-full"
         >
           <option value="">Nao definido</option>
           <option value="VAREJO">Varejo</option>
@@ -525,7 +525,7 @@ function Formulario({
           onChange={(e) => setAnotacoes(e.target.value)}
           rows={3}
           placeholder="Observacoes internas sobre o cliente"
-          className="scroll-fino w-full resize-none rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+          className="campo scroll-fino w-full resize-none"
         />
       </div>
       {erro && <p className="text-xs text-erro">{erro}</p>}
@@ -576,7 +576,7 @@ function Campo({
         value={valor}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+        className="campo w-full"
       />
     </div>
   );
