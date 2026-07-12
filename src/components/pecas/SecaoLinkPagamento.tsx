@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Plus,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatarBRL } from "@/lib/format";
@@ -171,6 +172,8 @@ export function SecaoLinkPagamento({
   }
 
   const podeGerar = temItens && totalFinal > 0;
+  // Pedido todo em garantia (pos-venda): ha itens mas total 0 -> nada a cobrar.
+  const semCobrancaGarantia = temItens && totalFinal === 0;
   // Valor mudou apos gerar? Oferece regenerar (sem sobrescrever silenciosamente).
   const valorMudou =
     pag != null &&
@@ -191,8 +194,16 @@ export function SecaoLinkPagamento({
         )}
       </div>
 
-      {/* Sem cobranca ainda: botao gerar. */}
-      {!carregando && !pag && (
+      {/* Pedido em garantia (total 0 com itens): nada a cobrar — sem botao. */}
+      {!carregando && !pag && semCobrancaGarantia && (
+        <p className="flex items-center gap-1.5 text-[11px] text-medio/60">
+          <ShieldCheck className="h-3.5 w-3.5 text-tiffany" />
+          Sem cobrança — pedido em garantia
+        </p>
+      )}
+
+      {/* Sem cobranca ainda (e ha valor a cobrar): botao gerar. */}
+      {!carregando && !pag && !semCobrancaGarantia && (
         <button
           type="button"
           onClick={() => void gerar()}

@@ -96,8 +96,9 @@ export async function POST(
 
   const valor = Math.round(Number(montagem.dados.totalFinal) * 100) / 100;
   if (!(valor > 0)) {
+    // Total zero = pedido todo em garantia (pos-venda): nada a cobrar do cliente.
     return NextResponse.json(
-      { erro: "Total do orçamento precisa ser maior que zero." },
+      { erro: "Nada a cobrar — pedido em garantia." },
       { status: 422 },
     );
   }
