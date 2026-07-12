@@ -34,6 +34,7 @@ import {
   SecaoEtapa,
   SecaoSegmento,
   SecaoDecisoes,
+  SecaoEtiquetas,
 } from "@/components/shared/SecoesPainel";
 import { useToast } from "@/components/ui/Toast";
 import type {
@@ -256,7 +257,19 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* 4. Etapa */}
+          {/* 4. Etiquetas (abaixo da Temperatura na venda; ocupa o lugar dela na
+              pos-venda). */}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <SecaoEtiquetas
+              etiquetas={etiquetas}
+              aplicadas={detalhe.etiquetas}
+              negocioId={negocioId}
+              recarregar={carregarNegocio}
+              onAtualizado={() => void carregarCliente()}
+            />
+          )}
+
+          {/* 5. Etapa */}
           {detalhe && negocioId && podeAcoesNegocio && (
             <SecaoEtapa
               etapaId={detalhe.etapaId}

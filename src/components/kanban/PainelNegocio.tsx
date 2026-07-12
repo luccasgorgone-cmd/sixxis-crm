@@ -71,6 +71,7 @@ import {
   SecaoEtapa,
   SecaoSegmento,
   SecaoDecisoes,
+  SecaoEtiquetas,
 } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
@@ -483,7 +484,17 @@ export function PainelNegocio({
                   salvar={salvar}
                 />
 
-                {/* 4. Etapa */}
+                {/* 4. Etiquetas (abaixo da Temperatura na venda; ocupa o lugar
+                    dela na pos-venda, onde Temperatura nao aparece). */}
+                <SecaoEtiquetas
+                  etiquetas={etiquetas}
+                  aplicadas={detalhe.etiquetas}
+                  negocioId={negocioId}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
+                />
+
+                {/* 5. Etapa */}
                 <SecaoEtapa
                   etapaId={detalhe.etapaId}
                   etapas={etapasFunil}
