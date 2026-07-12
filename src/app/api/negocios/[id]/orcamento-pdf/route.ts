@@ -8,6 +8,7 @@ import { obterAgente } from "@/lib/autorizacao";
 import { checarAcessoNegocio, montarDadosPdfOrcamento } from "@/lib/orcamentoDados";
 import { gerarPdfOrcamento } from "@/lib/orcamentoPdf";
 import { enviarParaR2ComRetry } from "@/lib/r2";
+import { codigoAgente } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,12 +37,14 @@ export async function POST(
     );
   }
 
-  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
+  // Codigo anonimo do atendente (Fatia J): mesmo do envio, para o preview casar.
+  const cod = codigoAgente(agente.id);
+  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo, cod);
   const buffer = Buffer.from(bytes);
 
   // Chave VERSIONADA por geracao (epoch): cada PDF vira um objeto novo no R2, entao
   // a URL muda sempre e o navegador nunca serve uma versao antiga em cache (3.16).
-  const chave = `orcamentos/orc-${id}-${Date.now()}.pdf`;
+  const chave = `orcamentos/orc-${id}-${cod}-${Date.now()}.pdf`;
   const url = await enviarParaR2ComRetry(chave, buffer, "application/pdf");
   if (!url) {
     return NextResponse.json(

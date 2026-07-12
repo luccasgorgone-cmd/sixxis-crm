@@ -1,6 +1,15 @@
 // Helpers de formatacao para a UI (executados no browser).
 import { ehTelefoneValidoBR } from "./ddd";
 
+// Codigo ANONIMO curto e ESTAVEL do atendente (Fatia J), derivado do agenteId —
+// SEM nome de pessoa. Ex.: agenteId "...a7k2f" -> "A7K2F". Permite distinguir e
+// rastrear quem emitiu um PDF sem expor identidade. Sem id -> "A0000".
+export function codigoAgente(agenteId?: string | null): string {
+  const base = (agenteId ?? "").replace(/[^a-zA-Z0-9]/g, "");
+  if (!base) return "A0000";
+  return `A${base.slice(-4).toUpperCase()}`;
+}
+
 // Rotulo curto para "telefones" que na verdade sao @lid (numero mascarado do
 // WhatsApp) ou lixo: nunca exibimos o numero interno gigante de 14-15 digitos.
 const ROTULO_SEM_TELEFONE = "Contato WhatsApp";

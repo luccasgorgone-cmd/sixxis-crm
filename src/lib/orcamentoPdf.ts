@@ -170,6 +170,9 @@ function quebrarTexto(
 export async function gerarPdfOrcamento(
   dados: DadosPdfOrcamento,
   logo?: LogoEmbed | null,
+  // Codigo anonimo do atendente (Fatia J): impresso discreto no rodape, permite
+  // rastrear quem emitiu sem expor nome. Ausente -> linha omitida.
+  codigoAtendente?: string | null,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`Orçamento ${dados.numeroFormatado}`);
@@ -503,6 +506,16 @@ export async function gerarPdfOrcamento(
     color: ESCURO,
   });
   textoDir(page, MARCA.site, xDir, yF, 9.5, fonteBold, TIFFANY);
+  // Codigo anonimo do atendente (Fatia J): discreto, abaixo da nota de validade.
+  if (codigoAtendente) {
+    page.drawText(`Atendimento: ${sanitizar(codigoAtendente)}`, {
+      x: xEsq,
+      y: yF - 12,
+      size: 7.5,
+      font: fonte,
+      color: CINZA_CLARO,
+    });
+  }
 
   // ---- Numeracao de pagina (so quando passa de 1) ----
   const pages = doc.getPages();

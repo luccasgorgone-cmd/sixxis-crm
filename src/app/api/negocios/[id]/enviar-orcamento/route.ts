@@ -13,6 +13,7 @@ import { enviarMidia } from "@/lib/evolution";
 import { enviarParaR2ComRetry } from "@/lib/r2";
 import { checarAcessoNegocio, montarDadosPdfOrcamento } from "@/lib/orcamentoDados";
 import { gerarPdfOrcamento } from "@/lib/orcamentoPdf";
+import { codigoAgente } from "@/lib/format";
 import {
   DirecaoMsg,
   TipoMsg,
@@ -73,13 +74,16 @@ export async function POST(
   // Gera o PDF (logo da marca, se PNG/JPEG/WEBP) e sobe no R2 com chave VERSIONADA
   // por geracao (epoch): cada envio vira um objeto novo -> o WhatsApp/navegador
   // sempre baixa a versao atual, nunca um PDF antigo em cache (Fatia 3.16).
-  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo);
+  // Codigo anonimo do atendente (Fatia J): distingue os arquivos por atendente
+  // sem expor nome. Entra na chave R2, no nome do arquivo e no rodape do PDF.
+  const cod = codigoAgente(agente.id);
+  const bytes = await gerarPdfOrcamento(montagem.dados, montagem.logo, cod);
   const buffer = Buffer.from(bytes);
-  const chave = `orcamentos/orc-${id}-${Date.now()}.pdf`;
+  const chave = `orcamentos/orc-${id}-${cod}-${Date.now()}.pdf`;
   const mediaUrl = await enviarParaR2ComRetry(chave, buffer, "application/pdf");
   const midiaParaEnviar = mediaUrl ?? buffer.toString("base64");
 
-  const nomeArquivo = `Orcamento-${montagem.numeroFormatado}.pdf`;
+  const nomeArquivo = `Orcamento-${montagem.numeroFormatado}-${cod}.pdf`;
   const instanciaEvolution =
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
 
