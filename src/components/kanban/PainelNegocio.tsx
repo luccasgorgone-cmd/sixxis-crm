@@ -58,19 +58,17 @@ import { useToast } from "@/components/ui/Toast";
 import {
   BadgeFinalidade,
   BadgeStatusNegocio,
-  BadgeTemperatura,
   BadgePendente,
 } from "@/components/badges";
 import {
-  TEMPERATURA_INFO,
   type DetalheNegocio,
   type Etapa,
   type EtiquetaChip,
   type AgenteResumo,
-  type Temperatura,
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
+import { SecaoTemperatura, SecaoEtapa } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
@@ -470,6 +468,19 @@ export function PainelNegocio({
                   onMensagemEnviada={(msg) => injetorThreadRef.current?.(msg)}
                 />
 
+                <SecaoTemperatura
+                  temperatura={detalhe.temperatura}
+                  finalidade={detalhe.finalidade}
+                  salvar={salvar}
+                />
+
+                <SecaoEtapa
+                  etapaId={detalhe.etapaId}
+                  etapas={etapasFunil}
+                  salvar={salvar}
+                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
+                />
+
                 <NegocioAcoes
                   detalhe={detalhe}
                   ehAdmin={ehAdmin}
@@ -746,14 +757,6 @@ export function NegocioAcoes({
       .catch(() => undefined);
   }, [transferindo, vendedores.length, detalhe.finalidade]);
 
-  function aoTrocarEtapa(novaEtapaId: string) {
-    const et = etapas.find((e) => e.id === novaEtapaId);
-    if (!et || novaEtapaId === detalhe.etapaId) return;
-    if (et.tipo === "GANHO") return abrirModal("ganho", novaEtapaId);
-    if (et.tipo === "PERDIDO") return abrirModal("perdido", novaEtapaId);
-    void salvar({ etapaId: novaEtapaId });
-  }
-
   async function aplicarEtiqueta(etiquetaId: string) {
     setAddEtiqueta(false);
     try {
@@ -948,22 +951,6 @@ export function NegocioAcoes({
         </div>
       )}
 
-      {/* Etapa */}
-      <div>
-        <Rotulo>Etapa</Rotulo>
-        <select
-          value={detalhe.etapaId ?? ""}
-          onChange={(e) => aoTrocarEtapa(e.target.value)}
-          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-        >
-          {etapas.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nome}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <Secao titulo="Gestão">
       {/* Dono / atribuicao / transferencia */}
       <div>
@@ -1088,34 +1075,6 @@ export function NegocioAcoes({
       </div>
       </Secao>
 
-      {/* Temperatura (so venda) */}
-        {/* Temperatura so na VENDA. Pos-venda usa ganho/pendente/perdido +
-            garantia (o campo Negocio.temperatura permanece no banco). */}
-        {detalhe.finalidade !== "POS_VENDA" && (
-          <div>
-            <Rotulo>Temperatura</Rotulo>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TEMPERATURA_INFO) as Temperatura[]).map((t) => {
-                const ativo = detalhe.temperatura === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      if (!ativo) void salvar({ temperatura: t });
-                    }}
-                    className={`rounded-lg border px-1.5 py-1 transition-colors ${
-                      ativo
-                        ? "border-tiffany bg-tiffany/5"
-                        : "border-transparent hover:bg-black/5"
-                    }`}
-                  >
-                    <BadgeTemperatura temperatura={t} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       {/* Pendencia operacional */}
       <BlocoPendencia detalhe={detalhe} salvar={salvar} />
 

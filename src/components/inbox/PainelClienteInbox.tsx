@@ -23,6 +23,7 @@ import {
   Notas,
 } from "@/components/kanban/PainelNegocio";
 import { ModalFechamento, type DadosFechamento } from "@/components/kanban/ModalFechamento";
+import { SecaoTemperatura, SecaoEtapa } from "@/components/shared/SecoesPainel";
 import { useToast } from "@/components/ui/Toast";
 import type {
   DetalheNegocio,
@@ -238,6 +239,21 @@ export function PainelClienteInbox({
           )}
 
           {/* (c) Decisoes / etapa / gestao — os mesmos controles do Kanban. */}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <SecaoTemperatura
+              temperatura={detalhe.temperatura}
+              finalidade={detalhe.finalidade}
+              salvar={salvar}
+            />
+          )}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <SecaoEtapa
+              etapaId={detalhe.etapaId}
+              etapas={etapasFunil}
+              salvar={salvar}
+              abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+            />
+          )}
           {detalhe && negocioId && podeAcoesNegocio && (
             <NegocioAcoes
               detalhe={detalhe}
