@@ -1,10 +1,20 @@
 "use client";
 
-// Bloco "Pedidos" da ficha: lista os pedidos GANHOS do cliente (venda e pecas)
-// com itens, quantidades, valores, frete, total e data. Permite "Repetir pedido"
-// (pre-carrega o compositor de ganho com os itens). Historico nunca e apagado.
+// Secao "Pedidos" da ficha (Fatia E): PEDIDO = ORCAMENTO com decisao GANHO (PED-
+// 000000, imutavel). Lista os pedidos do cliente com PED, data, valor, selo de
+// pagamento, NF (numero + data) e rastreio(s). Colapsada por padrao. Permite
+// "Repetir pedido" (pre-carrega o compositor de ganho com os itens). Nivel lead:
+// vale para venda e pos-venda. Padrao da casa: dark, tiffany, Lucide, sem emoji.
 import { useCallback, useEffect, useState } from "react";
-import { ShoppingBag, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
+import {
+  ShoppingBag,
+  ChevronRight,
+  ChevronDown,
+  RefreshCw,
+  Loader2,
+  FileText,
+  Truck,
+} from "lucide-react";
 import { formatarBRL } from "@/lib/format";
 
 export type ItemPedidoSeed = {
@@ -15,20 +25,57 @@ export type ItemPedidoSeed = {
 };
 
 type Pedido = {
+  id: string;
   negocioId: string;
+  numeroFormatado: string;
   finalidade: string;
   data: string | null;
   total: number | null;
-  valorProdutos: number | null;
   frete: number | null;
   fretePagoPelaEmpresa?: boolean;
-  freteDespesa?: number | null;
-  itens: (ItemPedidoSeed & { subtotal: number })[];
+  itens: (ItemPedidoSeed & { garantia: boolean; subtotal: number })[];
+  notasFiscais: { id: string; numero: string; dataNF: string }[];
+  rastreios: { id: string; codigo: string; transportadora: string | null }[];
+  pagamento: { status: string; valor: number; pagoEm: string | null } | null;
 };
 
 function dataCurta(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
+function dataBR(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+// Selo compacto da situacao de pagamento do pedido (cobranca vinculada).
+function SeloPagamento({ status }: { status: string | null | undefined }) {
+  if (status === "pago") {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-green-600/10 text-green-700">
+        Pago
+      </span>
+    );
+  }
+  if (status === "pendente") {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-amber-500/10 text-amber-600">
+        A pagar
+      </span>
+    );
+  }
+  if (status) {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-black/5 text-medio/60">
+        {status}
+      </span>
+    );
+  }
+  return <span className="shrink-0 text-[9px] font-semibold text-medio/30">—</span>;
 }
 
 export function BlocoPedidos({
@@ -38,148 +85,169 @@ export function BlocoPedidos({
   leadId: string;
   onRepetir?: (itens: ItemPedidoSeed[]) => void;
 }) {
+  const [aberto, setAberto] = useState(false);
   const [pedidos, setPedidos] = useState<Pedido[] | null>(null);
-  const [aberto, setAberto] = useState<string | null>(null);
+  const [expandido, setExpandido] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
       const r = await fetch(`/api/leads/${leadId}/pedidos`);
-      if (r.ok) setPedidos((await r.json()).pedidos ?? []);
-      else setPedidos([]);
+      setPedidos(r.ok ? (await r.json()).pedidos ?? [] : []);
     } catch {
       setPedidos([]);
     }
   }, [leadId]);
 
+  // Colapsada por padrao: busca ao abrir (e ao reabrir/trocar de lead).
   useEffect(() => {
-    void carregar();
-  }, [carregar]);
-
-  if (pedidos === null) {
-    return (
-      <section>
-        <Cabec />
-        <div className="flex items-center justify-center py-4 text-medio/40">
-          <Loader2 className="h-4 w-4 animate-spin" />
-        </div>
-      </section>
-    );
-  }
+    if (aberto) void carregar();
+  }, [aberto, carregar]);
 
   return (
-    <section>
-      <Cabec quantidade={pedidos.length} />
-      {pedidos.length === 0 ? (
-        <p className="text-sm text-medio/50">Nenhum pedido fechado ainda.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {pedidos.map((p) => {
-            const expandido = aberto === p.negocioId;
-            return (
-              <div key={p.negocioId} className="rounded-lg border border-black/5 bg-white">
-                <button
-                  onClick={() => setAberto(expandido ? null : p.negocioId)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="whitespace-nowrap text-sm font-semibold text-escuro">
-                        {p.total != null ? formatarBRL(p.total) : "—"}
+    <section className="rounded-xl border border-black/5 bg-white">
+      <button
+        onClick={() => setAberto((a) => !a)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left"
+      >
+        <ShoppingBag className="h-3.5 w-3.5 text-medio/50" />
+        <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-medio/50">
+          Pedidos
+        </span>
+        {pedidos != null && pedidos.length > 0 && (
+          <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold text-medio/60">
+            {pedidos.length}
+          </span>
+        )}
+        <ChevronRight
+          className={`h-4 w-4 text-medio/40 transition-transform ${aberto ? "rotate-90" : ""}`}
+        />
+      </button>
+
+      {aberto && (
+        <div className="px-4 pb-4">
+          {pedidos === null ? (
+            <div className="flex justify-center py-4 text-medio/40">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : pedidos.length === 0 ? (
+            <p className="py-2 text-xs text-medio/50">Nenhum pedido fechado ainda.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {pedidos.map((p) => {
+                const exp = expandido === p.id;
+                return (
+                  <div key={p.id} className="overflow-hidden rounded-lg border border-black/5 bg-fundo">
+                    <button
+                      onClick={() => setExpandido(exp ? null : p.id)}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+                    >
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 text-medio/40 transition-transform ${exp ? "rotate-180" : ""}`}
+                      />
+                      <span className="shrink-0 font-mono text-xs font-semibold text-escuro">
+                        {p.numeroFormatado}
                       </span>
-                      <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-medio/60">
+                      <span className="shrink-0 text-[11px] text-medio/50">{dataCurta(p.data)}</span>
+                      <span className="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-medium text-medio/60">
                         {p.finalidade === "POS_VENDA" ? "Pecas" : "Venda"}
                       </span>
-                    </div>
-                    <p className="text-xs text-medio/50">
-                      {dataCurta(p.data)}
-                      {p.itens.length > 0 && ` · ${p.itens.length} ${p.itens.length === 1 ? "item" : "itens"}`}
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-medio/40 transition-transform ${expandido ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {expandido && (
-                  <div className="border-t border-black/5 px-3 py-2">
-                    {p.itens.length > 0 ? (
-                      <div className="space-y-1">
-                        {p.itens.map((it, i) => (
-                          <div key={i} className="flex items-center justify-between gap-2 text-xs">
-                            <span className="min-w-0 truncate text-escuro">
-                              {it.quantidade}x {it.descricao}
-                            </span>
-                            <span className="shrink-0 whitespace-nowrap text-medio/60">
-                              {formatarBRL(it.subtotal)}
-                            </span>
+                      <SeloPagamento status={p.pagamento?.status} />
+                      <span className="ml-auto shrink-0 text-xs font-semibold text-escuro">
+                        {p.total != null ? formatarBRL(p.total) : "—"}
+                      </span>
+                    </button>
+
+                    {exp && (
+                      <div className="border-t border-black/5 px-2.5 py-2">
+                        {/* Itens */}
+                        {p.itens.length > 0 ? (
+                          <ul className="space-y-1">
+                            {p.itens.map((it, i) => (
+                              <li key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                                <span className="min-w-0 truncate text-medio/70">
+                                  <span className="text-medio/50">{it.quantidade}x </span>
+                                  {it.descricao}
+                                </span>
+                                {it.garantia ? (
+                                  <span className="shrink-0 text-tiffany">Garantia</span>
+                                ) : (
+                                  <span className="shrink-0 text-medio/60">
+                                    {formatarBRL(it.subtotal)}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-[11px] text-medio/50">Pedido sem itens detalhados.</p>
+                        )}
+
+                        <div className="mt-2 flex justify-between border-t border-black/5 pt-2 text-[11px] font-semibold text-escuro">
+                          <span>Total</span>
+                          <span>{p.total != null ? formatarBRL(p.total) : "—"}</span>
+                        </div>
+
+                        {/* Notas fiscais vinculadas (numero + data) */}
+                        {p.notasFiscais.length > 0 && (
+                          <div className="mt-2 border-t border-black/5 pt-2">
+                            <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-medio/40">
+                              <FileText className="h-3 w-3" /> Notas fiscais
+                            </p>
+                            <ul className="space-y-0.5 text-[11px] text-medio/60">
+                              {p.notasFiscais.map((n) => (
+                                <li key={n.id}>
+                                  <span className="font-mono font-semibold text-medio/80">{n.numero}</span>
+                                  {" · "}
+                                  {dataBR(n.dataNF)}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                        ))}
+                        )}
+
+                        {/* Rastreio(s) do negocio de origem */}
+                        {p.rastreios.length > 0 && (
+                          <div className="mt-2 border-t border-black/5 pt-2">
+                            <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-medio/40">
+                              <Truck className="h-3 w-3" /> Rastreio
+                            </p>
+                            <ul className="space-y-0.5 text-[11px] text-medio/60">
+                              {p.rastreios.map((r) => (
+                                <li key={r.id}>
+                                  <span className="font-mono text-medio/80">{r.codigo}</span>
+                                  {r.transportadora ? ` · ${r.transportadora}` : ""}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {onRepetir && p.itens.length > 0 && (
+                          <button
+                            onClick={() =>
+                              onRepetir(
+                                p.itens.map((it) => ({
+                                  produtoCatalogoId: it.produtoCatalogoId,
+                                  descricao: it.descricao,
+                                  quantidade: it.quantidade,
+                                  valorUnitario: it.valorUnitario,
+                                })),
+                              )
+                            }
+                            className="mt-2 flex items-center gap-1.5 rounded-lg border border-tiffany/30 px-2.5 py-1.5 text-xs font-medium text-tiffany transition-colors hover:bg-tiffany/10"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" /> Repetir pedido
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-medio/50">Pedido sem itens detalhados.</p>
-                    )}
-                    <div className="mt-2 space-y-0.5 border-t border-black/5 pt-2 text-xs text-medio/60">
-                      {p.valorProdutos != null && (
-                        <div className="flex justify-between">
-                          <span>Produtos</span>
-                          <span>{formatarBRL(p.valorProdutos)}</span>
-                        </div>
-                      )}
-                      {p.frete != null && p.frete > 0 && (
-                        <div className="flex justify-between">
-                          <span>Frete</span>
-                          <span>{formatarBRL(p.frete)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-semibold text-escuro">
-                        <span>Total</span>
-                        <span>{p.total != null ? formatarBRL(p.total) : "—"}</span>
-                      </div>
-                      {/* Frete pago pela empresa: despesa (fora do total do cliente). */}
-                      {p.fretePagoPelaEmpresa && p.freteDespesa != null && p.freteDespesa > 0 && (
-                        <div className="mt-1 flex justify-between rounded-md bg-amber-50 px-1.5 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
-                          <span>Frete (pago pela empresa · despesa)</span>
-                          <span>{formatarBRL(p.freteDespesa)}</span>
-                        </div>
-                      )}
-                    </div>
-                    {onRepetir && p.itens.length > 0 && (
-                      <button
-                        onClick={() =>
-                          onRepetir(
-                            p.itens.map((it) => ({
-                              produtoCatalogoId: it.produtoCatalogoId,
-                              descricao: it.descricao,
-                              quantidade: it.quantidade,
-                              valorUnitario: it.valorUnitario,
-                            })),
-                          )
-                        }
-                        className="mt-2 flex items-center gap-1.5 rounded-lg border border-tiffany/30 px-2.5 py-1.5 text-xs font-medium text-tiffany transition-colors hover:bg-tiffany/10"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" /> Repetir pedido
-                      </button>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </section>
-  );
-}
-
-function Cabec({ quantidade }: { quantidade?: number }) {
-  return (
-    <div className="mb-2 flex items-center gap-1.5">
-      <ShoppingBag className="h-4 w-4 text-tiffany" />
-      <h3 className="text-sm font-semibold text-escuro">Pedidos</h3>
-      {quantidade != null && quantidade > 0 && (
-        <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold text-medio/60">
-          {quantidade}
-        </span>
-      )}
-    </div>
   );
 }

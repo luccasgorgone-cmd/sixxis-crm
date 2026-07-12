@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, UserX } from "lucide-react";
 import { BlocoCliente, type ClientePainel } from "@/components/cliente/BlocoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
+import { BlocoPedidos } from "@/components/cliente/BlocoPedidos";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import {
   BlocoOrcamento,
@@ -336,6 +337,9 @@ export function PainelClienteInbox({
               onTransferido={onTransferido}
             />
           )}
+
+          {/* 13. Pedidos do cliente (colapsado). Sem "repetir" no inbox. */}
+          <BlocoPedidos leadId={leadId} />
 
           {/* 14. Notas (+ Historico do cliente logo apos) */}
           {detalhe && negocioId && (
