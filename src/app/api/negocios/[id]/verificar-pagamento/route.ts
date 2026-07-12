@@ -23,10 +23,18 @@ export async function POST(
   const acesso = await checarAcessoNegocio(agente, id);
   if (!acesso.ok) return NextResponse.json({ erro: acesso.erro }, { status: acesso.status });
 
-  const externalReference = `crm-${id}`;
-  const pagamento = await prisma.pagamento.findUnique({
-    where: { externalReference },
-    select: { id: true, negocioId: true, status: true, mpPaymentId: true, referencia: true },
+  // Cobranca MAIS RECENTE do negocio (Fatia A: 1-N).
+  const pagamento = await prisma.pagamento.findFirst({
+    where: { negocioId: id },
+    orderBy: { criadoEm: "desc" },
+    select: {
+      id: true,
+      negocioId: true,
+      status: true,
+      mpPaymentId: true,
+      referencia: true,
+      externalReference: true,
+    },
   });
   if (!pagamento) {
     return NextResponse.json(
@@ -42,9 +50,11 @@ export async function POST(
 
   // Confirma no MP via Loja: por mpPaymentId (se o webhook ja trouxe) ou, quando
   // nao ha id (webhook nunca chegou), por external_reference (busca).
+  // Consulta por external_reference usa a ARMAZENADA na linha (legado "crm-{id}"
+  // ou "crm-{id}-{seq}") — nunca reconstruida na mao.
   const consulta = pagamento.mpPaymentId
     ? await consultarPagamento(pagamento.mpPaymentId)
-    : await consultarPorReferencia(externalReference);
+    : await consultarPorReferencia(pagamento.externalReference);
 
   if (!consulta.ok) {
     return NextResponse.json(

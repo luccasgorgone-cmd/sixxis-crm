@@ -27,9 +27,11 @@ export async function POST(
   const acesso = await checarAcessoNegocio(agente, id);
   if (!acesso.ok) return NextResponse.json({ erro: acesso.erro }, { status: acesso.status });
 
-  // Cobranca ativa do negocio (precisa existir: gerar o link primeiro).
-  const pagamento = await prisma.pagamento.findUnique({
-    where: { externalReference: `crm-${id}` },
+  // Cobranca MAIS RECENTE do negocio (Fatia A: 1-N; precisa existir — gerar o
+  // link primeiro).
+  const pagamento = await prisma.pagamento.findFirst({
+    where: { negocioId: id },
+    orderBy: { criadoEm: "desc" },
     select: { initPoint: true, referencia: true, valor: true },
   });
   if (!pagamento?.initPoint) {
