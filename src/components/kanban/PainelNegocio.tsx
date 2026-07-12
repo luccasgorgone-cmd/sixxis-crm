@@ -68,7 +68,7 @@ import {
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
-import { SecaoTemperatura, SecaoEtapa } from "@/components/shared/SecoesPainel";
+import { SecaoTemperatura, SecaoEtapa, SecaoSegmento } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
@@ -480,6 +480,14 @@ export function PainelNegocio({
                   salvar={salvar}
                   abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
                 />
+
+                {/* Segmento (Varejo/Atacado): so na VENDA. */}
+                {detalhe.finalidade !== "POS_VENDA" && (
+                  <SecaoSegmento
+                    leadId={detalhe.cliente.id}
+                    onAtualizado={() => void carregar()}
+                  />
+                )}
 
                 <NegocioAcoes
                   detalhe={detalhe}

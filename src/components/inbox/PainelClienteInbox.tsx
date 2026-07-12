@@ -23,7 +23,7 @@ import {
   Notas,
 } from "@/components/kanban/PainelNegocio";
 import { ModalFechamento, type DadosFechamento } from "@/components/kanban/ModalFechamento";
-import { SecaoTemperatura, SecaoEtapa } from "@/components/shared/SecoesPainel";
+import { SecaoTemperatura, SecaoEtapa, SecaoSegmento } from "@/components/shared/SecoesPainel";
 import { useToast } from "@/components/ui/Toast";
 import type {
   DetalheNegocio,
@@ -253,6 +253,10 @@ export function PainelClienteInbox({
               salvar={salvar}
               abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
             />
+          )}
+          {/* Segmento (Varejo/Atacado): so na VENDA. */}
+          {detalhe && negocioId && podeAcoesNegocio && detalhe.finalidade !== "POS_VENDA" && (
+            <SecaoSegmento leadId={leadId} onAtualizado={() => void carregarCliente()} />
           )}
           {detalhe && negocioId && podeAcoesNegocio && (
             <NegocioAcoes
