@@ -29,6 +29,7 @@ import {
   Notas,
 } from "@/components/kanban/PainelNegocio";
 import { ModalFechamento, type DadosFechamento } from "@/components/kanban/ModalFechamento";
+import { fetchCacheado } from "@/lib/cacheClient";
 import {
   SecaoTemperatura,
   SecaoEtapa,
@@ -144,23 +145,22 @@ export function PainelClienteInbox({
     void carregarNegocio();
   }, [carregarNegocio]);
 
+  // Listas quase-estaticas (etapas/etiquetas/agentes/observacoes): cacheadas no
+  // client (Fatia L). Trocar de conversa reusa o cache — sem rebuscar as 4 a cada
+  // troca. A invalidacao (ao editar etiqueta/agente etc.) fica no fluxo de edicao.
   useEffect(() => {
     if (!negocioId) return;
-    fetch("/api/observacoes")
-      .then((r) => (r.ok ? r.json() : { observacoes: [] }))
+    fetchCacheado<{ observacoes?: ObservacaoOpcao[] }>("/api/observacoes")
       .then((d) => setPresets(d.observacoes ?? []))
       .catch(() => undefined);
-    fetch("/api/etapas")
-      .then((r) => (r.ok ? r.json() : { etapas: [] }))
-      .then((d) => setEtapas((d.etapas as Etapa[]) ?? []))
+    fetchCacheado<{ etapas?: Etapa[] }>("/api/etapas")
+      .then((d) => setEtapas(d.etapas ?? []))
       .catch(() => undefined);
-    fetch("/api/etiquetas")
-      .then((r) => (r.ok ? r.json() : { etiquetas: [] }))
+    fetchCacheado<{ etiquetas?: EtiquetaChip[] }>("/api/etiquetas")
       .then((d) => setEtiquetas(d.etiquetas ?? []))
       .catch(() => undefined);
     if (ehAdmin) {
-      fetch("/api/agentes")
-        .then((r) => (r.ok ? r.json() : { agentes: [] }))
+      fetchCacheado<{ agentes?: AgenteResumo[] }>("/api/agentes")
         .then((d) => setAgentes(d.agentes ?? []))
         .catch(() => undefined);
     }

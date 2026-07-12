@@ -34,6 +34,7 @@ import { lerPagamentos, formatarLinhaPagamento, type LinhaPagamento } from "@/li
 import { SecaoFrete } from "@/components/pecas/SecaoFrete";
 import { SecaoLinkPagamento } from "@/components/pecas/SecaoLinkPagamento";
 import { SeloGarantia } from "@/components/shared/SeloGarantia";
+import { fetchCacheado } from "@/lib/cacheClient";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -206,9 +207,12 @@ function EditorOrcamento(props: EditorProps) {
 
   useEffect(() => {
     let vivo = true;
+    // Catalogo (produtos/pecas) e quase-estatico: cacheado no client (Fatia L)
+    // para nao rebuscar ~652 itens a cada montagem/troca de cliente.
     if (ehVenda) {
-      fetch("/api/orcamento/produtos")
-        .then((r) => (r.ok ? r.json() : { produtos: [], categorias: [] }))
+      fetchCacheado<{ produtos?: ProdutoLoja[]; categorias?: string[] }>(
+        "/api/orcamento/produtos",
+      )
         .then((d) => {
           if (!vivo) return;
           setProdutos(d.produtos ?? []);
@@ -216,8 +220,7 @@ function EditorOrcamento(props: EditorProps) {
         })
         .catch(() => undefined);
     } else {
-      fetch("/api/pecas")
-        .then((r) => (r.ok ? r.json() : { itens: [] }))
+      fetchCacheado<{ itens?: PecaCat[] }>("/api/pecas")
         .then((d) => {
           if (vivo) setPecas(d.itens ?? []);
         })

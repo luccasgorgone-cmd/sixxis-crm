@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EstadoErro } from "@/components/ui/Estado";
 import { formatarBRL } from "@/lib/format";
+import { invalidarCache } from "@/lib/cacheClient";
 
 type Peca = {
   id: string;
@@ -489,6 +490,8 @@ function ModalPeca({
         toast.erro("Não foi possível salvar.");
         return;
       }
+      // Catalogo mudou -> invalida o cache do orcamento (Fatia L).
+      invalidarCache("/api/pecas");
       onSalvo();
     } catch {
       toast.erro("Falha de conexão.");
@@ -671,6 +674,7 @@ function ModalMovimentar({
         return;
       }
       toast.sucesso("Estoque atualizado.");
+      invalidarCache("/api/pecas");
       onSalvo();
     } catch {
       toast.erro("Falha de conexão.");
