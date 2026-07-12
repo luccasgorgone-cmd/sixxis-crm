@@ -647,7 +647,10 @@ function EditorOrcamento(props: EditorProps) {
       {sel ? (
         <div className="space-y-2 rounded-lg border border-tiffany/30 bg-tiffany/[0.03] p-2.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="min-w-0 flex-1 truncate text-sm font-medium text-escuro">
+            <p
+              className="min-w-0 flex-1 truncate text-sm font-medium text-escuro"
+              title={[sel.nome, sel.modelo].filter(Boolean).join(" ")}
+            >
               {[sel.nome, sel.modelo].filter(Boolean).join(" ")}
               {sel.voltagem && (
                 <span className="ml-1 rounded bg-tiffany/10 px-1 py-0.5 text-[10px] font-semibold text-tiffany">
@@ -731,8 +734,8 @@ function EditorOrcamento(props: EditorProps) {
                     onClick={() => escolherProduto(p)}
                     className="flex w-full items-center gap-2 rounded-lg border border-black/5 px-2.5 py-1.5 text-left hover:border-tiffany/40 hover:bg-tiffany/[0.03]"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm text-escuro">{p.nome}</span>
-                    <span className="shrink-0 text-xs">
+                    <span className="min-w-0 flex-1 truncate text-sm text-escuro" title={p.nome}>{p.nome}</span>
+                    <span className="shrink-0 text-xs tabular-nums">
                       {promo && <span className="mr-1 text-medio/40 line-through">{formatarBRL(p.preco)}</span>}
                       <span className="font-medium text-escuro">{formatarBRL(precoLoja(p))}</span>
                     </span>
@@ -784,7 +787,7 @@ function EditorOrcamento(props: EditorProps) {
               }`}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-escuro">
+                <p className="truncate text-sm text-escuro" title={[u.nome, u.modelo].filter(Boolean).join(" ")}>
                   {!qtdUrl && <span className="text-medio/60">{u.quantidade}x </span>}
                   {u.nome}
                   {u.modelo && <span className="text-medio/50"> {u.modelo}</span>}
@@ -797,10 +800,10 @@ function EditorOrcamento(props: EditorProps) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   {mostrarGarantia && u.garantia ? (
                     <span className="flex items-center gap-1 text-[11px] font-semibold text-tiffany">
-                      <ShieldCheck className="h-3 w-3" /> Garantia
+                      <ShieldCheck className="h-3 w-3" /> Garantia - sem custo
                     </span>
                   ) : (
-                    <span className="text-[11px] text-medio/50">
+                    <span className="text-[11px] tabular-nums text-medio/50">
                       {u.precoSugerido != null ? formatarBRL(u.quantidade * u.precoSugerido) : "—"}
                     </span>
                   )}
@@ -937,34 +940,38 @@ function EditorOrcamento(props: EditorProps) {
             </label>
           </div>
 
-          <div className="space-y-0.5 border-t border-black/5 pt-2 text-xs">
-            <div className="flex justify-between text-medio/60">
+          <div className="space-y-1 border-t border-black/5 pt-2.5 text-xs">
+            <div className="flex items-baseline justify-between gap-2 text-medio/60">
               <span>Subtotal</span>
-              <span>{formatarBRL(subtotal)}</span>
+              <span className="tabular-nums">{formatarBRL(subtotal)}</span>
             </div>
             {descValor > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Desconto {orc.cupom ? `· cupom ${orc.cupom}` : ""}</span>
-                <span>− {formatarBRL(descValor)}</span>
+              <div className="flex items-baseline justify-between gap-2 text-green-600">
+                <span className="min-w-0 truncate" title={orc.cupom ? `Cupom ${orc.cupom}` : "Desconto"}>
+                  Desconto {orc.cupom ? `· cupom ${orc.cupom}` : ""}
+                </span>
+                <span className="shrink-0 tabular-nums">− {formatarBRL(descValor)}</span>
               </div>
             )}
-            <div className="flex justify-between text-medio/60">
-              <span>
+            <div className="flex items-baseline justify-between gap-2 text-medio/60">
+              <span className="min-w-0 truncate">
                 Frete
                 {orc.freteTransportadora && (
                   <span className="ml-1 text-medio/45">· {orc.freteTransportadora}</span>
                 )}
               </span>
-              <span>{orc.fretePagoPelaEmpresa ? "empresa" : `+ ${formatarBRL(freteAplicado)}`}</span>
+              <span className="shrink-0 tabular-nums">
+                {orc.fretePagoPelaEmpresa ? "empresa" : `+ ${formatarBRL(freteAplicado)}`}
+              </span>
             </div>
-            <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
+            <div className="mt-1 flex items-baseline justify-between gap-2 border-t border-black/10 pt-2 text-sm font-bold text-escuro">
               <span>Total</span>
-              <span className="text-tiffany">{formatarBRL(totalFinal)}</span>
+              <span className="tabular-nums text-tiffany">{formatarBRL(totalFinal)}</span>
             </div>
             {mostrarGarantia && totalGarantia > 0 && (
-              <div className="flex justify-between text-[11px] text-medio/50">
+              <div className="flex items-baseline justify-between gap-2 text-[11px] text-medio/50">
                 <span>Garantia (não cobrado)</span>
-                <span className="line-through">{formatarBRL(totalGarantia)}</span>
+                <span className="tabular-nums line-through">{formatarBRL(totalGarantia)}</span>
               </div>
             )}
           </div>
