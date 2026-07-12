@@ -53,6 +53,10 @@ export type DadosFechamento = {
   valorAjustado?: number | null;
   // Formas de pagamento congeladas no snapshot (Fatia 3.18): array validado.
   orcPagamentos?: LinhaPagamento[];
+  // Fatia E (checkout no GANHO): NF e rastreio OPCIONAIS, criados na transacao da
+  // decisao. Ausentes = comportamento atual.
+  nf?: { numero: string; dataNF: string };
+  rastreio?: { codigo: string; transportadora?: string | null };
 };
 
 export function ModalFechamento({
@@ -124,6 +128,13 @@ export function ModalFechamento({
   const [frete, setFrete] = useState(freteInicial != null ? String(freteInicial) : "");
   // Frete pago pela empresa: sai do total (vira despesa rastreavel).
   const [fretePagoPelaEmpresa, setFretePagoPelaEmpresa] = useState(fretePagoPelaEmpresaInicial);
+
+  // Checkout no GANHO (Fatia E): NF (numero + data) e rastreio (codigo +
+  // transportadora), todos OPCIONAIS.
+  const [nfNumero, setNfNumero] = useState("");
+  const [nfData, setNfData] = useState("");
+  const [rastCodigo, setRastCodigo] = useState("");
+  const [rastTransp, setRastTransp] = useState("");
 
   // Formas de pagamento (Fatia 3.18): editaveis no GANHO. Pre-carrega do rascunho
   // (prop direta ou fetch por negocioId). Congela no snapshot ao confirmar.
@@ -221,6 +232,18 @@ export function ModalFechamento({
     itens.length > 0 ? valorFinal : Math.max(0, Number((valor || "0").replace(",", ".")) || 0);
   const semPagamento = paraPersistir(pagamentos).length === 0;
 
+  // Extras de checkout (Fatia E): NF/rastreio quando preenchidos. Vazio = {}.
+  function checkoutExtras(): Pick<DadosFechamento, "nf" | "rastreio"> {
+    const extras: Pick<DadosFechamento, "nf" | "rastreio"> = {};
+    const num = nfNumero.trim();
+    if (num && nfData) extras.nf = { numero: num, dataNF: nfData };
+    const cod = rastCodigo.trim();
+    if (cod) {
+      extras.rastreio = { codigo: cod, transportadora: rastTransp.trim() || null };
+    }
+    return extras;
+  }
+
   async function confirmar() {
     setErro(null);
     if (ehGanho) {
@@ -254,6 +277,7 @@ export function ModalFechamento({
               valorUnitario: i.valorUnitario,
               ...(ehPeca ? { garantia: i.garantia } : {}),
             })),
+            ...checkoutExtras(),
           });
         } catch {
           setErro("Nao foi possivel concluir.");
@@ -269,7 +293,11 @@ export function ModalFechamento({
       }
       setSalvando(true);
       try {
-        await onConfirmar({ valor: v, orcPagamentos: paraPersistir(pagamentos) });
+        await onConfirmar({
+          valor: v,
+          orcPagamentos: paraPersistir(pagamentos),
+          ...checkoutExtras(),
+        });
       } catch {
         setErro("Nao foi possivel concluir.");
         setSalvando(false);
@@ -556,6 +584,42 @@ export function ModalFechamento({
                   Nenhuma forma de pagamento informada (opcional).
                 </p>
               )}
+
+              {/* Checkout (Fatia E): NF + rastreio, OPCIONAIS. Preenchidos, sao
+                  criados na mesma transacao da decisao (NF vinculada ao pedido). */}
+              <div className="space-y-2 rounded-lg border border-black/5 bg-fundo p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-medio/50">
+                  Nota fiscal e rastreio (opcional)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={nfNumero}
+                    onChange={(e) => setNfNumero(e.target.value)}
+                    placeholder="Numero da NF"
+                    className="campo min-w-28 flex-1 text-sm"
+                  />
+                  <input
+                    type="date"
+                    value={nfData}
+                    onChange={(e) => setNfData(e.target.value)}
+                    className="campo min-w-32 text-sm"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={rastCodigo}
+                    onChange={(e) => setRastCodigo(e.target.value)}
+                    placeholder="Codigo de rastreio"
+                    className="campo min-w-28 flex-1 text-sm"
+                  />
+                  <input
+                    value={rastTransp}
+                    onChange={(e) => setRastTransp(e.target.value)}
+                    placeholder="Transportadora"
+                    className="campo min-w-32 flex-1 text-sm"
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <>

@@ -263,6 +263,11 @@ export async function PATCH(
     orcFreteTransportadora?: string | null;
     // Formas de pagamento do rascunho (Fatia 3.18): array de { metodo, valor, parcelas }.
     orcPagamentos?: unknown;
+    // Fatia E (checkout no GANHO): NF (numero + data) e rastreio (codigo +
+    // transportadora) OPCIONAIS, criados na MESMA transacao do snapshot. Vazio =
+    // comportamento atual, sem erro.
+    nf?: { numero?: string | null; dataNF?: string | null } | null;
+    rastreio?: { codigo?: string | null; transportadora?: string | null } | null;
   };
   try {
     body = await req.json();
@@ -907,6 +912,42 @@ export async function PATCH(
                 where: { id: cobrancaSemVinculo.id },
                 data: { orcamentoId: orcCriado.id },
               });
+            }
+
+            // Fatia E (Bloco 3): checkout no GANHO. Cria, na MESMA transacao, a
+            // NotaFiscal (vinculada ao lead, negocio e Orcamento recem-criado) e o
+            // RastreioNegocio, quando informados. Vazio = segue sem erro.
+            if (decisao === "GANHO") {
+              const nfNumero =
+                typeof body.nf?.numero === "string" ? body.nf.numero.trim() : "";
+              const nfData =
+                body.nf?.dataNF != null ? new Date(String(body.nf.dataNF)) : null;
+              if (nfNumero && nfData && !Number.isNaN(nfData.getTime())) {
+                await tx.notaFiscal.create({
+                  data: {
+                    leadId: negocio.leadId,
+                    negocioId: id,
+                    orcamentoId: orcCriado.id,
+                    numero: nfNumero,
+                    dataNF: nfData,
+                    agenteId: agente.id,
+                  },
+                });
+              }
+              const rastCodigo =
+                typeof body.rastreio?.codigo === "string"
+                  ? body.rastreio.codigo.trim()
+                  : "";
+              if (rastCodigo) {
+                const transp =
+                  typeof body.rastreio?.transportadora === "string" &&
+                  body.rastreio.transportadora.trim()
+                    ? body.rastreio.transportadora.trim()
+                    : null;
+                await tx.rastreioNegocio.create({
+                  data: { negocioId: id, codigo: rastCodigo, transportadora: transp },
+                });
+              }
             }
           }
         }
