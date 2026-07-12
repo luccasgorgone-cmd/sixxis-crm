@@ -329,7 +329,6 @@ export function PainelClienteInbox({
               ehAdmin={ehAdmin}
               agenteIdAtual={agenteIdAtual}
               agentes={agentes}
-              etiquetas={etiquetas}
               negocioId={negocioId}
               salvar={salvar}
               recarregar={carregarNegocio}

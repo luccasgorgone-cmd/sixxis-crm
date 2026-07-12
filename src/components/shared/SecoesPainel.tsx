@@ -9,6 +9,9 @@ import {
   Thermometer,
   GitBranch,
   Store,
+  Tag,
+  Plus,
+  X,
   Loader2,
   PauseCircle,
   PlayCircle,
@@ -25,6 +28,7 @@ import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
   type Etapa,
+  type EtiquetaChip,
   type Temperatura,
 } from "@/components/kanban/tipos";
 
@@ -455,6 +459,131 @@ export function SecaoDecisoes({
       {/* Detalhe/desmarcar da pendencia operacional */}
       <BlocoPendencia detalhe={detalhe} salvar={salvar} />
     </div>
+  );
+}
+
+// Normaliza para comparacao case/acento-insensivel (Fatia I): remove as marcas
+// diacriticas combinantes (separadas do char base pelo NFD) e baixa a caixa.
+function normalizar(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+// Etiquetas que DUPLICAM a Temperatura: removidas apenas das OPCOES de aplicacao
+// (Fatia I). Nao sao apagadas/desativadas no banco; chips ja aplicados continuam
+// visiveis e removiveis.
+const ETIQUETAS_TEMPERATURA = new Set(["quente", "morno", "frio"]);
+
+// ----------------------------------------------------------------------------
+// SECAO ETIQUETAS (Fatia I): extraida da Gestao (NegocioAcoes) para secao propria
+// reutilizada pelos dois paineis. A logica de aplicar/remover e UNICA aqui. As
+// opcoes ocultam Quente/Morno/Frio (duplicam a Temperatura); chips ja aplicados
+// permanecem removiveis.
+// ----------------------------------------------------------------------------
+export function SecaoEtiquetas({
+  etiquetas,
+  aplicadas,
+  negocioId,
+  recarregar,
+  onAtualizado,
+}: {
+  etiquetas: EtiquetaChip[];
+  aplicadas: EtiquetaChip[];
+  negocioId: string;
+  recarregar: () => Promise<void>;
+  onAtualizado: () => void;
+}) {
+  const toast = useToast();
+  const [addAberto, setAddAberto] = useState(false);
+
+  // Opcoes: nao aplicadas E que nao sejam Quente/Morno/Frio (duplicam Temperatura).
+  const naoAplicadas = etiquetas.filter(
+    (e) =>
+      !aplicadas.some((ap) => ap.id === e.id) &&
+      !ETIQUETAS_TEMPERATURA.has(normalizar(e.nome)),
+  );
+
+  async function aplicarEtiqueta(etiquetaId: string) {
+    setAddAberto(false);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/etiquetas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ etiquetaId }),
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Etiqueta aplicada.");
+    } catch {
+      toast.erro("Não foi possível aplicar a etiqueta.");
+    }
+    await recarregar();
+    onAtualizado();
+  }
+
+  async function removerEtiqueta(etiquetaId: string) {
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/etiquetas/${etiquetaId}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error();
+      toast.sucesso("Etiqueta removida.");
+    } catch {
+      toast.erro("Não foi possível remover a etiqueta.");
+    }
+    await recarregar();
+    onAtualizado();
+  }
+
+  return (
+    <section className="rounded-xl border border-black/5 bg-white p-4">
+      <TituloSecao icone={Tag}>Etiquetas</TituloSecao>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {aplicadas.map((e) => (
+          <span
+            key={e.id}
+            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+            style={{ backgroundColor: e.cor }}
+          >
+            {e.nome}
+            <button
+              onClick={() => void removerEtiqueta(e.id)}
+              aria-label={`Remover ${e.nome}`}
+              className="rounded-full hover:bg-black/20"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        {naoAplicadas.length > 0 && (
+          <button
+            onClick={() => setAddAberto((v) => !v)}
+            className="flex items-center gap-1 rounded-full border border-dashed border-medio/30 px-2 py-0.5 text-xs text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+          >
+            <Plus className="h-3 w-3" /> Etiqueta
+          </button>
+        )}
+      </div>
+      {addAberto && naoAplicadas.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-black/5 bg-fundo p-2">
+          {naoAplicadas.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => void aplicarEtiqueta(e.id)}
+              className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-0.5 text-xs text-escuro hover:bg-black/5"
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: e.cor }}
+              />
+              {e.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

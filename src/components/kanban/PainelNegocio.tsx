@@ -550,7 +550,6 @@ export function PainelNegocio({
                   ehAdmin={ehAdmin}
                   agenteIdAtual={agenteIdAtual}
                   agentes={agentes}
-                  etiquetas={etiquetas}
                   negocioId={negocioId}
                   salvar={salvar}
                   recarregar={carregar}
@@ -669,7 +668,6 @@ export function NegocioAcoes({
   ehAdmin,
   agenteIdAtual,
   agentes,
-  etiquetas,
   negocioId,
   salvar,
   recarregar,
@@ -680,7 +678,6 @@ export function NegocioAcoes({
   ehAdmin: boolean;
   agenteIdAtual: string;
   agentes: AgenteResumo[];
-  etiquetas: EtiquetaChip[];
   negocioId: string;
   salvar: (body: Record<string, unknown>) => Promise<boolean>;
   recarregar: () => Promise<void>;
@@ -692,7 +689,6 @@ export function NegocioAcoes({
 }) {
   const toast = useToast();
   const agente = useAgente();
-  const [addEtiqueta, setAddEtiqueta] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
@@ -707,10 +703,6 @@ export function NegocioAcoes({
   const podeMover =
     ehAdmin || !!agente?.acessoVenda || !!agente?.acessoPosVenda;
 
-  const naoAplicadas = etiquetas.filter(
-    (e) => !detalhe.etiquetas.some((ap) => ap.id === e.id),
-  );
-
   // Vendedores da finalidade (para transferir), carregados sob demanda.
   useEffect(() => {
     if (!transferindo || vendedores.length > 0) return;
@@ -719,37 +711,6 @@ export function NegocioAcoes({
       .then((d) => setVendedores(d.vendedores ?? []))
       .catch(() => undefined);
   }, [transferindo, vendedores.length, detalhe.finalidade]);
-
-  async function aplicarEtiqueta(etiquetaId: string) {
-    setAddEtiqueta(false);
-    try {
-      const r = await fetch(`/api/negocios/${negocioId}/etiquetas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ etiquetaId }),
-      });
-      if (!r.ok) throw new Error();
-      toast.sucesso("Etiqueta aplicada.");
-    } catch {
-      toast.erro("Não foi possível aplicar a etiqueta.");
-    }
-    await recarregar();
-    onAtualizado();
-  }
-
-  async function removerEtiqueta(etiquetaId: string) {
-    try {
-      const r = await fetch(`/api/negocios/${negocioId}/etiquetas/${etiquetaId}`, {
-        method: "DELETE",
-      });
-      if (!r.ok) throw new Error();
-      toast.sucesso("Etiqueta removida.");
-    } catch {
-      toast.erro("Não foi possível remover a etiqueta.");
-    }
-    await recarregar();
-    onAtualizado();
-  }
 
   async function transferir() {
     if (!destino) return;
@@ -844,54 +805,6 @@ export function NegocioAcoes({
             >
               Ok
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* Etiquetas */}
-      <div>
-        <Rotulo>Etiquetas</Rotulo>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {detalhe.etiquetas.map((e) => (
-            <span
-              key={e.id}
-              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              style={{ backgroundColor: e.cor }}
-            >
-              {e.nome}
-              <button
-                onClick={() => void removerEtiqueta(e.id)}
-                aria-label={`Remover ${e.nome}`}
-                className="rounded-full hover:bg-black/20"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          {naoAplicadas.length > 0 && (
-            <button
-              onClick={() => setAddEtiqueta((v) => !v)}
-              className="flex items-center gap-1 rounded-full border border-dashed border-medio/30 px-2 py-0.5 text-xs text-medio transition-colors hover:border-tiffany hover:text-tiffany"
-            >
-              <Plus className="h-3 w-3" /> Etiqueta
-            </button>
-          )}
-        </div>
-        {addEtiqueta && naoAplicadas.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-black/5 bg-fundo p-2">
-            {naoAplicadas.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => void aplicarEtiqueta(e.id)}
-                className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-0.5 text-xs text-escuro hover:bg-black/5"
-              >
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: e.cor }}
-                />
-                {e.nome}
-              </button>
-            ))}
           </div>
         )}
       </div>

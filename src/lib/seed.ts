@@ -136,10 +136,10 @@ const ETAPAS_PADRAO: {
 ];
 
 // Etiquetas padrao. So semeia se NENHUMA existir (idempotente).
+// Quente/Morno/Frio saíram do array (Fatia I): duplicavam a Temperatura. O seed
+// so cria quando NENHUMA etiqueta existe, entao remover daqui nao apaga nada em
+// producao; e a UI ja filtra essas 3 das OPCOES de aplicacao.
 const ETIQUETAS_PADRAO: { nome: string; cor: string }[] = [
-  { nome: "Quente", cor: "#dc2626" },
-  { nome: "Morno", cor: "#f59e0b" },
-  { nome: "Frio", cor: "#0ea5e9" },
   { nome: "VIP", cor: "#7c3aed" },
   { nome: "Aguardando", cor: "#64748b" },
   { nome: "Pos-venda", cor: "#16a34a" },
