@@ -282,6 +282,9 @@ model Lead {
   produtosInteresse LeadProdutoInteresse[]
   chamadas       Chamada[]
   itensLocal     ItemLocal[]
+  // Notas fiscais do cliente (Fatia D): multiplas, cada uma com numero + data,
+  // vinculaveis a um orcamento. O campo legado notaFiscal (acima) permanece.
+  notasFiscais   NotaFiscal[]
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -610,6 +613,8 @@ model Negocio {
   rastreios     RastreioNegocio[]
   // Cobrancas de pagamento (link Mercado Pago) geradas para o orcamento (Fase 3).
   pagamentos    Pagamento[]
+  // Notas fiscais emitidas no contexto deste negocio (Fatia D).
+  notasFiscais  NotaFiscal[]
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
   historicos    HistoricoNegocio[]
@@ -636,6 +641,31 @@ model RastreioNegocio {
   transportadora String?
   criadoEm       DateTime @default(now())
 
+  @@index([negocioId])
+}
+
+// Nota fiscal do CLIENTE (Fatia D): MULTIPLAS por cliente, cada uma com numero +
+// data (dataNF), opcionalmente vinculada a um negocio e a um orcamento (snapshot).
+// Nivel LEAD -> visivel em VENDA e POS-VENDA. Nao substitui o campo legado
+// Lead.notaFiscal (mantido no banco); e um registro estruturado a parte.
+model NotaFiscal {
+  id          String     @id @default(cuid())
+  leadId      String
+  lead        Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Negocio de origem (opcional). SetNull preserva a NF se o negocio sumir.
+  negocioId   String?
+  negocio     Negocio?   @relation(fields: [negocioId], references: [id], onDelete: SetNull)
+  // Orcamento (pedido) vinculado (opcional). SetNull preserva a NF.
+  orcamentoId String?
+  orcamento   Orcamento? @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)
+  numero      String
+  dataNF      DateTime
+  // Autor do registro (opcional). Plano, sem FK (como Orcamento.agenteId).
+  agenteId    String?
+  criadoEm    DateTime   @default(now())
+
+  @@index([leadId, criadoEm])
+  @@index([orcamentoId])
   @@index([negocioId])
 }
 
@@ -857,6 +887,8 @@ model Orcamento {
   // Cobrancas (links MP) vinculadas a este snapshot (Fatia A: 1-N por negocio).
   // Nome distinto do campo Json `pagamentos` (formas de pagamento congeladas).
   cobrancas     Pagamento[]
+  // Notas fiscais vinculadas a este orcamento (Fatia D).
+  notasFiscais  NotaFiscal[]
 
   @@index([leadId, criadoEm])
   @@index([negocioId])
