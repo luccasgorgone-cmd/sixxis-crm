@@ -455,12 +455,12 @@ export function PainelNegocio({
               } min-h-0 w-full flex-col lg:flex lg:w-1/2`}
             >
               <div className="scroll-fino flex-1 space-y-5 overflow-y-auto p-4 pb-6">
-                {/* Ordem unificada dos dois paineis (Fatia B):
-                    1. Cliente  2. Produtos de interesse  3. Temperatura
-                    4. Etapa  5. Segmento(venda)  6. Orcamento(+decisoes)
-                    7. Orcamentos anteriores  8. Assistencia(pos-venda)
-                    9. Acompanhamento  10. Rastreio  11. Agendar  12. Gestao
-                    13. Pedidos  14. Historico/Negocio/Loja/Notas */}
+                {/* Ordem unificada dos dois paineis (Fatia I):
+                    1. Cliente  2. Produtos de interesse  3. Temperatura(venda)
+                    4. Etiquetas  5. Etapa  6. Segmento(venda)
+                    7. Orcamento(+decisoes)  8. Orcamentos anteriores  9. Pedidos
+                    10. Assistencia(pos-venda)  11. Acompanhamento  12. Rastreio
+                    13. Agendar  14. Gestao  15. Historico/Negocio/Loja/Notas */}
 
                 {/* 1. Dados do cliente + enderecos */}
                 <BlocoCliente
@@ -502,7 +502,7 @@ export function PainelNegocio({
                   abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
                 />
 
-                {/* 5. Segmento (Varejo/Atacado): so na VENDA. */}
+                {/* 6. Segmento (Varejo/Atacado): so na VENDA. */}
                 {detalhe.finalidade !== "POS_VENDA" && (
                   <SecaoSegmento
                     leadId={detalhe.cliente.id}
@@ -510,7 +510,7 @@ export function PainelNegocio({
                   />
                 )}
 
-                {/* 6. Orcamento do atendimento com as DECISOES no rodape */}
+                {/* 7. Orcamento do atendimento com as DECISOES no rodape */}
                 <BlocoOrcamento
                   negocioId={negocioId}
                   finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
@@ -530,32 +530,38 @@ export function PainelNegocio({
                   }
                 />
 
-                {/* 7. Historico numerado de orcamentos do cliente (colapsado). */}
+                {/* 8. Historico numerado de orcamentos do cliente (colapsado). */}
                 <OrcamentosAnteriores leadId={detalhe.cliente.id} />
 
-                {/* 8. Assistencia (Local): so na pos-venda. */}
+                {/* 9. Pedidos do cliente (logo abaixo de Orcamentos anteriores). */}
+                <BlocoPedidos
+                  leadId={detalhe.cliente.id}
+                  onRepetir={etapaGanhoId ? repetirPedido : undefined}
+                />
+
+                {/* 10. Assistencia (Local): so na pos-venda. */}
                 {detalhe.finalidade === "POS_VENDA" && (
                   <BlocoAssistencia leadId={detalhe.cliente.id} />
                 )}
 
-                {/* 9. Acompanhamento */}
+                {/* 11. Acompanhamento */}
                 <BlocoAcompanhamento
                   detalhe={detalhe}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
                 />
 
-                {/* 10. Rastreio */}
+                {/* 12. Rastreio */}
                 <BlocoRastreio
                   detalhe={detalhe}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
                 />
 
-                {/* 11. Agendar contato */}
+                {/* 13. Agendar contato */}
                 <BlocoAgendar detalhe={detalhe} recarregar={carregar} />
 
-                {/* 12. Gestao (dono / transferir / etiquetas) */}
+                {/* 14. Gestao (dono / transferir / mover setor) */}
                 <NegocioAcoes
                   detalhe={detalhe}
                   ehAdmin={ehAdmin}
@@ -567,13 +573,7 @@ export function PainelNegocio({
                   onAtualizado={onAtualizado}
                 />
 
-                {/* 13. Pedidos do cliente (evolui na Fatia E) */}
-                <BlocoPedidos
-                  leadId={detalhe.cliente.id}
-                  onRepetir={etapaGanhoId ? repetirPedido : undefined}
-                />
-
-                {/* Sub-navegacao dos paineis inferiores */}
+                {/* 15. Sub-navegacao dos paineis inferiores (Historico/Negocio/Loja/Notas) */}
                 <div>
                   <div className="mb-3 flex gap-1 overflow-x-auto border-b border-black/5">
                     {(

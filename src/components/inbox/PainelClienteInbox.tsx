@@ -239,11 +239,12 @@ export function PainelClienteInbox({
             onAtualizado={() => void carregarCliente()}
           />
 
-          {/* Ordem unificada dos dois paineis (Fatia B):
-              1. Cliente  2. Produtos de interesse  3. Temperatura  4. Etapa
-              5. Segmento(venda)  6. Orcamento(+decisoes)  7. Orcamentos anteriores
-              8. Assistencia(pos-venda)  9. Acompanhamento  10. Rastreio
-              11. Agendar  12. Gestao  13. [Pedidos: Fatia E]  14. Notas/Historico */}
+          {/* Ordem unificada dos dois paineis (Fatia I):
+              1. Cliente  2. Produtos de interesse  3. Temperatura(venda)
+              4. Etiquetas  5. Etapa  6. Segmento(venda)  7. Orcamento(+decisoes)
+              8. Orcamentos anteriores  9. Pedidos  10. Assistencia(pos-venda)
+              11. Acompanhamento  12. Rastreio  13. Agendar  14. Gestao
+              15. Notas/Historico */}
 
           {/* 2. Produtos de interesse */}
           <BlocoProdutosInteresse leadId={leadId} />
@@ -279,12 +280,12 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* 5. Segmento (Varejo/Atacado): so na VENDA. */}
+          {/* 6. Segmento (Varejo/Atacado): so na VENDA. */}
           {detalhe && negocioId && podeAcoesNegocio && detalhe.finalidade !== "POS_VENDA" && (
             <SecaoSegmento leadId={leadId} onAtualizado={() => void carregarCliente()} />
           )}
 
-          {/* 6. Orcamento do atendimento com as DECISOES no rodape. */}
+          {/* 7. Orcamento do atendimento com as DECISOES no rodape. */}
           {negocioId && detalhe?.finalidade && (
             <BlocoOrcamento
               negocioId={negocioId}
@@ -308,13 +309,17 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* 7. Historico numerado de orcamentos do cliente (colapsado). */}
+          {/* 8. Historico numerado de orcamentos do cliente (colapsado). */}
           <OrcamentosAnteriores leadId={leadId} />
 
-          {/* 8. Assistencia (Local): so na pos-venda. */}
+          {/* 9. Pedidos do cliente (logo abaixo de Orcamentos anteriores).
+              Sem "repetir" no inbox. */}
+          <BlocoPedidos leadId={leadId} />
+
+          {/* 10. Assistencia (Local): so na pos-venda. */}
           {detalhe?.finalidade === "POS_VENDA" && <BlocoAssistencia leadId={leadId} />}
 
-          {/* 9. Acompanhamento e 10. Rastreio */}
+          {/* 11. Acompanhamento e 12. Rastreio */}
           {detalhe && negocioId && (
             <>
               <BlocoAcompanhamento
@@ -330,12 +335,12 @@ export function PainelClienteInbox({
             </>
           )}
 
-          {/* 11. Agendar contato */}
+          {/* 13. Agendar contato */}
           {detalhe && negocioId && (
             <BlocoAgendar detalhe={detalhe} recarregar={carregarNegocio} />
           )}
 
-          {/* 12. Gestao (dono / transferir / etiquetas) */}
+          {/* 14. Gestao (dono / transferir / mover setor) */}
           {detalhe && negocioId && podeAcoesNegocio && (
             <NegocioAcoes
               detalhe={detalhe}
@@ -350,10 +355,7 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* 13. Pedidos do cliente (colapsado). Sem "repetir" no inbox. */}
-          <BlocoPedidos leadId={leadId} />
-
-          {/* 14. Notas (+ Historico do cliente logo apos) */}
+          {/* 15. Notas (+ Historico do cliente logo apos) */}
           {detalhe && negocioId && (
             <div>
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
