@@ -3,9 +3,11 @@
 // (montarDadosPdfOrcamento -> dados.totalFinal, INCLUINDO frete) e chama a Loja
 // via pagamentoLoja.criarCobranca. Registra/atualiza o Pagamento local (pendente).
 //
-// Idempotencia: uma cobranca ATIVA por negocio (externalReference "crm-{id}"
-// unico). Se ja existe pendente com o MESMO valor, reaproveita o link (nao cria
-// outro). Ja paga -> nao regenera. Valor mudou -> gera novo link e atualiza a linha.
+// Idempotencia 1-N (Fatia A): opera sobre a cobranca MAIS RECENTE do negocio.
+//  a) recente pendente, MESMO valor -> reaproveita o link (nao cria outro);
+//  b) recente pendente, valor DIFERENTE -> gera novo link no MP e ATUALIZA a linha;
+//  c) recente PAGA (ou nao existe) -> CRIA NOVA LINHA "crm-{id}-{seq}" (seq =
+//     count de cobrancas + 1). Nunca muta linha paga.
 // TRAVA: pagamento nunca quebra o atendimento — falha da Loja retorna { ok:false }.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -24,7 +26,8 @@ function webhookUrl(): string | null {
   return `${base}/api/webhook/mercadopago`;
 }
 
-// GET: status atual da cobranca do negocio (para a UI exibir o selo/link).
+// GET: cobranca ATUAL (mais recente) do negocio + historico resumido de todas
+// (para a UI exibir o selo/link atual e o colapsavel de anteriores).
 export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -35,28 +38,42 @@ export async function GET(
   const acesso = await checarAcessoNegocio(agente, id);
   if (!acesso.ok) return NextResponse.json({ erro: acesso.erro }, { status: acesso.status });
 
-  const pag = await prisma.pagamento.findUnique({
-    where: { externalReference: `crm-${id}` },
+  // Todas as cobrancas do negocio, mais recente primeiro.
+  const cobrancas = await prisma.pagamento.findMany({
+    where: { negocioId: id },
+    orderBy: { criadoEm: "desc" },
     select: {
+      externalReference: true,
       status: true,
       initPoint: true,
       referencia: true,
       valor: true,
       pagoEm: true,
       atualizadoEm: true,
+      criadoEm: true,
     },
   });
+  const atual = cobrancas[0] ?? null;
   return NextResponse.json({
-    pagamento: pag
+    pagamento: atual
       ? {
-          status: pag.status,
-          initPoint: pag.initPoint,
-          referencia: pag.referencia,
-          valor: pag.valor != null ? Number(pag.valor) : null,
-          pagoEm: pag.pagoEm,
-          atualizadoEm: pag.atualizadoEm,
+          status: atual.status,
+          initPoint: atual.initPoint,
+          referencia: atual.referencia,
+          valor: atual.valor != null ? Number(atual.valor) : null,
+          pagoEm: atual.pagoEm,
+          atualizadoEm: atual.atualizadoEm,
         }
       : null,
+    // Historico resumido (inclui a atual). Chave estavel = externalReference.
+    historico: cobrancas.map((c) => ({
+      externalReference: c.externalReference,
+      status: c.status,
+      valor: c.valor != null ? Number(c.valor) : null,
+      referencia: c.referencia,
+      criadoEm: c.criadoEm,
+      pagoEm: c.pagoEm,
+    })),
   });
 }
 
@@ -85,34 +102,43 @@ export async function POST(
     );
   }
 
-  const externalReference = `crm-${id}`;
+  // Idempotencia 1-N: decide sobre a cobranca MAIS RECENTE do negocio.
+  const recente = await prisma.pagamento.findFirst({
+    where: { negocioId: id },
+    orderBy: { criadoEm: "desc" },
+  });
 
-  // Idempotencia: cobranca ativa ja existente para este negocio.
-  const existente = await prisma.pagamento.findUnique({ where: { externalReference } });
-  if (existente) {
-    if (existente.status === "pago") {
-      return NextResponse.json({
-        ok: true,
-        initPoint: existente.initPoint,
-        status: "pago",
-        referencia: existente.referencia,
-        jaPago: true,
-      });
-    }
-    // Pendente com o MESMO valor -> reaproveita o link (evita duplicar).
-    if (
-      existente.status === "pendente" &&
-      existente.initPoint &&
-      Number(existente.valor) === valor
-    ) {
-      return NextResponse.json({
-        ok: true,
-        initPoint: existente.initPoint,
-        status: "pendente",
-        referencia: existente.referencia,
-        reaproveitado: true,
-      });
-    }
+  // a) recente pendente com o MESMO valor -> reaproveita o link (nao duplica).
+  if (
+    recente &&
+    recente.status === "pendente" &&
+    recente.initPoint &&
+    Number(recente.valor) === valor
+  ) {
+    return NextResponse.json({
+      ok: true,
+      initPoint: recente.initPoint,
+      status: "pendente",
+      referencia: recente.referencia,
+      reaproveitado: true,
+    });
+  }
+
+  // Decisao entre (b) atualizar a linha pendente atual e (c) criar nova linha.
+  //  - atualizar: recente existe e esta pendente (valor diferente da regra "a").
+  //  - criar: recente inexistente OU recente ja PAGA/cancelada/erro (nunca muta paga).
+  const atualizarLinha = recente != null && recente.status === "pendente";
+  let refLoja: string; // vira external_reference "crm-{refLoja}" na Loja
+  let extRefFallback: string;
+  if (atualizarLinha) {
+    // (b) mesma externalReference da linha (legado "crm-{id}" ou "crm-{id}-{seq}").
+    extRefFallback = recente!.externalReference;
+    refLoja = recente!.externalReference.replace(/^crm-/, "");
+  } else {
+    // (c) nova linha: seq = total de cobrancas do negocio + 1.
+    const total = await prisma.pagamento.count({ where: { negocioId: id } });
+    refLoja = `${id}-${total + 1}`;
+    extRefFallback = `crm-${refLoja}`;
   }
 
   const notificationUrl = webhookUrl();
@@ -132,7 +158,7 @@ export async function POST(
     lead?.email && /.+@.+\..+/.test(lead.email) ? lead.email : undefined;
 
   const cob = await criarCobranca({
-    referencia: id, // -> external_reference "crm-{id}" na Loja
+    referencia: refLoja, // -> external_reference "crm-{refLoja}" na Loja
     descricao: `Orçamento ${montagem.numeroFormatado} — Sixxis Assistência`,
     valor,
     notificationUrl,
@@ -146,28 +172,38 @@ export async function POST(
     );
   }
 
-  const extRef = cob.externalReference ?? externalReference;
-  const pag = await prisma.pagamento.upsert({
-    where: { externalReference: extRef },
-    create: {
-      negocioId: id,
-      referencia: montagem.numeroFormatado,
-      externalReference: extRef,
-      valor,
-      status: "pendente",
-      mpPreferenceId: cob.preferenceId ?? null,
-      initPoint: cob.initPoint,
-    },
-    update: {
-      referencia: montagem.numeroFormatado,
-      valor,
-      status: "pendente",
-      mpPreferenceId: cob.preferenceId ?? null,
-      initPoint: cob.initPoint,
-      // Regerou -> volta a pendente e limpa a data de pagamento antiga.
-      pagoEm: null,
-    },
-  });
+  const extRef = cob.externalReference ?? extRefFallback;
+
+  let pag;
+  if (atualizarLinha) {
+    // (b) Atualiza a MESMA linha pendente (recente!.id). Nunca uma linha paga.
+    pag = await prisma.pagamento.update({
+      where: { id: recente!.id },
+      data: {
+        referencia: montagem.numeroFormatado,
+        valor,
+        status: "pendente",
+        mpPreferenceId: cob.preferenceId ?? null,
+        initPoint: cob.initPoint,
+        // Regerou -> volta a pendente e limpa a data de pagamento antiga.
+        pagoEm: null,
+      },
+    });
+  } else {
+    // (c) NOVA linha. orcamentoId = null (o vinculo vem no Bloco 4, na decisao).
+    pag = await prisma.pagamento.create({
+      data: {
+        negocioId: id,
+        referencia: montagem.numeroFormatado,
+        externalReference: extRef,
+        valor,
+        status: "pendente",
+        mpPreferenceId: cob.preferenceId ?? null,
+        initPoint: cob.initPoint,
+        orcamentoId: null,
+      },
+    });
+  }
 
   return NextResponse.json({
     ok: true,
