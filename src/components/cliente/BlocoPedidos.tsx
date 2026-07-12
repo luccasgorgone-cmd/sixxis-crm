@@ -16,6 +16,7 @@ import {
   Truck,
 } from "lucide-react";
 import { formatarBRL } from "@/lib/format";
+import { SeloGarantia } from "@/components/shared/SeloGarantia";
 
 export type ItemPedidoSeed = {
   produtoCatalogoId: string | null;
@@ -185,6 +186,21 @@ export function BlocoPedidos({
                         <div className="mt-2 flex justify-between border-t border-black/5 pt-2 text-[11px] font-semibold text-escuro">
                           <span>Total</span>
                           <span>{p.total != null ? formatarBRL(p.total) : "—"}</span>
+                        </div>
+
+                        {/* Garantia derivada (Fatia F): base = NF mais antiga. */}
+                        <div className="mt-1.5">
+                          <SeloGarantia
+                            finalidade={p.finalidade}
+                            dataNF={
+                              p.notasFiscais.length > 0
+                                ? p.notasFiscais
+                                    .map((n) => n.dataNF)
+                                    .reduce((a, b) => (a < b ? a : b))
+                                : null
+                            }
+                            itens={p.itens}
+                          />
                         </div>
 
                         {/* Notas fiscais vinculadas (numero + data) */}

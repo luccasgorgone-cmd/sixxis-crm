@@ -33,6 +33,7 @@ import {
 import { lerPagamentos, formatarLinhaPagamento, type LinhaPagamento } from "@/lib/pagamento";
 import { SecaoFrete } from "@/components/pecas/SecaoFrete";
 import { SecaoLinkPagamento } from "@/components/pecas/SecaoLinkPagamento";
+import { SeloGarantia } from "@/components/shared/SeloGarantia";
 
 // ---- Tipos ----
 type ProdutoLoja = {
@@ -1192,6 +1193,8 @@ type OrcamentoHist = {
   pagamentos: LinhaPagamento[];
   statusPagamento: string | null;
   pagamentoPagoEm: string | null;
+  // Base da garantia derivada (Fatia F): NF mais antiga vinculada, ou null.
+  dataNFGarantia: string | null;
   qtdItens: number;
   criadoEm: string;
   itens: {
@@ -1354,6 +1357,15 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
                             </li>
                           ))}
                         </ul>
+                        {/* Garantia derivada (Fatia F): "ate dd/mm/aaaa" / expirada
+                            / sem NF vinculada. */}
+                        <div className="px-2.5 py-2 pl-7">
+                          <SeloGarantia
+                            finalidade={o.finalidade}
+                            dataNF={o.dataNFGarantia}
+                            itens={o.itens}
+                          />
+                        </div>
                         {/* Forma(s) de pagamento do snapshot (Fatia 3.18). */}
                         {o.pagamentos.length > 0 && (
                           <div className="border-t border-black/5 px-2.5 py-2 pl-7">

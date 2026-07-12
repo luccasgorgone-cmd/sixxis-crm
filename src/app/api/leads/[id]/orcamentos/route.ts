@@ -63,6 +63,12 @@ export async function GET(
         take: 1,
         select: { status: true, valor: true, pagoEm: true },
       },
+      // NF mais antiga vinculada (base da garantia derivada, Fatia F).
+      notasFiscais: {
+        orderBy: { dataNF: "asc" },
+        take: 1,
+        select: { dataNF: true },
+      },
     },
   });
 
@@ -86,6 +92,8 @@ export async function GET(
         // Compat: campos planos ainda consumidos pela UI atual.
         statusPagamento: pagamento?.status ?? null,
         pagamentoPagoEm: pagamento?.pagoEm ?? null,
+        // Data da NF mais antiga vinculada (base da garantia, Fatia F) ou null.
+        dataNFGarantia: o.notasFiscais[0]?.dataNF ?? null,
         qtdItens: o.itens.length,
         criadoEm: o.criadoEm,
         itens: o.itens.map((it) => ({
