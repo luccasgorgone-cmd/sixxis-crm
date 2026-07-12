@@ -385,6 +385,20 @@ const PRODUTOS_INTERESSE_PADRAO: string[] = [
   "SX180 Trend - 220V",
   "SX200 Trend - 220V",
   "SX200 Prime - 220V",
+  // Modelos ANTIGOS de climatizador (categoria "Climatizadores (Antigos)" do
+  // catalogo, sufixo "(A)"). Ao final, para o pos-venda marcar o produto do
+  // cliente quando e modelo antigo (Fatia H). Nomes iguais aos do catalogo.
+  "SX015 Trend (A)",
+  "SX035 (A)",
+  "SX040 (A)",
+  "SX045 (A)",
+  "SX050 (A)",
+  "SX065 (A)",
+  "SX070 (A)",
+  "SX080 Prime (A)",
+  "SX090 Plus (A)",
+  "SX150 (A)",
+  "SX200 Prime (A)",
 ];
 
 export async function seedProdutosInteresse(): Promise<void> {
