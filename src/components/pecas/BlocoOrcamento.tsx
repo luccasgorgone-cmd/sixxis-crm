@@ -167,6 +167,9 @@ function EditorOrcamento(props: EditorProps) {
   const toast = useToast();
 
   const [usos, setUsos] = useState<Uso[] | null>(null);
+  // Estado de erro APENAS de exibicao (Fatia M): aviso ambar quando a lista de
+  // itens nao carrega. Nao muda logica/calculo.
+  const [erroLista, setErroLista] = useState(false);
   const [modelo, setModelo] = useState<string>(modeloFixo ?? "");
   const [salvandoModelo, setSalvandoModelo] = useState(false);
   const [destacado, setDestacado] = useState<string | null>(null);
@@ -236,6 +239,7 @@ function EditorOrcamento(props: EditorProps) {
       const r = await fetch(listUrl);
       if (r.ok) {
         const d = await r.json();
+        setErroLista(false);
         setUsos(d.pecas ?? []);
         if (modeloEditavel && typeof d.modeloProdutoCliente !== "undefined") {
           setModelo(d.modeloProdutoCliente ?? "");
@@ -244,9 +248,11 @@ function EditorOrcamento(props: EditorProps) {
         if (typeof d.cepDestino !== "undefined") setCepDestino(d.cepDestino ?? null);
         if (Array.isArray(d.pagamentos)) setPagamentos(paraUI(lerPagamentos(d.pagamentos)));
       } else {
+        setErroLista(true);
         setUsos([]);
       }
     } catch {
+      setErroLista(true);
       setUsos([]);
     }
   }, [listUrl, modeloEditavel]);
@@ -849,8 +855,26 @@ function EditorOrcamento(props: EditorProps) {
           ))}
         </ul>
       )}
-      {usos && usos.length === 0 && (
-        <p className="text-xs text-medio/50">Nenhum item no orçamento ainda.</p>
+      {/* Erro de carregamento (aviso ambar, nao-bloqueante) */}
+      {erroLista && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-700 dark:bg-amber-500/10">
+          <span className="min-w-0 flex-1">Não foi possível carregar os itens.</span>
+          <button
+            type="button"
+            onClick={() => void carregarLista()}
+            className="shrink-0 rounded-lg border border-amber-400/60 px-2 py-1 font-semibold text-amber-700 transition-colors hover:bg-amber-100/60"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
+
+      {/* Estado vazio (com hint), so quando nao ha erro. */}
+      {!erroLista && usos && usos.length === 0 && (
+        <p className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 px-3 py-3 text-xs text-medio/50">
+          <Icone className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+          Nenhum item ainda — escolha {icone === "peca" ? "uma peça" : "um produto"} acima para montar o orçamento.
+        </p>
       )}
 
       {/* RESUMO cupom/desconto/frete (so no orcamento do negocio) */}
