@@ -6,7 +6,7 @@
 //   lista imediata; clicar -> stepper de qtd -> entra no orcamento.
 // - POS_VENDA: ao escolher o "Produto do cliente" (modelo), as pecas do modelo +
 //   gerais aparecem para clicar (stepper + garantia).
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Wrench,
   ShoppingCart,
@@ -106,6 +106,9 @@ type EditorProps = {
   // para a bolha do PDF aparecer NA HORA (sem refresh). Fatia 3.15.
   onMensagemEnviada?: (msg: MensagemItem) => void;
   onMudou?: () => void;
+  // Rodape da secao de orcamento (Fatia B): decisoes Ganho/Perdido/Pendente
+  // renderizadas DENTRO deste bloco, ao final. Composto pelo painel.
+  rodape?: ReactNode;
 };
 
 function precoLoja(p: ProdutoLoja): number {
@@ -156,6 +159,7 @@ function EditorOrcamento(props: EditorProps) {
     clienteTelefone,
     onMensagemEnviada,
     onMudou,
+    rodape,
   } = props;
   const ehVenda = modo === "VENDA";
   const toast = useToast();
@@ -992,7 +996,7 @@ function EditorOrcamento(props: EditorProps) {
       )}
 
       {/* 4. ENVIAR orcamento ao cliente (PDF). As DECISOES (Pendente|Perdido +
-          Ganho) ficam logo abaixo, no NegocioAcoes que segue este bloco. */}
+          Ganho) ficam no RODAPE desta secao (slot `rodape`, Fatia B). */}
       {permitirEnvio && negocioId && (
         <div className="border-t border-black/5 pt-3">
           {!confirmandoEnvio ? (
@@ -1034,6 +1038,9 @@ function EditorOrcamento(props: EditorProps) {
           )}
         </div>
       )}
+
+      {/* 5. RODAPE: decisoes Ganho/Perdido/Pendente (Fatia B), quando fornecido. */}
+      {rodape && <div className="border-t border-black/5 pt-3">{rodape}</div>}
     </section>
   );
 }
@@ -1093,12 +1100,14 @@ export function BlocoOrcamento({
   clienteNome,
   clienteTelefone,
   onMensagemEnviada,
+  rodape,
 }: {
   negocioId: string;
   finalidade: "VENDA" | "POS_VENDA";
   clienteNome?: string | null;
   clienteTelefone?: string | null;
   onMensagemEnviada?: (msg: MensagemItem) => void;
+  rodape?: ReactNode;
 }) {
   const ehPos = finalidade === "POS_VENDA";
   const salvarModelo = useCallback(
@@ -1137,6 +1146,7 @@ export function BlocoOrcamento({
       clienteNome={clienteNome}
       clienteTelefone={clienteTelefone}
       onMensagemEnviada={onMensagemEnviada}
+      rodape={rodape}
     />
   );
 }

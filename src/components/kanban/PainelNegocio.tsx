@@ -27,12 +27,9 @@ import {
   ListChecks,
   ShoppingBag,
   History,
-  PauseCircle,
-  PlayCircle,
   AlarmClock,
   CalendarPlus,
   Check,
-  RotateCcw,
   FileText,
   Building2,
   ClipboardList,
@@ -42,7 +39,6 @@ import {
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
 import type { MensagemItem } from "@/components/inbox/tipos";
-import { MOTIVOS_PENDENCIA } from "@/lib/motivosPendencia";
 import { ModalFechamento } from "./ModalFechamento";
 import { ModalMoverFinalidade } from "./ModalMoverFinalidade";
 import { LojaCliente } from "@/components/loja/LojaCliente";
@@ -68,7 +64,12 @@ import {
   type ObservacaoOpcao,
   type LembreteItem,
 } from "./tipos";
-import { SecaoTemperatura, SecaoEtapa, SecaoSegmento } from "@/components/shared/SecoesPainel";
+import {
+  SecaoTemperatura,
+  SecaoEtapa,
+  SecaoSegmento,
+  SecaoDecisoes,
+} from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
 
@@ -466,6 +467,17 @@ export function PainelNegocio({
                   clienteNome={detalhe.cliente.nomeEfetivo}
                   clienteTelefone={detalhe.cliente.telefone}
                   onMensagemEnviada={(msg) => injetorThreadRef.current?.(msg)}
+                  rodape={
+                    <SecaoDecisoes
+                      detalhe={detalhe}
+                      etapas={etapasFunil}
+                      salvar={salvar}
+                      recarregar={carregar}
+                      onAtualizado={onAtualizado}
+                      negocioId={negocioId}
+                      abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
+                    />
+                  }
                 />
 
                 <SecaoTemperatura
@@ -495,12 +507,10 @@ export function PainelNegocio({
                   agenteIdAtual={agenteIdAtual}
                   agentes={agentes}
                   etiquetas={etiquetas}
-                  etapas={etapasFunil}
                   negocioId={negocioId}
                   salvar={salvar}
                   recarregar={carregar}
                   onAtualizado={onAtualizado}
-                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
                 />
 
                 <BlocoProdutosInteresse
@@ -628,8 +638,9 @@ export function PainelNegocio({
 }
 
 // ----------------------------------------------------------------------------
-// Acoes do negocio: valor, temperatura, etapa, dono/transferencia, etiquetas,
-// produtos e fechamento (ganho/perdido).
+// Acoes do negocio (Fatia B: "Gestao"): dono/transferencia, etiquetas e mover
+// setor. Decisoes/etapa/temperatura/segmento foram extraidas para secoes proprias
+// (SecoesPainel); as DECISOES agora vivem no rodape da secao de orcamento.
 // ----------------------------------------------------------------------------
 export function NegocioAcoes({
   detalhe,
@@ -637,20 +648,17 @@ export function NegocioAcoes({
   agenteIdAtual,
   agentes,
   etiquetas,
-  etapas,
   negocioId,
   salvar,
   recarregar,
   onAtualizado,
   onTransferido,
-  abrirModal,
 }: {
   detalhe: DetalheNegocio;
   ehAdmin: boolean;
   agenteIdAtual: string;
   agentes: AgenteResumo[];
   etiquetas: EtiquetaChip[];
-  etapas: Etapa[];
   negocioId: string;
   salvar: (body: Record<string, unknown>) => Promise<boolean>;
   recarregar: () => Promise<void>;
@@ -659,14 +667,12 @@ export function NegocioAcoes({
   // LISTA (conversas do Inbox / board do Kanban) sem depender do socket (Fatia
   // 3.20). Opcional: onde a lista ja se atualiza por onAtualizado, pode ser omitido.
   onTransferido?: () => void;
-  abrirModal: (tipo: "ganho" | "perdido", etapaId: string) => void;
 }) {
   const toast = useToast();
   const agente = useAgente();
   const [addEtiqueta, setAddEtiqueta] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
   const [destino, setDestino] = useState("");
-  const [reativando, setReativando] = useState(false);
   const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
   const [moverAberto, setMoverAberto] = useState(false);
 
@@ -678,79 +684,6 @@ export function NegocioAcoes({
     detalhe.finalidade === "POS_VENDA" ? "VENDA" : "POS_VENDA";
   const podeMover =
     ehAdmin || !!agente?.acessoVenda || !!agente?.acessoPosVenda;
-
-  const etapaGanho = etapas.find((e) => e.tipo === "GANHO");
-  const etapaPerda = etapas.find((e) => e.tipo === "PERDIDO");
-  const etapaAberta = etapas.find((e) => e.tipo === "ABERTA");
-
-  // Estados mutuamente exclusivos: ABERTO / PENDENTE / GANHO / PERDIDO.
-  const ehGanho = detalhe.status === "GANHO";
-  const ehPerdido = detalhe.status === "PERDIDO";
-  const ehPendente = detalhe.pendente;
-  const [pendAbrir, setPendAbrir] = useState(false);
-  // Motivo ESTRUTURADO da pendencia (Fatia 3.17): code predefinido + observacao.
-  const [pendCode, setPendCode] = useState("");
-  const [pendObs, setPendObs] = useState("");
-  const [mudandoPend, setMudandoPend] = useState(false);
-
-  // Reabre o negocio (volta a primeira etapa ABERTA => status ABERTO).
-  async function reabrir() {
-    if (!etapaAberta) return;
-    await salvar({ etapaId: etapaAberta.id });
-  }
-
-  // Toggle Ganho: clicar quando ja ganho desmarca (reabre); senao abre o modal.
-  function clicarGanho() {
-    if (ehGanho) {
-      void reabrir();
-      return;
-    }
-    if (etapaGanho) abrirModal("ganho", etapaGanho.id);
-  }
-  function clicarPerdido() {
-    if (ehPerdido) {
-      void reabrir();
-      return;
-    }
-    if (etapaPerda) abrirModal("perdido", etapaPerda.id);
-  }
-  // Toggle Pendente: ativo => desmarca; inativo => captura motivo e marca (se
-  // estava ganho/perdido, reabre junto => volta a ABERTO+pendente).
-  function clicarPendente() {
-    if (ehPendente) {
-      void salvar({ pendente: false });
-      return;
-    }
-    setPendCode("");
-    setPendObs("");
-    setPendAbrir(true);
-  }
-  async function confirmarPendente() {
-    if (!pendCode) {
-      toast.erro("Escolha o motivo da pendência.");
-      return;
-    }
-    const obs = pendObs.trim();
-    if (pendCode === "OUTRO" && !obs) {
-      toast.erro("Descreva o motivo (Outro).");
-      return;
-    }
-    setMudandoPend(true);
-    const body: Record<string, unknown> = {
-      pendente: true,
-      motivoPendenciaCode: pendCode,
-      motivoPendencia: obs || null,
-    };
-    if ((ehGanho || ehPerdido) && etapaAberta) body.etapaId = etapaAberta.id;
-    const ok = await salvar(body);
-    setMudandoPend(false);
-    if (ok) {
-      setPendAbrir(false);
-      setPendCode("");
-      setPendObs("");
-      toast.sucesso("Negócio marcado como pendente.");
-    }
-  }
 
   const naoAplicadas = etiquetas.filter(
     (e) => !detalhe.etiquetas.some((ap) => ap.id === e.id),
@@ -796,27 +729,6 @@ export function NegocioAcoes({
     onAtualizado();
   }
 
-  async function reativar() {
-    setReativando(true);
-    try {
-      const r = await fetch(`/api/negocios/${negocioId}/reativar`, {
-        method: "POST",
-      });
-      if (r.ok) {
-        toast.sucesso("Negocio reativado.");
-        await recarregar();
-        onAtualizado();
-      } else {
-        const d = await r.json().catch(() => null);
-        toast.erro(d?.erro ?? "Nao foi possivel reativar.");
-      }
-    } catch {
-      toast.erro("Falha de conexão.");
-    } finally {
-      setReativando(false);
-    }
-  }
-
   async function transferir() {
     if (!destino) return;
     try {
@@ -839,126 +751,6 @@ export function NegocioAcoes({
 
   return (
     <section className="space-y-4 rounded-xl border border-black/5 bg-white p-4">
-      {/* DECISAO do orcamento (Fatia 3.07): Pendente e Perdido lado a lado
-          (secundarios, sutis); o GANHO em destaque abaixo, ocupando a largura dos
-          dois. Clicar um estado ativo desmarca (volta a ABERTO). */}
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <button
-            onClick={clicarPendente}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              ehPendente
-                ? "bg-amber-500 text-white hover:bg-amber-600"
-                : "border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10"
-            }`}
-          >
-            <PauseCircle className="h-4 w-4" /> Pendente
-          </button>
-          {etapaPerda && (
-            <button
-              onClick={clicarPerdido}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                ehPerdido
-                  ? "bg-erro text-white hover:brightness-95"
-                  : "border border-erro/40 text-erro hover:bg-erro/10"
-              }`}
-            >
-              <XCircle className="h-4 w-4" /> Perdido
-            </button>
-          )}
-        </div>
-        {etapaGanho && (
-          <button
-            onClick={clicarGanho}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-100 ${
-              ehGanho ? "bg-tiffany-escuro" : "bg-tiffany hover:bg-tiffany-escuro"
-            }`}
-          >
-            <Trophy className="h-5 w-5" /> Ganho
-          </button>
-        )}
-      </div>
-
-      {/* Captura do MOTIVO da pendencia (Fatia 3.17): superficie escura da casa
-          (nao branca), motivos predefinidos + observacao (obrigatoria em Outro). */}
-      {pendAbrir && !ehPendente && (
-        <div className="space-y-2.5 rounded-lg border border-white/10 bg-escuro p-3">
-          <p className="text-xs font-semibold text-white/90">Motivo da pendência</p>
-          <select
-            value={pendCode}
-            onChange={(e) => setPendCode(e.target.value)}
-            autoFocus
-            className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-tiffany"
-          >
-            <option value="">Selecione um motivo...</option>
-            {MOTIVOS_PENDENCIA.map((m) => (
-              <option key={m.code} value={m.code}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <textarea
-            value={pendObs}
-            onChange={(e) => setPendObs(e.target.value)}
-            rows={2}
-            placeholder={
-              pendCode === "OUTRO" ? "Descreva o motivo" : "Observação (opcional)"
-            }
-            className="scroll-fino w-full resize-none rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-tiffany"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setPendAbrir(false);
-                setPendCode("");
-                setPendObs("");
-              }}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => void confirmarPendente()}
-              disabled={mudandoPend || !pendCode || (pendCode === "OUTRO" && !pendObs.trim())}
-              className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-50"
-            >
-              {mudandoPend && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Marcar pendente
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Motivo da perda + reativar (quando perdido) */}
-      {detalhe.status === "PERDIDO" && (
-        <div className="space-y-2">
-          {detalhe.motivoPerdaLabel && (
-            <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
-              <p className="text-xs font-semibold text-red-700">
-                Motivo da perda: {detalhe.motivoPerdaLabel}
-              </p>
-              {detalhe.motivoPerdaObs && (
-                <p className="mt-0.5 text-xs text-red-900/80">
-                  {detalhe.motivoPerdaObs}
-                </p>
-              )}
-            </div>
-          )}
-          <button
-            onClick={() => void reativar()}
-            disabled={reativando}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-tiffany px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-tiffany-escuro disabled:opacity-60"
-          >
-            {reativando ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
-            Reativar negocio
-          </button>
-        </div>
-      )}
-
       <Secao titulo="Gestão">
       {/* Dono / atribuicao / transferencia */}
       <div>
@@ -1083,9 +875,6 @@ export function NegocioAcoes({
       </div>
       </Secao>
 
-      {/* Pendencia operacional */}
-      <BlocoPendencia detalhe={detalhe} salvar={salvar} />
-
       {moverAberto && (
         <ModalMoverFinalidade
           leadId={detalhe.cliente.id}
@@ -1135,65 +924,6 @@ function Secao({
         />
       </button>
       {aberta && <div className="space-y-3 px-3 pb-3">{children}</div>}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// Pendencia operacional: marcar/desmarcar com motivo. Quando pendente, mostra o
-// motivo atual e permite remover; senao abre um campo de motivo para marcar.
-// ----------------------------------------------------------------------------
-function BlocoPendencia({
-  detalhe,
-  salvar,
-}: {
-  detalhe: DetalheNegocio;
-  salvar: (body: Record<string, unknown>) => Promise<boolean>;
-}) {
-  const toast = useToast();
-  const [salvando, setSalvando] = useState(false);
-
-  async function desmarcar() {
-    setSalvando(true);
-    const ok = await salvar({ pendente: false });
-    setSalvando(false);
-    if (ok) toast.sucesso("Pendencia removida.");
-  }
-
-  // Marcar pendente agora e feito pelo botao "Pendente" (entre Ganho/Perdido).
-  // Aqui mostramos o detalhe/motivo da pendencia e permitimos desmarcar.
-  if (!detalhe.pendente) return null;
-
-  return (
-    <div>
-      <Rotulo>Pendencia</Rotulo>
-      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-        <div className="flex items-start gap-2">
-          <PauseCircle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-orange-700">
-              {detalhe.motivoPendenciaLabel ?? "Negócio pendente"}
-            </p>
-            {detalhe.motivoPendencia && (
-              <p className="mt-0.5 whitespace-pre-wrap text-xs text-orange-900/80">
-                {detalhe.motivoPendencia}
-              </p>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={() => void desmarcar()}
-          disabled={salvando}
-          className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200 transition-colors hover:bg-orange-100 disabled:opacity-60"
-        >
-          {salvando ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <PlayCircle className="h-3.5 w-3.5" />
-          )}
-          Desmarcar pendencia
-        </button>
-      </div>
     </div>
   );
 }

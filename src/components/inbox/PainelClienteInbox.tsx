@@ -23,7 +23,12 @@ import {
   Notas,
 } from "@/components/kanban/PainelNegocio";
 import { ModalFechamento, type DadosFechamento } from "@/components/kanban/ModalFechamento";
-import { SecaoTemperatura, SecaoEtapa, SecaoSegmento } from "@/components/shared/SecoesPainel";
+import {
+  SecaoTemperatura,
+  SecaoEtapa,
+  SecaoSegmento,
+  SecaoDecisoes,
+} from "@/components/shared/SecoesPainel";
 import { useToast } from "@/components/ui/Toast";
 import type {
   DetalheNegocio,
@@ -227,7 +232,8 @@ export function PainelClienteInbox({
             onAtualizado={() => void carregarCliente()}
           />
 
-          {/* (b) Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+          {/* (b) Orcamento do atendimento (pecas no pos-venda, produtos na venda),
+              com as DECISOES no rodape (Fatia B). */}
           {negocioId && detalhe?.finalidade && (
             <BlocoOrcamento
               negocioId={negocioId}
@@ -235,6 +241,19 @@ export function PainelClienteInbox({
               clienteNome={cliente.nomeEfetivo}
               clienteTelefone={cliente.telefone}
               onMensagemEnviada={onMensagemEnviada}
+              rodape={
+                detalhe && podeAcoesNegocio ? (
+                  <SecaoDecisoes
+                    detalhe={detalhe}
+                    etapas={etapasFunil}
+                    salvar={salvar}
+                    recarregar={carregarNegocio}
+                    onAtualizado={() => void carregarCliente()}
+                    negocioId={negocioId}
+                    abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+                  />
+                ) : undefined
+              }
             />
           )}
 
@@ -265,13 +284,11 @@ export function PainelClienteInbox({
               agenteIdAtual={agenteIdAtual}
               agentes={agentes}
               etiquetas={etiquetas}
-              etapas={etapasFunil}
               negocioId={negocioId}
               salvar={salvar}
               recarregar={carregarNegocio}
               onAtualizado={() => void carregarCliente()}
               onTransferido={onTransferido}
-              abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
             />
           )}
 
