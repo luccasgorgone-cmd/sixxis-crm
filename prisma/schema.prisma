@@ -946,6 +946,9 @@ model Pagamento {
   @@index([negocioId])
   @@index([externalReference])
   @@index([orcamentoId])
+  // Fatia L: acelera o findFirst da cobranca MAIS RECENTE por negocio
+  // (where negocioId + orderBy criadoEm desc), rota quente 1-N.
+  @@index([negocioId, criadoEm])
 }
 
 // Campanha de envio em massa (multicanal). filtroJson guarda o recorte usado;

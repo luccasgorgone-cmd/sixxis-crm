@@ -17,7 +17,9 @@ export const includeCard = {
       origem: true,
       // Garantia (pos-venda): marcador colorido no card de pos-venda.
       garantia: true,
-      etiquetas: { include: { etiqueta: true } },
+      // Enxuto (Fatia L): so os campos usados pelo card (id/nome/cor), em vez do
+      // objeto etiqueta inteiro.
+      etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
     },
   },
   agente: { select: { id: true, nome: true, avatarUrl: true } },

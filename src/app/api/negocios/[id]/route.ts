@@ -79,7 +79,8 @@ export async function GET(
           dono: { select: { id: true, nome: true } },
           donoPosVendaId: true,
           donoPosVenda: { select: { id: true, nome: true } },
-          etiquetas: { include: { etiqueta: true } },
+          // Enxuto (Fatia L): so id/nome/cor da etiqueta (usados na UI).
+          etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
           notas: {
             orderBy: { criadoEm: "desc" },
             include: { agente: { select: { nome: true } } },
