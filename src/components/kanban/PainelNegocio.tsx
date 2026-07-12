@@ -30,11 +30,8 @@ import {
   AlarmClock,
   CalendarPlus,
   Check,
-  FileText,
   Building2,
   ClipboardList,
-  ShieldCheck,
-  ShieldOff,
   Truck,
 } from "lucide-react";
 import { ConversaEmbed } from "./ConversaEmbed";
@@ -46,6 +43,7 @@ import { AvatarCliente } from "@/components/AvatarCliente";
 import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
+import { BlocoNotasFiscais } from "@/components/cliente/BlocoNotasFiscais";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import {
   BlocoOrcamento,
@@ -953,8 +951,10 @@ function Secao({
 }
 
 // ----------------------------------------------------------------------------
-// Acompanhamento (pos-venda): nota fiscal (texto livre) e empresa faturada
-// (select das ativas). Ambos opcionais. Persistem via PATCH /api/leads/[id].
+// Acompanhamento: notas fiscais do cliente (Fatia D — BlocoNotasFiscais) e empresa
+// faturada (select das ativas). A garantia manual saiu daqui (Fatia F a deriva da
+// data da NF); o campo Lead.garantia permanece no banco. Empresa persiste via
+// PATCH /api/leads/[id].
 // ----------------------------------------------------------------------------
 type EmpresaOpcao = { id: string; nome: string };
 
@@ -968,18 +968,9 @@ export function BlocoAcompanhamento({
   onAtualizado: () => void;
 }) {
   const toast = useToast();
-  const agente = useAgente();
-  // Garantia: editavel por pos-venda (acesso) ou admin; demais so visualizam.
-  const podeEditarGarantia =
-    !!agente && (agente.papel === "ADMIN" || agente.acessoPosVenda);
   const cliente = detalhe.cliente;
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
-  const [nf, setNf] = useState(cliente.notaFiscal ?? "");
   const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    setNf(cliente.notaFiscal ?? "");
-  }, [cliente.notaFiscal]);
 
   useEffect(() => {
     fetch("/api/empresas-faturadas")
@@ -1027,107 +1018,41 @@ export function BlocoAcompanhamento({
         {salvando && <Loader2 className="h-3 w-3 animate-spin text-tiffany" />}
       </h4>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <Rotulo>Nota fiscal</Rotulo>
-          <div className="relative">
-            <FileText className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-medio/40" />
-            <input
-              value={nf}
-              onChange={(e) => setNf(e.target.value)}
-              onBlur={() => {
-                if ((nf.trim() || null) !== (cliente.notaFiscal ?? null)) {
-                  void salvar({ notaFiscal: nf.trim() });
-                }
-              }}
-              placeholder="Número NF"
-              className="w-full rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany"
-            />
-          </div>
-        </div>
+      {/* Notas fiscais do cliente (Fatia D): lista + adicionar + legado read-only.
+          Substitui o campo unico de NF; a garantia manual saiu daqui (passa a ser
+          derivada da data da NF na Fatia F). */}
+      <BlocoNotasFiscais
+        leadId={cliente.id}
+        negocioId={detalhe.id}
+        notaFiscalLegado={cliente.notaFiscal}
+      />
 
-        <div>
-          <Rotulo>Empresa faturada</Rotulo>
-          <div className="relative">
-            <Building2 className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-medio/40" />
-            <select
-              value={cliente.empresaFaturadaId ?? ""}
-              disabled={salvando}
-              onChange={(e) =>
-                void salvar({ empresaFaturadaId: e.target.value || null })
-              }
-              className="w-full appearance-none rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany disabled:opacity-60"
-            >
-              <option value="">—</option>
-              {opcoes.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          {empresas.length === 0 && (
-            <p className="mt-1 text-[11px] text-medio/50">
-              Nenhuma empresa ativa cadastrada.
-            </p>
-          )}
+      <div>
+        <Rotulo>Empresa faturada</Rotulo>
+        <div className="relative">
+          <Building2 className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-medio/40" />
+          <select
+            value={cliente.empresaFaturadaId ?? ""}
+            disabled={salvando}
+            onChange={(e) =>
+              void salvar({ empresaFaturadaId: e.target.value || null })
+            }
+            className="w-full appearance-none rounded-lg border border-black/10 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-tiffany disabled:opacity-60"
+          >
+            <option value="">—</option>
+            {opcoes.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
         </div>
+        {empresas.length === 0 && (
+          <p className="mt-1 text-[11px] text-medio/50">
+            Nenhuma empresa ativa cadastrada.
+          </p>
+        )}
       </div>
-
-      {/* Garantia: conceito de POS-VENDA. So aparece na pos-venda, como escolha
-          binaria com cor (Com=verde, Sem=ambar); sem "Nao definido" na UI (se vier
-          null, nenhum fica ativo e o hint pede para definir). Some na venda. */}
-      {detalhe.finalidade === "POS_VENDA" && (
-        <div>
-          <Rotulo>Garantia</Rotulo>
-          <div className="flex flex-wrap gap-1.5">
-            {(
-              [
-                [true, "Com garantia"],
-                [false, "Sem garantia"],
-              ] as [boolean, string][]
-            ).map(([valor, rotulo]) => {
-              const ativo = (cliente.garantia ?? null) === valor;
-              const corAtivo =
-                valor === true
-                  ? "border-green-500 bg-green-50 text-green-700"
-                  : "border-amber-500 bg-amber-50 text-amber-700";
-              return (
-                <button
-                  key={String(valor)}
-                  disabled={!podeEditarGarantia || salvando}
-                  onClick={() => {
-                    if (ativo) return;
-                    void salvar({ garantia: valor });
-                  }}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                    ativo
-                      ? corAtivo
-                      : "border-black/10 bg-white text-medio/70 hover:bg-black/5"
-                  } ${!podeEditarGarantia ? "cursor-default opacity-90" : ""}`}
-                >
-                  {valor === true ? (
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                  ) : (
-                    <ShieldOff className="h-3.5 w-3.5" />
-                  )}
-                  {rotulo}
-                </button>
-              );
-            })}
-          </div>
-          {cliente.garantia == null && (
-            <p className="mt-1 text-[11px] text-medio/50">
-              Garantia ainda nao definida.
-            </p>
-          )}
-          {!podeEditarGarantia && (
-            <p className="mt-1 text-[11px] text-medio/50">
-              Somente pos-venda edita a garantia.
-            </p>
-          )}
-        </div>
-      )}
     </section>
   );
 }
