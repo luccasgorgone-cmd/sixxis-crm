@@ -44,6 +44,7 @@ import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoNotasFiscais } from "@/components/cliente/BlocoNotasFiscais";
+import { fetchCacheado } from "@/lib/cacheClient";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
 import {
   BlocoOrcamento,
@@ -260,8 +261,9 @@ export function PainelNegocio({
   }, [detalhe, iniciandoConversa, carregar]);
 
   useEffect(() => {
-    fetch("/api/observacoes")
-      .then((r) => (r.ok ? r.json() : { observacoes: [] }))
+    // Observacoes sao quase-estaticas: cacheadas no client (Fatia L) — abrir o
+    // drawer varias vezes reusa o cache em vez de rebuscar.
+    fetchCacheado<{ observacoes?: ObservacaoOpcao[] }>("/api/observacoes")
       .then((d) => setPresets(d.observacoes ?? []))
       .catch(() => undefined);
   }, []);

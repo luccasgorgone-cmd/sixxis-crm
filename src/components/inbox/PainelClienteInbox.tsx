@@ -146,10 +146,10 @@ export function PainelClienteInbox({
   }, [carregarNegocio]);
 
   // Listas quase-estaticas (etapas/etiquetas/agentes/observacoes): cacheadas no
-  // client (Fatia L). Trocar de conversa reusa o cache — sem rebuscar as 4 a cada
-  // troca. A invalidacao (ao editar etiqueta/agente etc.) fica no fluxo de edicao.
+  // client (Fatia L) e carregadas UMA vez por montagem — deps [ehAdmin], nao
+  // [negocioId] — para NAO reexecutar a cada troca de conversa (antes eram 4
+  // fetches por troca; agora 0). Dados client-global, nao dependem do negocio.
   useEffect(() => {
-    if (!negocioId) return;
     fetchCacheado<{ observacoes?: ObservacaoOpcao[] }>("/api/observacoes")
       .then((d) => setPresets(d.observacoes ?? []))
       .catch(() => undefined);
@@ -164,7 +164,7 @@ export function PainelClienteInbox({
         .then((d) => setAgentes(d.agentes ?? []))
         .catch(() => undefined);
     }
-  }, [negocioId, ehAdmin]);
+  }, [ehAdmin]);
 
   // Etapas do funil da finalidade do negocio (para achar Ganho/Perdido e o select).
   const etapasFunil = detalhe
