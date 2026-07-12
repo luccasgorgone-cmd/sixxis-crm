@@ -7,8 +7,8 @@
 //  - POS_VENDA: o atendente informa peso+dimensoes da CAIXA; MOSTRA as duas
 //    cotacoes (Braspress e Melhor Envio) e ELE CLICA na escolhida.
 // TRAVA: frete nunca quebra o orcamento — falha/timeout mantem o campo manual.
-import { useState } from "react";
-import { Loader2, Truck, Calculator } from "lucide-react";
+import { useRef, useState } from "react";
+import { Loader2, Truck, Calculator, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatarBRL } from "@/lib/format";
 
@@ -65,15 +65,33 @@ export function SecaoFrete({
   const [comprimentoCm, setComprimentoCm] = useState("");
 
   const [calculando, setCalculando] = useState(false);
+  // 2a fase por tempo decorrido: a lib retenta no servidor (ate ~35-47s); apos ~9s
+  // avisamos "tentando de novo" para o clique nao parecer travado (Fatia K).
+  const [demorando, setDemorando] = useState(false);
   const [cotacoes, setCotacoes] = useState<Cotacao[] | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Guard contra respostas de cliques ANTIGOS: cada cotacao tem um id crescente e
+  // aborta a anterior; so a MAIS RECENTE atualiza o estado.
+  const reqIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const ehPos = modo === "POS_VENDA";
 
   async function cotar() {
-    if (calculando) return;
+    // Cancela a cotacao anterior (se houver) — a resposta antiga sera ignorada.
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const meuId = ++reqIdRef.current;
+
     setCalculando(true);
+    setDemorando(false);
     setAviso(null);
+
+    const timerDemora = setTimeout(() => {
+      if (reqIdRef.current === meuId) setDemorando(true);
+    }, 9_000);
+
     try {
       const cepDigits = cep.replace(/\D/g, "");
       const body: Record<string, unknown> = {};
@@ -90,8 +108,12 @@ export function SecaoFrete({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: abort.signal,
       });
       const d: RespCotacao = await r.json().catch(() => ({ ok: false }));
+
+      // Resposta obsoleta (um clique mais novo assumiu) -> descarta.
+      if (reqIdRef.current !== meuId) return;
 
       if (d.cepDestino && cepDigits.length !== 8) setCep(mascararCep(d.cepDestino));
 
@@ -112,10 +134,16 @@ export function SecaoFrete({
         setAviso("Nenhuma transportadora cotou este envio. Use o frete manual.");
       }
     } catch {
+      // AbortError da nossa propria substituicao -> ignora (nao mexe no estado).
+      if (reqIdRef.current !== meuId) return;
       setCotacoes(null);
       setAviso("Falha ao cotar o frete. Use o frete manual.");
     } finally {
-      setCalculando(false);
+      clearTimeout(timerDemora);
+      if (reqIdRef.current === meuId) {
+        setCalculando(false);
+        setDemorando(false);
+      }
     }
   }
 
@@ -198,9 +226,17 @@ export function SecaoFrete({
           ) : (
             <Calculator className="h-3.5 w-3.5" />
           )}
-          {ehPos ? "Cotar frete" : "Calcular frete"}
+          {calculando ? "Cotando..." : ehPos ? "Cotar frete" : "Calcular frete"}
         </button>
       </div>
+
+      {/* Progresso honesto: apos ~9s avisa que esta retentando (nao travou). */}
+      {calculando && (
+        <p className="flex items-center gap-1.5 text-[11px] text-medio/60">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {demorando ? "Demorou, tentando de novo..." : "Cotando o frete..."}
+        </p>
+      )}
 
       {/* Estado atual aplicado (transportadora do rascunho). */}
       {freteTransportadora && (
@@ -209,7 +245,18 @@ export function SecaoFrete({
         </p>
       )}
 
-      {aviso && <p className="text-[11px] text-amber-600">{aviso}</p>}
+      {aviso && !calculando && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="min-w-0 flex-1 text-[11px] text-amber-600">{aviso}</p>
+          <button
+            type="button"
+            onClick={() => void cotar()}
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-tiffany/40 px-2 py-1 text-[11px] font-semibold text-tiffany transition-colors hover:bg-tiffany/10"
+          >
+            <RefreshCw className="h-3 w-3" /> Tentar novamente
+          </button>
+        </div>
+      )}
 
       {/* Lista das cotacoes por transportadora — COMUM a venda e pos-venda. O
           atendente CLICA na escolhida; nada e aplicado automaticamente. A mais
