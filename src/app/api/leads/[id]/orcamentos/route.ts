@@ -32,6 +32,9 @@ export async function GET(
     );
   }
 
+  // Fatia C: a situacao de pagamento vem da COBRANCA VINCULADA ao orcamento
+  // (Pagamento.orcamentoId, criado na decisao — Fatia A). include/join da relacao
+  // `cobrancas` => 2 queries no total (orcamentos + cobrancas em lote), SEM N+1.
   const orcamentos = await prisma.orcamento.findMany({
     where: { leadId: id },
     orderBy: { criadoEm: "desc" },
@@ -55,41 +58,44 @@ export async function GET(
           garantia: true,
         },
       },
+      cobrancas: {
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { status: true, valor: true, pagoEm: true },
+      },
     },
   });
 
-  // Status do LINK de pagamento (Fase 3) por negocio: uma cobranca ativa por
-  // negocio (externalReference "crm-{negocioId}"). Mapeia negocioId -> status.
-  const negocioIds = [...new Set(orcamentos.map((o) => o.negocioId))];
-  const pagsLink = negocioIds.length
-    ? await prisma.pagamento.findMany({
-        where: { negocioId: { in: negocioIds } },
-        select: { negocioId: true, status: true, pagoEm: true },
-      })
-    : [];
-  const pagPorNegocio = new Map(pagsLink.map((p) => [p.negocioId, p]));
-
   return NextResponse.json({
-    orcamentos: orcamentos.map((o) => ({
-      id: o.id,
-      numero: o.numero,
-      numeroFormatado: formatarNumeroPedido(o.numero),
-      finalidade: o.finalidade,
-      decisao: o.decisao,
-      total: Number(o.total),
-      totalGarantia: o.totalGarantia != null ? Number(o.totalGarantia) : null,
-      pagamentos: lerPagamentos(o.pagamentos),
-      statusPagamento: pagPorNegocio.get(o.negocioId)?.status ?? null,
-      pagamentoPagoEm: pagPorNegocio.get(o.negocioId)?.pagoEm ?? null,
-      qtdItens: o.itens.length,
-      criadoEm: o.criadoEm,
-      itens: o.itens.map((it) => ({
-        id: it.id,
-        descricao: it.descricao,
-        quantidade: it.quantidade,
-        valorUnitario: Number(it.valorUnitario),
-        garantia: it.garantia,
-      })),
-    })),
+    orcamentos: orcamentos.map((o) => {
+      const cob = o.cobrancas[0] ?? null;
+      const pagamento = cob
+        ? { status: cob.status, valor: Number(cob.valor), pagoEm: cob.pagoEm }
+        : null;
+      return {
+        id: o.id,
+        numero: o.numero,
+        numeroFormatado: formatarNumeroPedido(o.numero),
+        finalidade: o.finalidade,
+        decisao: o.decisao,
+        total: Number(o.total),
+        totalGarantia: o.totalGarantia != null ? Number(o.totalGarantia) : null,
+        pagamentos: lerPagamentos(o.pagamentos),
+        // Situacao de pagamento POR ORCAMENTO (cobranca vinculada) ou null.
+        pagamento,
+        // Compat: campos planos ainda consumidos pela UI atual.
+        statusPagamento: pagamento?.status ?? null,
+        pagamentoPagoEm: pagamento?.pagoEm ?? null,
+        qtdItens: o.itens.length,
+        criadoEm: o.criadoEm,
+        itens: o.itens.map((it) => ({
+          id: it.id,
+          descricao: it.descricao,
+          quantidade: it.quantidade,
+          valorUnitario: Number(it.valorUnitario),
+          garantia: it.garantia,
+        })),
+      };
+    }),
   });
 }
