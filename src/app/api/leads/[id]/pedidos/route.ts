@@ -1,10 +1,14 @@
-// Pedidos (negocios GANHOS) de um cliente: itens, quantidades, valores, frete,
-// total e data — venda e pecas. Para a secao "Pedidos" da ficha e o "repetir
-// pedido". Escopo: o usuario so ve pedidos de leads que pode ver.
+// Pedidos de um cliente (Fatia E): PEDIDO = ORCAMENTO com decisao GANHO (imutavel,
+// numerado PED-000000). Retorna numero, data, totalFinal, finalidade, itens, NFs
+// vinculadas (NotaFiscal.orcamentoId), rastreios do negocio de origem e a situacao
+// de pagamento (cobranca vinculada, Pagamento.orcamentoId). Alimenta a secao
+// "Pedidos" e o "repetir pedido". Escopo: so leads que o usuario pode ver.
+// Sem N+1: orcamentos com includes (itens/NFs/cobrancas em lote) + 1 query de
+// rastreios por negocioId em lote.
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
-import { StatusNeg } from "@/generated/prisma/enums";
+import { formatarNumeroPedido } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,53 +32,92 @@ export async function GET(
     return NextResponse.json({ erro: "cliente nao encontrado no seu escopo" }, { status: 404 });
   }
 
-  const negocios = await prisma.negocio.findMany({
-    where: { leadId: id, status: StatusNeg.GANHO },
-    orderBy: [{ fechadoEm: "desc" }, { atualizadoEm: "desc" }],
+  const orcamentos = await prisma.orcamento.findMany({
+    where: { leadId: id, decisao: "GANHO" },
+    orderBy: { criadoEm: "desc" },
     take: 50,
     select: {
       id: true,
+      numero: true,
+      negocioId: true,
       finalidade: true,
-      valor: true,
-      valorAjustado: true,
-      valorProdutos: true,
+      total: true,
+      totalFinal: true,
       frete: true,
       fretePagoPelaEmpresa: true,
-      freteDespesa: true,
-      fechadoEm: true,
-      itensPedido: {
-        orderBy: { criadoEm: "asc" },
+      criadoEm: true,
+      itens: {
         select: {
-          id: true,
           produtoCatalogoId: true,
           descricao: true,
           quantidade: true,
           valorUnitario: true,
-          subtotal: true,
+          garantia: true,
         },
+      },
+      notasFiscais: {
+        orderBy: { dataNF: "desc" },
+        select: { id: true, numero: true, dataNF: true },
+      },
+      cobrancas: {
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { status: true, valor: true, pagoEm: true },
       },
     },
   });
 
-  const num = (v: unknown) => (v != null ? Number(v) : null);
+  // Rastreios do negocio de origem (em lote, sem N+1).
+  const negocioIds = [...new Set(orcamentos.map((o) => o.negocioId))];
+  const rastreios = negocioIds.length
+    ? await prisma.rastreioNegocio.findMany({
+        where: { negocioId: { in: negocioIds } },
+        orderBy: { criadoEm: "desc" },
+        select: { id: true, codigo: true, transportadora: true, negocioId: true },
+      })
+    : [];
+  const rastPorNegocio = new Map<
+    string,
+    { id: string; codigo: string; transportadora: string | null }[]
+  >();
+  for (const r of rastreios) {
+    const arr = rastPorNegocio.get(r.negocioId) ?? [];
+    arr.push({ id: r.id, codigo: r.codigo, transportadora: r.transportadora });
+    rastPorNegocio.set(r.negocioId, arr);
+  }
+
   return NextResponse.json({
-    pedidos: negocios.map((n) => ({
-      negocioId: n.id,
-      finalidade: n.finalidade,
-      data: n.fechadoEm,
-      // Pos-venda com desconto: total = valor realmente cobrado (valorAjustado).
-      total: n.valorAjustado != null ? num(n.valorAjustado) : num(n.valor),
-      valorProdutos: num(n.valorProdutos),
-      frete: num(n.frete),
-      fretePagoPelaEmpresa: n.fretePagoPelaEmpresa,
-      freteDespesa: num(n.freteDespesa),
-      itens: n.itensPedido.map((it) => ({
-        produtoCatalogoId: it.produtoCatalogoId,
-        descricao: it.descricao,
-        quantidade: it.quantidade,
-        valorUnitario: Number(it.valorUnitario),
-        subtotal: Number(it.subtotal),
-      })),
-    })),
+    pedidos: orcamentos.map((o) => {
+      const cob = o.cobrancas[0] ?? null;
+      return {
+        id: o.id,
+        negocioId: o.negocioId,
+        numero: o.numero,
+        numeroFormatado: formatarNumeroPedido(o.numero),
+        finalidade: o.finalidade,
+        data: o.criadoEm,
+        total: Number(o.totalFinal),
+        totalBruto: Number(o.total),
+        frete: o.frete != null ? Number(o.frete) : null,
+        fretePagoPelaEmpresa: o.fretePagoPelaEmpresa,
+        itens: o.itens.map((it) => ({
+          produtoCatalogoId: it.produtoCatalogoId,
+          descricao: it.descricao,
+          quantidade: it.quantidade,
+          valorUnitario: Number(it.valorUnitario),
+          garantia: it.garantia,
+          subtotal: it.quantidade * Number(it.valorUnitario),
+        })),
+        notasFiscais: o.notasFiscais.map((n) => ({
+          id: n.id,
+          numero: n.numero,
+          dataNF: n.dataNF,
+        })),
+        rastreios: rastPorNegocio.get(o.negocioId) ?? [],
+        pagamento: cob
+          ? { status: cob.status, valor: Number(cob.valor), pagoEm: cob.pagoEm }
+          : null,
+      };
+    }),
   });
 }
