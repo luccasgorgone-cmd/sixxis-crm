@@ -452,6 +452,14 @@ export function PainelNegocio({
               } min-h-0 w-full flex-col lg:flex lg:w-1/2`}
             >
               <div className="scroll-fino flex-1 space-y-5 overflow-y-auto p-4 pb-6">
+                {/* Ordem unificada dos dois paineis (Fatia B):
+                    1. Cliente  2. Produtos de interesse  3. Temperatura
+                    4. Etapa  5. Segmento(venda)  6. Orcamento(+decisoes)
+                    7. Orcamentos anteriores  8. Assistencia(pos-venda)
+                    9. Acompanhamento  10. Rastreio  11. Agendar  12. Gestao
+                    13. Pedidos  14. Historico/Negocio/Loja/Notas */}
+
+                {/* 1. Dados do cliente + enderecos */}
                 <BlocoCliente
                   cliente={detalhe.cliente}
                   onAtualizado={() => {
@@ -460,7 +468,36 @@ export function PainelNegocio({
                   }}
                 />
 
-                {/* Orcamento do atendimento (pecas no pos-venda, produtos na venda). */}
+                {/* 2. Produtos de interesse */}
+                <BlocoProdutosInteresse
+                  leadId={detalhe.cliente.id}
+                  onAtualizado={() => void carregar()}
+                />
+
+                {/* 3. Temperatura (so venda) */}
+                <SecaoTemperatura
+                  temperatura={detalhe.temperatura}
+                  finalidade={detalhe.finalidade}
+                  salvar={salvar}
+                />
+
+                {/* 4. Etapa */}
+                <SecaoEtapa
+                  etapaId={detalhe.etapaId}
+                  etapas={etapasFunil}
+                  salvar={salvar}
+                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
+                />
+
+                {/* 5. Segmento (Varejo/Atacado): so na VENDA. */}
+                {detalhe.finalidade !== "POS_VENDA" && (
+                  <SecaoSegmento
+                    leadId={detalhe.cliente.id}
+                    onAtualizado={() => void carregar()}
+                  />
+                )}
+
+                {/* 6. Orcamento do atendimento com as DECISOES no rodape */}
                 <BlocoOrcamento
                   negocioId={negocioId}
                   finalidade={detalhe.finalidade === "POS_VENDA" ? "POS_VENDA" : "VENDA"}
@@ -480,27 +517,32 @@ export function PainelNegocio({
                   }
                 />
 
-                <SecaoTemperatura
-                  temperatura={detalhe.temperatura}
-                  finalidade={detalhe.finalidade}
-                  salvar={salvar}
-                />
+                {/* 7. Historico numerado de orcamentos do cliente (colapsado). */}
+                <OrcamentosAnteriores leadId={detalhe.cliente.id} />
 
-                <SecaoEtapa
-                  etapaId={detalhe.etapaId}
-                  etapas={etapasFunil}
-                  salvar={salvar}
-                  abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
-                />
-
-                {/* Segmento (Varejo/Atacado): so na VENDA. */}
-                {detalhe.finalidade !== "POS_VENDA" && (
-                  <SecaoSegmento
-                    leadId={detalhe.cliente.id}
-                    onAtualizado={() => void carregar()}
-                  />
+                {/* 8. Assistencia (Local): so na pos-venda. */}
+                {detalhe.finalidade === "POS_VENDA" && (
+                  <BlocoAssistencia leadId={detalhe.cliente.id} />
                 )}
 
+                {/* 9. Acompanhamento */}
+                <BlocoAcompanhamento
+                  detalhe={detalhe}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
+                />
+
+                {/* 10. Rastreio */}
+                <BlocoRastreio
+                  detalhe={detalhe}
+                  recarregar={carregar}
+                  onAtualizado={onAtualizado}
+                />
+
+                {/* 11. Agendar contato */}
+                <BlocoAgendar detalhe={detalhe} recarregar={carregar} />
+
+                {/* 12. Gestao (dono / transferir / etiquetas) */}
                 <NegocioAcoes
                   detalhe={detalhe}
                   ehAdmin={ehAdmin}
@@ -513,35 +555,11 @@ export function PainelNegocio({
                   onAtualizado={onAtualizado}
                 />
 
-                <BlocoProdutosInteresse
-                  leadId={detalhe.cliente.id}
-                  onAtualizado={() => void carregar()}
-                />
-
+                {/* 13. Pedidos do cliente (evolui na Fatia E) */}
                 <BlocoPedidos
                   leadId={detalhe.cliente.id}
                   onRepetir={etapaGanhoId ? repetirPedido : undefined}
                 />
-
-                <BlocoAcompanhamento
-                  detalhe={detalhe}
-                  recarregar={carregar}
-                  onAtualizado={onAtualizado}
-                />
-
-                <BlocoRastreio
-                  detalhe={detalhe}
-                  recarregar={carregar}
-                  onAtualizado={onAtualizado}
-                />
-
-                {/* Assistencia (Local): so para pos-venda; cliente continua no funil. */}
-                <BlocoAssistencia leadId={detalhe.cliente.id} />
-
-                {/* Historico numerado de orcamentos do cliente (colapsado). */}
-                <OrcamentosAnteriores leadId={detalhe.cliente.id} />
-
-                <BlocoAgendar detalhe={detalhe} recarregar={carregar} />
 
                 {/* Sub-navegacao dos paineis inferiores */}
                 <div>
@@ -1355,7 +1373,7 @@ export function BlocoRastreio({
 // Agendar contato: cria um lembrete (data/hora + nota) e lista os proximos
 // lembretes pendentes do cliente, com acao de concluir.
 // ----------------------------------------------------------------------------
-function BlocoAgendar({
+export function BlocoAgendar({
   detalhe,
   recarregar,
 }: {

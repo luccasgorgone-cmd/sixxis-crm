@@ -19,6 +19,7 @@ import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
   BlocoRastreio,
+  BlocoAgendar,
   NegocioAcoes,
   Notas,
 } from "@/components/kanban/PainelNegocio";
@@ -232,8 +233,40 @@ export function PainelClienteInbox({
             onAtualizado={() => void carregarCliente()}
           />
 
-          {/* (b) Orcamento do atendimento (pecas no pos-venda, produtos na venda),
-              com as DECISOES no rodape (Fatia B). */}
+          {/* Ordem unificada dos dois paineis (Fatia B):
+              1. Cliente  2. Produtos de interesse  3. Temperatura  4. Etapa
+              5. Segmento(venda)  6. Orcamento(+decisoes)  7. Orcamentos anteriores
+              8. Assistencia(pos-venda)  9. Acompanhamento  10. Rastreio
+              11. Agendar  12. Gestao  13. [Pedidos: Fatia E]  14. Notas/Historico */}
+
+          {/* 2. Produtos de interesse */}
+          <BlocoProdutosInteresse leadId={leadId} />
+
+          {/* 3. Temperatura (so venda) */}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <SecaoTemperatura
+              temperatura={detalhe.temperatura}
+              finalidade={detalhe.finalidade}
+              salvar={salvar}
+            />
+          )}
+
+          {/* 4. Etapa */}
+          {detalhe && negocioId && podeAcoesNegocio && (
+            <SecaoEtapa
+              etapaId={detalhe.etapaId}
+              etapas={etapasFunil}
+              salvar={salvar}
+              abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
+            />
+          )}
+
+          {/* 5. Segmento (Varejo/Atacado): so na VENDA. */}
+          {detalhe && negocioId && podeAcoesNegocio && detalhe.finalidade !== "POS_VENDA" && (
+            <SecaoSegmento leadId={leadId} onAtualizado={() => void carregarCliente()} />
+          )}
+
+          {/* 6. Orcamento do atendimento com as DECISOES no rodape. */}
           {negocioId && detalhe?.finalidade && (
             <BlocoOrcamento
               negocioId={negocioId}
@@ -257,26 +290,34 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* (c) Decisoes / etapa / gestao — os mesmos controles do Kanban. */}
-          {detalhe && negocioId && podeAcoesNegocio && (
-            <SecaoTemperatura
-              temperatura={detalhe.temperatura}
-              finalidade={detalhe.finalidade}
-              salvar={salvar}
-            />
+          {/* 7. Historico numerado de orcamentos do cliente (colapsado). */}
+          <OrcamentosAnteriores leadId={leadId} />
+
+          {/* 8. Assistencia (Local): so na pos-venda. */}
+          {detalhe?.finalidade === "POS_VENDA" && <BlocoAssistencia leadId={leadId} />}
+
+          {/* 9. Acompanhamento e 10. Rastreio */}
+          {detalhe && negocioId && (
+            <>
+              <BlocoAcompanhamento
+                detalhe={detalhe}
+                recarregar={carregarNegocio}
+                onAtualizado={() => void carregarNegocio()}
+              />
+              <BlocoRastreio
+                detalhe={detalhe}
+                recarregar={carregarNegocio}
+                onAtualizado={() => void carregarNegocio()}
+              />
+            </>
           )}
-          {detalhe && negocioId && podeAcoesNegocio && (
-            <SecaoEtapa
-              etapaId={detalhe.etapaId}
-              etapas={etapasFunil}
-              salvar={salvar}
-              abrirModal={(tipo, etapaId) => setModal({ tipo, etapaId })}
-            />
+
+          {/* 11. Agendar contato */}
+          {detalhe && negocioId && (
+            <BlocoAgendar detalhe={detalhe} recarregar={carregarNegocio} />
           )}
-          {/* Segmento (Varejo/Atacado): so na VENDA. */}
-          {detalhe && negocioId && podeAcoesNegocio && detalhe.finalidade !== "POS_VENDA" && (
-            <SecaoSegmento leadId={leadId} onAtualizado={() => void carregarCliente()} />
-          )}
+
+          {/* 12. Gestao (dono / transferir / etiquetas) */}
           {detalhe && negocioId && podeAcoesNegocio && (
             <NegocioAcoes
               detalhe={detalhe}
@@ -292,40 +333,20 @@ export function PainelClienteInbox({
             />
           )}
 
-          {/* (f) Demais blocos, na sequencia natural */}
-          <BlocoProdutosInteresse leadId={leadId} />
-
-          {/* Assistencia (Local): nivel cliente, so para pos-venda. */}
-          <BlocoAssistencia leadId={leadId} />
-
+          {/* 14. Notas (+ Historico do cliente logo apos) */}
           {detalhe && negocioId && (
-            <>
-              <BlocoAcompanhamento
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
+                Notas
+              </h4>
+              <Notas
                 detalhe={detalhe}
+                negocioId={negocioId}
+                presets={presets}
                 recarregar={carregarNegocio}
-                onAtualizado={() => void carregarNegocio()}
               />
-              <BlocoRastreio
-                detalhe={detalhe}
-                recarregar={carregarNegocio}
-                onAtualizado={() => void carregarNegocio()}
-              />
-              <div>
-                <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
-                  Notas
-                </h4>
-                <Notas
-                  detalhe={detalhe}
-                  negocioId={negocioId}
-                  presets={presets}
-                  recarregar={carregarNegocio}
-                />
-              </div>
-            </>
+            </div>
           )}
-
-          {/* Historico numerado de orcamentos do cliente (colapsado). */}
-          <OrcamentosAnteriores leadId={leadId} />
 
           {/* Historico do cliente (nivel cliente, sempre) */}
           <div>
