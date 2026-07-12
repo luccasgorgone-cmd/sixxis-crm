@@ -292,7 +292,7 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
               <p className={`text-xs font-semibold ${c.ponto}`}>
                 {c.r} · {dados.quantidade}
               </p>
-              <p className="mt-0.5 truncate text-sm font-bold text-escuro">{formatarBRL(dados.somaTotal)}</p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-escuro">{formatarBRL(dados.somaTotal)}</p>
             </button>
           );
         })}
@@ -332,9 +332,9 @@ export function AbaOrcamentos({ ehAdmin }: { ehAdmin: boolean }) {
                   </span>
                   <SeloPagamento status={o.statusPagamento} />
                   <div className="ml-auto flex shrink-0 flex-col items-end">
-                    <span className="text-sm font-semibold text-escuro">{formatarBRL(o.totalFinal ?? 0)}</span>
+                    <span className="text-sm font-semibold tabular-nums text-escuro">{formatarBRL(o.totalFinal ?? 0)}</span>
                     {o.totalGarantia != null && o.totalGarantia > 0 && (
-                      <span className="text-[10px] text-medio/50">Garantia {formatarBRL(o.totalGarantia)}</span>
+                      <span className="text-[10px] tabular-nums text-medio/50">Garantia {formatarBRL(o.totalGarantia)}</span>
                     )}
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-medio/30" />
@@ -489,16 +489,16 @@ function DrawerOrcamento({ id, onFechar }: { id: string; onFechar: () => void })
                     key={it.id}
                     className="flex items-center gap-2 rounded-lg border border-black/5 bg-white px-2.5 py-1.5 text-xs"
                   >
-                    <span className="min-w-0 flex-1 truncate text-escuro">
+                    <span className="min-w-0 flex-1 truncate text-escuro" title={it.descricao}>
                       <span className="text-medio/50">{it.quantidade}x </span>
                       {it.descricao}
                     </span>
                     {it.garantia ? (
                       <span className="flex shrink-0 items-center gap-0.5 text-tiffany">
-                        <ShieldCheck className="h-3 w-3" /> Garantia
+                        <ShieldCheck className="h-3 w-3" /> Garantia - sem custo
                       </span>
                     ) : (
-                      <span className="shrink-0 text-medio/60">
+                      <span className="shrink-0 tabular-nums text-medio/60">
                         {formatarBRL(it.valorUnitario)} · {formatarBRL(it.subtotal)}
                       </span>
                     )}
@@ -511,37 +511,37 @@ function DrawerOrcamento({ id, onFechar }: { id: string; onFechar: () => void })
             {v && (
               <div className="rounded-xl border border-black/5 bg-fundo/50 p-3 text-xs">
                 <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">Valores</h4>
-                <div className="space-y-0.5">
-                  <div className="flex justify-between text-medio/60">
+                <div className="space-y-1">
+                  <div className="flex items-baseline justify-between gap-2 text-medio/60">
                     <span>Subtotal</span>
-                    <span>{formatarBRL(v.subtotal ?? 0)}</span>
+                    <span className="tabular-nums">{formatarBRL(v.subtotal ?? 0)}</span>
                   </div>
                   {descValor > 0 && (
-                    <div className="flex justify-between text-green-700">
-                      <span>
+                    <div className="flex items-baseline justify-between gap-2 text-green-700">
+                      <span className="min-w-0 truncate">
                         {v.cupom ? `Cupom ${v.cupom} · ` : ""}−{v.descontoPct}%
                       </span>
-                      <span>− {formatarBRL(descValor)}</span>
+                      <span className="shrink-0 tabular-nums">− {formatarBRL(descValor)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-medio/60">
+                  <div className="flex items-baseline justify-between gap-2 text-medio/60">
                     <span>Frete</span>
-                    <span>{v.fretePagoPelaEmpresa ? "pago pela empresa" : `+ ${formatarBRL(v.frete ?? 0)}`}</span>
+                    <span className="shrink-0 tabular-nums">{v.fretePagoPelaEmpresa ? "pago pela empresa" : `+ ${formatarBRL(v.frete ?? 0)}`}</span>
                   </div>
-                  <div className="flex justify-between border-t border-black/10 pt-1 text-sm font-bold text-escuro">
+                  <div className="mt-1 flex items-baseline justify-between gap-2 border-t border-black/10 pt-2 text-sm font-bold text-escuro">
                     <span>Total</span>
-                    <span className="text-tiffany">{formatarBRL(v.totalFinal ?? 0)}</span>
+                    <span className="tabular-nums text-tiffany">{formatarBRL(v.totalFinal ?? 0)}</span>
                   </div>
                   {v.totalGarantia != null && v.totalGarantia > 0 && (
-                    <div className="flex justify-between text-[11px] text-medio/50">
+                    <div className="flex items-baseline justify-between gap-2 text-[11px] text-medio/50">
                       <span>Garantia (não cobrado)</span>
-                      <span className="line-through">{formatarBRL(v.totalGarantia)}</span>
+                      <span className="tabular-nums line-through">{formatarBRL(v.totalGarantia)}</span>
                     </div>
                   )}
                   {v.valorNegocio != null && (
-                    <div className="flex justify-between border-t border-black/10 pt-1 text-medio/70">
+                    <div className="flex items-baseline justify-between gap-2 border-t border-black/10 pt-1 text-medio/70">
                       <span>Valor consolidado (ganho)</span>
-                      <span className="font-semibold text-escuro">{formatarBRL(v.valorNegocio)}</span>
+                      <span className="font-semibold tabular-nums text-escuro">{formatarBRL(v.valorNegocio)}</span>
                     </div>
                   )}
                 </div>
