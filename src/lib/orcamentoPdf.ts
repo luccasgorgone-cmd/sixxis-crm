@@ -371,7 +371,11 @@ export async function gerarPdfOrcamento(
     const b1 = y - topPad;
     let yl = b1;
     for (const ln of linhasDesc) {
-      page.drawText(ln, { x: descL, y: yl, size: 10, font: fonte, color: ESCURO });
+      // Robustez (Bloco 2): trunca a linha se uma palavra unica muito longa
+      // estourar a coluna de descricao (nao invade Qtd/Valor).
+      page.drawText(truncar(ln, fonte, 10, descMaxW), {
+        x: descL, y: yl, size: 10, font: fonte, color: ESCURO,
+      });
       yl -= lineStep;
     }
     textoDir(page, String(it.quantidade), colQtdR, b1, 10, fonte, ESCURO);
