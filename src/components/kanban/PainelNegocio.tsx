@@ -1058,10 +1058,20 @@ export function BlocoAcompanhamento({
 }
 
 // ----------------------------------------------------------------------------
-// Rastreio e transporte do NEGOCIO (venda e pos-venda). Transportadora principal
-// + datas de envio/previsao (PATCH negocio) e MULTIPLOS codigos de rastreio
-// (POST/DELETE), cada um com transportadora opcional. Reusado no Kanban e no Inbox.
+// Rastreio e transporte do NEGOCIO (venda e pos-venda): datas de envio/previsao
+// (PATCH negocio) e MULTIPLOS codigos de rastreio (POST/DELETE), cada um com
+// transportadora opcional. Alem dos codigos do negocio atual, lista (somente
+// leitura) os dos DEMAIS negocios do lead. Reusado no Kanban e no Inbox. A
+// transportadora PRINCIPAL saiu da UI (Fatia D); o campo permanece no banco.
 // ----------------------------------------------------------------------------
+type RastreioOutroNegocio = {
+  id: string;
+  codigo: string;
+  transportadora: string | null;
+  negocioId: string;
+  origemLabel: string;
+};
+
 export function BlocoRastreio({
   detalhe,
   recarregar,
@@ -1072,9 +1082,6 @@ export function BlocoRastreio({
   onAtualizado: () => void;
 }) {
   const toast = useToast();
-  const [transportadora, setTransportadora] = useState(
-    detalhe.transportadora ?? "",
-  );
   const [dataEnvio, setDataEnvio] = useState(dataNascParaInput(detalhe.dataEnvio));
   const [previsao, setPrevisao] = useState(
     dataNascParaInput(detalhe.previsaoChegada),
@@ -1083,16 +1090,35 @@ export function BlocoRastreio({
   const [novaTransp, setNovaTransp] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [removendo, setRemovendo] = useState<string | null>(null);
+  // Rastreios dos DEMAIS negocios do lead (nivel cliente, somente leitura).
+  const [outros, setOutros] = useState<RastreioOutroNegocio[]>([]);
 
-  useEffect(() => {
-    setTransportadora(detalhe.transportadora ?? "");
-  }, [detalhe.transportadora]);
   useEffect(() => {
     setDataEnvio(dataNascParaInput(detalhe.dataEnvio));
   }, [detalhe.dataEnvio]);
   useEffect(() => {
     setPrevisao(dataNascParaInput(detalhe.previsaoChegada));
   }, [detalhe.previsaoChegada]);
+
+  // Carrega os rastreios de todos os negocios do lead e mantem so os de OUTROS
+  // negocios (os do atual ja aparecem editaveis acima). Recarrega ao mudar o
+  // negocio atual ou apos alteracoes locais (via `detalhe.rastreios`).
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/leads/${detalhe.cliente.id}/rastreios`)
+      .then((r) => (r.ok ? r.json() : { rastreios: [] }))
+      .then((d) => {
+        if (!vivo) return;
+        const lista: RastreioOutroNegocio[] = (d.rastreios ?? []).filter(
+          (r: RastreioOutroNegocio) => r.negocioId !== detalhe.id,
+        );
+        setOutros(lista);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [detalhe.cliente.id, detalhe.id, detalhe.rastreios]);
 
   async function salvarTransporte(body: Record<string, unknown>): Promise<void> {
     setSalvando(true);
@@ -1178,25 +1204,10 @@ export function BlocoRastreio({
         {salvando && <Loader2 className="h-3 w-3 animate-spin text-tiffany" />}
       </h4>
 
-      {/* Transportadora principal + datas. As duas datas ficam numa grade de 2
-          colunas (mesma proporcao dos demais campos do painel), evitando o
-          desalinhamento que havia com 3 colunas — labels de tamanhos diferentes
-          nao quebram e os inputs alinham lado a lado. */}
+      {/* Datas de envio/previsao. A transportadora PRINCIPAL saiu da UI (Fatia D):
+          cada codigo de rastreio ja tem a sua; o campo Negocio.transportadora
+          permanece no banco. */}
       <div className="space-y-3">
-        <div>
-          <Rotulo>Transportadora (principal)</Rotulo>
-          <input
-            value={transportadora}
-            onChange={(e) => setTransportadora(e.target.value)}
-            onBlur={() => {
-              if ((transportadora.trim() || null) !== (detalhe.transportadora ?? null)) {
-                void salvarTransporte({ transportadora: transportadora.trim() });
-              }
-            }}
-            placeholder="Ex.: Correios, Jadlog..."
-            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
-          />
-        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Rotulo>Data de envio</Rotulo>
@@ -1296,6 +1307,32 @@ export function BlocoRastreio({
           </button>
         </div>
       </div>
+
+      {/* Rastreios de OUTROS negocios do lead (nivel cliente, somente leitura). */}
+      {outros.length > 0 && (
+        <div className="border-t border-black/5 pt-3">
+          <Rotulo>Outros rastreios do cliente</Rotulo>
+          <ul className="space-y-1.5">
+            {outros.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center gap-2 rounded-lg border border-black/5 bg-fundo px-2.5 py-1.5"
+              >
+                <Truck className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-xs text-escuro">{r.codigo}</p>
+                  {r.transportadora && (
+                    <p className="truncate text-[11px] text-medio/50">{r.transportadora}</p>
+                  )}
+                </div>
+                <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-medio/60">
+                  {r.origemLabel}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
