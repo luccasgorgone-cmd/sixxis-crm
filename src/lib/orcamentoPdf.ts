@@ -24,10 +24,14 @@ const CARD = rgb(0.963, 0.971, 0.97); // preenchimento do card do cliente
 // Dados da marca (cabecalho/rodape).
 const MARCA = {
   nome: "Sixxis",
+  cnpj: "54.978.947/0001-09",
   endereco: "R. Anhanguera, 1711 - Icaray, Araçatuba/SP",
   email: "sac@sixxis.com.br",
   site: "www.sixxis.com.br",
 };
+
+// Validade do orcamento em dias (regra do dono: 3 dias).
+const VALIDADE_DIAS = 3;
 
 export type ItemPdfOrcamento = {
   descricao: string;
@@ -108,6 +112,36 @@ function brl(valor: number): string {
   const [inteiro, dec] = n.toFixed(2).split(".");
   const agrupado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `R$ ${agrupado},${dec}`;
+}
+
+// Trunca `texto` com reticencias para caber em `larguraMax` (pt). Usado em campos
+// de UMA linha (nome do cliente) para nao estourar o layout (Bloco 2 robustez).
+function truncar(
+  texto: string,
+  font: PDFFont,
+  tamanho: number,
+  larguraMax: number,
+): string {
+  if (font.widthOfTextAtSize(texto, tamanho) <= larguraMax) return texto;
+  const retic = "…";
+  let corte = texto;
+  while (corte.length > 1 && font.widthOfTextAtSize(corte + retic, tamanho) > larguraMax) {
+    corte = corte.slice(0, -1);
+  }
+  return corte.trimEnd() + retic;
+}
+
+// "dd/mm/aaaa" + N dias -> "dd/mm/aaaa". Retorna null se o formato nao casar
+// (o PDF entao omite a data-limite sem quebrar).
+function somarDiasFormatado(dataFormatada: string, dias: number): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataFormatada.trim());
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const base = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+  if (Number.isNaN(base.getTime())) return null;
+  base.setDate(base.getDate() + dias);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(base.getDate())}/${p(base.getMonth() + 1)}/${base.getFullYear()}`;
 }
 
 // Quebra `texto` em linhas que cabem em `larguraMax` (pt), respeitando palavras.
@@ -196,39 +230,63 @@ export async function gerarPdfOrcamento(
     });
   };
 
-  // ---- CABECALHO: logo (ou wordmark) + numero/data + faixa tiffany ----
-  const logoH = 42;
+  // ---- CABECALHO: logo/wordmark + bloco da marca (esq) | ORCAMENTO/PED (dir) ----
+  const topo = y;
+  const logoH = 40;
   if (logoImg) {
     const escala = logoH / logoImg.height;
     let w = logoImg.width * escala;
     let h = logoH;
-    const maxW = 220;
+    const maxW = 200;
     if (w > maxW) {
       const k = maxW / w;
       w = maxW;
       h = logoH * k;
     }
-    page.drawImage(logoImg, { x: xEsq, y: y - h, width: w, height: h });
+    page.drawImage(logoImg, { x: xEsq, y: topo - h, width: w, height: h });
   } else {
     // Wordmark textual (fallback quando a logo nao e PNG/JPEG embutivel).
-    page.drawText(MARCA.nome, { x: xEsq, y: y - 30, size: 30, font: fonteBold, color: TIFFANY });
+    page.drawText(MARCA.nome, { x: xEsq, y: topo - 30, size: 30, font: fonteBold, color: TIFFANY });
   }
-  textoDir(page, "ORÇAMENTO", xDir, y - 8, 8, fonteBold, TIFFANY);
-  textoDir(page, dados.numeroFormatado, xDir, y - 24, 15, fonteBold, ESCURO);
-  textoDir(page, `Emitido em ${dados.dataFormatada}`, xDir, y - 38, 9, fonte, CINZA);
-  y -= 52;
 
-  page.drawText(MARCA.endereco, { x: xEsq, y, size: 9, font: fonte, color: CINZA });
-  y -= 12;
-  page.drawText(`${MARCA.email}   ${MARCA.site}`, { x: xEsq, y, size: 9, font: fonte, color: CINZA });
-  y -= 12;
-  y -= 6;
+  // Bloco de identificacao do documento (direita): rotulo, PED em destaque, data.
+  textoDir(page, "ORÇAMENTO", xDir, topo - 8, 8.5, fonteBold, TIFFANY);
+  textoDir(page, dados.numeroFormatado, xDir, topo - 26, 18, fonteBold, ESCURO);
+  textoDir(page, `Emitido em ${dados.dataFormatada}`, xDir, topo - 40, 9, fonte, CINZA);
+
+  // Bloco da marca (esquerda), abaixo da logo: nome + CNPJ, endereco, contato.
+  let yb = topo - logoH - 12;
+  page.drawText(`${MARCA.nome}  ·  CNPJ ${MARCA.cnpj}`, {
+    x: xEsq, y: yb, size: 9, font: fonteBold, color: ESCURO,
+  });
+  yb -= 12;
+  page.drawText(MARCA.endereco, { x: xEsq, y: yb, size: 8.5, font: fonte, color: CINZA });
+  yb -= 11;
+  page.drawText(`${MARCA.email}   ·   ${MARCA.site}`, {
+    x: xEsq, y: yb, size: 8.5, font: fonte, color: CINZA,
+  });
+
+  y = yb - 12;
   page.drawRectangle({ x: xEsq, y, width: larguraUtil, height: 3, color: TIFFANY });
-  y -= 26;
+  y -= 20;
 
-  // ---- TITULO ----
-  page.drawText("Orçamento", { x: xEsq, y: y - 4, size: 24, font: fonteBold, color: ESCURO });
-  y -= 28;
+  // ---- FAIXA DE VALIDADE (3 dias) em destaque ----
+  const limite = somarDiasFormatado(dados.dataFormatada, VALIDADE_DIAS);
+  const faixaH = 30;
+  const faixaTop = y;
+  const faixaBottom = faixaTop - faixaH;
+  page.drawRectangle({
+    x: xEsq, y: faixaBottom, width: larguraUtil, height: faixaH,
+    color: TIFFANY_SUAVE, borderColor: TIFFANY, borderWidth: 0.8,
+  });
+  const yFaixa = faixaBottom + (faixaH - 11) / 2 + 2;
+  page.drawText("PROPOSTA VÁLIDA POR", { x: xEsq + 14, y: yFaixa + 5, size: 7.5, font: fonteBold, color: TIFFANY });
+  page.drawText(`${VALIDADE_DIAS} dias`, { x: xEsq + 14, y: yFaixa - 7, size: 12, font: fonteBold, color: ESCURO });
+  if (limite) {
+    textoDir(page, "Válida até", xDir - 14, yFaixa + 5, 7.5, fonteBold, TIFFANY);
+    textoDir(page, limite, xDir - 14, yFaixa - 7, 12, fonteBold, ESCURO);
+  }
+  y = faixaBottom - 24;
 
   // ---- CARD DO CLIENTE ----
   page.drawText("CLIENTE", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
@@ -246,8 +304,8 @@ export async function gerarPdfOrcamento(
       ? `${dados.cliente.cidade}/${dados.cliente.uf}`
       : dados.cliente.cidade || dados.cliente.uf || null;
   if (local) partesInfo.push(local);
-  const nomeCliente = sanitizar(dados.cliente.nome) || "Cliente";
-  const infoLinha = sanitizar(partesInfo.join("     "));
+  const nomeCliente = truncar(sanitizar(dados.cliente.nome) || "Cliente", fonteBold, 13, larguraUtil - 28);
+  const infoLinha = truncar(sanitizar(partesInfo.join("     ")), fonte, 9.5, larguraUtil - 28);
   const temInfo = infoLinha.length > 0;
   const padY = 11;
   const cardH = padY * 2 + 13 + (temInfo ? 15 : 0);
@@ -330,10 +388,10 @@ export async function gerarPdfOrcamento(
         thickness: 0.7,
         color: CINZA_CLARO,
       });
-      page.drawText("Garantia - sem custo", {
+      page.drawText("GARANTIA - SEM CUSTO", {
         x: descL,
         y: yl + lineStep - 12,
-        size: 8.5,
+        size: 8,
         font: fonteBold,
         color: TIFFANY,
       });
@@ -376,7 +434,7 @@ export async function gerarPdfOrcamento(
   const transp = dados.transportadora ? sanitizar(dados.transportadora) : "";
   const rotuloFrete = transp ? `Frete - ${transp}` : "Frete";
   if (dados.fretePagoPelaEmpresa) {
-    linhaTot(rotuloFrete, "Cortesia Sixxis", TIFFANY, CINZA);
+    linhaTot(rotuloFrete, "Por conta da empresa", TIFFANY, CINZA);
   } else {
     linhaTot(rotuloFrete, dados.frete && dados.frete > 0 ? brl(dados.frete) : "Grátis");
   }
@@ -430,7 +488,10 @@ export async function gerarPdfOrcamento(
   // ---- RODAPE (na base da ultima pagina) ----
   const yF = MARGEM + 28;
   linhaFina(yF + 16);
-  page.drawText("Orçamento válido por 7 dias   Dúvidas? Chame no WhatsApp", {
+  const notaValidade = limite
+    ? `Proposta válida por ${VALIDADE_DIAS} dias (até ${limite}).  Dúvidas? Fale no WhatsApp.`
+    : `Proposta válida por ${VALIDADE_DIAS} dias.  Dúvidas? Fale no WhatsApp.`;
+  page.drawText(notaValidade, {
     x: xEsq,
     y: yF,
     size: 9,
