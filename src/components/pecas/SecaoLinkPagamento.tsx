@@ -5,7 +5,17 @@
 // o STATUS (Pendente ambar / Pago verde). Se o valor mudou apos gerar, permite
 // gerar um novo link. Padrao da casa (dark, tiffany, Lucide).
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Link2, Copy, Check, Send, CreditCard, RefreshCw } from "lucide-react";
+import {
+  Loader2,
+  Link2,
+  Copy,
+  Check,
+  Send,
+  CreditCard,
+  RefreshCw,
+  Plus,
+  ChevronDown,
+} from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatarBRL } from "@/lib/format";
 import type { MensagemItem } from "@/components/inbox/tipos";
@@ -15,6 +25,16 @@ type Pagamento = {
   initPoint: string | null;
   referencia: string | null;
   valor: number | null;
+  pagoEm: string | null;
+};
+
+// Item resumido do historico de cobrancas do negocio (Fatia A: 1-N).
+type HistoricoItem = {
+  externalReference: string;
+  status: string;
+  valor: number | null;
+  referencia: string | null;
+  criadoEm: string;
   pagoEm: string | null;
 };
 
@@ -53,6 +73,8 @@ export function SecaoLinkPagamento({
 }) {
   const toast = useToast();
   const [pag, setPag] = useState<Pagamento | null>(null);
+  const [historico, setHistorico] = useState<HistoricoItem[]>([]);
+  const [histAberto, setHistAberto] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -65,6 +87,7 @@ export function SecaoLinkPagamento({
       if (r.ok) {
         const d = await r.json();
         setPag(d.pagamento ?? null);
+        setHistorico(Array.isArray(d.historico) ? d.historico : []);
       }
     } catch {
       // silencioso — pagamento nunca quebra o painel
@@ -214,6 +237,19 @@ export function SecaoLinkPagamento({
             </div>
           )}
 
+          {/* Pago: novo orcamento -> novo link (POST cria a proxima cobranca). */}
+          {pag.status === "pago" && (
+            <button
+              type="button"
+              onClick={() => void gerar()}
+              disabled={gerando || !podeGerar}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-tiffany bg-tiffany/5 px-3 py-2 text-sm font-semibold text-tiffany transition-colors hover:bg-tiffany/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Gerar novo link
+            </button>
+          )}
+
           {pag.status !== "pago" && pag.initPoint && (
             <div className="flex gap-1.5">
               <button
@@ -253,6 +289,41 @@ export function SecaoLinkPagamento({
               {gerando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
               O total mudou — gerar novo link ({formatarBRL(totalFinal)})
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Historico compacto e colapsado das cobrancas ANTERIORES (fora a atual). */}
+      {historico.length > 1 && (
+        <div className="border-t border-black/5 pt-2">
+          <button
+            type="button"
+            onClick={() => setHistAberto((v) => !v)}
+            className="flex w-full items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-medio/50 transition-colors hover:text-medio/70"
+          >
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${histAberto ? "" : "-rotate-90"}`}
+            />
+            Cobranças anteriores ({historico.length - 1})
+          </button>
+          {histAberto && (
+            <ul className="mt-1.5 space-y-1">
+              {historico.slice(1).map((h) => (
+                <li
+                  key={h.externalReference}
+                  className="flex items-center gap-2 text-[11px] text-medio/60"
+                >
+                  <span className="flex-1 truncate">
+                    {h.referencia ? <span className="font-mono">{h.referencia}</span> : null}
+                    {h.referencia ? " · " : ""}
+                    {h.valor != null ? formatarBRL(h.valor) : "—"}
+                    {" · "}
+                    {new Date(h.criadoEm).toLocaleDateString("pt-BR")}
+                  </span>
+                  <SeloStatus status={h.status} />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
