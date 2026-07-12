@@ -854,6 +854,9 @@ model Orcamento {
   agenteId      String?
   criadoEm      DateTime        @default(now())
   itens         OrcamentoItem[]
+  // Cobrancas (links MP) vinculadas a este snapshot (Fatia A: 1-N por negocio).
+  // Nome distinto do campo Json `pagamentos` (formas de pagamento congeladas).
+  cobrancas     Pagamento[]
 
   @@index([leadId, criadoEm])
   @@index([negocioId])
@@ -880,17 +883,25 @@ model OrcamentoItem {
 // guarda o link e recebe a confirmacao "pago" DIRETO do Mercado Pago no webhook
 // /api/webhook/mercadopago. Cobranca AVULSA: nao cria Pedido nem venda na Loja.
 // Ligada ao NEGOCIO (o snapshot Orcamento so existe apos a decisao; o link pode
-// ser gerado antes). externalReference "crm-{negocioId}" e UNICO -> uma cobranca
-// ativa por negocio (regenerar atualiza a linha enquanto nao estiver paga).
+// ser gerado antes). Fatia A: 1-N por negocio — cada orcamento enviado pode ter
+// sua propria cobranca. externalReference e UNICO: formato legado "crm-{negocioId}"
+// (1 linha) OU "crm-{negocioId}-{seq}" para as novas. NUNCA muta cobranca "pago":
+// paga -> a proxima cobranca cria uma nova linha (nao regenera a antiga).
 model Pagamento {
   id                String    @id @default(cuid())
   negocioId         String
   negocio           Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  // Snapshot Orcamento vinculado (opcional): preenchido na decisao (Bloco 4) para
+  // o historico mostrar a situacao de pagamento por orcamento. SetNull preserva a
+  // cobranca (inclusive paga) se o Orcamento for removido.
+  orcamentoId       String?
+  orcamento         Orcamento? @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)
   // Rotulo do PED para exibicao/descricao (ex.: "PED-000123"). Nao e chave.
   referencia        String
   mpPreferenceId    String?
   mpPaymentId       String?
-  // "crm-{negocioId}": casa a notificacao do MP com esta cobranca. Unico.
+  // "crm-{negocioId}" (legado) ou "crm-{negocioId}-{seq}": casa a notificacao do
+  // MP com esta cobranca. Unico.
   externalReference String    @unique
   valor             Decimal   @db.Decimal(12, 2)
   // "pendente" | "pago" | "cancelado" | "erro".
@@ -902,6 +913,7 @@ model Pagamento {
 
   @@index([negocioId])
   @@index([externalReference])
+  @@index([orcamentoId])
 }
 
 // Campanha de envio em massa (multicanal). filtroJson guarda o recorte usado;
