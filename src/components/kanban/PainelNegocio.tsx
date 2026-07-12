@@ -47,7 +47,11 @@ import { BlocoCliente } from "@/components/cliente/BlocoCliente";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
-import { BlocoOrcamento, OrcamentosAnteriores } from "@/components/pecas/BlocoOrcamento";
+import {
+  BlocoOrcamento,
+  OrcamentosAnteriores,
+  avisarOrcamentosAtualizados,
+} from "@/components/pecas/BlocoOrcamento";
 import { BlocoPedidos, type ItemPedidoSeed } from "@/components/cliente/BlocoPedidos";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
@@ -646,6 +650,8 @@ export function PainelNegocio({
             toast.sucesso(
               modal.tipo === "ganho" ? "Pedido fechado como ganho." : "Negócio marcado como perdido.",
             );
+            // Revalida o historico de orcamentos sem refresh (Fatia C).
+            avisarOrcamentosAtualizados(detalhe.cliente.id);
             setModal(null);
           }}
           onCancelar={() => setModal(null)}

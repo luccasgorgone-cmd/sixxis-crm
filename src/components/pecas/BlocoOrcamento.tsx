@@ -1209,18 +1209,82 @@ const DECISAO_META: Record<string, { rotulo: string; classe: string }> = {
   PERDIDO: { rotulo: "Perdido", classe: "text-erro" },
 };
 
+// Evento global: uma decisao criou/atualizou um orcamento do lead. Orcamentos
+// Anteriores escuta e revalida sem refresh manual (Fatia C). Emitido pelos
+// paineis apos GANHO/PERDIDO/PENDENTE.
+const EVENTO_ORC_ATUALIZAR = "orcamentos:atualizar";
+export function avisarOrcamentosAtualizados(leadId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(EVENTO_ORC_ATUALIZAR, { detail: { leadId } }),
+  );
+}
+
+// Selo compacto da situacao de pagamento por orcamento (cobranca vinculada).
+function SeloPagamentoOrc({ status }: { status: string | null }) {
+  if (status === "pago") {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-green-600/10 text-green-700">
+        Pago
+      </span>
+    );
+  }
+  if (status === "pendente") {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-amber-500/10 text-amber-600">
+        A pagar
+      </span>
+    );
+  }
+  if (status) {
+    return (
+      <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold bg-black/5 text-medio/60">
+        {status}
+      </span>
+    );
+  }
+  // Sem cobranca vinculada.
+  return <span className="shrink-0 text-[9px] font-semibold text-medio/30">—</span>;
+}
+
 export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
   const [aberto, setAberto] = useState(false);
   const [orcs, setOrcs] = useState<OrcamentoHist[] | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
+  // Bumpado por evento (novo orcamento) / foco -> forca revalidacao enquanto aberto.
+  const [versao, setVersao] = useState(0);
 
+  const carregar = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/leads/${leadId}/orcamentos`);
+      const d = r.ok ? await r.json() : { orcamentos: [] };
+      setOrcs(d.orcamentos ?? []);
+    } catch {
+      setOrcs([]);
+    }
+  }, [leadId]);
+
+  // Busca SEMPRE ao abrir (e ao reabrir/focar/novo orcamento, via `versao`).
   useEffect(() => {
-    if (!aberto || orcs !== null) return;
-    fetch(`/api/leads/${leadId}/orcamentos`)
-      .then((r) => (r.ok ? r.json() : { orcamentos: [] }))
-      .then((d) => setOrcs(d.orcamentos ?? []))
-      .catch(() => setOrcs([]));
-  }, [aberto, orcs, leadId]);
+    if (aberto) void carregar();
+  }, [aberto, versao, carregar]);
+
+  // Revalida ao criar orcamento no mesmo painel (evento) e ao focar a janela.
+  useEffect(() => {
+    function onAtualizar(e: Event) {
+      const det = (e as CustomEvent<{ leadId?: string }>).detail;
+      if (!det?.leadId || det.leadId === leadId) setVersao((v) => v + 1);
+    }
+    function onFoco() {
+      setVersao((v) => v + 1);
+    }
+    window.addEventListener(EVENTO_ORC_ATUALIZAR, onAtualizar);
+    window.addEventListener("focus", onFoco);
+    return () => {
+      window.removeEventListener(EVENTO_ORC_ATUALIZAR, onAtualizar);
+      window.removeEventListener("focus", onFoco);
+    };
+  }, [leadId]);
 
   return (
     <section className="rounded-xl border border-black/5 bg-white">
@@ -1264,23 +1328,7 @@ export function OrcamentosAnteriores({ leadId }: { leadId: string }) {
                         {new Date(o.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                       </span>
                       <span className={`shrink-0 text-[11px] font-semibold ${dec.classe}`}>{dec.rotulo}</span>
-                      {o.statusPagamento && (
-                        <span
-                          className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold ${
-                            o.statusPagamento === "pago"
-                              ? "bg-green-600/10 text-green-700"
-                              : o.statusPagamento === "pendente"
-                                ? "bg-amber-500/10 text-amber-600"
-                                : "bg-black/5 text-medio/60"
-                          }`}
-                        >
-                          {o.statusPagamento === "pago"
-                            ? "Pago"
-                            : o.statusPagamento === "pendente"
-                              ? "A pagar"
-                              : o.statusPagamento}
-                        </span>
-                      )}
+                      <SeloPagamentoOrc status={o.statusPagamento} />
                       <span className="ml-auto shrink-0 text-xs font-medium text-escuro">
                         {formatarBRL(o.total)}
                       </span>

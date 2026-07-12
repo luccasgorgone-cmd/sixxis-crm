@@ -14,7 +14,11 @@ import { Loader2, UserX } from "lucide-react";
 import { BlocoCliente, type ClientePainel } from "@/components/cliente/BlocoCliente";
 import { BlocoProdutosInteresse } from "@/components/cliente/BlocoProdutosInteresse";
 import { BlocoAssistencia } from "@/components/local/BlocoAssistencia";
-import { BlocoOrcamento, OrcamentosAnteriores } from "@/components/pecas/BlocoOrcamento";
+import {
+  BlocoOrcamento,
+  OrcamentosAnteriores,
+  avisarOrcamentosAtualizados,
+} from "@/components/pecas/BlocoOrcamento";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
 import {
   BlocoAcompanhamento,
@@ -373,6 +377,8 @@ export function PainelClienteInbox({
               ...(detalhe.pendente ? { pendente: false } : {}),
             });
             if (!ok) throw new Error("falha");
+            // Revalida o historico de orcamentos sem refresh (Fatia C).
+            avisarOrcamentosAtualizados(leadId);
             setModal(null);
           }}
           onCancelar={() => setModal(null)}

@@ -20,6 +20,7 @@ import { BadgeTemperatura } from "@/components/badges";
 import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
 import { useToast } from "@/components/ui/Toast";
 import { MOTIVOS_PENDENCIA } from "@/lib/motivosPendencia";
+import { avisarOrcamentosAtualizados } from "@/components/pecas/BlocoOrcamento";
 import {
   TEMPERATURA_INFO,
   type DetalheNegocio,
@@ -311,6 +312,8 @@ export function SecaoDecisoes({
       setPendCode("");
       setPendObs("");
       toast.sucesso("Negócio marcado como pendente.");
+      // Pode ter criado um novo orcamento (snapshot) -> revalida o historico.
+      avisarOrcamentosAtualizados(detalhe.cliente.id);
     }
   }
 
