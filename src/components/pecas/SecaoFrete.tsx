@@ -290,7 +290,7 @@ export function SecaoFrete({
                     )}
                   </span>
                   {c.ok && c.preco != null ? (
-                    <span className="shrink-0 text-right text-xs">
+                    <span className="shrink-0 text-right text-xs tabular-nums">
                       <span className="font-semibold text-escuro">{formatarBRL(c.preco)}</span>
                       {c.prazoDias ? (
                         <span className="ml-1 text-medio/50">{prazoTxt(c.prazoDias)}</span>

@@ -222,7 +222,7 @@ export function SecaoLinkPagamento({
             <p className="text-[11px] text-medio/60">
               {pag.referencia ? <span className="font-mono">{pag.referencia}</span> : null}
               {pag.referencia ? " · " : ""}
-              {formatarBRL(pag.valor)}
+              <span className="tabular-nums">{formatarBRL(pag.valor)}</span>
               {pag.status === "pago" && pag.pagoEm
                 ? ` · pago em ${new Date(pag.pagoEm).toLocaleDateString("pt-BR")}`
                 : ""}
@@ -327,7 +327,7 @@ export function SecaoLinkPagamento({
                   <span className="flex-1 truncate">
                     {h.referencia ? <span className="font-mono">{h.referencia}</span> : null}
                     {h.referencia ? " · " : ""}
-                    {h.valor != null ? formatarBRL(h.valor) : "—"}
+                    <span className="tabular-nums">{h.valor != null ? formatarBRL(h.valor) : "—"}</span>
                     {" · "}
                     {new Date(h.criadoEm).toLocaleDateString("pt-BR")}
                   </span>

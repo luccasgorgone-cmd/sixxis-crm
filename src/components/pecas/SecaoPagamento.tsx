@@ -134,7 +134,7 @@ export function SecaoPagamento({
                 }
                 placeholder="0,00"
                 aria-label="Valor"
-                className="campo w-20 shrink-0 text-right"
+                className="campo w-20 shrink-0 text-right tabular-nums"
               />
               {parcelavel && (
                 <select
@@ -189,10 +189,10 @@ export function SecaoPagamento({
 
       {/* Resumo Pago vs Total — informativo, NAO trava. */}
       {temAlgum && (
-        <div className="flex items-center justify-between border-t border-black/5 pt-2 text-xs">
-          <span className="text-medio/60">
-            Pago <span className="font-semibold text-escuro">{formatarBRL(pago)}</span>
-            {" / "}Total {formatarBRL(totalFinal)}
+        <div className="flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-xs">
+          <span className="min-w-0 truncate text-medio/60">
+            Pago <span className="font-semibold tabular-nums text-escuro">{formatarBRL(pago)}</span>
+            {" / "}Total <span className="tabular-nums">{formatarBRL(totalFinal)}</span>
           </span>
           {bate ? (
             <span className="flex items-center gap-1 font-semibold text-green-600">
