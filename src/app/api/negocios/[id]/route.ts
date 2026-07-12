@@ -860,7 +860,7 @@ export async function PATCH(
               body.orcPagamentos !== undefined
                 ? lerPagamentos(body.orcPagamentos)
                 : lerPagamentos(negocio.orcPagamentos);
-            await tx.orcamento.create({
+            const orcCriado = await tx.orcamento.create({
               data: {
                 numero,
                 negocioId: id,
@@ -893,6 +893,21 @@ export async function PATCH(
               },
             });
             numeroOrcamentoGerado = numero;
+
+            // Fatia A (Bloco 4): vincula a este snapshot a cobranca MAIS RECENTE
+            // do negocio ainda sem orcamento (qualquer status), para o historico
+            // mostrar a situacao de pagamento por orcamento. Sem cobranca -> segue.
+            const cobrancaSemVinculo = await tx.pagamento.findFirst({
+              where: { negocioId: id, orcamentoId: null },
+              orderBy: { criadoEm: "desc" },
+              select: { id: true },
+            });
+            if (cobrancaSemVinculo) {
+              await tx.pagamento.update({
+                where: { id: cobrancaSemVinculo.id },
+                data: { orcamentoId: orcCriado.id },
+              });
+            }
           }
         }
 
