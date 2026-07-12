@@ -405,7 +405,12 @@ export async function PATCH(
             : negocio.valor != null
               ? Number(negocio.valor)
               : null;
-      if (valorEfetivo == null || valorEfetivo <= 0) {
+      // Total ZERO e legitimo SO na pos-venda com pedido (todas as pecas em
+      // garantia -> cliente nao paga nada). VENDA continua exigindo valor > 0;
+      // valorEfetivo == null nunca fecha ganho (pos-venda sem itens e sem valor
+      // tambem cai aqui). O front (ModalFechamento) ja permite esse caso.
+      const zeroGarantia = ehPosVenda && temPedido && valorEfetivo === 0;
+      if (valorEfetivo == null || (valorEfetivo <= 0 && !zeroGarantia)) {
         return NextResponse.json(
           { erro: "valor e obrigatorio para marcar como ganho" },
           { status: 422 },
