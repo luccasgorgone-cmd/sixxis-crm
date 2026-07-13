@@ -261,10 +261,31 @@ export async function gerarPdfOrcamento(
     page.drawText(MARCA.nome, { x: xEsq, y: topo - 30, size: 30, font: fonteBold, color: TIFFANY });
   }
 
-  // Bloco de identificacao do documento (direita): rotulo, PED em destaque, data.
+  // Validade (Fatia N): linha DISCRETA no cabecalho, nunca um bloco.
+  const limite = somarDiasFormatado(dados.dataFormatada, VALIDADE_DIAS);
+
+  // Bloco de identificacao do documento (direita): rotulo, PED em destaque,
+  // emissao e validade (uma linha só).
   textoDir(page, "ORÇAMENTO", xDir, topo - 8, 8.5, fonteBold, TIFFANY);
   textoDir(page, dados.numeroFormatado, xDir, topo - 26, 18, fonteBold, ESCURO);
-  textoDir(page, `Emitido em ${dados.dataFormatada}`, xDir, topo - 40, 9, fonte, CINZA);
+  textoDir(page, `Emissão  ${dados.dataFormatada}`, xDir, topo - 40, 9, fonte, CINZA);
+  if (limite) {
+    // "Válida até {data} (3 dias)" — cinza, com a DATA em tiffany. Alinhado a
+    // direita por segmentos (uma cor por drawText).
+    const s1 = "Válida até ";
+    const s3 = ` (${VALIDADE_DIAS} dias)`;
+    const w1 = fonte.widthOfTextAtSize(s1, 9);
+    const w2 = fonte.widthOfTextAtSize(limite, 9);
+    const w3 = fonte.widthOfTextAtSize(s3, 9);
+    const x0 = xDir - (w1 + w2 + w3);
+    const yv = topo - 53;
+    page.drawText(s1, { x: x0, y: yv, size: 9, font: fonte, color: CINZA });
+    page.drawText(limite, { x: x0 + w1, y: yv, size: 9, font: fonte, color: TIFFANY });
+    page.drawText(s3, { x: x0 + w1 + w2, y: yv, size: 9, font: fonte, color: CINZA });
+  } else {
+    // Data inesperada: so a regra, sem quebrar o layout.
+    textoDir(page, `Válida por ${VALIDADE_DIAS} dias`, xDir, topo - 53, 9, fonte, CINZA);
+  }
 
   // Bloco da marca (esquerda), abaixo da logo: nome + CNPJ, endereco, contato.
   let yb = topo - logoH - 12;
@@ -278,27 +299,10 @@ export async function gerarPdfOrcamento(
     x: xEsq, y: yb, size: 8.5, font: fonte, color: CINZA,
   });
 
+  // Regua tiffany fecha o cabecalho.
   y = yb - 12;
   page.drawRectangle({ x: xEsq, y, width: larguraUtil, height: 3, color: TIFFANY });
-  y -= 20;
-
-  // ---- FAIXA DE VALIDADE (3 dias) em destaque ----
-  const limite = somarDiasFormatado(dados.dataFormatada, VALIDADE_DIAS);
-  const faixaH = 30;
-  const faixaTop = y;
-  const faixaBottom = faixaTop - faixaH;
-  page.drawRectangle({
-    x: xEsq, y: faixaBottom, width: larguraUtil, height: faixaH,
-    color: TIFFANY_SUAVE, borderColor: TIFFANY, borderWidth: 0.8,
-  });
-  const yFaixa = faixaBottom + (faixaH - 11) / 2 + 2;
-  page.drawText("PROPOSTA VÁLIDA POR", { x: xEsq + 14, y: yFaixa + 5, size: 7.5, font: fonteBold, color: TIFFANY });
-  page.drawText(`${VALIDADE_DIAS} dias`, { x: xEsq + 14, y: yFaixa - 7, size: 12, font: fonteBold, color: ESCURO });
-  if (limite) {
-    textoDir(page, "Válida até", xDir - 14, yFaixa + 5, 7.5, fonteBold, TIFFANY);
-    textoDir(page, limite, xDir - 14, yFaixa - 7, 12, fonteBold, ESCURO);
-  }
-  y = faixaBottom - 24;
+  y -= 24;
 
   // ---- CARD DO CLIENTE ----
   page.drawText("CLIENTE", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
