@@ -46,8 +46,17 @@ export type DadosPdfOrcamento = {
   cliente: {
     nome: string;
     telefone: string | null;
+    // Fatia N: dados completos do cliente (todos OPCIONAIS — campo ausente NAO
+    // vira linha vazia no PDF, a linha simplesmente nao e desenhada).
+    email?: string | null;
+    empresa?: string | null;
     cpf?: string | null;
     cnpj?: string | null;
+    cep?: string | null;
+    logradouro?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
     cidade?: string | null;
     uf?: string | null;
   };
