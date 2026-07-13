@@ -11,6 +11,7 @@ import {
   podeGerenciarLead,
 } from "@/lib/autorizacao";
 import { excluirOuArquivarLeads } from "@/lib/exclusao";
+import { recalcularNomeBusca } from "@/lib/nomeBusca";
 import { registrarAtividade } from "@/lib/atividade";
 import {
   nomeEfetivo,
@@ -293,6 +294,12 @@ export async function PATCH(
       tipo: AtividadeTipo.ACOMPANHAMENTO,
       descricao: `${mudAcomp.join("; ")} (por ${agente.nome ?? "colaborador"})`,
     });
+  }
+
+  // Nome mudou -> recalcula nomeBusca (Fatia P). Idempotente; so quando o painel
+  // editou o nome manual.
+  if (body.nomeManual !== undefined) {
+    await recalcularNomeBusca(id);
   }
 
   getIO()?.emit("cliente:atualizado", {

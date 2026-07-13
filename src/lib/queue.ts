@@ -17,7 +17,7 @@ import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
-import { nomeEfetivo } from "./cliente";
+import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
@@ -1928,6 +1928,13 @@ async function processarEvento(
       // Em saida, cria sem nome e cai no telefone via nomeEfetivo.
       nome: pushNameCliente,
       pushName: pushNameCliente,
+      // nomeBusca normalizado (Fatia P): inline, sem query extra no caminho quente.
+      nomeBusca: nomeBuscaDe({
+        nome: pushNameCliente,
+        pushName: pushNameCliente,
+        nomeManual: null,
+        telefone,
+      }),
       origem: "whatsapp",
     },
   });
@@ -1935,7 +1942,10 @@ async function processarEvento(
   if (pushNameCliente && lead.pushName !== pushNameCliente) {
     lead = await prisma.lead.update({
       where: { id: lead.id },
-      data: { pushName: pushNameCliente },
+      data: {
+        pushName: pushNameCliente,
+        nomeBusca: nomeBuscaDe({ ...lead, pushName: pushNameCliente }),
+      },
     });
   }
   // Compat: se o nome legado ainda estava vazio, preenche com o pushName de
@@ -1943,7 +1953,10 @@ async function processarEvento(
   if (!lead.nome && pushNameCliente) {
     lead = await prisma.lead.update({
       where: { id: lead.id },
-      data: { nome: pushNameCliente },
+      data: {
+        nome: pushNameCliente,
+        nomeBusca: nomeBuscaDe({ ...lead, nome: pushNameCliente }),
+      },
     });
   }
 

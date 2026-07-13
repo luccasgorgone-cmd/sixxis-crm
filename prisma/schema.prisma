@@ -223,6 +223,11 @@ model Lead {
   // Nome efetivo na UI = nomeManual || pushName || nome || telefone (lib/cliente.ts).
   pushName      String?
   nomeManual    String?
+  // Nome EFETIVO normalizado (sem acento, minusculas) para a busca server-side do
+  // Kanban (Fatia P). Mantido pelo helper recalcularNomeBusca em todos os writes de
+  // nome; backfill idempotente no seed. A busca casa por nomeBusca OU pelos campos
+  // crus (cinto-e-suspensorio), entao nunca some cliente se ficar desatualizado.
+  nomeBusca     String?
   fotoUrl       String?
   fotoAtualizadaEm DateTime?
   telefone      String         @unique
@@ -290,6 +295,7 @@ model Lead {
   @@index([donoId])
   @@index([donoPosVendaId])
   @@index([empresaFaturadaId])
+  @@index([nomeBusca])
 }
 
 // Endereco de um cliente. Varios por cliente; um pode ser marcado principal.

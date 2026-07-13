@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { janelaDeParams } from "@/lib/metricas";
+import { normalizarTexto } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
 
@@ -73,17 +74,35 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     where.criadoEm = { gte: janela.inicio, lte: janela.fim };
   }
 
-  // Filtros sobre o lead (etiqueta + busca por nome/telefone).
+  // Filtros sobre o lead (etiqueta + busca), server-side (Fatia P). A busca casa,
+  // como no client de antes, por: NOME EFETIVO (via nomeBusca normalizado, sem
+  // acento) + os campos crus (cinto-e-suspensorio, caso nomeBusca esteja stale) +
+  // TELEFONE (digitos) + CONTEUDO das conversas (mensagens), escopado as
+  // finalidades visiveis.
   const leadWhere: Prisma.LeadWhereInput = {};
   if (etiquetaId) {
     leadWhere.etiquetas = { some: { etiquetaId } };
   }
   if (busca) {
     const digitos = busca.replace(/\D/g, "");
-    leadWhere.OR = [
+    const buscaNorm = normalizarTexto(busca);
+    const ors: Prisma.LeadWhereInput[] = [
+      { nomeBusca: { contains: buscaNorm } },
       { nome: { contains: busca, mode: "insensitive" } },
-      ...(digitos ? [{ telefone: { contains: digitos } }] : []),
+      { nomeManual: { contains: busca, mode: "insensitive" } },
+      { pushName: { contains: busca, mode: "insensitive" } },
+      // Conteudo das conversas (mesma semantica do /api/conversas?texto=).
+      {
+        conversas: {
+          some: {
+            finalidade: { in: finalidades },
+            mensagens: { some: { conteudo: { contains: busca, mode: "insensitive" } } },
+          },
+        },
+      },
     ];
+    if (digitos) ors.push({ telefone: { contains: digitos } });
+    leadWhere.OR = ors;
   }
   if (Object.keys(leadWhere).length > 0) {
     where.lead = leadWhere;

@@ -29,7 +29,6 @@ import {
   PERIODO_TODOS,
   type PeriodoEntrada,
 } from "@/components/ui/FiltroPeriodoEntrada";
-import { normalizarTexto } from "@/lib/format";
 import type {
   Etapa,
   CardNegocio as Card,
@@ -113,37 +112,8 @@ export function Kanban({
     return () => clearTimeout(t);
   }, [busca]);
 
-  // Busca por CONTEUDO das conversas (escopada). Reusa GET /api/conversas?texto=
-  // e coleta os telefones dos leads que bateram — o filtro casa os cards por
-  // telefone (mesmo campo cru do lead). Cancela requisicoes obsoletas.
-  const [telsConteudo, setTelsConteudo] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    const q = buscaAplicada.trim();
-    if (!q) {
-      setTelsConteudo(null);
-      return;
-    }
-    let cancelado = false;
-    const qs = new URLSearchParams({ texto: q });
-    if (finalidade) qs.set("finalidade", finalidade);
-    fetch(`/api/conversas?${qs.toString()}`)
-      .then((r) => (r.ok ? r.json() : { conversas: [] }))
-      .then((d) => {
-        if (cancelado) return;
-        const tels = new Set<string>(
-          (d.conversas ?? []).map((c: { leadTelefone?: string }) =>
-            (c.leadTelefone ?? "").replace(/\D/g, ""),
-          ),
-        );
-        setTelsConteudo(tels);
-      })
-      .catch(() => {
-        if (!cancelado) setTelsConteudo(new Set());
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [buscaAplicada, finalidade]);
+  // (Fatia P) A busca por CONTEUDO das conversas passou ao servidor (where da
+  // rota /api/negocios). Nao ha mais coleta client-side de telefones.
 
   // Pos-venda nao usa temperatura: limpa o filtro ao entrar (o select some, entao
   // um filtro remanescente esconderia cards sem o usuario poder limpar).
@@ -151,8 +121,11 @@ export function Kanban({
     if (finalidade === "POS_VENDA") setTemperatura("");
   }, [finalidade]);
 
-  // Servidor: so finalidade + dono (papel). Busca/temperatura/etiqueta sao
-  // aplicadas no cliente sobre os cards ja carregados.
+  // Servidor (Fatia P): finalidade + dono + periodo + BUSCA/TEMPERATURA/ETIQUETA.
+  // Antes esses tres filtravam no client sobre os cards carregados; agora vao ao
+  // `where` da rota (busca debounced), para o resumo/contadores e a paginacao
+  // futura serem fieis. A busca (nome sem acento + telefone + conteudo de conversa)
+  // e resolvida no servidor.
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set("finalidade", finalidade);
@@ -162,8 +135,12 @@ export function Kanban({
     }
     // Periodo por entrada (negocio.criadoEm): hoje|7d|15d|30d|custom.
     for (const [k, v] of Object.entries(paramsPeriodo(periodo))) p.set(k, v);
+    const q = buscaAplicada.trim();
+    if (q) p.set("busca", q);
+    if (temperatura) p.set("temperatura", temperatura);
+    if (etiquetaId) p.set("etiquetaId", etiquetaId);
     return p.toString();
-  }, [finalidade, ehAdmin, filtroDono, agenteId, periodo]);
+  }, [finalidade, ehAdmin, filtroDono, agenteId, periodo, buscaAplicada, temperatura, etiquetaId]);
 
   const carregar = useCallback(async () => {
     try {
@@ -371,31 +348,9 @@ export function Kanban({
     void carregar();
   }
 
-  // Busca/temperatura/etiqueta aplicadas no cliente (sobre os cards carregados).
-  const colunasFiltradas = useMemo(() => {
-    const q = normalizarTexto(buscaAplicada);
-    const qDig = buscaAplicada.replace(/\D/g, "");
-    const out: Record<string, Card[]> = {};
-    for (const [eid, cards] of Object.entries(colunas)) {
-      out[eid] = cards.filter((c) => {
-        if (temperatura && c.temperatura !== temperatura) return false;
-        if (etiquetaId && !c.etiquetas.some((e) => e.id === etiquetaId)) {
-          return false;
-        }
-        if (q) {
-          const nome = normalizarTexto(c.leadNome ?? "");
-          const tel = c.leadTelefone.replace(/\D/g, "");
-          const casaNome = nome.includes(q);
-          const casaTel = qDig.length > 0 && tel.includes(qDig);
-          // Tambem casa por CONTEUDO das conversas (telefone no conjunto).
-          const casaConteudo = telsConteudo?.has(tel) ?? false;
-          if (!casaNome && !casaTel && !casaConteudo) return false;
-        }
-        return true;
-      });
-    }
-    return out;
-  }, [colunas, buscaAplicada, temperatura, etiquetaId, telsConteudo]);
+  // (Fatia P) Filtros aplicados no SERVIDOR: `colunas` ja vem filtrado por
+  // busca/temperatura/etiqueta. Sem filtragem client-side (uma fonte de verdade).
+  const colunasFiltradas = colunas;
 
   // Total de cards carregados (ja filtrados por periodo/finalidade no servidor)
   // — contador do periodo mostrado na barra de filtros.
@@ -405,15 +360,12 @@ export function Kanban({
   );
 
   const temFiltro = Boolean(buscaAplicada.trim() || temperatura || etiquetaId);
-  const vazioReal =
-    !carregando &&
-    !erro &&
-    Object.values(colunas).every((c) => c.length === 0);
-  const semResultado =
-    !carregando &&
-    !erro &&
-    !vazioReal &&
-    Object.values(colunasFiltradas).every((c) => c.length === 0);
+  // Com filtros no servidor, `colunas` ja e o conjunto filtrado. Distinguimos
+  // board vazio (sem filtro) de "nenhum resultado" (com filtro) pelo temFiltro.
+  const boardVazio =
+    !carregando && !erro && Object.values(colunas).every((c) => c.length === 0);
+  const vazioReal = boardVazio && !temFiltro;
+  const semResultado = boardVazio && temFiltro;
 
   // Colaboradores (nao-admin, ativos) com acesso a finalidade atual.
   const elegiveis = useMemo(

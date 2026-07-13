@@ -1,7 +1,7 @@
 // Helpers do CLIENTE (Lead): nome efetivo e selects reusados na serializacao.
 // Nome efetivo = nomeManual (override do atendente) || pushName (WhatsApp) ||
 // nome (legado/ingestao) || telefone formatado. Usar em TODA a UI.
-import { formatarTelefone } from "./format";
+import { formatarTelefone, normalizarTexto } from "./format";
 import type { Segmento } from "@/generated/prisma/enums";
 
 export type LeadNomeavel = {
@@ -29,6 +29,14 @@ export function nomeEfetivo(l: LeadNomeavel): string {
     l.nome?.trim() ||
     formatarTelefone(l.telefone)
   );
+}
+
+// Versao normalizada do NOME EFETIVO (sem acento, minusculas) para a busca
+// server-side do Kanban (Fatia P). Deriva do MESMO nomeEfetivo que a UI mostra
+// (nomeManual || pushName || nome || telefone formatado), para a busca casar
+// exatamente o que o client casava (normalizarTexto(leadNome)).
+export function nomeBuscaDe(l: LeadNomeavel): string {
+  return normalizarTexto(nomeEfetivo(l));
 }
 
 // Select minimo para montar avatar/nome do cliente nos cards e listas.

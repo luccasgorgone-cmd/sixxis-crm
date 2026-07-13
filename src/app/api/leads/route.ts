@@ -12,7 +12,7 @@ import { normalizarTelefoneBR } from "@/lib/phone";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { espelharDonoNasConversas } from "@/lib/dono";
 import { garantirNegocioParaLead } from "@/lib/negocio";
-import { nomeEfetivo } from "@/lib/cliente";
+import { nomeEfetivo, nomeBuscaDe } from "@/lib/cliente";
 import { parseDataNascimento } from "@/lib/format";
 import { Finalidade, AtividadeTipo, Segmento } from "@/generated/prisma/enums";
 
@@ -170,10 +170,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Cria o lead manual ja com dono. Sem conversa/negocio (nascem no 1o contato).
   // Endereco (principal) so quando algum campo veio preenchido — tudo opcional.
+  const nomeManualNovo = body.nome?.trim() || null;
   const lead = await prisma.lead.create({
     data: {
       telefone,
-      nomeManual: body.nome?.trim() || null,
+      nomeManual: nomeManualNovo,
+      // nomeBusca normalizado (Fatia P): inline no cadastro manual.
+      nomeBusca: nomeBuscaDe({ nome: null, pushName: null, nomeManual: nomeManualNovo, telefone }),
       email: body.email?.trim() || null,
       cpf: body.cpf?.trim() || null,
       cnpj: body.cnpj?.trim() || null,

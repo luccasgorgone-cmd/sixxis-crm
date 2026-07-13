@@ -27,6 +27,7 @@ import {
   backfillNegocios,
   backfillDonoConversas,
   backfillCriadorMetas,
+  backfillNomeBusca,
 } from "./src/lib/seed";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
   await backfillNegocios();
   await backfillDonoConversas();
   await backfillCriadorMetas();
+  await backfillNomeBusca();
 
   // Servidor HTTP usando o request handler do Next.
   const httpServer = createServer((req, res) => {

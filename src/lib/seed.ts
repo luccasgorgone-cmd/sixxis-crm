@@ -15,6 +15,7 @@ import {
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
 import { excluirLeadsCompleto } from "./exclusao";
+import { nomeBuscaDe } from "./cliente";
 import { TEMPLATE_BASE_CONHECIMENTO } from "./lunaCatalogo";
 
 // Pre-configuracao "de fabrica" da Luna (campos EDITAVEIS). Aplicada no seed
@@ -1213,6 +1214,30 @@ export async function seedVoltagemPecasEletricas(): Promise<void> {
 
 // Backfill: garante um negocio aberto para cada lead que ainda nao tem.
 // Roda no boot, sem emitir socket (io ainda nao tem clientes / ruido).
+// Backfill idempotente de Lead.nomeBusca (Fatia P): so as linhas com nomeBusca
+// NULL (nunca recalculadas). Depois do 1o run, o helper recalcularNomeBusca mantem
+// a coluna nos writes, entao runs seguintes nao fazem nada.
+export async function backfillNomeBusca(): Promise<void> {
+  try {
+    const leads = await prisma.lead.findMany({
+      where: { nomeBusca: null },
+      select: { id: true, nome: true, pushName: true, nomeManual: true, telefone: true },
+    });
+    for (const l of leads) {
+      await prisma.lead.update({ where: { id: l.id }, data: { nomeBusca: nomeBuscaDe(l) } });
+    }
+    console.log(
+      leads.length > 0
+        ? `[seed] backfill: ${leads.length} nomeBusca calculados`
+        : "[seed] backfill nomeBusca ok",
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha no backfill de nomeBusca: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 export async function backfillNegocios(): Promise<void> {
   try {
     const etapa = await prisma.etapa.findFirst({
