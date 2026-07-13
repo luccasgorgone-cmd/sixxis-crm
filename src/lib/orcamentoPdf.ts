@@ -33,6 +33,12 @@ const MARCA = {
 // Validade do orcamento em dias (regra do dono: 3 dias).
 const VALIDADE_DIAS = 3;
 
+// Escala de espacamento vertical (pt), unica e explicita. Respiro ENTRE blocos
+// (secoes: cabecalho -> cliente -> itens -> totais...) e MAIOR que o respiro
+// DENTRO de um bloco. Sem numeros magicos soltos para os saltos de secao.
+const GAP_BLOCO = 24;
+const GAP_INTERNO = 12;
+
 export type ItemPdfOrcamento = {
   descricao: string;
   quantidade: number;
@@ -300,9 +306,9 @@ export async function gerarPdfOrcamento(
   });
 
   // Regua tiffany fecha o cabecalho.
-  y = yb - 12;
+  y = yb - GAP_INTERNO;
   page.drawRectangle({ x: xEsq, y, width: larguraUtil, height: 3, color: TIFFANY });
-  y -= 24;
+  y -= GAP_BLOCO;
 
   // ---- CARD DO CLIENTE (grade 2 colunas, ALTURA DINAMICA) ----
   page.drawText("CLIENTE", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
@@ -393,7 +399,7 @@ export async function gerarPdfOrcamento(
   drawColuna(colEsq, xEsq + cardPadX, corpoTopo);
   drawColuna(colDir, xEsq + cardPadX + colW + calha, corpoTopo);
 
-  y = cardBottom - 24;
+  y = cardBottom - GAP_BLOCO;
 
   // ---- TABELA DE ITENS ----
   const colSubR = xDir; // Subtotal (direita)
