@@ -21,8 +21,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX015 Trend (A)|550|
 Climatizadores (Antigos)|Limpeza|SX015 Trend (A)|150|
 Climatizadores (Antigos)|Motor|SX015 Trend (A)|550|110V
 Climatizadores (Antigos)|Motor|SX015 Trend (A)|550|220V
-Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|500|110V
-Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|500|220V
+Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|120|110V
+Climatizadores (Antigos)|Motor Swing|SX015 Trend (A)|120|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX015 Trend (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX015 Trend (A)|250|110V
 Climatizadores (Antigos)|Placa de Comando|SX015 Trend (A)|250|220V
@@ -54,8 +54,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX035 (A)|550|
 Climatizadores (Antigos)|Limpeza|SX035 (A)|150|
 Climatizadores (Antigos)|Motor|SX035 (A)|550|110V
 Climatizadores (Antigos)|Motor|SX035 (A)|550|220V
-Climatizadores (Antigos)|Motor Swing|SX035 (A)|500|110V
-Climatizadores (Antigos)|Motor Swing|SX035 (A)|500|220V
+Climatizadores (Antigos)|Motor Swing|SX035 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX035 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX035 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX035 (A)|250|110V
 Climatizadores (Antigos)|Placa de Comando|SX035 (A)|250|220V
@@ -87,8 +87,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX040 (A)|550|
 Climatizadores (Antigos)|Limpeza|SX040 (A)|150|
 Climatizadores (Antigos)|Motor|SX040 (A)|550|110V
 Climatizadores (Antigos)|Motor|SX040 (A)|550|220V
-Climatizadores (Antigos)|Motor Swing|SX040 (A)|500|110V
-Climatizadores (Antigos)|Motor Swing|SX040 (A)|500|220V
+Climatizadores (Antigos)|Motor Swing|SX040 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX040 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX040 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX040 (A)|250|110V
 Climatizadores (Antigos)|Placa de Comando|SX040 (A)|250|220V
@@ -120,8 +120,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX045 (A)|550|
 Climatizadores (Antigos)|Limpeza|SX045 (A)|150|
 Climatizadores (Antigos)|Motor|SX045 (A)|550|110V
 Climatizadores (Antigos)|Motor|SX045 (A)|550|220V
-Climatizadores (Antigos)|Motor Swing|SX045 (A)|500|110V
-Climatizadores (Antigos)|Motor Swing|SX045 (A)|500|220V
+Climatizadores (Antigos)|Motor Swing|SX045 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX045 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX045 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX045 (A)|250|110V
 Climatizadores (Antigos)|Placa de Comando|SX045 (A)|250|220V
@@ -153,8 +153,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX050 (A)|550|
 Climatizadores (Antigos)|Limpeza|SX050 (A)|150|
 Climatizadores (Antigos)|Motor|SX050 (A)|550|110V
 Climatizadores (Antigos)|Motor|SX050 (A)|550|220V
-Climatizadores (Antigos)|Motor Swing|SX050 (A)|500|110V
-Climatizadores (Antigos)|Motor Swing|SX050 (A)|500|220V
+Climatizadores (Antigos)|Motor Swing|SX050 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX050 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX050 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX050 (A)|250|110V
 Climatizadores (Antigos)|Placa de Comando|SX050 (A)|250|220V
@@ -186,8 +186,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX065 (A)|950|
 Climatizadores (Antigos)|Limpeza|SX065 (A)|200|
 Climatizadores (Antigos)|Motor|SX065 (A)|950|110V
 Climatizadores (Antigos)|Motor|SX065 (A)|950|220V
-Climatizadores (Antigos)|Motor Swing|SX065 (A)|750|110V
-Climatizadores (Antigos)|Motor Swing|SX065 (A)|750|220V
+Climatizadores (Antigos)|Motor Swing|SX065 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX065 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX065 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX065 (A)|300|110V
 Climatizadores (Antigos)|Placa de Comando|SX065 (A)|300|220V
@@ -220,8 +220,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX070 (A)|950|
 Climatizadores (Antigos)|Limpeza|SX070 (A)|200|
 Climatizadores (Antigos)|Motor|SX070 (A)|950|110V
 Climatizadores (Antigos)|Motor|SX070 (A)|950|220V
-Climatizadores (Antigos)|Motor Swing|SX070 (A)|750|110V
-Climatizadores (Antigos)|Motor Swing|SX070 (A)|750|220V
+Climatizadores (Antigos)|Motor Swing|SX070 (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX070 (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX070 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX070 (A)|300|110V
 Climatizadores (Antigos)|Placa de Comando|SX070 (A)|300|220V
@@ -254,8 +254,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX080 Prime (A)|950|
 Climatizadores (Antigos)|Limpeza|SX080 Prime (A)|200|
 Climatizadores (Antigos)|Motor|SX080 Prime (A)|950|110V
 Climatizadores (Antigos)|Motor|SX080 Prime (A)|950|220V
-Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|750|110V
-Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|750|220V
+Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX080 Prime (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX080 Prime (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX080 Prime (A)|300|110V
 Climatizadores (Antigos)|Placa de Comando|SX080 Prime (A)|300|220V
@@ -288,8 +288,8 @@ Climatizadores (Antigos)|Kit Colmeia|SX090 Plus (A)|950|
 Climatizadores (Antigos)|Limpeza|SX090 Plus (A)|200|
 Climatizadores (Antigos)|Motor|SX090 Plus (A)|950|110V
 Climatizadores (Antigos)|Motor|SX090 Plus (A)|950|220V
-Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|750|110V
-Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|750|220V
+Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|150|110V
+Climatizadores (Antigos)|Motor Swing|SX090 Plus (A)|150|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX090 Plus (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX090 Plus (A)|300|110V
 Climatizadores (Antigos)|Placa de Comando|SX090 Plus (A)|300|220V
@@ -319,7 +319,7 @@ Climatizadores (Antigos)|Hélice|SX150 (A)|450|
 Climatizadores (Antigos)|Kit Colmeia|SX150 (A)|1250|
 Climatizadores (Antigos)|Limpeza|SX150 (A)|300|
 Climatizadores (Antigos)|Motor|SX150 (A)|1250|220V
-Climatizadores (Antigos)|Motor Swing|SX150 (A)|950|220V
+Climatizadores (Antigos)|Motor Swing|SX150 (A)|200|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX150 (A)|25|
 Climatizadores (Antigos)|Placa de Comando|SX150 (A)|400|220V
 Climatizadores (Antigos)|Placa de Painel|SX150 (A)|350|220V
@@ -346,7 +346,7 @@ Climatizadores (Antigos)|Inversor|SX200 Prime (A)|950|220V
 Climatizadores (Antigos)|Kit Colmeia|SX200 Prime (A)|1400|
 Climatizadores (Antigos)|Limpeza|SX200 Prime (A)|300|
 Climatizadores (Antigos)|Motor|SX200 Prime (A)|1400|220V
-Climatizadores (Antigos)|Motor Swing|SX200 Prime (A)|1000|220V
+Climatizadores (Antigos)|Motor Swing|SX200 Prime (A)|250|220V
 Climatizadores (Antigos)|Pino Eixo Swing|SX200 Prime (A)|25|
 Climatizadores (Antigos)|Placa de Painel|SX200 Prime (A)|350|220V
 Climatizadores (Antigos)|Reservatório|SX200 Prime (A)|300|

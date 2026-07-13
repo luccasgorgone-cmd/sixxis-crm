@@ -144,15 +144,15 @@ Climatizadores|Hélice|SX200 Trend|450
 Climatizadores|Inversor|SX060 Prime|750
 Climatizadores|Inversor|SX120 Prime|850
 Climatizadores|Inversor|SX200 Prime|950
-Climatizadores|Motor Swing|M45 Trend|500
-Climatizadores|Motor Swing|SX040 Trend|500
-Climatizadores|Motor Swing|SX060 Prime|550
-Climatizadores|Motor Swing|SX070 Trend|650
-Climatizadores|Motor Swing|SX100 Trend|750
-Climatizadores|Motor Swing|SX120 Prime|900
-Climatizadores|Motor Swing|SX180 Trend|900
-Climatizadores|Motor Swing|SX200 Prime|1000
-Climatizadores|Motor Swing|SX200 Trend|950
+Climatizadores|Motor Swing|M45 Trend|150
+Climatizadores|Motor Swing|SX040 Trend|150
+Climatizadores|Motor Swing|SX060 Prime|200
+Climatizadores|Motor Swing|SX070 Trend|150
+Climatizadores|Motor Swing|SX100 Trend|150
+Climatizadores|Motor Swing|SX120 Prime|200
+Climatizadores|Motor Swing|SX180 Trend|200
+Climatizadores|Motor Swing|SX200 Prime|250
+Climatizadores|Motor Swing|SX200 Trend|200
 Climatizadores|Pino Eixo Swing|M45 Trend|25
 Climatizadores|Pino Eixo Swing|SX040 Trend|25
 Climatizadores|Pino Eixo Swing|SX060 Prime|25

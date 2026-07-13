@@ -1212,6 +1212,82 @@ export async function seedVoltagemPecasEletricas(): Promise<void> {
   }
 }
 
+// Precos corretos do "Motor Swing" (peca de climatizador) por modelo (Fatia R).
+// O valor vale para AMBAS as voltagens do mesmo modelo. As 34 linhas ja existem
+// no banco, mas foram semeadas na faixa do Motor principal (R$500-1000); os
+// valores corretos sao R$120-250. Chave: 14 modelos com 2 voltagens + 6 so 220V
+// = 34 linhas. Fonte unica desta correcao (espelha os arquivos seed-data ja
+// corrigidos, para que instalacoes novas ja nasçam certas e este passo seja no-op).
+const PRECOS_MOTOR_SWING: Record<string, number> = {
+  // Atuais (categoria "Climatizadores")
+  "M45 Trend": 150,
+  "SX040 Trend": 150,
+  "SX060 Prime": 200,
+  "SX070 Trend": 150,
+  "SX100 Trend": 150,
+  "SX120 Prime": 200,
+  "SX180 Trend": 200,
+  "SX200 Trend": 200,
+  "SX200 Prime": 250,
+  // Antigos (categoria "Climatizadores (Antigos)")
+  "SX015 Trend (A)": 120,
+  "SX035 (A)": 150,
+  "SX040 (A)": 150,
+  "SX045 (A)": 150,
+  "SX050 (A)": 150,
+  "SX065 (A)": 150,
+  "SX070 (A)": 150,
+  "SX080 Prime (A)": 150,
+  "SX090 Plus (A)": 150,
+  "SX150 (A)": 200,
+  "SX200 Prime (A)": 250,
+};
+
+// Corrige o precoSugerido das 34 linhas de "Motor Swing" que foram precificadas
+// na faixa do Motor principal (R$500-1000) em vez da correta (R$120-250) — Fatia R.
+// ESCOPADO ao maximo: match por nome EXATO "Motor Swing" + modelo da tabela;
+// atualiza TODAS as voltagens daquele modelo com o mesmo valor e toca SOMENTE
+// precoSugerido. "Motor", "Motor Resistencia" (bike) e o "Motor" do aspirador
+// ficam INTOCADOS. NAO e um update generico de precos (nao sobrescreve ajustes
+// manuais do admin em outras pecas). IDEMPOTENTE: o filtro `precoSugerido: { not }`
+// faz a 2a rodada nao atualizar nada (0 linhas). Espera-se 34 linhas na 1a rodada
+// em producao; qualquer valor entre 1 e 33 e LOGADO EM DESTAQUE (pode indicar
+// modelo com nome divergente).
+export async function seedPrecosMotorSwing(): Promise<void> {
+  try {
+    let atualizadas = 0;
+    const aplicados: string[] = [];
+    for (const [modelo, preco] of Object.entries(PRECOS_MOTOR_SWING)) {
+      const { count } = await prisma.produtoCatalogo.updateMany({
+        where: {
+          tipo: TipoCatalogo.PECA,
+          nome: "Motor Swing",
+          modelo,
+          precoSugerido: { not: preco },
+        },
+        data: { precoSugerido: preco },
+      });
+      if (count > 0) aplicados.push(`${modelo} => ${preco} (${count})`);
+      atualizadas += count;
+    }
+    if (atualizadas === 0) {
+      console.log("[seed] precos-motor-swing: 0 a atualizar (ja corrigido)");
+    } else if (atualizadas === 34) {
+      console.log("[seed] precos-motor-swing: 34 linhas atualizadas");
+    } else {
+      console.warn(
+        `[seed] precos-motor-swing: ATENCAO — ${atualizadas} linhas atualizadas ` +
+          `(esperado 34 na 1a rodada; 0 nas seguintes). Verificar modelo com nome ` +
+          `divergente. Detalhe: ${aplicados.join("; ")}`,
+      );
+    }
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao corrigir precos do Motor Swing: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Backfill: garante um negocio aberto para cada lead que ainda nao tem.
 // Roda no boot, sem emitir socket (io ainda nao tem clientes / ruido).
 // Backfill idempotente de Lead.nomeBusca (Fatia P): so as linhas com nomeBusca

@@ -22,6 +22,7 @@ import {
   seedAssistenteEscrita,
   seedPecas,
   seedVoltagemPecasEletricas,
+  seedPrecosMotorSwing,
   backfillAcesso,
   purgarDadosTeste,
   backfillNegocios,
@@ -53,6 +54,7 @@ async function main(): Promise<void> {
   await seedAssistenteEscrita();
   await seedPecas();
   await seedVoltagemPecasEletricas();
+  await seedPrecosMotorSwing();
   await backfillAcesso();
   await purgarDadosTeste();
   await backfillNegocios();
