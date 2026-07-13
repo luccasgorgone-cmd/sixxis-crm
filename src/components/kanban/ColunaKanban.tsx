@@ -12,6 +12,7 @@ import { formatarBRL } from "@/lib/format";
 export function ColunaKanban({
   etapa,
   cards,
+  resumo,
   onAbrir,
   mostrarFinalidade = false,
   ehAdmin = false,
@@ -22,6 +23,10 @@ export function ColunaKanban({
 }: {
   etapa: Etapa;
   cards: Card[];
+  // Resumo AGREGADO da etapa (Fatia P): total e soma do BANCO, com os mesmos
+  // filtros. E a UNICA fonte do contador/soma do cabecalho — nunca cards.length/
+  // reduce (que refletiriam so o carregado, mentindo sob paginacao).
+  resumo?: { total: number; somaValor: number };
   onAbrir: (id: string) => void;
   mostrarFinalidade?: boolean;
   ehAdmin?: boolean;
@@ -31,7 +36,10 @@ export function ColunaKanban({
   onAtribuirMassa?: (negocioIds: string[]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
-  const soma = cards.reduce((acc, c) => acc + (c.valor ?? 0), 0);
+  // Contador e soma vem do resumo (banco). Fallback ao carregado so se o resumo
+  // ainda nao chegou (evita piscar 0).
+  const total = resumo?.total ?? cards.length;
+  const soma = resumo?.somaValor ?? cards.reduce((acc, c) => acc + (c.valor ?? 0), 0);
   const semDono = cards.filter((c) => !c.agente);
 
   return (
@@ -46,7 +54,7 @@ export function ColunaKanban({
             {etapa.nome}
           </h2>
           <span className="shrink-0 rounded-full bg-black/5 px-1.5 text-xs text-medio/70">
-            {cards.length}
+            {total}
           </span>
         </div>
         {soma > 0 && (

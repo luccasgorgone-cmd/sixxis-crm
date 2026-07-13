@@ -47,6 +47,9 @@ type Pendente = {
   valorInicial: number | null;
 };
 
+// Resumo agregado por etapa vindo da rota (Fatia P).
+type ResumoEtapa = { total: number; somaValor: number };
+
 export function Kanban({
   papel,
   agenteIdAtual,
@@ -74,6 +77,8 @@ export function Kanban({
 
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [colunas, setColunas] = useState<Record<string, Card[]>>({});
+  // Resumo por etapa (Fatia P): total (COUNT) e somaValor (SUM) do banco.
+  const [resumo, setResumo] = useState<Record<string, ResumoEtapa>>({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -149,6 +154,9 @@ export function Kanban({
       const d = await r.json();
       setEtapas(d.etapas as Etapa[]);
       setColunas(d.colunas as Record<string, Card[]>);
+      // Resumo por etapa (Fatia P): total e somaValor do banco, para o cabecalho
+      // da coluna nao depender dos cards carregados.
+      setResumo((d.resumo as Record<string, ResumoEtapa>) ?? {});
       setErro(null);
     } catch {
       setErro("Nao foi possivel carregar o quadro.");
@@ -498,6 +506,7 @@ export function Kanban({
                           key={etapa.id}
                           etapa={etapa}
                           cards={colunasFiltradas[etapa.id] ?? []}
+                          resumo={resumo[etapa.id]}
                           onAbrir={setDrawerId}
                           mostrarFinalidade={ehAdmin}
                           ehAdmin={ehAdmin}
@@ -529,6 +538,7 @@ export function Kanban({
                   key={etapa.id}
                   etapa={etapa}
                   cards={colunasFiltradas[etapa.id] ?? []}
+                  resumo={resumo[etapa.id]}
                   onAbrir={setDrawerId}
                   mostrarFinalidade={ehAdmin}
                   ehAdmin={ehAdmin}
