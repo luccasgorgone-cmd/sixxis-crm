@@ -304,28 +304,55 @@ export async function gerarPdfOrcamento(
   page.drawRectangle({ x: xEsq, y, width: larguraUtil, height: 3, color: TIFFANY });
   y -= 24;
 
-  // ---- CARD DO CLIENTE ----
+  // ---- CARD DO CLIENTE (grade 2 colunas, ALTURA DINAMICA) ----
   page.drawText("CLIENTE", { x: xEsq, y, size: 8.5, font: fonteBold, color: TIFFANY });
   y -= 14;
-  const partesInfo: string[] = [];
-  if (dados.cliente.telefone) partesInfo.push(dados.cliente.telefone);
-  const docTxt = dados.cliente.cnpj
-    ? `CNPJ ${dados.cliente.cnpj}`
-    : dados.cliente.cpf
-      ? `CPF ${dados.cliente.cpf}`
-      : null;
-  if (docTxt) partesInfo.push(docTxt);
-  const local =
-    dados.cliente.cidade && dados.cliente.uf
-      ? `${dados.cliente.cidade}/${dados.cliente.uf}`
-      : dados.cliente.cidade || dados.cliente.uf || null;
-  if (local) partesInfo.push(local);
-  const nomeCliente = truncar(sanitizar(dados.cliente.nome) || "Cliente", fonteBold, 13, larguraUtil - 28);
-  const infoLinha = truncar(sanitizar(partesInfo.join("     ")), fonte, 9.5, larguraUtil - 28);
-  const temInfo = infoLinha.length > 0;
-  const padY = 11;
-  const cardH = padY * 2 + 13 + (temInfo ? 15 : 0);
+
+  const cli = dados.cliente;
+  const docTxt = cli.cnpj ?? cli.cpf ?? null;
+  const docRot = cli.cnpj ? "CNPJ" : "CPF";
+  const ruaParts = [cli.logradouro, cli.numero ? `nº ${cli.numero}` : null]
+    .filter(Boolean)
+    .join(", ");
+  const rua = ruaParts
+    ? cli.complemento
+      ? `${ruaParts} — ${cli.complemento}`
+      : ruaParts
+    : cli.complemento ?? null;
+  const cidadeUf =
+    cli.cidade && cli.uf ? `${cli.cidade}/${cli.uf}` : cli.cidade || cli.uf || null;
+
+  type CampoCard = { rot: string; val: string; wrap?: boolean };
+  const colEsq: CampoCard[] = [];
+  if (cli.empresa) colEsq.push({ rot: "EMPRESA", val: cli.empresa });
+  if (docTxt) colEsq.push({ rot: docRot, val: docTxt });
+  if (cli.telefone) colEsq.push({ rot: "TELEFONE", val: cli.telefone });
+  if (cli.email) colEsq.push({ rot: "E-MAIL", val: cli.email });
+  const colDir: CampoCard[] = [];
+  if (rua) colDir.push({ rot: "ENDEREÇO", val: rua, wrap: true });
+  if (cli.bairro) colDir.push({ rot: "BAIRRO", val: cli.bairro });
+  if (cidadeUf) colDir.push({ rot: "CIDADE/UF", val: cidadeUf });
+  if (cli.cep) colDir.push({ rot: "CEP", val: cli.cep });
+
+  // Geometria do card. Escala explicita: padding, calha e larguras das colunas.
+  const cardPadX = 14;
+  const cardPadTop = 12;
+  const cardPadBot = 12;
+  const calha = 22;
+  const colW = (larguraUtil - cardPadX * 2 - calha) / 2;
+  const nomeBloco = 13 + 9; // linha do nome + respiro ate o corpo
+
+  // Nº de linhas do valor (1, ou ate 2 quando wrap). Cada valor mede/quebra pela
+  // largura DA SUA COLUNA — nunca pela pagina.
+  const nLinhas = (c: CampoCard): number =>
+    c.wrap ? Math.min(2, quebrarTexto(sanitizar(c.val), fonte, 9.5, colW).length || 1) : 1;
+  const alturaCampo = (c: CampoCard): number => 11 + 12 * nLinhas(c) + 4;
+  const alturaColuna = (campos: CampoCard[]): number =>
+    campos.reduce((h, c) => h + alturaCampo(c), 0);
+  const corpoH = Math.max(alturaColuna(colEsq), alturaColuna(colDir));
+
   const cardTop = y;
+  const cardH = cardPadTop + nomeBloco + corpoH + cardPadBot;
   const cardBottom = cardTop - cardH;
   page.drawRectangle({
     x: xEsq,
@@ -336,13 +363,37 @@ export async function gerarPdfOrcamento(
     borderColor: LINHA,
     borderWidth: 0.7,
   });
-  let yc = cardTop - padY - 11;
-  page.drawText(nomeCliente, { x: xEsq + 14, y: yc, size: 13, font: fonteBold, color: ESCURO });
-  if (temInfo) {
-    yc -= 15;
-    page.drawText(infoLinha, { x: xEsq + 14, y: yc, size: 9.5, font: fonte, color: CINZA });
-  }
-  y = cardBottom - 26;
+
+  // Nome do cliente (destaque), truncado pela largura interna do card.
+  page.drawText(truncar(sanitizar(cli.nome) || "Cliente", fonteBold, 13, larguraUtil - cardPadX * 2), {
+    x: xEsq + cardPadX,
+    y: cardTop - cardPadTop - 13,
+    size: 13,
+    font: fonteBold,
+    color: ESCURO,
+  });
+
+  // Desenha uma coluna de pares rotulo/valor a partir de (x, yTopo).
+  const drawColuna = (campos: CampoCard[], colX: number, yTopo: number): void => {
+    let yy = yTopo;
+    for (const c of campos) {
+      page.drawText(sanitizar(c.rot), { x: colX, y: yy, size: 7.5, font: fonteBold, color: CINZA_CLARO });
+      yy -= 11;
+      const linhas = c.wrap
+        ? quebrarTexto(sanitizar(c.val), fonte, 9.5, colW).slice(0, 2)
+        : [truncar(sanitizar(c.val), fonte, 9.5, colW)];
+      for (const ln of linhas) {
+        page.drawText(ln, { x: colX, y: yy, size: 9.5, font: fonte, color: ESCURO });
+        yy -= 12;
+      }
+      yy -= 4;
+    }
+  };
+  const corpoTopo = cardTop - cardPadTop - nomeBloco;
+  drawColuna(colEsq, xEsq + cardPadX, corpoTopo);
+  drawColuna(colDir, xEsq + cardPadX + colW + calha, corpoTopo);
+
+  y = cardBottom - 24;
 
   // ---- TABELA DE ITENS ----
   const colSubR = xDir; // Subtotal (direita)
