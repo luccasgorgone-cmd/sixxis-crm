@@ -98,7 +98,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     finalidadeEtapas.push(FinalidadeEtapa.POS_VENDA);
   }
 
-  const [etapas, negocios] = await Promise.all([
+  // RESUMO por etapa (Fatia P): total (COUNT) e somaValor (SUM) calculados NO
+  // BANCO, com EXATAMENTE o mesmo `where` da listagem — nunca a partir dos cards
+  // carregados. A soma replica o valor do card = COALESCE(valorAjustado, valor):
+  // dois groupBy particionados por valorAjustado (nulo / nao-nulo) e somados.
+  // Sem N+1, sem contar em memoria. Fundacao para a paginacao (Fatia Q).
+  const [etapas, negocios, aggAjustado, aggValor] = await Promise.all([
     prisma.etapa.findMany({
       where: { ativo: true, finalidade: { in: finalidadeEtapas } },
       orderBy: { ordem: "asc" },
@@ -116,6 +121,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       include: includeCard,
       orderBy: { entrouEtapaEm: "desc" },
     }),
+    prisma.negocio.groupBy({
+      by: ["etapaId"],
+      where: { ...where, valorAjustado: { not: null } },
+      _count: { _all: true },
+      _sum: { valorAjustado: true },
+    }),
+    prisma.negocio.groupBy({
+      by: ["etapaId"],
+      where: { ...where, valorAjustado: null },
+      _count: { _all: true },
+      _sum: { valor: true },
+    }),
   ]);
 
   // Agrupa por etapaId.
@@ -127,5 +144,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ etapas, colunas });
+  // Consolida o resumo por etapa a partir das duas particoes.
+  const resumo: Record<string, { total: number; somaValor: number }> = {};
+  for (const e of etapas) resumo[e.id] = { total: 0, somaValor: 0 };
+  for (const r of aggAjustado) {
+    if (r.etapaId && resumo[r.etapaId]) {
+      resumo[r.etapaId].total += r._count._all;
+      resumo[r.etapaId].somaValor += Number(r._sum.valorAjustado ?? 0);
+    }
+  }
+  for (const r of aggValor) {
+    if (r.etapaId && resumo[r.etapaId]) {
+      resumo[r.etapaId].total += r._count._all;
+      resumo[r.etapaId].somaValor += Number(r._sum.valor ?? 0);
+    }
+  }
+
+  return NextResponse.json({ etapas, colunas, resumo });
 }
