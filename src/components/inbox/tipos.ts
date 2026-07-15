@@ -43,6 +43,10 @@ export type ConversaItem = {
 
 export type MensagemItem = {
   id: string;
+  // Conversa a que a mensagem pertence (Fatia T). Aditivo/opcional: usado na
+  // reconciliacao fetch-vs-socket para descartar mensagens de OUTRA conversa
+  // que cheguem durante a troca. Ausente => tratada como da conversa atual.
+  conversaId?: string;
   direcao: Direcao;
   tipo: TipoMensagem;
   conteudo: string | null;

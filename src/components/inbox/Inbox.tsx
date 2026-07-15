@@ -67,6 +67,12 @@ export function Inbox({
   const selecionadaRef = useRef<string | null>(null);
   selecionadaRef.current = selecionada;
 
+  // Token do fetch de mensagens (Fatia T): cada abrirConversa incrementa. Ao
+  // aplicar o resultado de um fetch, so vale se o token ainda for o atual — se o
+  // usuario ja clicou em outra conversa, o fetch lento anterior e descartado (mata
+  // a corrida "fetch de A retorna depois de eu abrir B").
+  const fetchTokenRef = useRef(0);
+
   const carregarConversas = useCallback(async () => {
     try {
       const p = new URLSearchParams();
@@ -118,6 +124,7 @@ export function Inbox({
   }, [carregarConversas]);
 
   const abrirConversa = useCallback(async (id: string) => {
+    const token = ++fetchTokenRef.current;
     setSelecionada(id);
     setCarregandoThread(true);
     setMensagens([]);
@@ -129,20 +136,34 @@ export function Inbox({
       const r = await fetch(`/api/conversas/${id}/mensagens`);
       if (!r.ok) throw new Error();
       const d = await r.json();
-      const fetched = d.mensagens as MensagemItem[];
+      // Fetch obsoleto: o usuario ja abriu outra conversa. Descarta o resultado
+      // (nao sobrescreve a thread da conversa atual) — Fatia T.
+      if (fetchTokenRef.current !== token) return;
+      // Cada mensagem carrega a conversa a que pertence (Fatia T).
+      const fetched = (d.mensagens as MensagemItem[]).map((m) => ({
+        ...m,
+        conversaId: id,
+      }));
       // Reconciliacao fetch vs socket (Fatia 3.20): se uma "mensagem:nova" chegou
       // DURANTE o fetch, ela foi anexada ao estado mas NAO esta no snapshot do
       // servidor. Preserva essas extras (por id real, ignorando bolhas tmp) no fim
       // — cronologicamente corretas — em vez de sobrescrever e perder a mensagem.
+      // Fatia T: descarta extra que pertenca a OUTRA conversa (chegou no meio da
+      // troca); extra sem conversaId (envio local) e tratada como da atual.
       setMensagens((prev) => {
         const ids = new Set(fetched.map((m) => m.id));
-        const extras = prev.filter((m) => !ids.has(m.id) && !ehTmp(m.id));
+        const extras = prev.filter(
+          (m) =>
+            !ids.has(m.id) &&
+            !ehTmp(m.id) &&
+            (!m.conversaId || m.conversaId === id),
+        );
         return extras.length ? [...fetched, ...extras] : fetched;
       });
     } catch {
-      setMensagens([]);
+      if (fetchTokenRef.current === token) setMensagens([]);
     } finally {
-      setCarregandoThread(false);
+      if (fetchTokenRef.current === token) setCarregandoThread(false);
     }
   }, []);
 
@@ -177,6 +198,7 @@ export function Inbox({
             { mensagemId: evt.mensagemId, clientId: evt.clientId },
             () => ({
               id: evt.mensagemId,
+              conversaId: evt.conversaId,
               direcao: evt.direcao,
               tipo: evt.tipo,
               conteudo: evt.conteudo,
