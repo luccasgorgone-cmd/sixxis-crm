@@ -69,6 +69,26 @@ export function BlocoProdutosInteresse({
   for (const p of selecionados) if (!porId.has(p.id)) porId.set(p.id, p);
   const opcoes = [...porId.values()];
 
+  // Modelos ANTIGOS (nome termina em "(A)", semeados na Fatia H) vao AGRUPADOS
+  // e DEPOIS dos novos, preservando a ordem interna de cada grupo (Fatia S).
+  const ehAntigo = (p: Produto) => p.nome.trimEnd().endsWith("(A)");
+  const opcoesNovas = opcoes.filter((p) => !ehAntigo(p));
+  const opcoesAntigas = opcoes.filter(ehAntigo);
+
+  function renderOpcao(p: Produto) {
+    const marcado = selecionados.some((s) => s.id === p.id);
+    return (
+      <button
+        key={p.id}
+        onClick={() => alternar(p)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm text-escuro hover:bg-black/5"
+      >
+        <span className="truncate">{p.nome}</span>
+        {marcado && <Check className="h-3.5 w-3.5 shrink-0 text-tiffany" />}
+      </button>
+    );
+  }
+
   return (
     <div>
       <div className="mb-1 flex items-center gap-1.5">
@@ -115,19 +135,15 @@ export function BlocoProdutosInteresse({
                     Nenhum produto cadastrado.
                   </p>
                 ) : (
-                  opcoes.map((p) => {
-                    const marcado = selecionados.some((s) => s.id === p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => alternar(p)}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm text-escuro hover:bg-black/5"
-                      >
-                        <span className="truncate">{p.nome}</span>
-                        {marcado && <Check className="h-3.5 w-3.5 shrink-0 text-tiffany" />}
-                      </button>
-                    );
-                  })
+                  <>
+                    {opcoesNovas.map(renderOpcao)}
+                    {opcoesAntigas.length > 0 && (
+                      <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-medio/50">
+                        Modelos antigos
+                      </div>
+                    )}
+                    {opcoesAntigas.map(renderOpcao)}
+                  </>
                 )}
               </div>
             </>
