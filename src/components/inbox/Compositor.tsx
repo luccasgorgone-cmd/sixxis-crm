@@ -11,8 +11,6 @@ import {
   X,
   Package,
   Mic,
-  Square,
-  Trash2,
   Paperclip,
   Wand2,
   Undo2,
@@ -173,15 +171,18 @@ export function Compositor({
     valores: Record<string, string>;
   } | null>(null);
 
-  // ---- Audio (gravacao/anexo) ----
+  // ---- Audio (gravacao) — estilo WhatsApp: parar ENVIA direto; X cancela. ----
   const [gravando, setGravando] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [enviandoAudio, setEnviandoAudio] = useState(false);
   const [segundos, setSegundos] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Acao pendente que o onstop deve executar: enviar direto (parar) ou descartar
+  // (cancelar/troca de conversa/desmontagem).
+  const acaoRef = useRef<"enviar" | "cancelar">("enviar");
+  // Instante de inicio (ms) para descartar gravacao muito curta (toque acidental).
+  const gravacaoInicioRef = useRef(0);
 
   // ---- Anexo GERAL (clipe): MULTIPLOS arquivos numa fila, qualquer tipo. Cada um
   // com preview (miniatura/icone + nome + tamanho + remover). Envia em ordem pelo
@@ -309,21 +310,17 @@ export function Compositor({
     }
   }
 
-  function definirAudio(blob: Blob) {
-    setAudioBlob(blob);
-    setAudioUrl((u) => {
-      if (u) URL.revokeObjectURL(u);
-      return URL.createObjectURL(blob);
-    });
-  }
-
+  // Cancela a gravacao em curso (X, troca de conversa ou desmontagem): para o
+  // recorder e o microfone, descarta chunks/timer e volta ao compositor. NAO
+  // envia nada. O onstop, vendo acao "cancelar", nao dispara envio.
   function descartarAudio() {
-    setAudioBlob(null);
-    setAudioUrl((u) => {
-      if (u) URL.revokeObjectURL(u);
-      return null;
-    });
+    acaoRef.current = "cancelar";
+    const rec = recorderRef.current;
+    if (rec && rec.state !== "inactive") rec.stop();
+    pararTimer();
+    chunksRef.current = [];
     setSegundos(0);
+    setGravando(false);
   }
 
   async function iniciarGravacao() {
@@ -336,18 +333,26 @@ export function Compositor({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       chunksRef.current = [];
+      acaoRef.current = "enviar";
       rec.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
+      // Ao PARAR: envia DIRETO (estilo WhatsApp), sem preview. Se a acao foi
+      // CANCELAR, apenas descarta. Toque acidental (muito curto/vazio) e ignorado.
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         pararTimer();
-        const blob = new Blob(chunksRef.current, {
-          type: rec.mimeType || "audio/webm",
-        });
-        if (blob.size > 0) definirAudio(blob);
+        const acao = acaoRef.current;
+        const chunks = chunksRef.current;
+        chunksRef.current = [];
+        if (acao === "cancelar") return;
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        const durMs = Date.now() - gravacaoInicioRef.current;
+        if (blob.size === 0 || durMs < 1000) return;
+        void enviarAudioBlob(blob);
       };
       recorderRef.current = rec;
+      gravacaoInicioRef.current = Date.now();
       rec.start();
       setGravando(true);
       setSegundos(0);
@@ -357,21 +362,23 @@ export function Compositor({
     }
   }
 
-  function pararGravacao() {
+  // PARAR-E-ENVIAR: para o recorder; o onstop dispara o envio direto do blob.
+  function pararEEnviar() {
+    acaoRef.current = "enviar";
     recorderRef.current?.stop();
     setGravando(false);
   }
 
-  async function enviarAudioMsg() {
-    if (!audioBlob || enviandoAudio) return;
+  async function enviarAudioBlob(blob: Blob) {
+    if (enviandoAudio) return;
     setEnviandoAudio(true);
     setErro(null);
     try {
       const fd = new FormData();
       fd.append("conversaId", conversaId);
       if (instanciaSel) fd.append("instanciaId", instanciaSel);
-      const ext = (audioBlob.type.split("/")[1] || "webm").split(";")[0];
-      fd.append("audio", audioBlob, `audio.${ext}`);
+      const ext = (blob.type.split("/")[1] || "webm").split(";")[0];
+      fd.append("audio", blob, `audio.${ext}`);
       const r = await fetch("/api/mensagens/enviar-audio", {
         method: "POST",
         body: fd,
@@ -381,7 +388,6 @@ export function Compositor({
       if (!r.ok) {
         setErro("Falha ao enviar o audio. Verifique a conexao com o WhatsApp.");
       }
-      descartarAudio();
     } catch {
       setErro("Nao foi possivel enviar o audio agora.");
     } finally {
@@ -389,14 +395,15 @@ export function Compositor({
     }
   }
 
-  // Limpeza da URL de preview e do timer ao desmontar.
+  // Ao desmontar: para o timer, cancela gravacao em curso e revoga previews.
   useEffect(() => {
     return () => {
       pararTimer();
-      setAudioUrl((u) => {
-        if (u) URL.revokeObjectURL(u);
-        return null;
-      });
+      const rec = recorderRef.current;
+      if (rec && rec.state !== "inactive") {
+        acaoRef.current = "cancelar";
+        rec.stop();
+      }
       setArquivoFila((prev) => {
         prev.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
         return [];
@@ -1077,34 +1084,6 @@ export function Compositor({
         </div>
       )}
 
-      {/* Preview do audio gravado (microfone): tocar, descartar ou enviar. */}
-      {audioBlob && audioUrl && !gravando && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo p-2">
-          <audio src={audioUrl} controls className="h-9 min-w-0 flex-1" />
-          <button
-            onClick={descartarAudio}
-            disabled={enviandoAudio}
-            title="Descartar audio"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-medio hover:bg-black/5 hover:text-erro"
-          >
-            <Trash2 className="h-4.5 w-4.5" />
-          </button>
-          <button
-            onClick={() => void enviarAudioMsg()}
-            disabled={enviandoAudio}
-            title="Enviar audio"
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-tiffany px-3 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-50"
-          >
-            {enviandoAudio ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Enviar
-          </button>
-        </div>
-      )}
-
       {/* Anexo geral: multiplos, sem accept => abre em "Todos os Arquivos". */}
       <input
         ref={arquivoRef}
@@ -1137,19 +1116,31 @@ export function Compositor({
 
       <div className="flex items-center gap-2">
         {gravando ? (
-          // Gravando: indicador + parar (substitui as acoes auxiliares).
+          // Gravando (estilo WhatsApp): X cancela (descarta) e o botao principal
+          // PARA-E-ENVIA direto. O timer segue visivel.
           <div className="flex h-11 flex-1 items-center gap-3 rounded-lg border border-erro/30 bg-erro/5 px-3">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-erro" />
             <span className="text-sm font-medium text-erro">
               Gravando... {mmss(segundos)}
             </span>
-            <button
-              onClick={pararGravacao}
-              title="Parar gravacao"
-              className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-erro text-white hover:opacity-90"
-            >
-              <Square className="h-4 w-4" />
-            </button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                onClick={descartarAudio}
+                title="Cancelar"
+                aria-label="Cancelar gravacao"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-medio transition-colors hover:bg-black/5 hover:text-erro"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                onClick={pararEEnviar}
+                title="Enviar (parar e enviar)"
+                aria-label="Enviar audio"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-tiffany text-white transition-colors hover:bg-tiffany-escuro"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         ) : (
           <>
