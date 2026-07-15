@@ -16,6 +16,7 @@ import { campoDono, filtroEquipe } from "./dono";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
+import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
 import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
@@ -1999,7 +2000,22 @@ async function processarEvento(
       `[ingest] instancia "${nomeInstancia}" nao cadastrada; usando finalidade VENDA`,
     );
   }
-  const finalidade = instancia?.finalidade ?? Finalidade.VENDA;
+  const finalidadeInstancia = instancia?.finalidade ?? Finalidade.VENDA;
+
+  // Fatia W: o setor com atendimento ABERTO vence a finalidade da instancia.
+  // Cliente repassado ao pos-venda que responde no numero de VENDA cai na
+  // conversa do POS-VENDA (onde ha negocio aberto), sem abrir conversa nova.
+  // Qualquer falha/ambiguidade -> finalidade da instancia (nunca perde a msg).
+  const resolucaoFinalidade = await resolverFinalidadeEntrante(
+    lead.id,
+    finalidadeInstancia,
+  );
+  const finalidade = resolucaoFinalidade.finalidade;
+  if (finalidade !== finalidadeInstancia) {
+    console.debug(
+      `[ingest] roteamento por setor aberto: instancia=${finalidadeInstancia} -> resolvido=${finalidade} (${resolucaoFinalidade.motivo}) lead=${lead.id}`,
+    );
+  }
 
   // Foto de perfil do WhatsApp (best-effort, throttled, nao bloqueia ingestao).
   agendarFotoPerfil(

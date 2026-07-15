@@ -635,6 +635,9 @@ model Negocio {
   @@index([agenteId])
   @@index([finalidade])
   @@index([agenteId, status, fechadoEm])
+  // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
+  // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
+  @@index([leadId, status])
 }
 
 // Codigo(s) de rastreio de um negocio. MULTIPLOS por negocio (varias remessas).
