@@ -59,20 +59,36 @@ export async function resolverFinalidadeEntrante(
       };
     }
 
-    // Ambos os setores com negocio aberto: desempate por atividade mais recente
-    // (max entre atualizadoEm do negocio e ultimaMensagemEm da conversa ativa).
+    // Ambos os setores com negocio aberto. O atendimento vive na CONVERSA ATIVA
+    // (arquivada=false): apos qualquer repasse/reassumir (mover-finalidade), so
+    // o setor de DESTINO fica com conversa ativa — a de origem e movida/arquivada.
+    // Por isso o setor com conversa ativa vence, respeitando o "reassumir" mesmo
+    // que o negocio do outro setor tenha sido editado depois (o que bumparia
+    // atualizadoEm e enganaria um desempate so por recencia de negocio).
     const conversas = await prisma.conversa.findMany({
       where: { leadId, arquivada: false },
       select: { finalidade: true, ultimaMensagemEm: true },
     });
+    const temVenda = conversas.some((c) => c.finalidade === Finalidade.VENDA);
+    const temPos = conversas.some((c) => c.finalidade === Finalidade.POS_VENDA);
+    if (temVenda !== temPos) {
+      // Exatamente um setor com conversa ativa: e onde o atendimento vive.
+      return {
+        finalidade: temVenda ? Finalidade.VENDA : Finalidade.POS_VENDA,
+        motivo: "desempate",
+        setorInstancia: finalidadeInstancia,
+      };
+    }
+    // Ambos (ou nenhum) com conversa ativa: desempate por atividade mais recente
+    // — ultima mensagem da conversa e, na falta dela, atualizadoEm do negocio.
     const escore = (f: Finalidade): number => {
       const tempos = [
-        ...abertos
-          .filter((n) => n.finalidade === f)
-          .map((n) => n.atualizadoEm?.getTime() ?? 0),
         ...conversas
           .filter((c) => c.finalidade === f)
           .map((c) => c.ultimaMensagemEm?.getTime() ?? 0),
+        ...abertos
+          .filter((n) => n.finalidade === f)
+          .map((n) => n.atualizadoEm?.getTime() ?? 0),
       ];
       return tempos.length ? Math.max(...tempos) : 0;
     };
