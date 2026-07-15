@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import type { ConversaItem, MensagemItem, Finalidade } from "./tipos";
 import { Compositor, type ViaOtimista } from "./Compositor";
+import { PlayerAudio } from "./PlayerAudio";
 import {
   novoClientId,
   criarBolhaOtimista,
@@ -1213,7 +1214,7 @@ function Midia({
       );
     }
     if (mensagem.tipo === "AUDIO") {
-      return <audio src={mediaUrl} controls className="w-56 max-w-full" />;
+      return <PlayerAudio mediaUrl={mediaUrl} ehOut={ehOut} />;
     }
     // DOCUMENTO
     return (
