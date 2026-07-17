@@ -79,6 +79,9 @@ type Cliente = {
   bloqueado: boolean;
 };
 
+// Espelha o take da rota /api/clientes: a lista carrega no maximo 500 do recorte.
+const TETO_CLIENTES = 500;
+
 type EmpresaOpcao = { id: string; nome: string };
 type ProdutoOpcao = { id: string; nome: string };
 
@@ -735,6 +738,12 @@ export function ListaClientes({
             <strong className="text-escuro">{selecionados.size}</strong>{" "}
             selecionados
           </span>
+          {clientes.length >= TETO_CLIENTES && (
+            <span className="text-xs text-medio/50">
+              Selecionando os {TETO_CLIENTES} carregados. Refine os filtros para
+              alcancar os demais.
+            </span>
+          )}
           {selecionados.size > 0 && (
             <button
               onClick={() => setSelecionados(new Set())}
