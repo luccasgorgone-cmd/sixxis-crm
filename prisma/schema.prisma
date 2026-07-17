@@ -369,7 +369,13 @@ model Conversa {
   status           String            @default("aberta")
   atendidoPor      AtendidoPor       @default(HUMANO)
   naoLidas         Int               @default(0)
+  // Marcacao MANUAL de "nao lida" (estilo WhatsApp), independente do contador
+  // naoLidas (automatico da ingestao). Abrir a conversa zera ambos.
+  marcadaNaoLida   Boolean           @default(false)
   ultimaMensagemEm DateTime?
+  // Conversa FIXADA (pin) no topo da lista. null = nao fixada; data = quando
+  // foi fixada (serve para ordenar as fixadas entre si).
+  fixadaEm         DateTime?
   arquivada        Boolean           @default(false)
   // Ultima vez que enviamos a mensagem automatica de "fora do horario" nesta
   // conversa (evita repetir a cada mensagem; reenvia apos ~8h).
@@ -391,6 +397,7 @@ model Conversa {
   @@index([instanciaId])
   @@index([finalidade])
   @@index([agenteId, ultimaMensagemEm])
+  @@index([fixadaEm])
 }
 
 model Mensagem {
