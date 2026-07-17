@@ -28,6 +28,10 @@ export type ConversaItem = {
   ultimaMensagemPreview: string | null;
   ultimaMensagemEm: string | null;
   naoLidas: number;
+  // Fatia Y: pin (null = nao fixada; data = fixada) + marcacao MANUAL de
+  // nao-lida (independente do contador naoLidas). Ausentes em usos embutidos.
+  fixadaEm?: string | null;
+  marcadaNaoLida?: boolean;
   atendidoPor: AtendidoPor;
   agenteId: string | null;
   finalidade?: Finalidade;

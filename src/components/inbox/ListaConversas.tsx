@@ -1,12 +1,17 @@
 "use client";
 
 // Coluna esquerda da inbox: busca, filtros e a lista de conversas.
+import { useState } from "react";
 import {
   Search,
   Bot,
   User as UserIcon,
   Inbox as InboxIcon,
   SearchX,
+  Pin,
+  PinOff,
+  MoreVertical,
+  CircleDot,
 } from "lucide-react";
 import type { ConversaItem, Filtro, Finalidade } from "./tipos";
 import { horarioLista } from "@/lib/format";
@@ -47,6 +52,8 @@ export function ListaConversas({
   onPeriodo,
   onSelecionar,
   onTentar,
+  onFixar,
+  onMarcarNaoLida,
 }: {
   conversas: ConversaItem[];
   carregando: boolean;
@@ -64,6 +71,9 @@ export function ListaConversas({
   onPeriodo: (v: PeriodoEntrada) => void;
   onSelecionar: (id: string) => void;
   onTentar?: () => void;
+  // Fatia Y: acoes rapidas do item (fixar/desafixar, marcar nao lida).
+  onFixar?: (id: string) => void;
+  onMarcarNaoLida?: (id: string) => void;
 }) {
   return (
     <div className="flex h-full w-full flex-col border-r border-black/5 bg-white sm:w-80 md:w-96">
@@ -153,6 +163,8 @@ export function ListaConversas({
               conversa={c}
               ativa={c.id === selecionada}
               onClick={() => onSelecionar(c.id)}
+              onFixar={onFixar}
+              onMarcarNaoLida={onMarcarNaoLida}
             />
           ))
         )}
@@ -165,18 +177,36 @@ function ItemConversa({
   conversa,
   ativa,
   onClick,
+  onFixar,
+  onMarcarNaoLida,
 }: {
   conversa: ConversaItem;
   ativa: boolean;
   onClick: () => void;
+  onFixar?: (id: string) => void;
+  onMarcarNaoLida?: (id: string) => void;
 }) {
+  const [menu, setMenu] = useState(false);
   const nome = conversa.leadNome?.trim() || conversa.leadTelefone;
   const cor = conversa.finalidade ? corFinalidade(conversa.finalidade) : null;
+  const fixada = Boolean(conversa.fixadaEm);
+  // Fatia Y: acoes so fazem sentido na lista real do Inbox (tem callbacks).
+  const temAcoes = Boolean(onFixar || onMarcarNaoLida);
+
   return (
-    <button
+    // Div clicavel (nao <button>) para permitir os botoes de acao aninhados.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={cor ? { borderLeftColor: cor.hex } : undefined}
-      className={`flex w-full items-center gap-3 border-b border-l-[3px] border-black/5 px-3 py-3 text-left transition-colors ${
+      className={`group relative flex w-full cursor-pointer items-center gap-3 border-b border-l-[3px] border-black/5 px-3 py-3 text-left transition-colors ${
         ativa ? "bg-tiffany/10" : "hover:bg-fundo"
       }`}
     >
@@ -201,8 +231,21 @@ function ItemConversa({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-semibold text-escuro">{nome}</p>
-          <span className="shrink-0 text-[11px] text-medio/50">
+          <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-escuro">
+            {fixada && (
+              <Pin
+                className="h-3 w-3 shrink-0 text-medio/50"
+                aria-label="Conversa fixada"
+              />
+            )}
+            <span className="truncate">{nome}</span>
+          </p>
+          {/* Horario some no hover para dar lugar ao botao de acoes. */}
+          <span
+            className={`shrink-0 text-[11px] text-medio/50 ${
+              temAcoes ? "transition-opacity group-hover:opacity-0" : ""
+            }`}
+          >
             {horarioLista(conversa.ultimaMensagemEm)}
           </span>
         </div>
@@ -220,11 +263,18 @@ function ItemConversa({
           <p className="truncate text-xs text-medio/70">
             {conversa.ultimaMensagemPreview ?? "Sem mensagens"}
           </p>
-          {conversa.naoLidas > 0 && (
+          {/* Indicador de nao-lida: contador automatico OU ponto da marcacao manual. */}
+          {conversa.naoLidas > 0 ? (
             <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-tiffany px-1.5 text-[11px] font-semibold text-white">
               {conversa.naoLidas > 99 ? "99+" : conversa.naoLidas}
             </span>
-          )}
+          ) : conversa.marcadaNaoLida ? (
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full bg-tiffany"
+              title="Marcada como nao lida"
+              aria-label="Nao lida"
+            />
+          ) : null}
         </div>
         {conversa.trechoBusca && (
           <p
@@ -236,7 +286,65 @@ function ItemConversa({
           </p>
         )}
       </div>
-    </button>
+
+      {/* Acoes rapidas (fixar / marcar nao lida). */}
+      {temAcoes && (
+        <div
+          className="absolute right-1.5 top-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => setMenu((v) => !v)}
+            aria-label="Acoes da conversa"
+            aria-expanded={menu}
+            className={`flex h-6 w-6 items-center justify-center rounded-md text-medio/60 transition-colors hover:bg-black/5 hover:text-escuro ${
+              menu ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+          {menu && (
+            <>
+              {/* Camada para fechar ao clicar fora. */}
+              <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
+              <div className="absolute right-0 top-7 z-20 w-48 overflow-hidden rounded-lg border border-black/10 bg-white py-1 shadow-lg">
+                {onFixar && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFixar(conversa.id);
+                      setMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro hover:bg-fundo"
+                  >
+                    {fixada ? (
+                      <PinOff className="h-4 w-4 text-medio/60" />
+                    ) : (
+                      <Pin className="h-4 w-4 text-medio/60" />
+                    )}
+                    {fixada ? "Desafixar" : "Fixar"}
+                  </button>
+                )}
+                {onMarcarNaoLida && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onMarcarNaoLida(conversa.id);
+                      setMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro hover:bg-fundo"
+                  >
+                    <CircleDot className="h-4 w-4 text-medio/60" />
+                    Marcar como nao lida
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import { MessageSquare } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
 import { previewMensagem } from "@/lib/preview";
 import { normalizarTexto } from "@/lib/format";
+import { compararPin } from "@/lib/ordenacao";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
 import type { ViaOtimista } from "./Compositor";
@@ -128,9 +129,12 @@ export function Inbox({
     setSelecionada(id);
     setCarregandoThread(true);
     setMensagens([]);
-    // Zera o badge localmente (a API tambem zera no servidor).
+    // Zera o badge localmente (a API tambem zera no servidor). Fatia Y: abrir
+    // tambem limpa a marcacao MANUAL de nao-lida, como no WhatsApp.
     setConversas((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, naoLidas: 0 } : c)),
+      prev.map((c) =>
+        c.id === id ? { ...c, naoLidas: 0, marcadaNaoLida: false } : c,
+      ),
     );
     try {
       const r = await fetch(`/api/conversas/${id}/mensagens`);
@@ -166,6 +170,43 @@ export function Inbox({
       if (fetchTokenRef.current === token) setCarregandoThread(false);
     }
   }, []);
+
+  // Fatia Y: fixar/desafixar (otimista + socket). Alterna fixadaEm local na hora;
+  // o servidor emite "conversa:atualizada" e a lista recarrega/reordena. Falha =
+  // recarrega para voltar ao estado real.
+  const alternarFixar = useCallback(
+    async (id: string) => {
+      setConversas((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, fixadaEm: c.fixadaEm ? null : new Date().toISOString() }
+            : c,
+        ),
+      );
+      try {
+        await fetch(`/api/conversas/${id}/fixar`, { method: "POST" });
+      } catch {
+        void carregarConversas();
+      }
+    },
+    [carregarConversas],
+  );
+
+  // Fatia Y: marcar como nao lida (otimista). Abrir a conversa reverte (ver
+  // abrirConversa). Falha = recarrega.
+  const marcarNaoLida = useCallback(
+    async (id: string) => {
+      setConversas((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, marcadaNaoLida: true } : c)),
+      );
+      try {
+        await fetch(`/api/conversas/${id}/marcar-nao-lida`, { method: "POST" });
+      } catch {
+        void carregarConversas();
+      }
+    },
+    [carregarConversas],
+  );
 
   // Deep-link opcional: /inbox?lead=<id> pre-abre a conversa daquele lead (ex.:
   // vindo da lista de Clientes ou de uma notificacao). Roda uma vez, quando a
@@ -382,9 +423,18 @@ export function Inbox({
     const qDigitos = buscaAplicada.replace(/\D/g, "");
     const passaFiltro = (c: ConversaItem) => {
       if (filtro === "minhas" && c.agenteId !== agenteIdAtual) return false;
-      if (filtro === "naoLidas" && c.naoLidas <= 0) return false;
+      // Fatia Y: "nao lidas" tambem inclui a marcacao MANUAL (marcadaNaoLida).
+      if (filtro === "naoLidas" && c.naoLidas <= 0 && !c.marcadaNaoLida)
+        return false;
       return true;
     };
+    // Fatia Y: fixadas primeiro, depois recencia (mesma regra do servidor —
+    // reafirmada no cliente porque updates ao vivo reordenam a lista).
+    const ordenar = (arr: ConversaItem[]) =>
+      [...arr].sort((a, b) => {
+        const p = compararPin(a.fixadaEm, b.fixadaEm);
+        return p !== 0 ? p : compararPin(a.ultimaMensagemEm, b.ultimaMensagemEm);
+      });
     const locais = conversas.filter((c) => {
       if (!passaFiltro(c)) return false;
       if (q) {
@@ -396,7 +446,7 @@ export function Inbox({
       }
       return true;
     });
-    if (!buscaAplicada.trim()) return locais;
+    if (!buscaAplicada.trim()) return ordenar(locais);
     // Une com os que bateram no conteudo (respeitando o mesmo filtro).
     const mapa = new Map<string, ConversaItem>(locais.map((c) => [c.id, c]));
     for (const c of resConteudo) {
@@ -407,7 +457,7 @@ export function Inbox({
         mapa.set(c.id, { ...existente, trechoBusca: c.trechoBusca });
       }
     }
-    return Array.from(mapa.values());
+    return ordenar(Array.from(mapa.values()));
   }, [conversas, buscaAplicada, filtro, agenteIdAtual, resConteudo]);
 
   const conversaAberta = useMemo(
@@ -434,6 +484,8 @@ export function Inbox({
         onPeriodo={setPeriodo}
         onSelecionar={abrirConversa}
         onTentar={() => void carregarConversas()}
+        onFixar={alternarFixar}
+        onMarcarNaoLida={marcarNaoLida}
       />
 
       {conversaAberta ? (
