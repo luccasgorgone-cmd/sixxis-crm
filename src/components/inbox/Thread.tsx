@@ -618,11 +618,15 @@ function Bolha({
   }
 
   // So pode revogar a propria mensagem enviada, recente e ainda nao apagada.
+  // Fatia Z: LIDA tambem e revogavel (antes essas mensagens ficavam em ENTREGUE;
+  // sem incluir LIDA, uma mensagem lida perderia o "apagar para todos").
   const podeRevogar =
     podeApagar &&
     ehOut &&
     !apagada &&
-    (mensagem.statusEnvio === "ENVIADA" || mensagem.statusEnvio === "ENTREGUE");
+    (mensagem.statusEnvio === "ENVIADA" ||
+      mensagem.statusEnvio === "ENTREGUE" ||
+      mensagem.statusEnvio === "LIDA");
 
   async function apagar() {
     setApagando(true);
