@@ -335,9 +335,27 @@ export function ListaClientes({
     });
   }
 
+  // Estado do checkbox mestre: alguns (nao todos) do recorte selecionados.
+  const algunsDoRecorteSel =
+    !todosDoRecorteSel && filtrados.some((c) => selecionados.has(c.leadId));
+
   const colunaSelecao: Coluna<Cliente> = {
     chave: "sel",
     rotulo: "",
+    cabecalho: () => (
+      <input
+        type="checkbox"
+        checked={todosDoRecorteSel}
+        ref={(el) => {
+          if (el) el.indeterminate = algunsDoRecorteSel;
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onChange={() => alternarTodos()}
+        className="h-4 w-4 accent-tiffany"
+        aria-label="Selecionar todos os clientes filtrados"
+        title="Selecionar todos os filtrados"
+      />
+    ),
     render: (c) => (
       <input
         type="checkbox"

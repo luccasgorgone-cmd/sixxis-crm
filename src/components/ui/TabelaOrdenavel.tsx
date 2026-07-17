@@ -11,6 +11,8 @@ export type Coluna<T> = {
   align?: "left" | "right" | "center";
   // valor para ordenar (numero ou string). Ausente = coluna nao ordenavel.
   sortValue?: (linha: T) => number | string;
+  // cabecalho custom (ex.: checkbox mestre). Substitui o rotulo/botao de ordem.
+  cabecalho?: () => ReactNode;
   render: (linha: T) => ReactNode;
 };
 
@@ -66,7 +68,9 @@ export function TabelaOrdenavel<T>({
               const ativa = ordem?.chave === c.chave;
               return (
                 <th key={c.chave} className={`px-3 py-2.5 font-medium ${alinhar(c.align)}`}>
-                  {c.sortValue ? (
+                  {c.cabecalho ? (
+                    c.cabecalho()
+                  ) : c.sortValue ? (
                     <button
                       onClick={() => alternar(c.chave)}
                       aria-label={`Ordenar por ${c.rotulo}`}
