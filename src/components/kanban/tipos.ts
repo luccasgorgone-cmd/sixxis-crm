@@ -48,6 +48,9 @@ export type CardNegocio = {
   motivoPerdaObs: string | null;
   etapaId: string | null;
   entrouEtapaEm: string;
+  // Fatia Y: pin herdado da conversa da mesma finalidade (null = nao fixada).
+  // Cards fixados sobem ao topo da coluna e exibem o icone de pin.
+  fixadaEm?: string | null;
   agente: AgenteResumo | null;
   etiquetas: EtiquetaChip[];
   // Quantidade de alertas de SLA abertos (selo no card).

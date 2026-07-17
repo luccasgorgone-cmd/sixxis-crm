@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { janelaDeParams } from "@/lib/metricas";
+import { compararPin } from "@/lib/ordenacao";
 import { normalizarTexto } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
@@ -161,6 +162,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (n.etapaId && colunas[n.etapaId]) {
       colunas[n.etapaId].push(cardNegocio(n));
     }
+  }
+
+  // Fatia Y: fixadas primeiro em cada coluna. O DB ja ordenou por entrouEtapaEm
+  // desc; como Array.sort e estavel e compararPin devolve 0 no empate, os cards
+  // sem pin mantem essa ordem — o pin so promove os fixados ao topo.
+  for (const id of Object.keys(colunas)) {
+    colunas[id].sort((a, b) => compararPin(a.fixadaEm, b.fixadaEm));
   }
 
   // Consolida o resumo por etapa a partir das duas particoes.

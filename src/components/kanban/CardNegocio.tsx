@@ -5,7 +5,7 @@
 // pela finalidade; badge de finalidade para o admin.
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, UserPlus, BellRing, ShieldCheck, ShieldOff } from "lucide-react";
+import { Clock, UserPlus, BellRing, ShieldCheck, ShieldOff, Pin } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -64,6 +64,12 @@ export function CardNegocio({
             fotoUrl={card.leadFoto}
             tamanho={28}
           />
+          {card.fixadaEm && (
+            <Pin
+              className="h-3 w-3 shrink-0 text-medio/50"
+              aria-label="Conversa fixada"
+            />
+          )}
           <p className="min-w-0 truncate text-sm font-semibold text-escuro">
             {nome}
           </p>

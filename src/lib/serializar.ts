@@ -20,6 +20,9 @@ export const includeCard = {
       // Enxuto (Fatia L): so os campos usados pelo card (id/nome/cor), em vez do
       // objeto etiqueta inteiro.
       etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
+      // Fatia Y: pin da conversa da mesma finalidade do negocio — o card herda o
+      // "fixada" para subir ao topo da coluna (ordenacao no /api/negocios).
+      conversas: { where: { arquivada: false }, select: { finalidade: true, fixadaEm: true } },
     },
   },
   agente: { select: { id: true, nome: true, avatarUrl: true } },
@@ -31,6 +34,10 @@ export const includeCard = {
 type NegocioCard = Prisma.NegocioGetPayload<{ include: typeof includeCard }>;
 
 export function cardNegocio(n: NegocioCard) {
+  // Pin herdado: conversa (nao arquivada) da mesma finalidade do negocio.
+  const conversaDaFinalidade = n.lead.conversas.find(
+    (cv) => cv.finalidade === n.finalidade,
+  );
   return {
     id: n.id,
     leadNome: nomeEfetivo(n.lead),
@@ -60,6 +67,8 @@ export function cardNegocio(n: NegocioCard) {
     motivoPerdaObs: n.motivoPerdaObs,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
+    // Fatia Y: null = nao fixada; data = fixada (sobe ao topo da coluna + pin no card).
+    fixadaEm: conversaDaFinalidade?.fixadaEm ?? null,
     alertasSla: n.alertasSla.length,
     agente: n.agente
       ? { id: n.agente.id, nome: n.agente.nome, avatarUrl: n.agente.avatarUrl }

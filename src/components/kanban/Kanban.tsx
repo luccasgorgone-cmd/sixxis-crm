@@ -206,9 +206,17 @@ export function Kanban({
       if (arrastandoRef.current) return;
       void carregar();
     }
+    // Fatia Y: fixar/desafixar uma conversa altera a ordem da coluna (fixadas
+    // primeiro) — recarrega o quadro para refletir o pin ao vivo.
+    function onConversa() {
+      if (arrastandoRef.current) return;
+      void carregar();
+    }
     socket.on("negocio:atualizado", onEvt);
+    socket.on("conversa:atualizada", onConversa);
     return () => {
       socket.off("negocio:atualizado", onEvt);
+      socket.off("conversa:atualizada", onConversa);
     };
   }, [carregar]);
 

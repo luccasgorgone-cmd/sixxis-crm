@@ -6,6 +6,7 @@ import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { previewMensagem } from "@/lib/preview";
 import { nomeEfetivo, selectClienteBasico } from "@/lib/cliente";
 import { janelaDeParams } from "@/lib/metricas";
+import { ordemConversas } from "@/lib/ordenacao";
 import type { Prisma } from "@/generated/prisma/client";
 import { Finalidade } from "@/generated/prisma/enums";
 
@@ -49,7 +50,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const conversas = await prisma.conversa.findMany({
     where,
-    orderBy: [{ ultimaMensagemEm: "desc" }, { criadoEm: "desc" }],
+    // Fatia Y: fixadas primeiro, depois recencia — fonte unica em src/lib/ordenacao.
+    orderBy: ordemConversas,
     include: {
       lead: {
         select: {
@@ -135,6 +137,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       : null,
     ultimaMensagemEm: c.ultimaMensagemEm,
     naoLidas: c.naoLidas,
+    // Fatia Y: pin + marcacao manual de nao-lida.
+    fixadaEm: c.fixadaEm,
+    marcadaNaoLida: c.marcadaNaoLida,
     atendidoPor: c.atendidoPor,
     agenteId: c.agenteId,
     // Finalidade visivel a todos (indicador colorido). Nome/numero da instancia

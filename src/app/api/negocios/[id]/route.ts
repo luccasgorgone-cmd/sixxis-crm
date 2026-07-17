@@ -81,6 +81,8 @@ export async function GET(
           donoPosVenda: { select: { id: true, nome: true } },
           // Enxuto (Fatia L): so id/nome/cor da etiqueta (usados na UI).
           etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
+          // Fatia Y: pin herdado pelo card (mesma finalidade). Ver cardNegocio.
+          conversas: { where: { arquivada: false }, select: { finalidade: true, fixadaEm: true } },
           notas: {
             orderBy: { criadoEm: "desc" },
             include: { agente: { select: { nome: true } } },
