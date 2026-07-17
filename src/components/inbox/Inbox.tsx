@@ -287,6 +287,21 @@ export function Inbox({
       );
     }
 
+    // Fatia Z: status do envio mudou (ENVIADA -> ENTREGUE -> LIDA / ERRO).
+    // Atualiza os checks ao vivo na thread aberta, sem refresh.
+    function onStatus(evt: {
+      conversaId: string;
+      mensagemId: string;
+      statusEnvio: MensagemItem["statusEnvio"];
+    }) {
+      if (selecionadaRef.current !== evt.conversaId) return;
+      setMensagens((prev) =>
+        prev.map((m) =>
+          m.id === evt.mensagemId ? { ...m, statusEnvio: evt.statusEnvio } : m,
+        ),
+      );
+    }
+
     // Reacao (nossa ou do cliente) mudou: atualiza a bolha na thread aberta.
     function onReacao(evt: {
       conversaId: string;
@@ -328,11 +343,13 @@ export function Inbox({
 
     socket.on("mensagem:nova", onNova);
     socket.on("mensagem:midia", onMidia);
+    socket.on("mensagem:status", onStatus);
     socket.on("mensagem:reacao", onReacao);
     socket.on("mensagem:editada", onEditada);
     return () => {
       socket.off("mensagem:nova", onNova);
       socket.off("mensagem:midia", onMidia);
+      socket.off("mensagem:status", onStatus);
       socket.off("mensagem:reacao", onReacao);
       socket.off("mensagem:editada", onEditada);
     };

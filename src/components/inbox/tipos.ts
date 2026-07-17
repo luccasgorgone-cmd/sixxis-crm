@@ -9,7 +9,14 @@ export type TipoMensagem =
   | "VIDEO"
   | "DOCUMENTO"
   | "OUTRO";
-export type StatusEnvio = "ENVIANDO" | "ENVIADA" | "ENTREGUE" | "ERRO" | null;
+// Fatia Z: LIDA (dois checks azuis) entre ENTREGUE e ERRO.
+export type StatusEnvio =
+  | "ENVIANDO"
+  | "ENVIADA"
+  | "ENTREGUE"
+  | "LIDA"
+  | "ERRO"
+  | null;
 export type AtendidoPor = "HUMANO" | "IA";
 
 export type Finalidade = "VENDA" | "POS_VENDA";

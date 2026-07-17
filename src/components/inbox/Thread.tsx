@@ -1274,6 +1274,11 @@ function StatusEnvio({ status }: { status: MensagemItem["statusEnvio"] }) {
       return <Check className="h-3 w-3" />;
     case "ENTREGUE":
       return <CheckCheck className="h-3 w-3" />;
+    // Fatia Z: LIDA = dois checks AZUIS. O balao OUT e tiffany (bg-tiffany), entao
+    // usar o proprio tiffany deixaria os checks invisiveis — usamos o azul-leitura
+    // do WhatsApp (#53bdeb), que contrasta no balao e ja e o "lida" reconhecido.
+    case "LIDA":
+      return <CheckCheck className="h-3 w-3" style={{ color: "#53bdeb" }} />;
     case "ERRO":
       return <AlertCircle className="h-3 w-3 text-red-200" />;
     default:
