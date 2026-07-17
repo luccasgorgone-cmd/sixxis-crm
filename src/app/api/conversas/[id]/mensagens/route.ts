@@ -105,7 +105,12 @@ export async function GET(
 
   // Marca como lidas / zera o badge APENAS para o dono da conversa (quem
   // realmente esta atendendo). A inspecao do admin nao zera o contador alheio.
-  if (conversa.agenteId === session.user.id && conversa.naoLidas > 0) {
+  // Fatia Y: abrir tambem limpa a marcacao MANUAL de nao-lida (marcadaNaoLida) —
+  // por isso o bloco roda tambem quando ha marcacao manual, mesmo com naoLidas=0.
+  const precisaLimpar =
+    conversa.agenteId === session.user.id &&
+    (conversa.naoLidas > 0 || conversa.marcadaNaoLida);
+  if (precisaLimpar) {
     await prisma.$transaction([
       prisma.mensagem.updateMany({
         where: { conversaId: id, direcao: DirecaoMsg.IN, lida: false },
@@ -113,7 +118,7 @@ export async function GET(
       }),
       prisma.conversa.update({
         where: { id },
-        data: { naoLidas: 0 },
+        data: { naoLidas: 0, marcadaNaoLida: false },
       }),
     ]);
     // Avisa a sidebar para reduzir o contador de nao lidas ao vivo.
