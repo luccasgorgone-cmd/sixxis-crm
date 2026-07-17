@@ -819,14 +819,18 @@ const ORDEM_STATUS: Record<string, number> = {
   ENVIANDO: 0,
   ENVIADA: 1,
   ENTREGUE: 2,
-  ERRO: 3,
+  // Fatia Z: LIDA acima de ENTREGUE (nao regride: LIDA nao volta pra ENTREGUE).
+  LIDA: 3,
+  ERRO: 4,
 };
 const MAPA_STATUS: Record<string, StatusEnvio> = {
   PENDING: StatusEnvio.ENVIADA,
   SERVER_ACK: StatusEnvio.ENVIADA,
   DELIVERY_ACK: StatusEnvio.ENTREGUE,
-  READ: StatusEnvio.ENTREGUE,
-  PLAYED: StatusEnvio.ENTREGUE,
+  // Fatia Z: READ (lida) e PLAYED (audio ouvido) viram LIDA — antes achatavam
+  // em ENTREGUE, descartando a informacao de leitura que ja chegava do WhatsApp.
+  READ: StatusEnvio.LIDA,
+  PLAYED: StatusEnvio.LIDA,
   ERROR: StatusEnvio.ERRO,
 };
 async function atualizarStatusMensagem(

@@ -46,6 +46,9 @@ enum StatusEnvio {
   ENVIANDO
   ENVIADA
   ENTREGUE
+  // Fatia Z: lida pelo cliente (dois checks azuis). O ack READ/PLAYED do WhatsApp
+  // vira LIDA (antes achatava em ENTREGUE). Nem toda conta envia READ.
+  LIDA
   ERRO
 }
 
