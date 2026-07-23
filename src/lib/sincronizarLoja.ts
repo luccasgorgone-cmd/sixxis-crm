@@ -1,14 +1,18 @@
-// Nucleo da Fatia AA: mesclagem CRM x Loja. PONTO UNICO usado pelo PREVIEW
-// (GET) e pela APLICACAO (POST) da rota /api/leads/[id]/sincronizar-loja, para
-// que a classificacao seja identica nos dois lados (o POST recomputa e nunca
-// confia em valor vindo do cliente — so nas CHAVES marcadas).
+// Nucleo da sincronizacao CRM x Loja (Fatias AA/AB). PONTO UNICO de comparacao.
+//
+// Fatia AB inverteu o fluxo: os dados agora CHEGAM na requisicao (a Loja chama o
+// CRM). Por isso a comparacao virou PURA — `analisarValores(estado, valores)` —
+// recebendo um objeto de valores externos e o estado atual do lead, sem saber de
+// onde os valores vieram. `analisar(estado, cliente, pedidoId)` continua para uso
+// interno (obtem os valores da Loja e delega para a funcao pura), sem duplicar a
+// classificacao.
 //
 // Regra de mesclagem (o coracao da fatia):
 //   a) CRM vazio + Loja tem valor      -> "preencher" (pre-marcado na UI)
 //   b) CRM e Loja iguais               -> "igual"     (nao vira acao)
 //   c) CRM tem valor e Loja tem OUTRO  -> "conflito"  (desmarcado; usuario opta)
-// NOME: o efetivo e nomeManual||pushName||nome. Se ha nomeManual, e curadoria
-// humana -> SEMPRE conflito (nunca preencher por cima).
+// NOME: "preencher" so quando NAO ha nome real no CRM (nem nomeManual, nem
+// pushName, nem nome). Qualquer nome real diferente -> "conflito".
 import type { ClienteLoja, PedidoLoja, EnderecoLoja } from "./loja";
 
 export type Classificacao = "preencher" | "conflito" | "igual";
@@ -21,6 +25,26 @@ export type CampoSync = {
   valorCrm: string | null;
   valorLoja: string | null;
   classificacao: Classificacao;
+};
+
+// Valores externos a comparar (o `dados` das rotas de entrada da Fatia AB, e
+// tambem o que `analisar` monta a partir da Loja). Tudo opcional.
+export type ValoresExternos = {
+  nome?: string | null;
+  cpf?: string | null;
+  email?: string | null;
+  empresa?: string | null;
+  endereco?: {
+    cep?: string | null;
+    logradouro?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    cidade?: string | null;
+    uf?: string | null;
+  } | null;
+  notaFiscal?: { numero?: string | null; data?: string | null } | null;
+  rastreio?: { codigo?: string | null; transportadora?: string | null } | null;
 };
 
 // Endereco principal atual do CRM (ou tudo null quando nao ha).
@@ -52,11 +76,12 @@ export type EstadoCrm = {
 };
 
 export type Analise = {
+  // Pedido da loja usado (so quando os valores vieram da Loja via `analisar`).
   pedidoUsado: PedidoLoja | null;
   campos: CampoSync[];
-  // Valores da loja normalizados por chave, para o POST aplicar SEM reparsear.
+  // Valores normalizados por chave, para o POST aplicar SEM reparsear.
   valores: Record<string, string | null>;
-  // Data crua da NF (ISO) quando a loja mandou uma valida; senao null.
+  // Data crua da NF (ISO) quando ha uma valida e a NF ainda nao existe; senao null.
   dataNF: string | null;
   transportadora: string | null;
   avisos: string[];
@@ -102,57 +127,6 @@ function iguais(a: string | null, b: string | null): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-// Escolhe o pedido: por id, senao o mais recente (maior criadoEm).
-export function escolherPedido(
-  cliente: ClienteLoja,
-  pedidoId?: string | null,
-): PedidoLoja | null {
-  const pedidos = cliente.pedidos ?? [];
-  if (pedidos.length === 0) return null;
-  if (pedidoId) {
-    const achado = pedidos.find((p) => p.id === pedidoId);
-    if (achado) return achado;
-  }
-  return pedidos.reduce((mais, p) =>
-    new Date(p.criadoEm).getTime() > new Date(mais.criadoEm).getTime() ? p : mais,
-  );
-}
-
-function enderecoLojaCampo(
-  end: EnderecoLoja | null | undefined,
-  campo: (typeof CAMPOS_ENDERECO)[number],
-): string | null {
-  if (!end) return null;
-  if (campo === "uf") return limpar(end.uf ?? end.estado);
-  return limpar(end[campo]);
-}
-
-// Valores da loja por chave (pedido tem prioridade; cliente e fallback).
-function valoresLoja(
-  cliente: ClienteLoja,
-  pedido: PedidoLoja | null,
-): Record<string, string | null> {
-  const c = cliente.cliente;
-  const v: Record<string, string | null> = {
-    nome: limpar(c?.nome),
-    cpf: limpar(pedido?.cpf ?? c?.cpf),
-    email: limpar(c?.email),
-    empresa: limpar(c?.empresa),
-    notaFiscal: limpar(pedido?.notaFiscal),
-    codigoRastreio: limpar(pedido?.codigoRastreio),
-    transportadora: limpar(
-      pedido?.transportadora ?? pedido?.rastreio?.transportadora,
-    ),
-  };
-  for (const campo of CAMPOS_ENDERECO) {
-    v[campo] =
-      enderecoLojaCampo(pedido?.endereco, campo) ??
-      enderecoLojaCampo(c?.endereco, campo);
-  }
-  if (v.uf) v.uf = v.uf.toUpperCase().slice(0, 2);
-  return v;
-}
-
 // Classificacao generica (preencher/conflito/igual) a partir de crm x loja.
 // Retorna null quando a loja nao tem valor (campo nem entra na lista).
 function classificar(
@@ -165,14 +139,37 @@ function classificar(
   return "conflito";
 }
 
-// Nucleo compartilhado: monta a lista de campos + valores para preview e apply.
-export function analisar(
+// Achata ValoresExternos no mapa por chave usado pela classificacao/aplicacao,
+// e devolve a data crua da NF em separado (nao e um campo comparavel).
+function flatDeExternos(v: ValoresExternos): {
+  flat: Record<string, string | null>;
+  dataNFbruta: string | null;
+} {
+  const flat: Record<string, string | null> = {
+    nome: limpar(v.nome),
+    cpf: limpar(v.cpf),
+    email: limpar(v.email),
+    empresa: limpar(v.empresa),
+    notaFiscal: limpar(v.notaFiscal?.numero),
+    codigoRastreio: limpar(v.rastreio?.codigo),
+    transportadora: limpar(v.rastreio?.transportadora),
+  };
+  for (const campo of CAMPOS_ENDERECO) {
+    flat[campo] = limpar(v.endereco?.[campo]);
+  }
+  if (flat.uf) flat.uf = flat.uf.toUpperCase().slice(0, 2);
+  return { flat, dataNFbruta: limpar(v.notaFiscal?.data) };
+}
+
+// ===========================================================================
+// (b) COMPARAR/CLASSIFICAR — funcao PURA. Recebe o estado do lead + valores
+// externos e devolve os campos classificados. Nao busca nada, nao grava nada.
+// ===========================================================================
+export function analisarValores(
   estado: EstadoCrm,
-  cliente: ClienteLoja,
-  pedidoId?: string | null,
+  valoresExternos: ValoresExternos,
 ): Analise {
-  const pedido = escolherPedido(cliente, pedidoId);
-  const valores = valoresLoja(cliente, pedido);
+  const { flat, dataNFbruta } = flatDeExternos(valoresExternos);
   const campos: CampoSync[] = [];
   const avisos: string[] = [];
 
@@ -198,78 +195,144 @@ export function analisar(
   // nome). Se ha QUALQUER nome real e ele difere do da loja -> "conflito"
   // (desmarcado, "vai substituir"), seja pushName do WhatsApp ou nomeManual
   // curado pelo atendente. Nunca sobrescrever nome existente sem opt-in.
-  if (valores.nome !== null) {
-    if (iguais(estado.nomeEfetivo, valores.nome)) {
-      push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "igual");
+  if (flat.nome !== null) {
+    if (iguais(estado.nomeEfetivo, flat.nome)) {
+      push("nome", "cadastro", estado.nomeEfetivo, flat.nome, "igual");
     } else if (!estado.temNomeReal) {
-      push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "preencher");
+      push("nome", "cadastro", estado.nomeEfetivo, flat.nome, "preencher");
     } else {
-      push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "conflito");
+      push("nome", "cadastro", estado.nomeEfetivo, flat.nome, "conflito");
     }
   }
 
   // --- Cadastro generico ---
   for (const chave of ["cpf", "email", "empresa"] as const) {
     const crm = estado[chave];
-    const cls = classificar(crm, valores[chave]);
-    if (cls) push(chave, "cadastro", crm, valores[chave], cls);
+    const cls = classificar(crm, flat[chave]);
+    if (cls) push(chave, "cadastro", crm, flat[chave], cls);
   }
 
   // --- Endereco (compara com o principal atual) ---
   for (const chave of CAMPOS_ENDERECO) {
     const crm = estado.endereco[chave];
-    const cls = classificar(crm, valores[chave]);
-    if (cls) push(chave, "endereco", crm, valores[chave], cls);
+    const cls = classificar(crm, flat[chave]);
+    if (cls) push(chave, "endereco", crm, flat[chave], cls);
   }
 
   // --- Nota fiscal (aditiva; exige data; idempotente pelo numero) ---
   let dataNF: string | null = null;
-  if (valores.notaFiscal !== null) {
-    const dataCrua = limpar(pedido?.dataNotaFiscal);
-    const dataOk = dataCrua && !Number.isNaN(new Date(dataCrua).getTime());
+  if (flat.notaFiscal !== null) {
+    const dataOk = dataNFbruta && !Number.isNaN(new Date(dataNFbruta).getTime());
     if (!dataOk) {
       avisos.push(
-        `Nota fiscal ${valores.notaFiscal} encontrada na loja, mas sem data — nao sincronizavel (a data e o relogio da garantia).`,
+        `Nota fiscal ${flat.notaFiscal} recebida, mas sem data valida — nao sincronizavel (a data e o relogio da garantia).`,
       );
-    } else if (estado.numerosNF.includes(valores.notaFiscal)) {
-      push("notaFiscal", "nota", valores.notaFiscal, valores.notaFiscal, "igual");
+    } else if (estado.numerosNF.includes(flat.notaFiscal)) {
+      push("notaFiscal", "nota", flat.notaFiscal, flat.notaFiscal, "igual");
     } else {
-      dataNF = dataCrua;
-      push("notaFiscal", "nota", null, valores.notaFiscal, "preencher");
+      dataNF = dataNFbruta;
+      push("notaFiscal", "nota", null, flat.notaFiscal, "preencher");
     }
   }
 
   // --- Rastreio (exige negocio; idempotente pelo codigo) ---
-  if (valores.codigoRastreio !== null) {
+  if (flat.codigoRastreio !== null) {
     if (estado.codigosRastreio === null) {
       avisos.push(
-        `Codigo de rastreio ${valores.codigoRastreio} encontrado na loja, mas nao ha negocio para vincula-lo.`,
+        `Codigo de rastreio ${flat.codigoRastreio} recebido, mas nao ha negocio para vincula-lo.`,
       );
-    } else if (estado.codigosRastreio.includes(valores.codigoRastreio)) {
+    } else if (estado.codigosRastreio.includes(flat.codigoRastreio)) {
       push(
         "codigoRastreio",
         "rastreio",
-        valores.codigoRastreio,
-        valores.codigoRastreio,
+        flat.codigoRastreio,
+        flat.codigoRastreio,
         "igual",
       );
     } else {
-      push(
-        "codigoRastreio",
-        "rastreio",
-        null,
-        valores.codigoRastreio,
-        "preencher",
-      );
+      push("codigoRastreio", "rastreio", null, flat.codigoRastreio, "preencher");
     }
   }
 
   return {
-    pedidoUsado: pedido,
+    pedidoUsado: null,
     campos,
-    valores,
+    valores: flat,
     dataNF,
-    transportadora: valores.transportadora,
+    transportadora: flat.transportadora,
     avisos,
   };
+}
+
+// ===========================================================================
+// (a) OBTER valores da LOJA (uso interno). Escolhe o pedido, mapeia para
+// ValoresExternos e delega para a funcao pura acima (zero duplicacao).
+// ===========================================================================
+
+// Escolhe o pedido: por id, senao o mais recente (maior criadoEm).
+export function escolherPedido(
+  cliente: ClienteLoja,
+  pedidoId?: string | null,
+): PedidoLoja | null {
+  const pedidos = cliente.pedidos ?? [];
+  if (pedidos.length === 0) return null;
+  if (pedidoId) {
+    const achado = pedidos.find((p) => p.id === pedidoId);
+    if (achado) return achado;
+  }
+  return pedidos.reduce((mais, p) =>
+    new Date(p.criadoEm).getTime() > new Date(mais.criadoEm).getTime() ? p : mais,
+  );
+}
+
+function enderecoLojaCampo(
+  end: EnderecoLoja | null | undefined,
+  campo: (typeof CAMPOS_ENDERECO)[number],
+): string | null {
+  if (!end) return null;
+  if (campo === "uf") return limpar(end.uf ?? end.estado);
+  return limpar(end[campo]);
+}
+
+// Mapeia cliente+pedido da loja para ValoresExternos (pedido tem prioridade;
+// cliente e fallback).
+function externosDaLoja(
+  cliente: ClienteLoja,
+  pedido: PedidoLoja | null,
+): ValoresExternos {
+  const c = cliente.cliente;
+  const endereco: NonNullable<ValoresExternos["endereco"]> = {};
+  for (const campo of CAMPOS_ENDERECO) {
+    endereco[campo] =
+      enderecoLojaCampo(pedido?.endereco, campo) ??
+      enderecoLojaCampo(c?.endereco, campo);
+  }
+  return {
+    nome: c?.nome,
+    cpf: pedido?.cpf ?? c?.cpf,
+    email: c?.email,
+    empresa: c?.empresa,
+    endereco,
+    notaFiscal: pedido?.notaFiscal
+      ? { numero: pedido.notaFiscal, data: pedido.dataNotaFiscal ?? null }
+      : null,
+    rastreio: pedido?.codigoRastreio
+      ? {
+          codigo: pedido.codigoRastreio,
+          transportadora:
+            pedido.transportadora ?? pedido.rastreio?.transportadora ?? null,
+        }
+      : null,
+  };
+}
+
+// Entrada interna (rota antiga por leadId): obtem valores da Loja e classifica.
+export function analisar(
+  estado: EstadoCrm,
+  cliente: ClienteLoja,
+  pedidoId?: string | null,
+): Analise {
+  const pedido = escolherPedido(cliente, pedidoId);
+  const res = analisarValores(estado, externosDaLoja(cliente, pedido));
+  return { ...res, pedidoUsado: pedido };
 }
