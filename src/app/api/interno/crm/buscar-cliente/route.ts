@@ -11,7 +11,7 @@ import {
   naoAutorizadoInterno,
 } from "@/lib/internoAuth";
 import { nomeEfetivo } from "@/lib/cliente";
-import { normalizarTelefoneBR } from "@/lib/phone";
+import { variantesTelefoneBR } from "@/lib/phone";
 import { normalizarTexto } from "@/lib/format";
 import { StatusNeg } from "@/generated/prisma/enums";
 
@@ -81,12 +81,8 @@ export async function POST(req: NextRequest) {
     return jsonInterno({ erro: "informe telefone, cpf ou nome" }, 400);
   }
 
-  // Variantes de telefone: forma normalizada (55...) e digitos crus.
-  const telVariantes = telefone
-    ? [...new Set([normalizarTelefoneBR(telefone), telefone.replace(/\D/g, "")])].filter(
-        Boolean,
-      )
-    : [];
+  // Variantes de telefone: tolera 9o digito e DDI (com/sem 55, com/sem o 9).
+  const telVariantes = telefone ? variantesTelefoneBR(telefone) : [];
   // Variantes de CPF: como veio e so digitos.
   const cpfVariantes = cpf
     ? [...new Set([cpf, cpf.replace(/\D/g, "")])].filter(Boolean)
