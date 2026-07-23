@@ -52,8 +52,9 @@ export type ClienteLoja = {
         nome: string;
         email: string;
         telefone: string | null;
-        // Extensao Fatia AA (opcionais; fallback quando nao vem por pedido).
+        // Extensao Fatia AA/AD (opcionais; fallback quando nao vem por pedido).
         cpf?: string | null;
+        cnpj?: string | null;
         empresa?: string | null;
         endereco?: EnderecoLoja | null;
       }

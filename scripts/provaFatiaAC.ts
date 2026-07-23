@@ -18,6 +18,7 @@ const estado: EstadoCrm = {
   nomeEfetivo: "Fulano",
   temNomeReal: true,
   cpf: "12345678900",
+  cnpj: null,
   email: null,
   empresa: null,
   endereco: {

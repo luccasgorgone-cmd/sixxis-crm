@@ -12,13 +12,16 @@ import type { Prisma } from "@/generated/prisma/client";
 import { soDigitos, type Analise } from "./sincronizarLoja";
 import { dataSomenteDia } from "./data";
 
-const CADASTRO_LEAD: Record<string, "nomeManual" | "cpf" | "email" | "empresa"> =
-  {
-    nome: "nomeManual",
-    cpf: "cpf",
-    email: "email",
-    empresa: "empresa",
-  };
+const CADASTRO_LEAD: Record<
+  string,
+  "nomeManual" | "cpf" | "cnpj" | "email" | "empresa"
+> = {
+  nome: "nomeManual",
+  cpf: "cpf",
+  cnpj: "cnpj",
+  email: "email",
+  empresa: "empresa",
+};
 
 type CampoEnd =
   | "cep"

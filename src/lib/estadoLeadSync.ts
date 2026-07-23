@@ -19,6 +19,7 @@ export async function montarEstadoLead(
       nomeManual: true,
       telefone: true,
       cpf: true,
+      cnpj: true,
       email: true,
       empresa: true,
     },
@@ -63,6 +64,7 @@ export async function montarEstadoLead(
         lead.nome?.trim()
       ),
       cpf: lead.cpf ?? null,
+      cnpj: lead.cnpj ?? null,
       email: lead.email ?? null,
       empresa: lead.empresa ?? null,
       endereco: {

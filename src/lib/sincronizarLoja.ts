@@ -32,6 +32,7 @@ export type CampoSync = {
 export type ValoresExternos = {
   nome?: string | null;
   cpf?: string | null;
+  cnpj?: string | null;
   email?: string | null;
   empresa?: string | null;
   endereco?: {
@@ -68,6 +69,7 @@ export type EstadoCrm = {
   // distingue "CRM vazio" (preencher) de "CRM tem nome diferente" (conflito).
   temNomeReal: boolean;
   cpf: string | null;
+  cnpj: string | null;
   email: string | null;
   empresa: string | null;
   endereco: EnderecoCrm;
@@ -100,6 +102,7 @@ const CAMPOS_ENDERECO = [
 const ROTULOS: Record<string, string> = {
   nome: "Nome",
   cpf: "CPF",
+  cnpj: "CNPJ",
   email: "E-mail",
   empresa: "Empresa",
   cep: "CEP",
@@ -160,6 +163,7 @@ function flatDeExternos(v: ValoresExternos): {
   const flat: Record<string, string | null> = {
     nome: limpar(v.nome),
     cpf: limpar(v.cpf),
+    cnpj: limpar(v.cnpj),
     email: limpar(v.email),
     empresa: limpar(v.empresa),
     notaFiscal: limpar(v.notaFiscal?.numero),
@@ -217,8 +221,8 @@ export function analisarValores(
     }
   }
 
-  // --- Cadastro generico ---
-  for (const chave of ["cpf", "email", "empresa"] as const) {
+  // --- Cadastro generico (cpf/cnpj comparados por digitos via CHAVES_DIGITO) ---
+  for (const chave of ["cpf", "cnpj", "email", "empresa"] as const) {
     const crm = estado[chave];
     const cls = classificar(chave, crm, flat[chave]);
     if (cls) push(chave, "cadastro", crm, flat[chave], cls);
@@ -322,6 +326,7 @@ function externosDaLoja(
   return {
     nome: c?.nome,
     cpf: pedido?.cpf ?? c?.cpf,
+    cnpj: c?.cnpj,
     email: c?.email,
     empresa: c?.empresa,
     endereco,
