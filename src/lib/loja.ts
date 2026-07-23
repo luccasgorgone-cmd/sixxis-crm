@@ -15,6 +15,20 @@ export type ProdutoLoja = {
 };
 
 export type ItemPedidoLoja = { nome: string; qtd: number; preco: number };
+
+// Endereco entregue pela loja (checkout). Todos os campos OPCIONAIS: a loja pode
+// nao ter ainda (Fatia AA guarda cada um). uf/estado sao aceitos como sinonimos.
+export type EnderecoLoja = {
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  estado?: string | null;
+};
+
 export type PedidoLoja = {
   id: string;
   numero: string;
@@ -23,9 +37,27 @@ export type PedidoLoja = {
   criadoEm: string;
   itens: ItemPedidoLoja[];
   rastreio: { transportadora?: string; link?: string } | null;
+  // ---- Campos da extensao da loja (Fatia AA). OPCIONAIS: podem nao chegar ----
+  // Nunca assuma que existem; o preview so oferece o que vier preenchido.
+  cpf?: string | null;
+  endereco?: EnderecoLoja | null;
+  notaFiscal?: string | null;
+  dataNotaFiscal?: string | null;
+  codigoRastreio?: string | null;
+  transportadora?: string | null;
 };
 export type ClienteLoja = {
-  cliente: { nome: string; email: string; telefone: string | null } | null;
+  cliente:
+    | {
+        nome: string;
+        email: string;
+        telefone: string | null;
+        // Extensao Fatia AA (opcionais; fallback quando nao vem por pedido).
+        cpf?: string | null;
+        empresa?: string | null;
+        endereco?: EnderecoLoja | null;
+      }
+    | null;
   pedidos: PedidoLoja[];
   carrinho: ItemPedidoLoja[] | null;
 };
