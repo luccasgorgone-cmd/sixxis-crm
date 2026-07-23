@@ -379,19 +379,13 @@ export function PainelClienteInbox({
             <HistoricoCliente leadId={leadId} />
           </div>
 
-          {/* Loja (Fatia AA — paridade com o Kanban): cadastro/pedidos da loja +
-              botao "Trazer dados para o CRM". MESMO componente, sem duplicacao. */}
+          {/* Loja (paridade com o Kanban): cadastro/pedidos da loja para
+              consulta. MESMO componente, sem duplicacao. */}
           <div>
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
               Loja
             </h4>
-            <LojaCliente
-              telefone={cliente.telefone}
-              origem={cliente.origem}
-              leadId={leadId}
-              negocioId={negocioId}
-              onAtualizado={() => void carregarCliente()}
-            />
+            <LojaCliente telefone={cliente.telefone} origem={cliente.origem} />
           </div>
         </>
       )}
