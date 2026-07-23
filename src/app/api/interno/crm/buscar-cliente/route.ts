@@ -67,7 +67,7 @@ function ultimaInteracao(l: LeadBusca): Date {
 export async function POST(req: NextRequest) {
   if (!autorizarInterno(req)) return naoAutorizadoInterno();
 
-  let body: { telefone?: unknown; cpf?: unknown; nome?: unknown };
+  let body: { telefone?: unknown; cpf?: unknown; cnpj?: unknown; nome?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -76,21 +76,25 @@ export async function POST(req: NextRequest) {
 
   const telefone = limpar(body.telefone);
   const cpf = limpar(body.cpf);
+  const cnpj = limpar(body.cnpj);
   const nome = limpar(body.nome);
-  if (!telefone && !cpf && !nome) {
-    return jsonInterno({ erro: "informe telefone, cpf ou nome" }, 400);
+  if (!telefone && !cpf && !cnpj && !nome) {
+    return jsonInterno({ erro: "informe telefone, cpf, cnpj ou nome" }, 400);
   }
 
   // Variantes de telefone: tolera 9o digito e DDI (com/sem 55, com/sem o 9).
   const telVariantes = telefone ? variantesTelefoneBR(telefone) : [];
-  // Variantes de CPF: como veio e so digitos.
+  // Variantes de documento: como veio e so digitos.
   const cpfVariantes = cpf
     ? [...new Set([cpf, cpf.replace(/\D/g, "")])].filter(Boolean)
     : [];
+  const cnpjVariantes = cnpj
+    ? [...new Set([cnpj, cnpj.replace(/\D/g, "")])].filter(Boolean)
+    : [];
   const nomeTermo = nome ? normalizarTexto(nome) : "";
 
-  // Rank de relevancia por origem do match: telefone 0, cpf 1, nome 2.
-  const [porTelefone, porCpf, porNome] = await Promise.all([
+  // Rank de relevancia: telefone 0, documento (cpf OU cnpj) 1, nome 2.
+  const [porTelefone, porCpf, porCnpj, porNome] = await Promise.all([
     telVariantes.length
       ? prisma.lead.findMany({
           where: { telefone: { in: telVariantes } },
@@ -105,6 +109,13 @@ export async function POST(req: NextRequest) {
           take: 10,
         })
       : Promise.resolve([]),
+    cnpjVariantes.length
+      ? prisma.lead.findMany({
+          where: { cnpj: { in: cnpjVariantes } },
+          select: SELECT,
+          take: 10,
+        })
+      : Promise.resolve([]),
     nomeTermo
       ? prisma.lead.findMany({
           where: { nomeBusca: { contains: nomeTermo } },
@@ -114,7 +125,7 @@ export async function POST(req: NextRequest) {
       : Promise.resolve([]),
   ]);
 
-  // Merge mantendo o MENOR rank por lead (match mais forte vence).
+  // Merge mantendo o MENOR rank por lead (match mais forte vence; sem duplicar).
   const porId = new Map<string, { lead: LeadBusca; rank: number }>();
   const juntar = (leads: LeadBusca[], rank: number) => {
     for (const lead of leads) {
@@ -124,6 +135,7 @@ export async function POST(req: NextRequest) {
   };
   juntar(porTelefone as LeadBusca[], 0);
   juntar(porCpf as LeadBusca[], 1);
+  juntar(porCnpj as LeadBusca[], 1);
   juntar(porNome as LeadBusca[], 2);
 
   const candidatos = [...porId.values()]
