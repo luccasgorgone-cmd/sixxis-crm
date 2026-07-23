@@ -10,6 +10,7 @@ import { getIO } from "./socket";
 import { AtividadeTipo } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import { soDigitos, type Analise } from "./sincronizarLoja";
+import { dataSomenteDia } from "./data";
 
 const CADASTRO_LEAD: Record<string, "nomeManual" | "cpf" | "email" | "empresa"> =
   {
@@ -99,6 +100,8 @@ export async function aplicarSincronizacao(params: {
     // --- Nota fiscal (aditiva; exige data; idempotente pelo numero) ---
     if (pedidas.has("notaFiscal")) {
       const numero = analise.valores.notaFiscal;
+      // Data ancorada ao meio-dia UTC (nao desloca no fuso — relogio da garantia).
+      const dataNFDia = dataSomenteDia(analise.dataNF);
       if (!numero) {
         pulados.push({ chave: "notaFiscal", motivo: "sem numero de NF" });
       } else {
@@ -111,7 +114,7 @@ export async function aplicarSincronizacao(params: {
             chave: "notaFiscal",
             motivo: "NF ja registrada para o cliente",
           });
-        } else if (!analise.dataNF) {
+        } else if (!dataNFDia) {
           pulados.push({ chave: "notaFiscal", motivo: "sem data da NF" });
         } else {
           await tx.notaFiscal.create({
@@ -119,7 +122,7 @@ export async function aplicarSincronizacao(params: {
               leadId,
               negocioId: negocio.id,
               numero,
-              dataNF: new Date(analise.dataNF),
+              dataNF: dataNFDia,
               agenteId: autor.agenteId,
             },
           });

@@ -6,6 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeGerenciarLead } from "@/lib/autorizacao";
 import { formatarNumeroPedido } from "@/lib/format";
+import { dataSomenteDia } from "@/lib/data";
 import { registrarAtividade } from "@/lib/atividade";
 import { AtividadeTipo } from "@/generated/prisma/enums";
 
@@ -74,8 +75,10 @@ export async function POST(
     return NextResponse.json({ erro: "Numero da NF e obrigatorio." }, { status: 400 });
   }
 
-  const dataNF = body.dataNF != null ? new Date(String(body.dataNF)) : null;
-  if (!dataNF || Number.isNaN(dataNF.getTime())) {
+  // Data "so dia" ancorada ao meio-dia UTC (nao desloca no fuso BR — a NF e o
+  // relogio da garantia). Ponto unico: lib/data.
+  const dataNF = dataSomenteDia(body.dataNF as string | null | undefined);
+  if (!dataNF) {
     return NextResponse.json({ erro: "Data da NF invalida." }, { status: 400 });
   }
 
