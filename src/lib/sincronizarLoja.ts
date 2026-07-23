@@ -39,7 +39,10 @@ export type EnderecoCrm = {
 // entao nem e oferecido).
 export type EstadoCrm = {
   nomeEfetivo: string;
-  temNomeManual: boolean;
+  // Ha QUALQUER nome real no CRM (nomeManual || pushName || nome)? nomeEfetivo
+  // cai no telefone quando nao ha nome, entao nunca e vazio; este flag e o que
+  // distingue "CRM vazio" (preencher) de "CRM tem nome diferente" (conflito).
+  temNomeReal: boolean;
   cpf: string | null;
   email: string | null;
   empresa: string | null;
@@ -190,14 +193,18 @@ export function analisar(
     });
   };
 
-  // --- Nome (especial: nomeManual = curadoria -> conflito) ---
+  // --- Nome ---
+  // "preencher" = CRM VAZIO (sem nome real: nem nomeManual, nem pushName, nem
+  // nome). Se ha QUALQUER nome real e ele difere do da loja -> "conflito"
+  // (desmarcado, "vai substituir"), seja pushName do WhatsApp ou nomeManual
+  // curado pelo atendente. Nunca sobrescrever nome existente sem opt-in.
   if (valores.nome !== null) {
     if (iguais(estado.nomeEfetivo, valores.nome)) {
       push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "igual");
-    } else if (estado.temNomeManual) {
-      push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "conflito");
-    } else {
+    } else if (!estado.temNomeReal) {
       push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "preencher");
+    } else {
+      push("nome", "cadastro", estado.nomeEfetivo, valores.nome, "conflito");
     }
   }
 

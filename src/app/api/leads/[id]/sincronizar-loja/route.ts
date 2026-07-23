@@ -82,7 +82,11 @@ async function montarEstado(
     telefone: lead.telefone,
     estado: {
       nomeEfetivo: nomeEfetivo(lead),
-      temNomeManual: !!lead.nomeManual?.trim(),
+      temNomeReal: !!(
+        lead.nomeManual?.trim() ||
+        lead.pushName?.trim() ||
+        lead.nome?.trim()
+      ),
       cpf: lead.cpf ?? null,
       email: lead.email ?? null,
       empresa: lead.empresa ?? null,
