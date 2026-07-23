@@ -34,7 +34,12 @@ export type ValoresExternos = {
   cpf?: string | null;
   cnpj?: string | null;
   email?: string | null;
+  // Empresa DO CLIENTE (texto livre -> Lead.empresa). NUNCA e a empresa que
+  // fatura (Lead.empresaFaturadaId), que esta fora do escopo desta sincronizacao.
   empresa?: string | null;
+  // Razao social do cadastro PJ. Mapeia para Lead.empresa e TEM PRECEDENCIA sobre
+  // `empresa` quando ambos vierem (e o dado formal do cadastro PJ).
+  razaoSocial?: string | null;
   endereco?: {
     cep?: string | null;
     logradouro?: string | null;
@@ -165,7 +170,8 @@ function flatDeExternos(v: ValoresExternos): {
     cpf: limpar(v.cpf),
     cnpj: limpar(v.cnpj),
     email: limpar(v.email),
-    empresa: limpar(v.empresa),
+    // razaoSocial tem precedencia sobre empresa (dado formal do cadastro PJ).
+    empresa: limpar(v.razaoSocial) ?? limpar(v.empresa),
     notaFiscal: limpar(v.notaFiscal?.numero),
     codigoRastreio: limpar(v.rastreio?.codigo),
     transportadora: limpar(v.rastreio?.transportadora),
