@@ -21,6 +21,7 @@ import {
   avisarOrcamentosAtualizados,
 } from "@/components/pecas/BlocoOrcamento";
 import { HistoricoCliente } from "@/components/cliente/HistoricoCliente";
+import { LojaCliente } from "@/components/loja/LojaCliente";
 import {
   BlocoAcompanhamento,
   BlocoRastreio,
@@ -376,6 +377,21 @@ export function PainelClienteInbox({
               Historico
             </h4>
             <HistoricoCliente leadId={leadId} />
+          </div>
+
+          {/* Loja (Fatia AA — paridade com o Kanban): cadastro/pedidos da loja +
+              botao "Trazer dados para o CRM". MESMO componente, sem duplicacao. */}
+          <div>
+            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-medio/50">
+              Loja
+            </h4>
+            <LojaCliente
+              telefone={cliente.telefone}
+              origem={cliente.origem}
+              leadId={leadId}
+              negocioId={negocioId}
+              onAtualizado={() => void carregarCliente()}
+            />
           </div>
         </>
       )}
