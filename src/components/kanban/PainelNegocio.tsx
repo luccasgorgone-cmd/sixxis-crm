@@ -619,6 +619,12 @@ export function PainelNegocio({
                       telefone={detalhe.cliente.telefone}
                       origem={detalhe.cliente.origem}
                       ehAdmin={ehAdmin}
+                      leadId={detalhe.cliente.id}
+                      negocioId={negocioId}
+                      onAtualizado={() => {
+                        void carregar();
+                        onAtualizado();
+                      }}
                     />
                   )}
                   {subAba === "notas" && (

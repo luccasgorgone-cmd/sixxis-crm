@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { formatarBRL } from "@/lib/format";
 import type { ClienteLoja, PedidoLoja } from "./tipos";
+import { BotaoSincronizarLoja } from "./BotaoSincronizarLoja";
 
 const COR_STATUS: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-700",
@@ -43,10 +44,18 @@ export function LojaCliente({
   telefone,
   origem,
   ehAdmin = false,
+  leadId,
+  negocioId,
+  onAtualizado,
 }: {
   telefone: string;
   origem?: string | null;
   ehAdmin?: boolean;
+  // Fatia AA: quando presente, habilita o botao "Trazer dados para o CRM".
+  // Ausente (ex.: supervisao read-only) -> so leitura, sem sincronizacao.
+  leadId?: string;
+  negocioId?: string | null;
+  onAtualizado?: () => void;
 }) {
   const [dados, setDados] = useState<ClienteLoja | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -112,6 +121,16 @@ export function LojaCliente({
 
   return (
     <div className="space-y-5">
+      {/* Sincronizacao (Fatia AA): botao + modal de conferencia. So quando ha
+          leadId (painel editavel); supervisao read-only nao passa leadId. */}
+      {leadId && (
+        <BotaoSincronizarLoja
+          leadId={leadId}
+          negocioId={negocioId}
+          onAtualizado={onAtualizado}
+        />
+      )}
+
       {/* Cadastro */}
       <Secao titulo="Cliente na loja">
         {cliente ? (
