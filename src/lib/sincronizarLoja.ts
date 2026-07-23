@@ -127,16 +127,28 @@ function iguais(a: string | null, b: string | null): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+// So os digitos de um texto (para comparar/gravar documentos sem mascara).
+export function soDigitos(v: string | null | undefined): string {
+  return (v ?? "").replace(/\D/g, "");
+}
+
+// Campos comparados por CONTEUDO (so digitos), nao por formatacao: CPF/CNPJ/CEP.
+// "123.456.789-00" e "12345678900" sao o MESMO valor -> "igual", nao "conflito".
+const CHAVES_DIGITO = new Set(["cpf", "cnpj", "cep"]);
+
 // Classificacao generica (preencher/conflito/igual) a partir de crm x loja.
 // Retorna null quando a loja nao tem valor (campo nem entra na lista).
 function classificar(
+  chave: string,
   valorCrm: string | null,
   valorLoja: string | null,
 ): Classificacao | null {
   if (valorLoja === null) return null;
   if (valorCrm === null) return "preencher";
-  if (iguais(valorCrm, valorLoja)) return "igual";
-  return "conflito";
+  const mesmo = CHAVES_DIGITO.has(chave)
+    ? soDigitos(valorCrm) === soDigitos(valorLoja)
+    : iguais(valorCrm, valorLoja);
+  return mesmo ? "igual" : "conflito";
 }
 
 // Achata ValoresExternos no mapa por chave usado pela classificacao/aplicacao,
@@ -208,14 +220,14 @@ export function analisarValores(
   // --- Cadastro generico ---
   for (const chave of ["cpf", "email", "empresa"] as const) {
     const crm = estado[chave];
-    const cls = classificar(crm, flat[chave]);
+    const cls = classificar(chave, crm, flat[chave]);
     if (cls) push(chave, "cadastro", crm, flat[chave], cls);
   }
 
   // --- Endereco (compara com o principal atual) ---
   for (const chave of CAMPOS_ENDERECO) {
     const crm = estado.endereco[chave];
-    const cls = classificar(crm, flat[chave]);
+    const cls = classificar(chave, crm, flat[chave]);
     if (cls) push(chave, "endereco", crm, flat[chave], cls);
   }
 

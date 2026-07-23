@@ -9,7 +9,7 @@ import { registrarAtividade } from "./atividade";
 import { getIO } from "./socket";
 import { AtividadeTipo } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
-import type { Analise } from "./sincronizarLoja";
+import { soDigitos, type Analise } from "./sincronizarLoja";
 
 const CADASTRO_LEAD: Record<string, "nomeManual" | "cpf" | "email" | "empresa"> =
   {
@@ -60,7 +60,10 @@ export async function aplicarSincronizacao(params: {
       const campo = porChave.get(chave);
       if (!campo || campo.classificacao === "igual") continue;
       const valor = analise.valores[chave] ?? null;
-      (leadData as Record<string, unknown>)[CADASTRO_LEAD[chave]] = valor;
+      // CPF/CNPJ gravados canonicos (so digitos); a mascara e so de apresentacao.
+      const canon =
+        (chave === "cpf" || chave === "cnpj") && valor ? soDigitos(valor) : valor;
+      (leadData as Record<string, unknown>)[CADASTRO_LEAD[chave]] = canon;
       if (chave === "nome") nomeAplicado = true;
       aplicados.push(chave);
     }
@@ -73,7 +76,10 @@ export async function aplicarSincronizacao(params: {
     for (const campo of analise.campos) {
       if (campo.grupo !== "endereco") continue;
       if (!pedidas.has(campo.chave) || campo.classificacao === "igual") continue;
-      endData[campo.chave as CampoEnd] = analise.valores[campo.chave] ?? null;
+      const val = analise.valores[campo.chave] ?? null;
+      // CEP gravado canonico (so digitos); mascara e so de apresentacao.
+      endData[campo.chave as CampoEnd] =
+        campo.chave === "cep" && val ? soDigitos(val) : val;
       aplicados.push(campo.chave);
     }
     if (Object.keys(endData).length > 0) {
