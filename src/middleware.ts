@@ -32,8 +32,14 @@ export default auth((req) => {
   );
   if (ehPublica) return NextResponse.next();
 
-  // Deslogado: manda para o login guardando para onde queria ir.
+  // Deslogado. Uma rota de API nunca deve responder com redirect de pagina: o
+  // consumidor seguiria o redirect e receberia o HTML do /login com status 200,
+  // transformando erro de autenticacao em resposta ilegivel e silenciosa. Para
+  // /api/* respondemos 401 JSON; paginas continuam indo para /login.
   if (!req.auth) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
+    }
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
