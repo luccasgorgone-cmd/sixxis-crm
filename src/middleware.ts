@@ -14,6 +14,14 @@ const ROTAS_PUBLICAS = [
   "/api/auth",
   "/api/webhook/evolution",
   "/api/health",
+  // Rotas maquina-a-maquina do CRM (servidor da Loja, sem cookie de sessao).
+  // Publicas aqui porque a autenticacao delas e o header x-internal-key com
+  // timingSafeEqual (mesma abordagem do webhook da Evolution), que para
+  // chamadas server-to-server e mais forte que sessao de navegador. NAO liberar
+  // "/api/interno" inteiro: /api/interno/grupos e o chat da equipe e depende da
+  // sessao. So o prefixo "/api/interno/crm". A checagem abaixo (pathname === p
+  // || startsWith(`${p}/`)) ja cobre buscar-cliente, previa e aplicar.
+  "/api/interno/crm",
 ];
 
 export default auth((req) => {
