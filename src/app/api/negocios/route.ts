@@ -20,51 +20,16 @@ import { janelaDeParams } from "@/lib/metricas";
 import { compararPin } from "@/lib/ordenacao";
 import { normalizarTexto } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
+import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
 import {
-  Temperatura,
-  Finalidade,
-  FinalidadeEtapa,
-  TipoEtapa,
-} from "@/generated/prisma/enums";
+  TETO_FIXADAS,
+  ordemDaEtapa,
+  particoesFixadas,
+  lerPaginacao,
+} from "@/lib/paginacaoKanban";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Cards carregados por coluna a cada lote. O cabecalho segue mostrando o TOTAL
-// real (resumo), entao limitar a lista nao esconde tamanho de funil.
-const LIMITE_PADRAO = 50;
-const LIMITE_MAX = 100;
-// Teto das fixadas trazidas de uma vez (elas nao consomem a cota do lote). Pin e
-// acao manual e rara; o teto so existe para nao virar carga ilimitada.
-const TETO_FIXADAS = 200;
-
-// Ordenacao DETERMINISTICA da coluna (o "carregar mais" nao repete nem pula):
-// terminais pelo fechamento, ativas pela entrada na etapa; desempate por id desc.
-function ordemDaEtapa(tipo: TipoEtapa): Prisma.NegocioOrderByWithRelationInput[] {
-  if (tipo === TipoEtapa.GANHO || tipo === TipoEtapa.PERDIDO) {
-    return [
-      { fechadoEm: { sort: "desc", nulls: "last" } },
-      { atualizadoEm: "desc" },
-      { id: "desc" },
-    ];
-  }
-  return [{ entrouEtapaEm: "desc" }, { id: "desc" }];
-}
-
-// "Card fixado" = o lead tem conversa nao arquivada, da MESMA finalidade do
-// negocio, com fixadaEm != null (e a regra que `cardNegocio` usa para o pin).
-// Prisma nao correlaciona negocio.finalidade com conversa.finalidade, entao
-// abrimos um ramo por finalidade visivel (1 ou 2) — o OR fica exato.
-function ramosFixadas(finalidades: Finalidade[]): Prisma.NegocioWhereInput[] {
-  return finalidades.map((f) => ({
-    finalidade: f,
-    lead: {
-      conversas: {
-        some: { arquivada: false, finalidade: f, fixadaEm: { not: null } },
-      },
-    },
-  }));
-}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -172,18 +137,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // Paginacao (Fatia Q): tamanho do lote e cursor por deslocamento.
   const etapaIdParam = sp.get("etapaId") ?? "";
-  const offset = Math.max(0, Math.trunc(Number(sp.get("offset") ?? 0)) || 0);
-  const limiteBruto = Math.trunc(Number(sp.get("limite") ?? LIMITE_PADRAO));
-  const limite = Number.isFinite(limiteBruto)
-    ? Math.min(LIMITE_MAX, Math.max(1, limiteBruto || LIMITE_PADRAO))
-    : LIMITE_PADRAO;
-
-  const fixadas = ramosFixadas(finalidades);
-  // Uma coluna = as FIXADAS (topo, fora da cota) + o fluxo das NAO FIXADAS, que
-  // e o unico paginado. Os conjuntos sao disjuntos: o "carregar mais" nunca
-  // devolve um card que ja esta na tela.
-  const soFixadas: Prisma.NegocioWhereInput = { OR: fixadas };
-  const semFixadas: Prisma.NegocioWhereInput = { NOT: { OR: fixadas } };
+  const { offset, limite } = lerPaginacao(sp);
+  const { soFixadas, semFixadas } = particoesFixadas(finalidades);
 
   // ---- MODO COLUNA: proxima pagina de UMA etapa (botao "Carregar mais") ----
   if (etapaIdParam) {
