@@ -49,6 +49,9 @@ type Pendente = {
 
 // Resumo agregado por etapa vindo da rota (Fatia P).
 type ResumoEtapa = { total: number; somaValor: number };
+// Cursor de paginacao por etapa (Fatia Q). `offset` conta as NAO FIXADAS ja
+// carregadas — e o que a rota espera de volta no "carregar mais".
+type PaginaEtapa = { offset: number; temMais: boolean; carregados: number };
 
 export function Kanban({
   papel,
@@ -79,6 +82,11 @@ export function Kanban({
   const [colunas, setColunas] = useState<Record<string, Card[]>>({});
   // Resumo por etapa (Fatia P): total (COUNT) e somaValor (SUM) do banco.
   const [resumo, setResumo] = useState<Record<string, ResumoEtapa>>({});
+  // Paginacao por etapa (Fatia Q) + quais colunas estao buscando o proximo lote.
+  const [paginacao, setPaginacao] = useState<Record<string, PaginaEtapa>>({});
+  const [carregandoMais, setCarregandoMais] = useState<Record<string, boolean>>(
+    {},
+  );
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -157,6 +165,11 @@ export function Kanban({
       // Resumo por etapa (Fatia P): total e somaValor do banco, para o cabecalho
       // da coluna nao depender dos cards carregados.
       setResumo((d.resumo as Record<string, ResumoEtapa>) ?? {});
+      // Fatia Q: o quadro volta ao PRIMEIRO lote de cada coluna. Recarregar
+      // (troca de filtro, evento de tempo real, volta do foco) reinicia os
+      // cursores — quem tinha expandido uma coluna clica de novo.
+      setPaginacao((d.paginacao as Record<string, PaginaEtapa>) ?? {});
+      setCarregandoMais({});
       setErro(null);
     } catch {
       setErro("Nao foi possivel carregar o quadro.");
@@ -164,6 +177,50 @@ export function Kanban({
       setCarregando(false);
     }
   }, [query]);
+
+  // "Carregar mais" de UMA coluna: pede o proximo lote de nao fixadas mantendo
+  // TODOS os filtros ativos (mesmo `query` do quadro) e anexa ao fim da coluna.
+  const carregarMais = useCallback(
+    async (etapaId: string) => {
+      const pagina = paginacao[etapaId];
+      if (!pagina?.temMais || carregandoMais[etapaId]) return;
+      setCarregandoMais((p) => ({ ...p, [etapaId]: true }));
+      try {
+        const r = await fetch(
+          `/api/negocios?${query}&etapaId=${encodeURIComponent(etapaId)}&offset=${pagina.offset}`,
+        );
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        const novos = (d.cards ?? []) as Card[];
+        // Cinto-e-suspensorio: se um card mudou de etapa entre os dois fetches,
+        // o deslocamento poderia repeti-lo — o id ja na coluna manda.
+        setColunas((prev) => {
+          const atuais = prev[etapaId] ?? [];
+          const vistos = new Set(atuais.map((c) => c.id));
+          return {
+            ...prev,
+            [etapaId]: [...atuais, ...novos.filter((c) => !vistos.has(c.id))],
+          };
+        });
+        setPaginacao((prev) => {
+          const p = prev[etapaId];
+          return {
+            ...prev,
+            [etapaId]: {
+              offset: Number(d.offset ?? (p?.offset ?? 0) + novos.length),
+              temMais: Boolean(d.temMais),
+              carregados: (p?.carregados ?? 0) + novos.length,
+            },
+          };
+        });
+      } catch {
+        toast.erro("Nao foi possivel carregar mais cards.");
+      } finally {
+        setCarregandoMais((p) => ({ ...p, [etapaId]: false }));
+      }
+    },
+    [paginacao, carregandoMais, query, toast],
+  );
 
   useEffect(() => {
     void carregar();
@@ -368,18 +425,20 @@ export function Kanban({
   // busca/temperatura/etiqueta. Sem filtragem client-side (uma fonte de verdade).
   const colunasFiltradas = colunas;
 
-  // Total de cards carregados (ja filtrados por periodo/finalidade no servidor)
-  // — contador do periodo mostrado na barra de filtros.
+  // Contador do periodo na barra de filtros. Fatia Q: soma os TOTAIS do resumo
+  // (banco), nao os cards carregados — com paginacao, `colunas` mostraria ~350
+  // onde existem 1.653.
   const totalCards = useMemo(
-    () => Object.values(colunas).reduce((s, c) => s + c.length, 0),
-    [colunas],
+    () => Object.values(resumo).reduce((s, r) => s + r.total, 0),
+    [resumo],
   );
 
   const temFiltro = Boolean(buscaAplicada.trim() || temperatura || etiquetaId);
   // Com filtros no servidor, `colunas` ja e o conjunto filtrado. Distinguimos
   // board vazio (sem filtro) de "nenhum resultado" (com filtro) pelo temFiltro.
-  const boardVazio =
-    !carregando && !erro && Object.values(colunas).every((c) => c.length === 0);
+  // Vazio tambem se decide pelo resumo: uma coluna pode estar sem cards na tela
+  // e cheia no banco.
+  const boardVazio = !carregando && !erro && totalCards === 0;
   const vazioReal = boardVazio && !temFiltro;
   const semResultado = boardVazio && temFiltro;
 
@@ -532,6 +591,9 @@ export function Kanban({
                               titulo: "Atribuir sem dono",
                             })
                           }
+                          temMais={paginacao[etapa.id]?.temMais ?? false}
+                          carregandoMais={carregandoMais[etapa.id] ?? false}
+                          onCarregarMais={() => void carregarMais(etapa.id)}
                         />
                       ))}
                     </div>
@@ -564,6 +626,9 @@ export function Kanban({
                       titulo: "Atribuir sem dono",
                     })
                   }
+                  temMais={paginacao[etapa.id]?.temMais ?? false}
+                  carregandoMais={carregandoMais[etapa.id] ?? false}
+                  onCarregarMais={() => void carregarMais(etapa.id)}
                 />
               ))}
             </div>

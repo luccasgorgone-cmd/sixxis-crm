@@ -2,12 +2,15 @@
 
 // Coluna do Kanban = uma etapa. Area de soltar (droppable) com header colorido,
 // contagem e soma de valor. Na coluna de ENTRADA (Novo), mostra um botao para
-// atribuir em massa os cards sem dono.
+// atribuir em massa os cards sem dono. Fatia Q: a lista e paginada (50 por lote)
+// com rodape "Carregar mais" — o cabecalho continua mostrando o total REAL.
 import { useDroppable } from "@dnd-kit/core";
 import { UserPlus } from "lucide-react";
 import type { Etapa, CardNegocio as Card } from "./tipos";
 import { CardNegocio } from "./CardNegocio";
 import { formatarBRL } from "@/lib/format";
+
+const nf = new Intl.NumberFormat("pt-BR");
 
 export function ColunaKanban({
   etapa,
@@ -20,6 +23,9 @@ export function ColunaKanban({
   onAtribuir,
   ehEntrada = false,
   onAtribuirMassa,
+  temMais = false,
+  carregandoMais = false,
+  onCarregarMais,
 }: {
   etapa: Etapa;
   cards: Card[];
@@ -34,6 +40,10 @@ export function ColunaKanban({
   onAtribuir?: (card: Card) => void;
   ehEntrada?: boolean;
   onAtribuirMassa?: (negocioIds: string[]) => void;
+  // Fatia Q: ha mais cards no banco alem dos carregados nesta coluna.
+  temMais?: boolean;
+  carregandoMais?: boolean;
+  onCarregarMais?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
   // Contador e soma vem do resumo (banco). Fallback ao carregado so se o resumo
@@ -70,7 +80,10 @@ export function ColunaKanban({
           className="mb-2 flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-tiffany/40 bg-tiffany/5 px-2 py-1.5 text-xs font-medium text-tiffany transition-colors hover:bg-tiffany/10"
         >
           <UserPlus className="h-3.5 w-3.5" />
-          Atribuir sem dono ({semDono.length})
+          {/* Sob paginacao a acao so alcanca os cards CARREGADOS — o rotulo diz
+              isso em vez de sugerir que limpou a coluna inteira. */}
+          Atribuir sem dono ({semDono.length}
+          {temMais ? " na tela" : ""})
         </button>
       )}
 
@@ -96,6 +109,26 @@ export function ColunaKanban({
           ))
         )}
       </div>
+
+      {/* Rodape FIXO (fora da area rolavel): o botao nao se move conforme a lista
+          cresce e a troca do rotulo por "Carregando..." nao empurra nada — a
+          altura e a mesma nos dois estados. Fatia Q. */}
+      {temMais && (
+        <div className="mt-2 shrink-0">
+          <button
+            onClick={onCarregarMais}
+            disabled={carregandoMais}
+            className="flex h-8 w-full items-center justify-center rounded-lg border border-black/10 bg-white text-xs font-medium text-medio transition-colors hover:border-tiffany/40 hover:text-tiffany disabled:cursor-default disabled:opacity-60 disabled:hover:border-black/10 disabled:hover:text-medio"
+          >
+            {carregandoMais ? "Carregando..." : "Carregar mais"}
+          </button>
+          {/* Indicacao honesta: quantos estao na tela de quantos existem no banco
+              (total do resumo, nao da lista carregada). */}
+          <p className="pt-1 text-center text-[11px] text-medio/50">
+            Mostrando {nf.format(cards.length)} de {nf.format(total)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
