@@ -1,6 +1,17 @@
 // Lista os negocios para o Kanban, agrupados por etapa, filtrados por papel.
 // VENDEDOR/POS_VENDA: somente os proprios. ADMIN: todos, com filtro
 // meus|todos|sem_dono e agenteId opcional.
+//
+// Fatia Q — PAGINACAO POR COLUNA. Dois modos, MESMO `where` (fonte unica: os
+// filtros valem igual no primeiro lote e no "carregar mais"):
+//   1) QUADRO   GET /api/negocios?<filtros>
+//      -> { etapas, colunas, resumo, paginacao }
+//      Cada coluna traz as FIXADAS (pin, Fatia Y) + ate `limite` nao fixadas.
+//   2) COLUNA   GET /api/negocios?<filtros>&etapaId=<id>&offset=<n>[&limite=50]
+//      -> { cards, offset, total, temMais }
+//      Proxima pagina das NAO FIXADAS daquela coluna (as fixadas ja vieram no
+//      quadro e nunca se repetem aqui — os dois conjuntos sao disjuntos).
+// O cabecalho da coluna NUNCA usa esta lista: total/soma vem de `resumo` (Fatia P).
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
@@ -9,10 +20,51 @@ import { janelaDeParams } from "@/lib/metricas";
 import { compararPin } from "@/lib/ordenacao";
 import { normalizarTexto } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
-import { Temperatura, Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
+import {
+  Temperatura,
+  Finalidade,
+  FinalidadeEtapa,
+  TipoEtapa,
+} from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Cards carregados por coluna a cada lote. O cabecalho segue mostrando o TOTAL
+// real (resumo), entao limitar a lista nao esconde tamanho de funil.
+const LIMITE_PADRAO = 50;
+const LIMITE_MAX = 100;
+// Teto das fixadas trazidas de uma vez (elas nao consomem a cota do lote). Pin e
+// acao manual e rara; o teto so existe para nao virar carga ilimitada.
+const TETO_FIXADAS = 200;
+
+// Ordenacao DETERMINISTICA da coluna (o "carregar mais" nao repete nem pula):
+// terminais pelo fechamento, ativas pela entrada na etapa; desempate por id desc.
+function ordemDaEtapa(tipo: TipoEtapa): Prisma.NegocioOrderByWithRelationInput[] {
+  if (tipo === TipoEtapa.GANHO || tipo === TipoEtapa.PERDIDO) {
+    return [
+      { fechadoEm: { sort: "desc", nulls: "last" } },
+      { atualizadoEm: "desc" },
+      { id: "desc" },
+    ];
+  }
+  return [{ entrouEtapaEm: "desc" }, { id: "desc" }];
+}
+
+// "Card fixado" = o lead tem conversa nao arquivada, da MESMA finalidade do
+// negocio, com fixadaEm != null (e a regra que `cardNegocio` usa para o pin).
+// Prisma nao correlaciona negocio.finalidade com conversa.finalidade, entao
+// abrimos um ramo por finalidade visivel (1 ou 2) — o OR fica exato.
+function ramosFixadas(finalidades: Finalidade[]): Prisma.NegocioWhereInput[] {
+  return finalidades.map((f) => ({
+    finalidade: f,
+    lead: {
+      conversas: {
+        some: { arquivada: false, finalidade: f, fixadaEm: { not: null } },
+      },
+    },
+  }));
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
@@ -118,29 +170,98 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     finalidadeEtapas.push(FinalidadeEtapa.POS_VENDA);
   }
 
+  // Paginacao (Fatia Q): tamanho do lote e cursor por deslocamento.
+  const etapaIdParam = sp.get("etapaId") ?? "";
+  const offset = Math.max(0, Math.trunc(Number(sp.get("offset") ?? 0)) || 0);
+  const limiteBruto = Math.trunc(Number(sp.get("limite") ?? LIMITE_PADRAO));
+  const limite = Number.isFinite(limiteBruto)
+    ? Math.min(LIMITE_MAX, Math.max(1, limiteBruto || LIMITE_PADRAO))
+    : LIMITE_PADRAO;
+
+  const fixadas = ramosFixadas(finalidades);
+  // Uma coluna = as FIXADAS (topo, fora da cota) + o fluxo das NAO FIXADAS, que
+  // e o unico paginado. Os conjuntos sao disjuntos: o "carregar mais" nunca
+  // devolve um card que ja esta na tela.
+  const soFixadas: Prisma.NegocioWhereInput = { OR: fixadas };
+  const semFixadas: Prisma.NegocioWhereInput = { NOT: { OR: fixadas } };
+
+  // ---- MODO COLUNA: proxima pagina de UMA etapa (botao "Carregar mais") ----
+  if (etapaIdParam) {
+    const etapa = await prisma.etapa.findFirst({
+      where: {
+        id: etapaIdParam,
+        ativo: true,
+        finalidade: { in: finalidadeEtapas },
+      },
+      select: { id: true, tipo: true },
+    });
+    if (!etapa) {
+      return NextResponse.json({ erro: "etapa nao encontrada" }, { status: 404 });
+    }
+
+    const daEtapa: Prisma.NegocioWhereInput = {
+      AND: [where, { etapaId: etapa.id }],
+    };
+    // take = limite + 1: a linha extra diz se ha proxima pagina sem um COUNT
+    // adicional (e sem prometer botao quando o resto e exatamente zero).
+    const [linhas, total] = await Promise.all([
+      prisma.negocio.findMany({
+        where: { AND: [daEtapa, semFixadas] },
+        include: includeCard,
+        orderBy: ordemDaEtapa(etapa.tipo),
+        skip: offset,
+        take: limite + 1,
+      }),
+      prisma.negocio.count({ where: daEtapa }),
+    ]);
+    const temMais = linhas.length > limite;
+    const cards = linhas.slice(0, limite).map(cardNegocio);
+    // `offset` devolvido = proximo cursor (quantas NAO FIXADAS ja sairam).
+    return NextResponse.json({
+      cards,
+      offset: offset + cards.length,
+      total,
+      temMais,
+    });
+  }
+
+  // ---- MODO QUADRO ----
+  const etapas = await prisma.etapa.findMany({
+    where: { ativo: true, finalidade: { in: finalidadeEtapas } },
+    orderBy: { ordem: "asc" },
+    select: {
+      id: true,
+      nome: true,
+      cor: true,
+      tipo: true,
+      finalidade: true,
+      ordem: true,
+    },
+  });
+
   // RESUMO por etapa (Fatia P): total (COUNT) e somaValor (SUM) calculados NO
   // BANCO, com EXATAMENTE o mesmo `where` da listagem — nunca a partir dos cards
   // carregados. A soma replica o valor do card = COALESCE(valorAjustado, valor):
   // dois groupBy particionados por valorAjustado (nulo / nao-nulo) e somados.
-  // Sem N+1, sem contar em memoria. Fundacao para a paginacao (Fatia Q).
-  const [etapas, negocios, aggAjustado, aggValor] = await Promise.all([
-    prisma.etapa.findMany({
-      where: { ativo: true, finalidade: { in: finalidadeEtapas } },
-      orderBy: { ordem: "asc" },
-      select: {
-        id: true,
-        nome: true,
-        cor: true,
-        tipo: true,
-        finalidade: true,
-        ordem: true,
-      },
-    }),
+  // Sob paginacao isto e o que segura a verdade: 50 na tela, "1.241" no cabecalho.
+  const [comPin, paginas, aggAjustado, aggValor] = await Promise.all([
+    // Fixadas do quadro inteiro em UMA consulta (nao por coluna): pin e raro.
     prisma.negocio.findMany({
-      where,
+      where: { AND: [where, soFixadas] },
       include: includeCard,
-      orderBy: { entrouEtapaEm: "desc" },
+      orderBy: [{ entrouEtapaEm: "desc" }, { id: "desc" }],
+      take: TETO_FIXADAS,
     }),
+    Promise.all(
+      etapas.map((e) =>
+        prisma.negocio.findMany({
+          where: { AND: [where, { etapaId: e.id }, semFixadas] },
+          include: includeCard,
+          orderBy: ordemDaEtapa(e.tipo),
+          take: limite + 1,
+        }),
+      ),
+    ),
     prisma.negocio.groupBy({
       by: ["etapaId"],
       where: { ...where, valorAjustado: { not: null } },
@@ -155,21 +276,33 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }),
   ]);
 
-  // Agrupa por etapaId.
-  const colunas: Record<string, ReturnType<typeof cardNegocio>[]> = {};
-  for (const e of etapas) colunas[e.id] = [];
-  for (const n of negocios) {
-    if (n.etapaId && colunas[n.etapaId]) {
-      colunas[n.etapaId].push(cardNegocio(n));
-    }
+  // Fixadas por etapa, mais recentes primeiro (fixadaEm desc, via compararPin).
+  const fixadasPorEtapa: Record<string, ReturnType<typeof cardNegocio>[]> = {};
+  for (const n of comPin) {
+    if (!n.etapaId) continue;
+    (fixadasPorEtapa[n.etapaId] ??= []).push(cardNegocio(n));
+  }
+  for (const id of Object.keys(fixadasPorEtapa)) {
+    fixadasPorEtapa[id].sort((a, b) => compararPin(a.fixadaEm, b.fixadaEm));
   }
 
-  // Fatia Y: fixadas primeiro em cada coluna. O DB ja ordenou por entrouEtapaEm
-  // desc; como Array.sort e estavel e compararPin devolve 0 no empate, os cards
-  // sem pin mantem essa ordem — o pin so promove os fixados ao topo.
-  for (const id of Object.keys(colunas)) {
-    colunas[id].sort((a, b) => compararPin(a.fixadaEm, b.fixadaEm));
-  }
+  // Monta cada coluna: fixadas no topo + o primeiro lote das nao fixadas.
+  const colunas: Record<string, ReturnType<typeof cardNegocio>[]> = {};
+  const paginacao: Record<
+    string,
+    { offset: number; temMais: boolean; carregados: number }
+  > = {};
+  etapas.forEach((e, i) => {
+    const linhas = paginas[i];
+    const temMais = linhas.length > limite;
+    const lote = linhas.slice(0, limite).map(cardNegocio);
+    colunas[e.id] = [...(fixadasPorEtapa[e.id] ?? []), ...lote];
+    paginacao[e.id] = {
+      offset: lote.length,
+      temMais,
+      carregados: colunas[e.id].length,
+    };
+  });
 
   // Consolida o resumo por etapa a partir das duas particoes.
   const resumo: Record<string, { total: number; somaValor: number }> = {};
@@ -187,5 +320,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ etapas, colunas, resumo });
+  return NextResponse.json({ etapas, colunas, resumo, paginacao });
 }
