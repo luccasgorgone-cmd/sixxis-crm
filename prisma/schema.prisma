@@ -645,6 +645,11 @@ model Negocio {
   @@index([agenteId])
   @@index([finalidade])
   @@index([agenteId, status, fechadoEm])
+  // Fatia Q: formato EXATO do ORDER BY da paginacao das colunas do Kanban
+  // (WHERE etapaId = $1 ORDER BY entrouEtapaEm DESC, id DESC LIMIT 51). Sem
+  // ele o Postgres ordena a coluna inteira antes do LIMIT — a coluna "Novo"
+  // tem 1.241 cards. Declarado aqui para o schema nao divergir da migracao.
+  @@index([etapaId, entrouEtapaEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_entrada_idx")
   // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
   // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
   @@index([leadId, status])

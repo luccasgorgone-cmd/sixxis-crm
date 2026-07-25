@@ -10,9 +10,14 @@
 // Reporta, para cada um: cards trafegados, KB do JSON e ms.
 //
 // Depois roda EXPLAIN (ANALYZE) na consulta QUENTE (a coluna ativa com mais
-// cards) para responder objetivamente se o indice (etapaId, entrouEtapaEm) e
-// necessario: sem ele o Postgres ordena a coluna inteira e o LIMIT 51 nao
-// economiza nada; com ele o plano vira Index Scan e para no 51o.
+// cards).
+//
+// VERIFICACAO A POSTERIORI: o indice Negocio_etapa_entrada_idx foi criado SEM
+// medicao local (o ambiente de desenvolvimento nao tem acesso a banco algum —
+// ver o comentario da migracao 20260725000000_fatiaQ_indice_etapa_entrada).
+// Este script existe para o dono conferir quando quiser, com o banco real: o
+// EXPLAIN abaixo deve mostrar Index Scan usando esse indice. Se aparecer Sort
+// da coluna inteira, o indice nao esta sendo usado — reporte.
 //
 // As helpers vem de src/lib/paginacaoKanban.ts — as MESMAS que a rota usa.
 import { prisma } from "../src/lib/prisma";
@@ -26,7 +31,7 @@ import {
 import { Finalidade, FinalidadeEtapa } from "../src/generated/prisma/enums";
 import type { Prisma } from "../src/generated/prisma/client";
 
-const INDICE = "Negocio_etapaId_entrouEtapaEm_idx";
+const INDICE = "Negocio_etapa_entrada_idx";
 
 function kb(v: unknown): number {
   return Buffer.byteLength(JSON.stringify(v), "utf8") / 1024;
@@ -170,11 +175,14 @@ async function porFinalidade(f: Finalidade) {
       `\nEXPLAIN da coluna quente "${quente.nome}" (${totais[quente.id]} cards):`,
     );
     console.log(txt.split("\n").map((l) => "  " + l).join("\n"));
-    const ordenaTudo = /\bSort\b/.test(txt) && !/Index Scan.*entrouEtapaEm/.test(txt);
+    const usaIndice = new RegExp(`Index Scan[^\\n]*${INDICE}`).test(txt);
+    const ordenaTudo = /\bSort\b/.test(txt) && !usaIndice;
     console.log(
-      ordenaTudo
-        ? `-> INDICE INDICADO: ha Sort da coluna inteira; o LIMIT nao economiza. Crie ${INDICE}.`
-        : `-> sem Sort da coluna inteira: o plano ja para no ${LIMITE_PADRAO + 1}o. Indice NAO indicado.`,
+      usaIndice
+        ? `-> OK: Index Scan por ${INDICE}, parando na ${LIMITE_PADRAO + 1}a linha.`
+        : ordenaTudo
+          ? `-> ATENCAO: Sort da coluna inteira — ${INDICE} nao esta sendo usado. Reporte.`
+          : `-> plano sem Sort da coluna inteira, mas sem ${INDICE}: confira o plano acima.`,
     );
   }
 }
