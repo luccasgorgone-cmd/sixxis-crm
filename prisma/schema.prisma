@@ -1071,6 +1071,10 @@ model RecaptacaoEnvio {
   erro       String?            @db.Text
   enviadoEm  DateTime?
   respondidoEm DateTime?
+  // Bolha correspondente no inbox. Sem esta referencia, "entregues/lidas" so
+  // sairia adivinhando por conversa + horario — numero plausivel e errado.
+  // Sem FK: a mensagem e do inbox, nao propriedade da campanha.
+  mensagemId String?
   criadoEm   DateTime           @default(now())
 
   @@unique([campanhaId, leadId])
@@ -1078,6 +1082,7 @@ model RecaptacaoEnvio {
   @@index([campanhaId, status])
   // "este lead ja recebeu recaptacao?" (em qualquer campanha).
   @@index([leadId, status])
+  @@index([mensagemId])
   // Relatorio por dia.
   @@index([enviadoEm])
 }

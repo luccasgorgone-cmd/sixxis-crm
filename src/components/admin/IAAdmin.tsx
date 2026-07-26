@@ -18,6 +18,7 @@ import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
 import { SandboxLuna } from "./SandboxLuna";
 import { MetricasSol } from "./MetricasSol";
+import { RecaptacaoAdmin } from "./RecaptacaoAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 
@@ -615,6 +616,11 @@ export function IAAdmin() {
             sandbox — quem acabou de ajustar o modelo/prompt ve logo abaixo o
             efeito em volume, custo e conversao. */}
         <MetricasSol />
+
+        {/* SOL-4: recaptacao em ondas. Fica DEPOIS do desempenho de proposito —
+            e a unica secao desta tela que envia mensagem a cliente real, entao
+            o dono passa antes pelos numeros que dizem se vale a pena. */}
+        <RecaptacaoAdmin />
 
         {/* Sandbox de teste (efemero; nada e enviado a clientes) */}
         <SandboxLuna />

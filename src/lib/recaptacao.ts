@@ -259,8 +259,9 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       // fosse false, a regra de colisao impediria a Sol de responder quando o
       // cliente voltasse — e a proxima onda excluiria este lead achando que o
       // time ja o atendeu.
+      let mensagemId: string | null = null;
       try {
-        await prisma.mensagem.create({
+        const msg = await prisma.mensagem.create({
           data: {
             externalId: r.externalId ?? `out-recap-${randomUUID()}`,
             conversaId: envio.conversaId,
@@ -274,6 +275,9 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
             hora: agora,
           },
         });
+        // Guardado para o painel contar entregues/lidas por JOIN, em vez de
+        // adivinhar por conversa + horario.
+        mensagemId = msg.id;
         await prisma.conversa.update({
           where: { id: envio.conversaId },
           data: { ultimaMensagemEm: agora },
@@ -291,10 +295,11 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       await prisma.recaptacaoEnvio.update({
         where: { id: envio.id },
         data: r.ok
-          ? { status: StatusRecapEnvio.ENVIADO, enviadoEm: agora, erro: null }
+          ? { status: StatusRecapEnvio.ENVIADO, enviadoEm: agora, erro: null, mensagemId }
           : {
               status: StatusRecapEnvio.ERRO,
               erro: JSON.stringify(r.raw ?? {}).slice(0, 500),
+              mensagemId,
             },
       });
 
