@@ -1486,6 +1486,15 @@ model SolEvento {
   acao       String
   motivo     String?  @db.Text
   modelo     String?
+  // SOL-2: consumo da decisao, somando TODAS as rodadas de tool use.
+  // NULL = evento anterior a SOL-2 (nunca mediu). 0 = mediu e nao chamou a IA
+  // (colisao com humano, teto de mensagens, sem chave). O dashboard trata NULL
+  // como ausencia, nao como zero.
+  tokensEntrada Int?
+  tokensSaida   Int?
+  // Custo estimado em USD (lib/custoIA.ts, cotacao no proprio arquivo). NULL
+  // quando o modelo nao esta na tabela de precos — nao chutamos.
+  custoEstimado Decimal? @db.Decimal(10, 5)
   criadoEm   DateTime @default(now())
 
   @@index([criadoEm])

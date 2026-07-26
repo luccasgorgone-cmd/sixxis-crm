@@ -20,6 +20,7 @@ import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
 import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
+import { custoEstimado } from "./custoIA";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import {
@@ -1178,10 +1179,25 @@ async function gravarSolEvento(
   acao: string,
   motivo?: string | null,
   modelo?: string | null,
+  // SOL-2: consumo da decisao. Omitido = decisao que nao passou pela IA; grava
+  // 0/0 (mediu e nao gastou), diferente de NULL (evento anterior a SOL-2).
+  uso?: { tokensEntrada: number; tokensSaida: number },
 ): Promise<void> {
   try {
+    const tokensEntrada = uso?.tokensEntrada ?? 0;
+    const tokensSaida = uso?.tokensSaida ?? 0;
     await prisma.solEvento.create({
-      data: { conversaId, leadId, acao, motivo: motivo ?? null, modelo: modelo ?? null },
+      data: {
+        conversaId,
+        leadId,
+        acao,
+        motivo: motivo ?? null,
+        modelo: modelo ?? null,
+        tokensEntrada,
+        tokensSaida,
+        // null quando o modelo nao esta na tabela de precos — nao chutamos.
+        custoEstimado: custoEstimado(modelo, tokensEntrada, tokensSaida),
+      },
     });
   } catch (e) {
     console.warn(
@@ -1366,6 +1382,12 @@ async function executarRespostaLuna(
     resultado.acao,
     resultado.motivo,
     cfg.modelo,
+    // SOL-2: tokens ja somados por gerarRespostaLuna (todas as rodadas de tool
+    // use). O motor de decisao nao mudou — so passamos adiante o que ele mede.
+    {
+      tokensEntrada: resultado.tokensEntrada,
+      tokensSaida: resultado.tokensSaida,
+    },
   );
 
   // Silenciar (abuso/fora do escopo): nao responde e NAO cria lembrete. So loga.

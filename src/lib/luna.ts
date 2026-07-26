@@ -30,6 +30,13 @@ export type LunaResultado = {
   // Compat: "texto" = mensagens.join("\n\n"). Derivado, sempre presente.
   texto: string;
   motivo?: string;
+  // SOL-2: tokens consumidos nesta decisao, SOMANDO todas as rodadas de tool
+  // use (uma resposta pode chamar buscar_produto varias vezes). Sempre presente:
+  // decisao tomada sem chamar a API (sem chave, teto de mensagens, colisao) vem
+  // com 0/0 — nao e null, porque 0 aqui e informacao, nao ausencia de dado.
+  // Puramente informativo: NAO participa de nenhuma decisao.
+  tokensEntrada: number;
+  tokensSaida: number;
 };
 
 // Subset da ConfigAgenteIA de que a Luna precisa (estruturalmente compativel com
@@ -507,7 +514,16 @@ function montarResultado(
   motivo?: string,
 ): LunaResultado {
   const limpa = normalizarMensagens(mensagens);
-  return { acao, mensagens: limpa, texto: limpa.join("\n\n"), motivo };
+  // Tokens entram depois (via `comUso`), quando o acumulador da chamada e
+  // conhecido — aqui ficam zerados para o tipo continuar total.
+  return {
+    acao,
+    mensagens: limpa,
+    texto: limpa.join("\n\n"),
+    motivo,
+    tokensEntrada: 0,
+    tokensSaida: 0,
+  };
 }
 
 // Extrai o JSON de decisao do texto do modelo (tolerante a lixo em volta).
@@ -550,14 +566,21 @@ export async function gerarRespostaLuna(entrada: {
 }): Promise<LunaResultado> {
   const { finalidade, historico, config, catalogo } = entrada;
 
+  // SOL-2: acumulador de tokens da decisao inteira. Cada resposta da API soma
+  // aqui, entao as rodadas de tool use entram todas. `comUso` carimba o total
+  // no resultado na hora de retornar — nenhum caminho de decisao muda por causa
+  // disso, so ganha os numeros.
+  const uso = { tokensEntrada: 0, tokensSaida: 0 };
+  const comUso = (r: LunaResultado): LunaResultado => ({ ...r, ...uso });
+
   // Sem chave -> nunca quebra: handoff com motivo claro.
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return montarResultado(
+    return comUso(montarResultado(
       "handoff",
       ["Um momento — vou chamar um atendente para continuar por aqui."],
       "ANTHROPIC_API_KEY ausente: IA indisponivel, handoff automatico.",
-    );
+    ));
   }
 
   // Teto de mensagens (trava por codigo): ultrapassou o limite de trocas do
@@ -570,13 +593,13 @@ export async function gerarRespostaLuna(entrada: {
       entrada.totalMensagensCliente ??
       historico.filter((m) => m.autor === "cliente").length;
     if (qtdCliente > teto) {
-      return montarResultado(
+      return comUso(montarResultado(
         "handoff",
         [
           "Vou passar seu atendimento para um de nossos atendentes.\nJa continuo com voce.",
         ],
         `teto de mensagens atingido (${qtdCliente} > ${teto})`,
-      );
+      ));
     }
   }
 
@@ -586,11 +609,11 @@ export async function gerarRespostaLuna(entrada: {
   type MsgAnthropic = { role: "user" | "assistant"; content: string | BlocoAnthropic[] };
   const mensagens: MsgAnthropic[] = montarMensagens(historico);
   if (mensagens.length === 0) {
-    return montarResultado(
+    return comUso(montarResultado(
       "handoff",
       [],
       "sem mensagem do cliente para responder",
-    );
+    ));
   }
 
   // Cupom disponivel apenas quando ativo e com codigo definido.
@@ -637,17 +660,22 @@ export async function gerarRespostaLuna(entrada: {
         console.error(
           `[luna] Anthropic status ${resp.status} (modelo=${config.modelo}): ${corpo || "(sem corpo)"}`,
         );
-        return montarResultado(
+        return comUso(montarResultado(
           "handoff",
           ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
           `falha Anthropic (status ${resp.status})`,
-        );
+        ));
       }
 
       const data = (await resp.json().catch(() => null)) as {
         stop_reason?: string;
         content?: BlocoAnthropic[];
+        usage?: { input_tokens?: number; output_tokens?: number };
       } | null;
+      // SOL-2: soma o usage DESTA rodada. Fica aqui (e nao so no retorno final)
+      // justamente para as rodadas de tool use entrarem na conta.
+      uso.tokensEntrada += Number(data?.usage?.input_tokens ?? 0) || 0;
+      uso.tokensSaida += Number(data?.usage?.output_tokens ?? 0) || 0;
       const blocos = Array.isArray(data?.content) ? data.content : [];
 
       // O modelo quer usar a ferramenta e ainda temos rodadas disponiveis.
@@ -694,30 +722,31 @@ export async function gerarRespostaLuna(entrada: {
         .trim();
 
       const decisao = parsearDecisao(texto);
-      if (decisao) return decisao;
+      if (decisao) return comUso(decisao);
 
       // Sem JSON parseavel: trata o texto como resposta normal (nunca quebra).
-      return montarResultado(
+      return comUso(montarResultado(
         "responder",
         [texto],
         "resposta sem envelope JSON (fallback)",
-      );
+      ));
     }
 
     // Excedeu o limite de rodadas de ferramenta sem resposta final.
-    return montarResultado(
+    return comUso(montarResultado(
       "handoff",
       ["Vou confirmar essa informacao com um atendente e ja te retorno."],
       "limite de rodadas de tool use atingido sem resposta final",
-    );
+    ));
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);
     console.error(`[luna] erro ao chamar Anthropic: ${motivo}`);
-    return montarResultado(
+    // Mesmo falhando, o que ja foi consumido nas rodadas anteriores conta.
+    return comUso(montarResultado(
       "handoff",
       ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
       `excecao ao chamar Anthropic: ${motivo}`,
-    );
+    ));
   } finally {
     clearTimeout(timer);
   }
