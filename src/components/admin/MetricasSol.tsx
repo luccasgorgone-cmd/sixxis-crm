@@ -87,10 +87,18 @@ export function MetricasSol() {
     void carregar();
   }, [carregar]);
 
-  const totalAcoes = dados
-    ? Object.values(dados.acoes).reduce((s, v) => s + v, 0)
+  // SOL-4: o denominador de "% handoff / % silenciar" e so o atendimento
+  // REATIVO. A recaptacao tambem grava SolEvento, mas e acao ativa — se entrasse
+  // aqui, cada onda enviada faria a taxa de handoff cair sozinha sem nada ter
+  // melhorado.
+  const reativos = dados
+    ? (dados.acoes.responder ?? 0) +
+      (dados.acoes.handoff ?? 0) +
+      (dados.acoes.silenciar ?? 0) +
+      (dados.acoes.colisao_humano ?? 0)
     : 0;
-  const taxa = (n: number) => (totalAcoes > 0 ? n / totalAcoes : 0);
+  const recaptacoes = dados?.acoes.recaptacao_envio ?? 0;
+  const taxa = (n: number) => (reativos > 0 ? n / reativos : 0);
 
   const serie = useMemo(
     () =>
@@ -203,13 +211,19 @@ export function MetricasSol() {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
               <Cartao
                 rotulo="Atendimentos"
-                valor={nf.format(dados.volume.eventos)}
-                nota={`${nf.format(dados.volume.conversas)} conversas`}
+                valor={nf.format(reativos)}
+                nota={
+                  recaptacoes > 0
+                    ? `${nf.format(dados.volume.conversas)} conversas · + ${nf.format(recaptacoes)} recaptacao`
+                    : `${nf.format(dados.volume.conversas)} conversas`
+                }
+                titulo="Atendimentos reativos (a Sol respondendo a uma mensagem do cliente). Envios de recaptacao sao contados a parte."
               />
               <Cartao
                 rotulo="Handoff"
                 valor={pct(taxa(dados.acoes.handoff ?? 0))}
                 nota={`${nf.format(dados.acoes.handoff ?? 0)} passados a humano`}
+                titulo="Sobre os atendimentos reativos do periodo."
               />
               <Cartao
                 rotulo="Silenciar"

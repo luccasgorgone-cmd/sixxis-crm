@@ -20,7 +20,7 @@ import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
 import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
-import { custoEstimado } from "./custoIA";
+import { registrarSolEvento } from "./solEvento";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import {
@@ -1171,40 +1171,10 @@ async function humanoAtivoNaConversa(conversaId: string): Promise<boolean> {
   return !!ultimaOut && ultimaOut.viaIA !== true;
 }
 
-// Telemetria da Sol (Fatia 2.98): grava um SolEvento por decisao. Best-effort —
-// NUNCA quebra o fluxo de envio (try/catch com log).
-async function gravarSolEvento(
-  conversaId: string,
-  leadId: string,
-  acao: string,
-  motivo?: string | null,
-  modelo?: string | null,
-  // SOL-2: consumo da decisao. Omitido = decisao que nao passou pela IA; grava
-  // 0/0 (mediu e nao gastou), diferente de NULL (evento anterior a SOL-2).
-  uso?: { tokensEntrada: number; tokensSaida: number },
-): Promise<void> {
-  try {
-    const tokensEntrada = uso?.tokensEntrada ?? 0;
-    const tokensSaida = uso?.tokensSaida ?? 0;
-    await prisma.solEvento.create({
-      data: {
-        conversaId,
-        leadId,
-        acao,
-        motivo: motivo ?? null,
-        modelo: modelo ?? null,
-        tokensEntrada,
-        tokensSaida,
-        // null quando o modelo nao esta na tabela de precos — nao chutamos.
-        custoEstimado: custoEstimado(modelo, tokensEntrada, tokensSaida),
-      },
-    });
-  } catch (e) {
-    console.warn(
-      `[luna] falha ao gravar SolEvento: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-}
+// Telemetria da Sol: a implementacao vive em lib/solEvento.ts desde a SOL-4, para
+// o motor de recaptacao gravar pelo mesmo caminho. Alias local para nao mexer nas
+// chamadas ja existentes abaixo.
+const gravarSolEvento = registrarSolEvento;
 
 async function responderComLunaSePreciso(
   conversa: ConvLuna,

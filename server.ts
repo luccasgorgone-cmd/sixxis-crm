@@ -9,6 +9,7 @@ import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import { iniciarManutencao } from "./src/lib/manutencao";
 import { iniciarAlertas } from "./src/lib/alertas";
 import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
+import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import {
   seedAdmin,
   seedFunil,
@@ -82,6 +83,9 @@ async function main(): Promise<void> {
   iniciarAlertas();
   // Alertas de SLA por etapa/setor (negocios parados), a cada ~60s.
   iniciarSlaAlertas();
+  // SOL-4: motor da recaptacao em ondas. Agendar NAO envia nada — ele so age se
+  // houver campanha ARMADA pelo dono, dentro do horario e da cota diaria.
+  iniciarRecaptacao(io);
 
   httpServer.listen(port, () => {
     console.log(`CRM no ar na porta ${port}`);
