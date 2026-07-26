@@ -17,6 +17,7 @@ import {
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
 import { SandboxLuna } from "./SandboxLuna";
+import { MetricasSol } from "./MetricasSol";
 import { EstadoErro } from "@/components/ui/Estado";
 import { useToast } from "@/components/ui/Toast";
 
@@ -609,6 +610,11 @@ export function IAAdmin() {
             </select>
           </Cartao>
         </Secao>
+
+        {/* SOL-2: desempenho da Sol (somente leitura), entre a config e o
+            sandbox — quem acabou de ajustar o modelo/prompt ve logo abaixo o
+            efeito em volume, custo e conversao. */}
+        <MetricasSol />
 
         {/* Sandbox de teste (efemero; nada e enviado a clientes) */}
         <SandboxLuna />
