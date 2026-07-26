@@ -364,23 +364,70 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
 
 // ===== SOL-4 B4: a resposta do cliente =====
 
-// Pedidos EXPLICITOS de parar, procurados em qualquer lugar do texto.
-const FRASES_OPTOUT = [
+// HOTFIX: antes, TODOS os gatilhos valiam por includes() em qualquer posicao —
+// entao "qual o preco pra parar de suar?" continha "parar" e virava opt-out. O
+// cliente interessado era descartado. Agora sao tres grupos com regras
+// diferentes, do mais restrito ao mais permissivo.
+
+// GRUPO 1a — recusas INEQUIVOCAS: tem verbo de parar entrega ou sao
+// multi-palavra sem ambiguidade. Valem em qualquer posicao do texto.
+const OPTOUT_FRASE = [
+  "para de mandar",
+  "parar de mandar",
+  "pare de mandar",
+  "para de me mandar",
+  "para de enviar",
+  "parar de enviar",
+  "pare de enviar",
+  "nao me mande",
+  "nao me manda",
+  "nao manda mais",
+  "nao mande mais",
+  "nao envie mais",
+  "me remova",
+  "descadastr", // pega descadastrar/descadastre/descadastro
+  "sair da lista",
+  "tirar da lista",
+  "nao me perturbe",
+  "nao perturbe",
+];
+
+// GRUPO 1b — inequivocas COM EXCECAO. Sao frases longas que ainda assim colidem
+// com uma frase comum de cliente interessado. A excecao e um lookahead negativo
+// estreito, so para a colisao conhecida — nao um relaxamento geral da regra.
+const OPTOUT_FRASE_COM_EXCECAO: { re: RegExp; colisao: string }[] = [
+  {
+    // "nao quero mais O azul, quero o vermelho" e TROCA DE PRODUTO, nao recusa.
+    re: /\bnao quero mais\b(?!\s+(o|a|os|as|um|uma|esse|essa|este|esta|desse|dessa|deste|desta|de|do|da|dos|das)\b)/,
+    colisao: "nao quero mais o <produto>",
+  },
+  {
+    // "me tira uma duvida" e PERGUNTA — em pt-BR e o comeco tipico de quem quer
+    // comprar. Sem esta excecao o hotfix trocaria um falso positivo por outro.
+    re: /\bme tir[ae]\b(?!\s+(uma\s+)?duvidas?\b)/,
+    colisao: "me tira uma duvida",
+  },
+  {
+    // "nao quero receber em casa, vou buscar" e sobre ENTREGA.
+    re: /\bnao quero receber\b(?!\s+(em|no|na|pelo|pela|via|por)\b)/,
+    colisao: "nao quero receber em casa",
+  },
+];
+
+// GRUPO 2 — gatilhos CURTOS e ambiguos: aparecem no meio de frases normais
+// ("vou parar", "cancelar minha compra antiga", "vou sair de viagem"). So valem
+// quando sao praticamente a mensagem inteira.
+const GATILHOS_CURTOS = new Set([
   "parar",
   "pare",
-  "para de mandar",
-  "nao me mande",
-  "nao manda mais",
-  "nao quero mais",
   "sair",
-  "me tira",
-  "me tire",
   "remover",
-  "descadastrar",
-  "descadastre",
   "cancelar",
   "stop",
-];
+]);
+// Ate 3 palavras cobre "parar", "quero cancelar", "parar por favor" — e deixa
+// fora "tem que cancelar minha compra antiga" (6).
+const MAX_PALAVRAS_CURTAS = 3;
 
 // Negativas CURTAS que so valem como opt-out quando sao a mensagem inteira.
 // Comparadas por igualdade de proposito: "nao sei", "nao agora", "nao entendi"
@@ -399,14 +446,32 @@ const NEGATIVAS_INTEIRAS = new Set([
   "nao tenho mais interesse",
 ]);
 
+// Ordem: do criterio mais restrito ao mais amplo. Nenhum grupo depende do outro,
+// entao a ordem e legibilidade, nao correcao.
 export function ehOptOut(texto: string): boolean {
   const t = normalizarTexto(texto)
-    .replace(/[.!,;:]+/g, " ")
+    .replace(/[.!,;:?"'()\[\]-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!t) return false;
+
+  // Negativa curta que e a mensagem INTEIRA ("nao", "sem interesse").
   if (NEGATIVAS_INTEIRAS.has(t)) return true;
-  return FRASES_OPTOUT.some((f) => t.includes(f));
+
+  // Gatilho curto ambiguo, so em mensagem quase inteira ("quero cancelar").
+  const palavras = t.split(" ");
+  if (
+    palavras.length <= MAX_PALAVRAS_CURTAS &&
+    palavras.some((p) => GATILHOS_CURTOS.has(p))
+  ) {
+    return true;
+  }
+
+  // Recusa inequivoca em qualquer posicao ("pode parar de mandar mensagem").
+  if (OPTOUT_FRASE.some((f) => t.includes(f))) return true;
+
+  // Idem, descontadas as colisoes conhecidas com frases de interesse.
+  return OPTOUT_FRASE_COM_EXCECAO.some(({ re }) => re.test(t));
 }
 
 export type RespostaRecaptacao = { respondido: boolean; optOut: boolean };
