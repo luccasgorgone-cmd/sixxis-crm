@@ -283,6 +283,8 @@ model Lead {
   atividades     Atividade[]
   lembretes      Lembrete[]
   campanhaDestinos CampanhaDestino[]
+  // SOL-4: ondas de recaptacao que ja alcancaram este lead.
+  recaptacoes    RecaptacaoEnvio[]
   cotacoes       CotacaoProduto[]
   orcamentos     Orcamento[]
   enderecos      Endereco[]
@@ -1003,6 +1005,81 @@ model Campanha {
 
   @@index([agenteId, criadoEm])
   @@index([status])
+}
+
+// ===== SOL-4: RECAPTACAO EM ONDAS =====
+// Deliberadamente SEPARADA de Campanha/CampanhaDestino acima. Aquela e a
+// ferramenta de disparo em massa (varios canais, dispara o lote todo); esta e o
+// oposto: fila lenta, limite diario, freio automatico e trava dura contra
+// reenvio. Botar as duas no mesmo modelo faria a de massa herdar travas que ela
+// nao tem, ou esta perder as que existe para ter. Convivem, nao competem.
+
+enum StatusCampanhaRecap {
+  RASCUNHO // criada, sem enviar nada (estado inicial — NAO envia)
+  ARMADA // o dono armou explicitamente: o motor pode enviar
+  PAUSADA // parada pelo dono OU pelo freio automatico (ver pausadaMotivo)
+  CONCLUIDA // acabaram os candidatos
+}
+
+enum StatusRecapEnvio {
+  PENDENTE // materializado, ainda nao enviado
+  ENVIADO // saiu para o cliente
+  RESPONDIDO // o cliente respondeu (SOL-4 B4)
+  OPTOUT // o cliente pediu para parar — nunca mais enviar
+  ERRO // a Evolution recusou/falhou
+  PULADO // nao da para enviar com seguranca (ex.: sem instancia de origem)
+}
+
+// Uma onda de recaptacao. O envio real exige status ARMADA — nenhum deploy,
+// seed ou migracao arma nada: o estado inicial e RASCUNHO.
+model CampanhaRecaptacao {
+  id               String              @id @default(cuid())
+  nome             String
+  mensagemTemplate String              @db.Text
+  status           StatusCampanhaRecap @default(RASCUNHO)
+  // Teto de envios por dia. Comeca BAIXO de proposito: a fatia existe para
+  // DESCOBRIR o limite seguro do numero, subindo aos poucos, nao para adivinhar.
+  limiteDiario     Int                 @default(20)
+  enviadosHoje     Int                 @default(0)
+  // Dia (data local) a que enviadosHoje se refere. Virou o dia -> zera.
+  dataContadorDia  DateTime?           @db.Date
+  // Por que pausou. O freio automatico escreve aqui — erro em rajada e sinal de
+  // numero sendo limitado pela Meta, e o motivo precisa sobreviver ao susto.
+  pausadaMotivo    String?             @db.Text
+  pausadaEm        DateTime?
+  envios           RecaptacaoEnvio[]
+  criadoEm         DateTime            @default(now())
+  atualizadoEm     DateTime            @updatedAt
+
+  @@index([status])
+}
+
+// Um lead dentro de uma onda. O @@unique(campanhaId, leadId) e a trava DURA
+// contra reenvio: mesmo que o motor rode duas vezes em paralelo, o banco recusa
+// a segunda linha.
+model RecaptacaoEnvio {
+  id         String             @id @default(cuid())
+  campanhaId String
+  campanha   CampanhaRecaptacao @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+  leadId     String
+  lead       Lead               @relation(fields: [leadId], references: [id])
+  conversaId String?
+  // Numero (instancia Evolution) por onde o cliente falou originalmente — a
+  // mensagem sai por ele, nunca por um numero que o cliente nao conhece.
+  instancia  String?
+  status     StatusRecapEnvio   @default(PENDENTE)
+  erro       String?            @db.Text
+  enviadoEm  DateTime?
+  respondidoEm DateTime?
+  criadoEm   DateTime           @default(now())
+
+  @@unique([campanhaId, leadId])
+  // Varredura do motor: proximos PENDENTE de uma campanha.
+  @@index([campanhaId, status])
+  // "este lead ja recebeu recaptacao?" (em qualquer campanha).
+  @@index([leadId, status])
+  // Relatorio por dia.
+  @@index([enviadoEm])
 }
 
 // Destinatario resolvido de uma campanha, com status/erro por envio.
