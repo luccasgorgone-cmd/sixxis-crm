@@ -23,6 +23,7 @@ import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { enviarTexto } from "./evolution";
 import { nomeEfetivo } from "./cliente";
+import { normalizarTexto } from "./format";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
 import { registrarSolEvento, ACAO_RECAPTACAO } from "./solEvento";
 import {
@@ -353,6 +354,113 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
     );
   } finally {
     rodando = false;
+  }
+}
+
+// ===== SOL-4 B4: a resposta do cliente =====
+
+// Pedidos EXPLICITOS de parar, procurados em qualquer lugar do texto.
+const FRASES_OPTOUT = [
+  "parar",
+  "pare",
+  "para de mandar",
+  "nao me mande",
+  "nao manda mais",
+  "nao quero mais",
+  "sair",
+  "me tira",
+  "me tire",
+  "remover",
+  "descadastrar",
+  "descadastre",
+  "cancelar",
+  "stop",
+];
+
+// Negativas CURTAS que so valem como opt-out quando sao a mensagem inteira.
+// Comparadas por igualdade de proposito: "nao sei", "nao agora", "nao entendi"
+// NAO sao recusa definitiva — sao conversa, e a Sol deve atender.
+const NEGATIVAS_INTEIRAS = new Set([
+  "nao",
+  "n",
+  "no",
+  "nop",
+  "nope",
+  "negativo",
+  "nao obrigado",
+  "nao obrigada",
+  "nao tenho interesse",
+  "sem interesse",
+  "nao tenho mais interesse",
+]);
+
+export function ehOptOut(texto: string): boolean {
+  const t = normalizarTexto(texto)
+    .replace(/[.!,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return false;
+  if (NEGATIVAS_INTEIRAS.has(t)) return true;
+  return FRASES_OPTOUT.some((f) => t.includes(f));
+}
+
+export type RespostaRecaptacao = { respondido: boolean; optOut: boolean };
+
+// Chamado pela ingestao a cada mensagem de ENTRADA. Se o lead recebeu uma onda,
+// marca a resposta; se o texto e recusa explicita, marca OPTOUT e desliga o
+// aceitaContato do lead (o mesmo campo que a selecao de publico ja respeita) —
+// nunca mais entra em onda nenhuma.
+export async function marcarRespostaRecaptacao(
+  leadId: string,
+  texto: string,
+): Promise<RespostaRecaptacao> {
+  try {
+    const envio = await prisma.recaptacaoEnvio.findFirst({
+      where: {
+        leadId,
+        // RESPONDIDO tambem entra: quem respondeu antes e depois pede para parar
+        // tem que ser atendido do mesmo jeito.
+        status: { in: [StatusRecapEnvio.ENVIADO, StatusRecapEnvio.RESPONDIDO] },
+      },
+      orderBy: { enviadoEm: "desc" },
+      select: { id: true, status: true, campanhaId: true },
+    });
+    if (!envio) return { respondido: false, optOut: false };
+
+    const agora = new Date();
+    if (ehOptOut(texto)) {
+      // Duas escritas em transacao: marcar o envio sem desligar o consentimento
+      // deixaria o lead elegivel para a proxima onda.
+      await prisma.$transaction([
+        prisma.recaptacaoEnvio.update({
+          where: { id: envio.id },
+          data: { status: StatusRecapEnvio.OPTOUT, respondidoEm: agora },
+        }),
+        prisma.lead.update({
+          where: { id: leadId },
+          data: { aceitaContato: false },
+        }),
+      ]);
+      getIO()?.emit("recaptacao:atualizada", { campanhaId: envio.campanhaId });
+      return { respondido: true, optOut: true };
+    }
+
+    if (envio.status === StatusRecapEnvio.ENVIADO) {
+      await prisma.recaptacaoEnvio.update({
+        where: { id: envio.id },
+        data: { status: StatusRecapEnvio.RESPONDIDO, respondidoEm: agora },
+      });
+      getIO()?.emit("recaptacao:atualizada", { campanhaId: envio.campanhaId });
+    }
+    return { respondido: true, optOut: false };
+  } catch (e) {
+    // Best-effort: telemetria de recaptacao nunca pode engolir a mensagem do
+    // cliente. Em erro, seguimos como se nao houvesse recaptacao — o pior caso
+    // e a resposta ser atendida normalmente, que ja e o comportamento desejado.
+    console.warn(
+      `[recaptacao] falha ao marcar resposta: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return { respondido: false, optOut: false };
   }
 }
 

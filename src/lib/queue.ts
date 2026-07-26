@@ -21,6 +21,7 @@ import { persistirMidia, persistirMidiaGrupo } from "./midia";
 import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { registrarSolEvento } from "./solEvento";
+import { marcarRespostaRecaptacao } from "./recaptacao";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import {
@@ -2125,6 +2126,15 @@ async function processarEvento(
       return;
     }
 
+    // SOL-4 B4: se este lead recebeu uma onda de recaptacao, esta mensagem e a
+    // RESPOSTA dela. Marca RESPONDIDO (ou OPTOUT, se for recusa explicita, o que
+    // tambem desliga aceitaContato). Best-effort: nunca engole a mensagem.
+    let optOutRecaptacao = false;
+    if (direcao === DirecaoMsg.IN) {
+      const rec = await marcarRespostaRecaptacao(lead.id, mensagem.conteudo ?? "");
+      optOutRecaptacao = rec.optOut;
+    }
+
     // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente).
     // Registra HistoricoNegocio(CRIACAO) e emite evento.
     await garantirNegocioParaLead(lead.id, finalidade);
@@ -2137,7 +2147,11 @@ async function processarEvento(
     // ConfigAgenteIA.ativo): se ela assumir, NAO envia o aviso fixo. Se a Luna
     // estiver inativa/dentro do horario/erro, cai no comportamento atual (aviso
     // fixo de fora do horario). Nada disso bloqueia o roteamento.
-    if (direcao === DirecaoMsg.IN) {
+    // SOL-4: quem pediu para parar NAO recebe resposta automatica nenhuma — nem
+    // da Sol, nem o aviso de fora de horario. A mensagem ja esta registrada e o
+    // negocio ja foi roteado, entao um humano ve no inbox: nada se perde, so
+    // nao insistimos com quem disse nao.
+    if (direcao === DirecaoMsg.IN && !optOutRecaptacao) {
       const lunaAssumiu = await responderComLunaSePreciso(
         { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId },
         telefone,
