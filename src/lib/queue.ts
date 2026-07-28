@@ -914,10 +914,17 @@ function extrairEdicao(
   const data = payload?.data as Record<string, unknown> | undefined;
   if (!data) return null;
   const msg = data.message as Record<string, unknown> | undefined;
+  // Com envelope o protocolMessage/editedMessage fica DENTRO do wrapper; sem
+  // envelope o desembrulhado e o proprio message (candidatos repetidos, mesmo
+  // resultado). Os caminhos antigos continuam sendo tentados primeiro.
+  const msgD = desembrulharMessage(msg);
   const candidatos = [
     (msg?.editedMessage as { message?: Record<string, unknown> } | undefined)?.message
       ?.protocolMessage,
     msg?.protocolMessage,
+    (msgD?.editedMessage as { message?: Record<string, unknown> } | undefined)?.message
+      ?.protocolMessage,
+    msgD?.protocolMessage,
     (data.editedMessage as { message?: Record<string, unknown> } | undefined)?.message
       ?.protocolMessage,
   ] as (
