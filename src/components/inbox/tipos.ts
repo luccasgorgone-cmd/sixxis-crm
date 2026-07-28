@@ -88,6 +88,11 @@ export type MensagemItem = {
     tipo: TipoMensagem;
     conteudo: string | null;
     contatoNome?: string | null;
+    // Midia da citada: miniatura na bolha de citacao (distingue QUAL foto/video
+    // foi respondida quando ha varias). Ausente na bolha otimista.
+    mediaUrl?: string | null;
+    // Audio citado: trecho da transcricao diferencia dois audios.
+    transcricao?: string | null;
   } | null;
   // Marca visual "Encaminhada" na bolha (forward).
   encaminhada?: boolean;

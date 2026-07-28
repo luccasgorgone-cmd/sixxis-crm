@@ -76,6 +76,11 @@ export async function GET(
           tipo: true,
           conteudo: true,
           contatoNome: true,
+          // Miniatura da citacao: sem a mediaUrl, duas fotos citadas ficam com o
+          // mesmo rotulo "Imagem" e o atendente nao sabe qual foi respondida.
+          mediaUrl: true,
+          // Diferencia dois audios citados pelo inicio do texto transcrito.
+          transcricao: true,
         },
       })
     : [];
