@@ -740,16 +740,25 @@ function extrairAnuncio(message?: Record<string, unknown> | null): {
 
 // Transcricao de audio (speech-to-text), quando a Evolution enviar. Busca em
 // alguns locais conhecidos; ausente = null.
-function extrairTranscricao(data?: EventoEvolution["data"]): string | null {
+function extrairTranscricao(
+  data?: EventoEvolution["data"],
+  // message DESEMBRULHADO (opcional): com envelope o audioMessage fica DENTRO do
+  // wrapper e a transcricao se perdia. Sem envelope o desembrulhado e o proprio
+  // message, entao a varredura abaixo da exatamente o mesmo resultado de antes.
+  msgDesemb?: Record<string, unknown> | null,
+): string | null {
   const d = data as Record<string, unknown> | undefined;
   const direto = d?.["speechToText"];
   if (typeof direto === "string" && direto.trim()) return direto.trim();
-  const msg = data?.message as Record<string, unknown> | undefined;
-  const noMsg = msg?.["speechToText"];
-  if (typeof noMsg === "string" && noMsg.trim()) return noMsg.trim();
-  const audio = msg?.["audioMessage"] as { transcription?: string } | undefined;
-  if (typeof audio?.transcription === "string" && audio.transcription.trim()) {
-    return audio.transcription.trim();
+  const cru = data?.message as Record<string, unknown> | undefined;
+  for (const msg of [msgDesemb ?? undefined, cru]) {
+    if (!msg) continue;
+    const noMsg = msg["speechToText"];
+    if (typeof noMsg === "string" && noMsg.trim()) return noMsg.trim();
+    const audio = msg["audioMessage"] as { transcription?: string } | undefined;
+    if (typeof audio?.transcription === "string" && audio.transcription.trim()) {
+      return audio.transcription.trim();
+    }
   }
   return null;
 }
@@ -1897,7 +1906,7 @@ async function processarEvento(
   const msgDesemb = desembrulharMessage(data?.message);
   const tipo = mapearTipo(tipoEfetivoMensagem(data));
   const conteudo = extrairConteudo(msgDesemb);
-  const transcricao = extrairTranscricao(data);
+  const transcricao = extrairTranscricao(data, msgDesemb);
   // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
   // Le do DESEMBRULHADO: com envelope o contactMessage/contactsArrayMessage fica
   // dentro do wrapper e o card nao era detectado.
