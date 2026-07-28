@@ -93,6 +93,8 @@ export type MensagemItem = {
     mediaUrl?: string | null;
     // Audio citado: trecho da transcricao diferencia dois audios.
     transcricao?: string | null;
+    // Citada apagada: a citacao mostra so o rotulo (sem miniatura).
+    apagada?: boolean;
   } | null;
   // Marca visual "Encaminhada" na bolha (forward).
   encaminhada?: boolean;

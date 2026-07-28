@@ -81,6 +81,8 @@ export async function GET(
           mediaUrl: true,
           // Diferencia dois audios citados pelo inicio do texto transcrito.
           transcricao: true,
+          // Citada apagada: a citacao mostra o rotulo, nunca a midia.
+          apagada: true,
         },
       })
     : [];

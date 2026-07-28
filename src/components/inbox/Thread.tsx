@@ -459,7 +459,8 @@ function MiniaturaCitada({
   citada: NonNullable<MensagemItem["citada"]>;
 }) {
   const url = citada.mediaUrl;
-  if (!ehUrlRenderavel(url)) return null;
+  // Apagada ou sem mediaUrl (midia ainda nao subiu ao R2): so o rotulo textual.
+  if (citada.apagada || !ehUrlRenderavel(url)) return null;
   const ehFigurinhaCitada = (citada.conteudo ?? "").trim() === "[figurinha]";
   if (citada.tipo === "IMAGEM" || ehFigurinhaCitada) {
     return (
@@ -751,8 +752,10 @@ function Bolha({
 
   // Preview curto de uma mensagem citada (reply).
   function previewCitada(c: NonNullable<MensagemItem["citada"]>): string {
+    if (c.apagada) return "Mensagem apagada";
     if (c.contatoNome) return `Contato: ${c.contatoNome}`;
     const t = (c.conteudo ?? "").trim();
+    if (t === "[figurinha]") return "Figurinha";
     if (c.tipo === "IMAGEM") return t && !t.startsWith("[") ? t : "Imagem";
     if (c.tipo === "VIDEO") return t && !t.startsWith("[") ? t : "Video";
     if (c.tipo === "AUDIO") {
@@ -762,7 +765,12 @@ function Bolha({
       if (!tr) return "Audio";
       return `Audio: ${tr.length > 40 ? `${tr.slice(0, 40)}...` : tr}`;
     }
-    if (c.tipo === "DOCUMENTO") return t || "Documento";
+    if (c.tipo === "DOCUMENTO") {
+      // O nome do arquivo e o que diferencia dois PDFs citados; a ingestao grava
+      // "[documento] nome.pdf" quando nao ha legenda.
+      const nome = t.replace(/^\[documento\]\s*/i, "").trim();
+      return nome || "Documento";
+    }
     return t || "Mensagem";
   }
 
