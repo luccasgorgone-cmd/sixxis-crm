@@ -654,19 +654,33 @@ function extrairStanzaCitada(
   );
 }
 
-// DIAGNOSTICO TEMPORARIO (reply). Primeiro contextInfo encontrado nos sub-objetos
-// da mensagem — usado so para LOGAR a estrutura (nomes de chaves), nunca conteudo.
-// Remover junto com o log [reply-debug] quando a causa do reply estiver fechada.
+// DIAGNOSTICO TEMPORARIO (reply). Primeiro contextInfo encontrado, procurando nos
+// MESMOS lugares (e na mesma ordem) que extrairStanzaCitada: sub-objetos de
+// message -> nivel do evento (data) -> message.contextInfo. `achouEm` diz onde,
+// para o log. Usado so para LOGAR estrutura (nomes de chaves), nunca conteudo.
+// Remover junto com o log [reply-debug] apos a validacao ao vivo.
 function primeiroContextInfo(
   message?: Record<string, unknown> | null,
-): Record<string, unknown> | null {
-  if (!message) return null;
-  for (const sub of Object.values(message)) {
-    if (!sub || typeof sub !== "object") continue;
-    const ctx = (sub as { contextInfo?: unknown }).contextInfo;
-    if (ctx && typeof ctx === "object") return ctx as Record<string, unknown>;
+  data?: Record<string, unknown> | null,
+): { ctx: Record<string, unknown> | null; achouEm: string } {
+  if (message) {
+    for (const [chave, sub] of Object.entries(message)) {
+      if (!sub || typeof sub !== "object") continue;
+      const ctx = (sub as { contextInfo?: unknown }).contextInfo;
+      if (ctx && typeof ctx === "object") {
+        return { ctx: ctx as Record<string, unknown>, achouEm: `subobjeto:${chave}` };
+      }
+    }
   }
-  return null;
+  const doEvento = (data as { contextInfo?: unknown } | null | undefined)?.contextInfo;
+  if (doEvento && typeof doEvento === "object") {
+    return { ctx: doEvento as Record<string, unknown>, achouEm: "dataNivel" };
+  }
+  const noMessage = (message as { contextInfo?: unknown } | null | undefined)?.contextInfo;
+  if (noMessage && typeof noMessage === "object") {
+    return { ctx: noMessage as Record<string, unknown>, achouEm: "messageContextInfo" };
+  }
+  return { ctx: null, achouEm: "nenhum" };
 }
 
 // Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
@@ -1977,16 +1991,19 @@ async function processarEvento(
   // Leitura: stanzaExtraido=null -> o id nao esta em contextInfo.stanzaId;
   // stanzaExtraido preenchido + citadaEncontradaNoBanco=false -> o id nao casa
   // com nenhum externalId gravado. Remover apos a correcao do reply.
-  const ctxDebug = primeiroContextInfo(msgDesemb);
-  if (ctxDebug) {
+  const ctxDebug = primeiroContextInfo(
+    msgDesemb,
+    data as Record<string, unknown> | undefined,
+  );
+  if (ctxDebug.ctx) {
     const chavesCru = Object.keys((data?.message ?? {}) as Record<string, unknown>);
     console.log(
       `[reply-debug] keyId=${externalId}` +
         ` stanzaExtraido=${stanzaCitada ?? "null"}` +
         ` chavesMsg=${Object.keys(msgDesemb ?? {}).join("|") || "-"}` +
         ` chavesCru=${chavesCru.join("|") || "-"}` +
-        ` chavesContextInfo=${Object.keys(ctxDebug).join("|") || "-"}` +
-        ` temQuotedMessage=${!!ctxDebug["quotedMessage"]}` +
+        ` chavesContextInfo=${Object.keys(ctxDebug.ctx).join("|") || "-"}` +
+        ` temQuotedMessage=${!!ctxDebug.ctx["quotedMessage"]}` +
         ` citadaEncontradaNoBanco=${stanzaCitada ? respostaAId !== null : "n/a"}`,
     );
   }
