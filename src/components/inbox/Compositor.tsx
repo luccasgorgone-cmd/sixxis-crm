@@ -681,6 +681,10 @@ export function Compositor({
             tipo: reply.tipo,
             conteudo: reply.conteudo,
             contatoNome: reply.contatoNome ?? null,
+            // Miniatura ja na bolha otimista: quem responde uma foto ve QUAL
+            // foto citou na hora, sem esperar a reconciliacao.
+            mediaUrl: reply.mediaUrl ?? null,
+            apagada: reply.apagada ?? false,
           }
         : null,
     });

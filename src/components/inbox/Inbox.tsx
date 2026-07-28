@@ -247,6 +247,9 @@ export function Inbox({
               statusEnvio: evt.statusEnvio,
               hora: evt.hora,
               viaIA: evt.viaIA,
+              // Reply: a bolha ja nasce com a citacao (antes so aparecia no F5).
+              respostaAId: evt.respostaAId ?? null,
+              citada: evt.citada ?? null,
             }),
           ),
         );

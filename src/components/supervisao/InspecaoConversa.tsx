@@ -109,6 +109,9 @@ export function InspecaoConversa({
                 conteudo: evt.conteudo,
                 statusEnvio: evt.statusEnvio,
                 hora: evt.hora,
+                // Reply: a citacao aparece ao vivo tambem na inspecao do admin.
+                respostaAId: evt.respostaAId ?? null,
+                citada: evt.citada ?? null,
               },
             ],
       );
