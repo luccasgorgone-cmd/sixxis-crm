@@ -445,6 +445,48 @@ function ehUrlRenderavel(url?: string | null): boolean {
   return !/whatsapp\.net/i.test(url) && !/\.enc(\?|#|$)/i.test(url);
 }
 
+// Miniatura da mensagem CITADA (reply). Existe para o atendente distinguir QUAL
+// midia foi respondida: com duas fotos na conversa, o rotulo "Imagem" sozinho e
+// identico nas duas citacoes. So renderiza com mediaUrl do R2 (ehUrlRenderavel);
+// a URL crua do WhatsApp e criptografada e quebraria a imagem. Nao geramos
+// thumbnail leve na ingestao, entao usa a propria mediaUrl num contêiner de 36px
+// com object-cover (custo aceitavel: e uma imagem pequena na tela). Para VIDEO,
+// preload="metadata" pega o primeiro frame sem baixar o arquivo inteiro; se o
+// browser nao pintar o frame, sobra o fundo neutro com o icone de video.
+function MiniaturaCitada({
+  citada,
+}: {
+  citada: NonNullable<MensagemItem["citada"]>;
+}) {
+  const url = citada.mediaUrl;
+  if (!ehUrlRenderavel(url)) return null;
+  const ehFigurinhaCitada = (citada.conteudo ?? "").trim() === "[figurinha]";
+  if (citada.tipo === "IMAGEM" || ehFigurinhaCitada) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url!}
+        alt=""
+        className="h-9 w-9 shrink-0 rounded-md object-cover"
+      />
+    );
+  }
+  if (citada.tipo === "VIDEO") {
+    return (
+      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-black/25">
+        <video
+          src={url!}
+          muted
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <VideoIcon className="relative h-3.5 w-3.5 text-white drop-shadow" />
+      </span>
+    );
+  }
+  return null;
+}
+
 // Popover de reacao renderizado em PORTAL (document.body) com posicao fixa.
 // Assim ele NUNCA e cortado pelo overflow do container (o drawer do Kanban tem
 // rolagem propria que clipava o popover). Abre acima da ancora; se nao couber,
@@ -712,8 +754,14 @@ function Bolha({
     if (c.contatoNome) return `Contato: ${c.contatoNome}`;
     const t = (c.conteudo ?? "").trim();
     if (c.tipo === "IMAGEM") return t && !t.startsWith("[") ? t : "Imagem";
-    if (c.tipo === "VIDEO") return "Video";
-    if (c.tipo === "AUDIO") return "Audio";
+    if (c.tipo === "VIDEO") return t && !t.startsWith("[") ? t : "Video";
+    if (c.tipo === "AUDIO") {
+      // Dois audios citados so se distinguem pelo texto: mostra o inicio da
+      // transcricao quando houver.
+      const tr = (c.transcricao ?? "").trim();
+      if (!tr) return "Audio";
+      return `Audio: ${tr.length > 40 ? `${tr.slice(0, 40)}...` : tr}`;
+    }
     if (c.tipo === "DOCUMENTO") return t || "Documento";
     return t || "Mensagem";
   }
@@ -852,7 +900,10 @@ function Bolha({
                 : "border-tiffany bg-black/[0.04] text-medio/80"
             }`}
           >
-            <span className="truncate">
+            {/* Miniatura da midia citada (quando houver): e o que diferencia
+                uma foto da outra. O rotulo textual continua ao lado. */}
+            <MiniaturaCitada citada={mensagem.citada} />
+            <span className="min-w-0 flex-1 self-center truncate">
               <span className="font-semibold">
                 {mensagem.citada.direcao === "OUT" ? "Voce" : "Cliente"}
               </span>
