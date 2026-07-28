@@ -327,6 +327,9 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
         naoLidas: 0,
         ultimaMensagemEm: agora,
         viaIA: true,
+        // Onda de recaptacao: texto NOVO do modelo, nunca cita mensagem.
+        respostaAId: null,
+        citada: null,
       });
 
       if (r.ok) enviados++;

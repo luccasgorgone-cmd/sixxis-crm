@@ -289,6 +289,9 @@ async function processarCampanha(
           hora: msg.hora,
           naoLidas: 0,
           ultimaMensagemEm: msg.hora,
+          // Campanha: texto NOVO, nunca responde a nada — sem citacao.
+          respostaAId: null,
+          citada: null,
         });
       } catch (e) {
         // Falha de registro nao deve abortar a campanha (idempotencia/corrida).
@@ -1219,6 +1222,9 @@ async function responderForaHorarioSePreciso(
       hora: msg.hora,
       naoLidas: 0,
       ultimaMensagemEm: agora,
+      // Aviso de fora de horario: texto NOVO, sem citacao.
+      respostaAId: null,
+      citada: null,
     });
   } catch (e) {
     console.warn(
@@ -1626,6 +1632,9 @@ async function enviarMensagensLuna(
       naoLidas: 0,
       ultimaMensagemEm: agora,
       viaIA: true,
+      // Resposta da Sol: texto NOVO gerado pela IA, sem citacao.
+      respostaAId: null,
+      citada: null,
     });
 
     // Falha de envio: nao insiste com as proximas mensagens.

@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { enviarTexto } from "@/lib/evolution";
+import { previewCitada } from "@/lib/citada";
 import {
   DirecaoMsg,
   TipoMsg,
@@ -216,6 +217,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     },
   });
 
+  // Reply: mesmo preview da citada que a rota da thread devolve, para quem ve a
+  // conversa por socket (outro atendente, supervisao, drawer do Kanban) receber
+  // a bolha JA com a citacao. O remetente nao depende disto — a bolha otimista
+  // dele ja nasce com a citada —, mas os demais dependiam do F5.
+  const citadaPreview = await previewCitada(respostaAId);
+
   // Tempo real: a mensagem OUT aparece na thread/lista sem refresh.
   getIO()?.emit("mensagem:nova", {
     leadId: conversa.lead.id,
@@ -231,6 +238,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     hora: mensagem.hora,
     naoLidas: 0,
     ultimaMensagemEm: agora,
+    respostaAId: mensagem.respostaAId,
+    citada: citadaPreview,
     // Devolve o clientId para o remetente reconciliar a bolha otimista (3.11).
     clientId,
   });
@@ -243,6 +252,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     mediaUrl: mensagem.mediaUrl,
     statusEnvio: mensagem.statusEnvio,
     hora: mensagem.hora,
+    // A bolha reconciliada ja vem com a citacao (o Reenviar tambem passa por
+    // aqui, e nele nao ha bolha otimista de onde herdar).
+    respostaAId: mensagem.respostaAId,
+    citada: citadaPreview,
   };
 
   // Sucesso da gravacao, mas falha no envio: 502 para a UI sinalizar o erro.
