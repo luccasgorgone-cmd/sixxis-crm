@@ -1884,7 +1884,9 @@ async function processarEvento(
   const conteudo = extrairConteudo(msgDesemb);
   const transcricao = extrairTranscricao(data);
   // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
-  const contatoInfo = extrairContato(data?.message);
+  // Le do DESEMBRULHADO: com envelope o contactMessage/contactsArrayMessage fica
+  // dentro do wrapper e o card nao era detectado.
+  const contatoInfo = extrairContato(msgDesemb);
   // Reply: se cita uma mensagem que temos, vincula por externalId (best-effort).
   // Le do message DESEMBRULHADO: com envelope (ephemeral/view-once/doc com
   // legenda) o contextInfo.stanzaId fica DENTRO do envelope e a busca por chaves
