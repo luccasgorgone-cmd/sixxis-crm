@@ -1966,7 +1966,10 @@ async function processarEvento(
   // Origem por ANUNCIO (Click-to-WhatsApp): grava na 1a mensagem, sem
   // sobrescrever dados ja existentes com vazio. Registra Atividade de origem.
   if (direcao === DirecaoMsg.IN && !lead.ctwaClid && !lead.anuncioId) {
-    const anuncio = extrairAnuncio(data?.message);
+    // Le do DESEMBRULHADO: extrairAnuncio procura contextInfo nos sub-objetos de
+    // 1o nivel; com envelope o 1o nivel e o wrapper (que nao tem contextInfo) e
+    // retornava null — o lead vindo de anuncio pago perdia ctwaClid/origem.
+    const anuncio = extrairAnuncio(msgDesemb);
     if (anuncio && (anuncio.ctwaClid || anuncio.anuncioId)) {
       lead = await prisma.lead.update({
         where: { id: lead.id },
