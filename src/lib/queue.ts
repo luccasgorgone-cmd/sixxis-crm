@@ -18,6 +18,7 @@ import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
 import { garantirConversaUnificada } from "./conversa";
 import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
+import { previewCitada } from "./citada";
 import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { registrarSolEvento } from "./solEvento";
@@ -2240,6 +2241,10 @@ async function processarEvento(
 
     // Tempo real: notifica os clientes conectados sobre a nova mensagem.
     // O payload carrega o suficiente para a UI atualizar lista E thread.
+    // Reply: leva o MESMO preview da citada que a rota da thread devolve, senao
+    // a citacao so apareceria depois do F5. Uma leitura por chave primaria, e
+    // apenas quando a mensagem cita alguma (sem reply, custo zero).
+    const citadaSocket = await previewCitada(respostaAId);
     (io ?? getIO())?.emit("mensagem:nova", {
       leadId: lead.id,
       leadNome: nomeEfetivo(lead),
@@ -2255,6 +2260,8 @@ async function processarEvento(
       hora: mensagem.hora,
       naoLidas: conversaAtualizada.naoLidas,
       ultimaMensagemEm: mensagem.hora,
+      respostaAId: respostaAId ?? null,
+      citada: citadaSocket,
     });
 
     // Contato bloqueado: para por aqui (registrou + emitiu). NAO roteia, NAO

@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
+import { SELECT_CITADA } from "@/lib/citada";
 import { DirecaoMsg } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
@@ -70,20 +71,9 @@ export async function GET(
   const citadas = respIds.length
     ? await prisma.mensagem.findMany({
         where: { id: { in: respIds } },
-        select: {
-          id: true,
-          direcao: true,
-          tipo: true,
-          conteudo: true,
-          contatoNome: true,
-          // Miniatura da citacao: sem a mediaUrl, duas fotos citadas ficam com o
-          // mesmo rotulo "Imagem" e o atendente nao sabe qual foi respondida.
-          mediaUrl: true,
-          // Diferencia dois audios citados pelo inicio do texto transcrito.
-          transcricao: true,
-          // Citada apagada: a citacao mostra o rotulo, nunca a midia.
-          apagada: true,
-        },
+        // Formato UNICO da citada (src/lib/citada.ts), o mesmo que os emits de
+        // socket usam — a citacao do tempo real fica identica a do F5.
+        select: SELECT_CITADA,
       })
     : [];
   const mapaCitada = new Map(citadas.map((c) => [c.id, c]));
