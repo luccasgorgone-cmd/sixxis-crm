@@ -826,8 +826,15 @@ async function registrarReacaoCliente(
 // messageStubType REVOKE (no update). Retorna o id da mensagem original.
 function idRevogado(payload: EventoEvolution): string | null {
   const data = payload?.data as Record<string, unknown> | undefined;
-  const proto = (data?.message as Record<string, unknown> | undefined)
-    ?.protocolMessage as { type?: number | string; key?: { id?: string } } | undefined;
+  const msgCru = data?.message as Record<string, unknown> | undefined;
+  // Com envelope (chat com mensagens temporarias) o protocolMessage do REVOKE
+  // fica DENTRO do wrapper. Sem envelope, desembrulharMessage devolve o proprio
+  // message — os dois candidatos sao o mesmo objeto e nada muda.
+  const msgDesemb = desembrulharMessage(msgCru);
+  const proto = (msgCru?.["protocolMessage"] ??
+    msgDesemb?.["protocolMessage"]) as
+    | { type?: number | string; key?: { id?: string } }
+    | undefined;
   const ehRevoke =
     !!proto && (proto.type === 0 || proto.type === "REVOKE" || proto.type === "0");
   if (ehRevoke && proto?.key?.id) return proto.key.id;
