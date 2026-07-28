@@ -1886,7 +1886,10 @@ async function processarEvento(
   // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
   const contatoInfo = extrairContato(data?.message);
   // Reply: se cita uma mensagem que temos, vincula por externalId (best-effort).
-  const stanzaCitada = extrairStanzaCitada(data?.message);
+  // Le do message DESEMBRULHADO: com envelope (ephemeral/view-once/doc com
+  // legenda) o contextInfo.stanzaId fica DENTRO do envelope e a busca por chaves
+  // de 1o nivel no message cru nao acha nada — o reply se perdia.
+  const stanzaCitada = extrairStanzaCitada(msgDesemb);
   const respostaAId = stanzaCitada
     ? (
         await prisma.mensagem.findUnique({
