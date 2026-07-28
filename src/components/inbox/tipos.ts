@@ -52,6 +52,24 @@ export type ConversaItem = {
   trechoBusca?: string | null;
 };
 
+// Preview da mensagem CITADA (reply). Espelha o SELECT_CITADA do servidor
+// (src/lib/citada.ts) e e o MESMO objeto na rota da thread e no socket — por
+// isso vive num type proprio, consumido pela MensagemItem e pelo evento.
+export type CitadaPreview = {
+  id: string;
+  direcao: Direcao;
+  tipo: TipoMensagem;
+  conteudo: string | null;
+  contatoNome?: string | null;
+  // Midia da citada: miniatura na bolha de citacao (distingue QUAL foto/video
+  // foi respondida quando ha varias). Ausente na bolha otimista.
+  mediaUrl?: string | null;
+  // Audio citado: trecho da transcricao diferencia dois audios.
+  transcricao?: string | null;
+  // Citada apagada: a citacao mostra so o rotulo (sem miniatura).
+  apagada?: boolean;
+};
+
 export type MensagemItem = {
   id: string;
   // Conversa a que a mensagem pertence (Fatia T). Aditivo/opcional: usado na
@@ -82,20 +100,7 @@ export type MensagemItem = {
   contatoTelefone?: string | null;
   // Reply (estilo WhatsApp): id da citada + preview da mensagem citada.
   respostaAId?: string | null;
-  citada?: {
-    id: string;
-    direcao: Direcao;
-    tipo: TipoMensagem;
-    conteudo: string | null;
-    contatoNome?: string | null;
-    // Midia da citada: miniatura na bolha de citacao (distingue QUAL foto/video
-    // foi respondida quando ha varias). Ausente na bolha otimista.
-    mediaUrl?: string | null;
-    // Audio citado: trecho da transcricao diferencia dois audios.
-    transcricao?: string | null;
-    // Citada apagada: a citacao mostra so o rotulo (sem miniatura).
-    apagada?: boolean;
-  } | null;
+  citada?: CitadaPreview | null;
   // Marca visual "Encaminhada" na bolha (forward).
   encaminhada?: boolean;
 };
@@ -118,6 +123,11 @@ export type EventoMensagemNova = {
   ultimaMensagemEm: string;
   // Enviada pela Luna (IA)? (mensagens OUT geradas pelo motor de atendimento).
   viaIA?: boolean;
+  // Reply: mesmo preview da citada que a rota da thread devolve — a bolha do
+  // tempo real ja nasce com a citacao, sem esperar o F5. null nos emits que
+  // nunca citam (campanha, fora de horario, Sol, recaptacao).
+  respostaAId?: string | null;
+  citada?: CitadaPreview | null;
   // Chave idempotente do envio otimista (Fatia 3.11): quando o texto foi enviado
   // pelo compositor com um id temporario, a rota devolve o MESMO clientId aqui.
   // O remetente casa este evento com a bolha "tmp-<uuid>" e reconcilia no lugar,
