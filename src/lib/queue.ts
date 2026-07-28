@@ -737,18 +737,22 @@ function extrairConteudo(
 // Extrai dados de ANUNCIO (Click-to-WhatsApp) do contextInfo.externalAdReply
 // de qualquer subtipo de mensagem. Retorna ctwaClid + dados do anuncio quando
 // presentes (mensagem originada de clique num anuncio do Meta).
-function extrairAnuncio(message?: Record<string, unknown> | null): {
+type DadosAnuncio = {
   ctwaClid: string | null;
   anuncioId: string | null;
   anuncioTitulo: string | null;
   anuncioUrl: string | null;
   origemDetalhe: string | null;
-} | null {
-  if (!message) return null;
-  for (const sub of Object.values(message)) {
-    if (!sub || typeof sub !== "object") continue;
-    const ctx = (sub as { contextInfo?: Record<string, unknown> }).contextInfo;
-    if (!ctx) continue;
+};
+function extrairAnuncio(
+  message?: Record<string, unknown> | null,
+  // Nivel do EVENTO: quando a 1a mensagem do anuncio e TEXTO PURO, a Evolution
+  // manda o contextInfo IRMAO de message — e o externalAdReply vai junto. Mesmo
+  // formato ja confirmado no reply de texto. Verificado DEPOIS dos sub-objetos.
+  data?: Record<string, unknown> | null,
+): DadosAnuncio | null {
+  const doContexto = (ctx?: Record<string, unknown> | null): DadosAnuncio | null => {
+    if (!ctx) return null;
     const ad = ctx["externalAdReply"] as
       | {
           title?: string;
@@ -763,17 +767,29 @@ function extrairAnuncio(message?: Record<string, unknown> | null): {
       (ad?.ctwaClid as string | undefined) ??
       (ctx["ctwaClid"] as string | undefined) ??
       null;
-    if (ad || ctwaClid) {
-      return {
-        ctwaClid: ctwaClid || null,
-        anuncioId: ad?.sourceId || null,
-        anuncioTitulo: ad?.title || null,
-        anuncioUrl: ad?.sourceUrl || null,
-        origemDetalhe: ad?.body || ad?.sourceType || null,
-      };
+    if (!ad && !ctwaClid) return null;
+    return {
+      ctwaClid: ctwaClid || null,
+      anuncioId: ad?.sourceId || null,
+      anuncioTitulo: ad?.title || null,
+      anuncioUrl: ad?.sourceUrl || null,
+      origemDetalhe: ad?.body || ad?.sourceType || null,
+    };
+  };
+
+  if (message) {
+    for (const sub of Object.values(message)) {
+      if (!sub || typeof sub !== "object") continue;
+      const achado = doContexto(
+        (sub as { contextInfo?: Record<string, unknown> }).contextInfo,
+      );
+      if (achado) return achado;
     }
   }
-  return null;
+  return doContexto(
+    (data as { contextInfo?: Record<string, unknown> } | null | undefined)
+      ?.contextInfo,
+  );
 }
 
 // Transcricao de audio (speech-to-text), quando a Evolution enviar. Busca em
@@ -2080,7 +2096,10 @@ async function processarEvento(
     // Le do DESEMBRULHADO: extrairAnuncio procura contextInfo nos sub-objetos de
     // 1o nivel; com envelope o 1o nivel e o wrapper (que nao tem contextInfo) e
     // retornava null — o lead vindo de anuncio pago perdia ctwaClid/origem.
-    const anuncio = extrairAnuncio(msgDesemb);
+    const anuncio = extrairAnuncio(
+      msgDesemb,
+      data as Record<string, unknown> | undefined,
+    );
     if (anuncio && (anuncio.ctwaClid || anuncio.anuncioId)) {
       lead = await prisma.lead.update({
         where: { id: lead.id },
