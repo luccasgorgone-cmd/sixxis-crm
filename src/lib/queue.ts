@@ -1985,12 +1985,15 @@ async function processarEvento(
       )?.id ?? null
     : null;
 
-  // DIAGNOSTICO TEMPORARIO (reply): o vinculo nao esta sendo gravado nem apos o
-  // fix do envelope. Loga UMA linha por mensagem que traga contextInfo, so com
-  // ESTRUTURA (ids do WhatsApp e nomes de chaves) — sem texto e sem telefone.
-  // Leitura: stanzaExtraido=null -> o id nao esta em contextInfo.stanzaId;
-  // stanzaExtraido preenchido + citadaEncontradaNoBanco=false -> o id nao casa
-  // com nenhum externalId gravado. Remover apos a correcao do reply.
+  // DIAGNOSTICO TEMPORARIO (reply) — REMOVER apos a validacao ao vivo do tech
+  // lead (este log e a funcao primeiroContextInfo saem juntos).
+  // Loga UMA linha por mensagem que traga contextInfo, so com ESTRUTURA (ids do
+  // WhatsApp e nomes de chaves) — sem texto de mensagem e sem telefone.
+  // Leitura: achouEm=dataNivel confirma o formato do reply de TEXTO (contextInfo
+  // irmao de message); achouEm=subobjeto:* e o caminho da MIDIA, que ja
+  // funcionava; achouEm=nenhum + stanza=null -> o id nao esta em stanzaId;
+  // stanza preenchido + citadaEncontradaNoBanco=false -> o id nao casa com
+  // nenhum externalId gravado.
   const ctxDebug = primeiroContextInfo(
     msgDesemb,
     data as Record<string, unknown> | undefined,
@@ -1999,7 +2002,8 @@ async function processarEvento(
     const chavesCru = Object.keys((data?.message ?? {}) as Record<string, unknown>);
     console.log(
       `[reply-debug] keyId=${externalId}` +
-        ` stanzaExtraido=${stanzaCitada ?? "null"}` +
+        ` achouEm=${ctxDebug.achouEm}` +
+        ` stanza=${stanzaCitada ?? "null"}` +
         ` chavesMsg=${Object.keys(msgDesemb ?? {}).join("|") || "-"}` +
         ` chavesCru=${chavesCru.join("|") || "-"}` +
         ` chavesContextInfo=${Object.keys(ctxDebug.ctx).join("|") || "-"}` +
