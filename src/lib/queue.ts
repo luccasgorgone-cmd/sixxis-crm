@@ -658,35 +658,6 @@ function extrairStanzaCitada(
   );
 }
 
-// DIAGNOSTICO TEMPORARIO (reply). Primeiro contextInfo encontrado, procurando nos
-// MESMOS lugares (e na mesma ordem) que extrairStanzaCitada: sub-objetos de
-// message -> nivel do evento (data) -> message.contextInfo. `achouEm` diz onde,
-// para o log. Usado so para LOGAR estrutura (nomes de chaves), nunca conteudo.
-// Remover junto com o log [reply-debug] apos a validacao ao vivo.
-function primeiroContextInfo(
-  message?: Record<string, unknown> | null,
-  data?: Record<string, unknown> | null,
-): { ctx: Record<string, unknown> | null; achouEm: string } {
-  if (message) {
-    for (const [chave, sub] of Object.entries(message)) {
-      if (!sub || typeof sub !== "object") continue;
-      const ctx = (sub as { contextInfo?: unknown }).contextInfo;
-      if (ctx && typeof ctx === "object") {
-        return { ctx: ctx as Record<string, unknown>, achouEm: `subobjeto:${chave}` };
-      }
-    }
-  }
-  const doEvento = (data as { contextInfo?: unknown } | null | undefined)?.contextInfo;
-  if (doEvento && typeof doEvento === "object") {
-    return { ctx: doEvento as Record<string, unknown>, achouEm: "dataNivel" };
-  }
-  const noMessage = (message as { contextInfo?: unknown } | null | undefined)?.contextInfo;
-  if (noMessage && typeof noMessage === "object") {
-    return { ctx: noMessage as Record<string, unknown>, achouEm: "messageContextInfo" };
-  }
-  return { ctx: null, achouEm: "nenhum" };
-}
-
 // Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
 // tipos sem texto (figurinha/localizacao/contato). Captura o maximo de info.
 function extrairConteudo(
@@ -2011,32 +1982,6 @@ async function processarEvento(
       )?.id ?? null
     : null;
 
-  // DIAGNOSTICO TEMPORARIO (reply) — REMOVER apos a validacao ao vivo do tech
-  // lead (este log e a funcao primeiroContextInfo saem juntos).
-  // Loga UMA linha por mensagem que traga contextInfo, so com ESTRUTURA (ids do
-  // WhatsApp e nomes de chaves) — sem texto de mensagem e sem telefone.
-  // Leitura: achouEm=dataNivel confirma o formato do reply de TEXTO (contextInfo
-  // irmao de message); achouEm=subobjeto:* e o caminho da MIDIA, que ja
-  // funcionava; achouEm=nenhum + stanza=null -> o id nao esta em stanzaId;
-  // stanza preenchido + citadaEncontradaNoBanco=false -> o id nao casa com
-  // nenhum externalId gravado.
-  const ctxDebug = primeiroContextInfo(
-    msgDesemb,
-    data as Record<string, unknown> | undefined,
-  );
-  if (ctxDebug.ctx) {
-    const chavesCru = Object.keys((data?.message ?? {}) as Record<string, unknown>);
-    console.log(
-      `[reply-debug] keyId=${externalId}` +
-        ` achouEm=${ctxDebug.achouEm}` +
-        ` stanza=${stanzaCitada ?? "null"}` +
-        ` chavesMsg=${Object.keys(msgDesemb ?? {}).join("|") || "-"}` +
-        ` chavesCru=${chavesCru.join("|") || "-"}` +
-        ` chavesContextInfo=${Object.keys(ctxDebug.ctx).join("|") || "-"}` +
-        ` temQuotedMessage=${!!ctxDebug.ctx["quotedMessage"]}` +
-        ` citadaEncontradaNoBanco=${stanzaCitada ? respostaAId !== null : "n/a"}`,
-    );
-  }
   // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
   // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
   // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
