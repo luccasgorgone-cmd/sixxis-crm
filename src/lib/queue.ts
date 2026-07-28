@@ -1791,9 +1791,14 @@ async function processarEvento(
   // REACAO recebida (cliente reagiu a uma mensagem). Chega como upsert com
   // message.reactionMessage = { key: { id }, text: emoji }. Ignora o eco das
   // NOSSAS reacoes (fromMe). Best-effort: erro aqui nao quebra a ingestao.
-  const reacaoWa = (
-    data?.message as { reactionMessage?: { key?: { id?: string }; text?: string } } | undefined
-  )?.reactionMessage;
+  // Le do cru e, se nao achar, do DESEMBRULHADO (com envelope o reactionMessage
+  // fica dentro do wrapper). Sem envelope os dois sao o mesmo objeto. Aqui o
+  // msgDesemb do fluxo principal ainda nao existe (e definido mais abaixo), por
+  // isso desembrulha localmente.
+  type MsgReacao = { reactionMessage?: { key?: { id?: string }; text?: string } };
+  const reacaoWa =
+    (data?.message as MsgReacao | undefined)?.reactionMessage ??
+    (desembrulharMessage(data?.message) as MsgReacao | null)?.reactionMessage;
   if (reacaoWa && !fromMe) {
     const alvo = reacaoWa.key?.id;
     if (alvo) {
