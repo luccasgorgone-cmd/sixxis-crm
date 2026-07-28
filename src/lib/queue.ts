@@ -398,6 +398,9 @@ type EventoEvolution = {
     };
     pushName?: string;
     message?: Record<string, unknown> | null;
+    // Reply de TEXTO PURO (conversation): a Evolution v2 manda o contextInfo
+    // aqui, IRMAO de message — nao dentro do sub-objeto da mensagem.
+    contextInfo?: Record<string, unknown> | null;
     messageType?: string;
     messageTimestamp?: number | string;
   };
@@ -610,24 +613,45 @@ function extrairContato(
   return null;
 }
 
-// Reply recebido: id (stanzaId) da mensagem CITADA no contextInfo. Fatia 2.85.
+// Reply recebido: id (stanzaId) da mensagem CITADA. Fatia 2.85.
+// A Evolution poe o contextInfo em lugares DIFERENTES conforme o tipo:
+//  - MIDIA e texto estendido: DENTRO do sub-objeto (imageMessage.contextInfo...);
+//  - TEXTO PURO (message.conversation): IRMAO de message, no nivel do `data`
+//    (Evolution v2.3.7, issue #2065). Era por isso que reply de texto nunca
+//    vinculava: a busca so olhava dentro do message.
+// Ordem: sub-objetos de message -> data.contextInfo -> message.contextInfo.
+// Nenhum caminho antigo foi removido — os novos vem DEPOIS.
 function extrairStanzaCitada(
   message?: Record<string, unknown> | null,
+  data?: Record<string, unknown> | null,
 ): string | null {
-  if (!message) return null;
-  const m = message as Record<string, { contextInfo?: { stanzaId?: string } }>;
-  for (const chave of [
-    "extendedTextMessage",
-    "imageMessage",
-    "videoMessage",
-    "documentMessage",
-    "audioMessage",
-    "stickerMessage",
-  ]) {
-    const stanza = m[chave]?.contextInfo?.stanzaId;
-    if (stanza) return String(stanza);
+  const stanzaDe = (ctx: unknown): string | null => {
+    const s = (ctx as { stanzaId?: unknown } | null | undefined)?.stanzaId;
+    return s ? String(s) : null;
+  };
+  if (message) {
+    const m = message as Record<string, { contextInfo?: { stanzaId?: string } }>;
+    for (const chave of [
+      "extendedTextMessage",
+      "imageMessage",
+      "videoMessage",
+      "documentMessage",
+      "audioMessage",
+      "stickerMessage",
+    ]) {
+      const stanza = m[chave]?.contextInfo?.stanzaId;
+      if (stanza) return String(stanza);
+    }
   }
-  return null;
+  // NOVO: contextInfo no nivel do EVENTO (irmao de message) — reply de texto puro.
+  const doEvento = stanzaDe(
+    (data as { contextInfo?: unknown } | null | undefined)?.contextInfo,
+  );
+  if (doEvento) return doEvento;
+  // NOVO (defensivo): contextInfo pendurado direto no message.
+  return stanzaDe(
+    (message as { contextInfo?: unknown } | null | undefined)?.contextInfo,
+  );
 }
 
 // DIAGNOSTICO TEMPORARIO (reply). Primeiro contextInfo encontrado nos sub-objetos
@@ -1931,10 +1955,13 @@ async function processarEvento(
   // dentro do wrapper e o card nao era detectado.
   const contatoInfo = extrairContato(msgDesemb);
   // Reply: se cita uma mensagem que temos, vincula por externalId (best-effort).
-  // Le do message DESEMBRULHADO: com envelope (ephemeral/view-once/doc com
-  // legenda) o contextInfo.stanzaId fica DENTRO do envelope e a busca por chaves
-  // de 1o nivel no message cru nao acha nada — o reply se perdia.
-  const stanzaCitada = extrairStanzaCitada(msgDesemb);
+  // Le do message DESEMBRULHADO (envelope esconde o contextInfo do sub-objeto) E
+  // do nivel do EVENTO (`data`), onde a Evolution poe o contextInfo quando a
+  // resposta e TEXTO PURO (message.conversation).
+  const stanzaCitada = extrairStanzaCitada(
+    msgDesemb,
+    data as Record<string, unknown> | undefined,
+  );
   const respostaAId = stanzaCitada
     ? (
         await prisma.mensagem.findUnique({
