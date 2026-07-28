@@ -630,6 +630,21 @@ function extrairStanzaCitada(
   return null;
 }
 
+// DIAGNOSTICO TEMPORARIO (reply). Primeiro contextInfo encontrado nos sub-objetos
+// da mensagem — usado so para LOGAR a estrutura (nomes de chaves), nunca conteudo.
+// Remover junto com o log [reply-debug] quando a causa do reply estiver fechada.
+function primeiroContextInfo(
+  message?: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!message) return null;
+  for (const sub of Object.values(message)) {
+    if (!sub || typeof sub !== "object") continue;
+    const ctx = (sub as { contextInfo?: unknown }).contextInfo;
+    if (ctx && typeof ctx === "object") return ctx as Record<string, unknown>;
+  }
+  return null;
+}
+
 // Extrai um conteudo legivel: texto puro, legenda de midia ou um resumo para
 // tipos sem texto (figurinha/localizacao/contato). Captura o maximo de info.
 function extrairConteudo(
@@ -1900,6 +1915,26 @@ async function processarEvento(
         })
       )?.id ?? null
     : null;
+
+  // DIAGNOSTICO TEMPORARIO (reply): o vinculo nao esta sendo gravado nem apos o
+  // fix do envelope. Loga UMA linha por mensagem que traga contextInfo, so com
+  // ESTRUTURA (ids do WhatsApp e nomes de chaves) — sem texto e sem telefone.
+  // Leitura: stanzaExtraido=null -> o id nao esta em contextInfo.stanzaId;
+  // stanzaExtraido preenchido + citadaEncontradaNoBanco=false -> o id nao casa
+  // com nenhum externalId gravado. Remover apos a correcao do reply.
+  const ctxDebug = primeiroContextInfo(msgDesemb);
+  if (ctxDebug) {
+    const chavesCru = Object.keys((data?.message ?? {}) as Record<string, unknown>);
+    console.log(
+      `[reply-debug] keyId=${externalId}` +
+        ` stanzaExtraido=${stanzaCitada ?? "null"}` +
+        ` chavesMsg=${Object.keys(msgDesemb ?? {}).join("|") || "-"}` +
+        ` chavesCru=${chavesCru.join("|") || "-"}` +
+        ` chavesContextInfo=${Object.keys(ctxDebug).join("|") || "-"}` +
+        ` temQuotedMessage=${!!ctxDebug["quotedMessage"]}` +
+        ` citadaEncontradaNoBanco=${stanzaCitada ? respostaAId !== null : "n/a"}`,
+    );
+  }
   // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
   // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
   // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
