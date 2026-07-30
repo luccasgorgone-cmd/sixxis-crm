@@ -25,6 +25,15 @@ type CatalogoItem = {
   precoSugerido: number | null;
 };
 
+// Rotulo do item do catalogo. Varios produtos ja tem o modelo dentro do proprio
+// nome ("Climatizador M45 Trend" + modelo "M45 Trend"); concatenar cegamente
+// gerava "Climatizador M45 Trend M45 Trend". Se o nome ja contem o modelo, usa
+// so o nome; senao, mantem a concatenacao (produtos cujo nome nao traz o modelo).
+function rotuloCatalogo(c: Pick<CatalogoItem, "nome" | "modelo">): string {
+  if (c.modelo && c.nome.includes(c.modelo)) return c.nome;
+  return [c.nome, c.modelo].filter(Boolean).join(" ");
+}
+
 type Linha = {
   key: string;
   produtoCatalogoId: string | null;
@@ -196,7 +205,7 @@ export function ModalFechamento({
           ? {
               ...i,
               produtoCatalogoId: c?.id ?? null,
-              descricao: c ? [c.nome, c.modelo].filter(Boolean).join(" ") : "",
+              descricao: c ? rotuloCatalogo(c) : "",
               valorUnitario:
                 i.valorUnitario > 0 ? i.valorUnitario : c?.precoSugerido ?? 0,
             }
@@ -356,7 +365,7 @@ export function ModalFechamento({
                           <optgroup key={g} label={g}>
                             {lista.map((c) => (
                               <option key={c.id} value={c.id}>
-                                {[c.nome, c.modelo].filter(Boolean).join(" ")}
+                                {rotuloCatalogo(c)}
                               </option>
                             ))}
                           </optgroup>
