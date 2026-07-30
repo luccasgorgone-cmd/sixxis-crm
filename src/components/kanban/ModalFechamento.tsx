@@ -22,8 +22,14 @@ type CatalogoItem = {
   nome: string;
   categoria: string | null;
   modelo: string | null;
+  // Referencia do catalogo: pre-preenchem o item quando o produto e escolhido.
+  voltagem: string | null;
+  cor: string | null;
   precoSugerido: number | null;
 };
+
+// Voltagens aceitas no item do Ganho. "" = nao informada (o campo e opcional).
+const VOLTAGENS = ["110V", "220V"] as const;
 
 // Rotulo do item do catalogo. Varios produtos ja tem o modelo dentro do proprio
 // nome ("Climatizador M45 Trend" + modelo "M45 Trend"); concatenar cegamente
@@ -42,6 +48,12 @@ type Linha = {
   valorUnitario: number;
   // Garantia (so pos-venda): item nao soma no total cobrado.
   garantia: boolean;
+  // Voltagem e cor do item (opcionais). Pre-preenchidos pelo catalogo quando o
+  // produto e escolhido; o vendedor pode ajustar. "" = nao informado.
+  // AINDA NAO PERSISTIDOS: ItemPedido nao tem onde guardar (ver comentario em
+  // confirmar()); por ora servem para conferencia na hora do fechamento.
+  voltagem: string;
+  cor: string;
 };
 
 export type DadosFechamento = {
@@ -124,6 +136,8 @@ export function ModalFechamento({
         quantidade: it.quantidade,
         valorUnitario: it.valorUnitario,
         garantia: it.garantia ?? false,
+        voltagem: "",
+        cor: "",
       };
     }),
   );
@@ -188,7 +202,16 @@ export function ModalFechamento({
     contador.current += 1;
     setItens((p) => [
       ...p,
-      { key: `l${contador.current}`, produtoCatalogoId: null, descricao: "", quantidade: 1, valorUnitario: 0, garantia: false },
+      {
+        key: `l${contador.current}`,
+        produtoCatalogoId: null,
+        descricao: "",
+        quantidade: 1,
+        valorUnitario: 0,
+        garantia: false,
+        voltagem: "",
+        cor: "",
+      },
     ]);
   }
   function alternarGarantia(key: string) {
@@ -208,6 +231,10 @@ export function ModalFechamento({
               descricao: c ? rotuloCatalogo(c) : "",
               valorUnitario:
                 i.valorUnitario > 0 ? i.valorUnitario : c?.precoSugerido ?? 0,
+              // Catalogo manda quando tem o dado; senao mantem o que o vendedor
+              // digitou. (Na fase do endpoint da Loja, quem pre-preenche e o pedido.)
+              voltagem: c?.voltagem ?? i.voltagem,
+              cor: c?.cor ?? i.cor,
             }
           : i,
       ),
@@ -279,6 +306,10 @@ export function ModalFechamento({
             valorAjustado: temAjuste ? valorFinal : null,
             // Formas de pagamento (opcional; congela no snapshot). Metadado.
             orcPagamentos: paraPersistir(pagamentos),
+            // voltagem/cor NAO vao aqui: ItemPedido (schema.prisma) nao tem essas
+            // colunas, entao nao ha onde guardar sem uma migracao aditiva propria.
+            // Por ora sao so conferencia na tela; a persistencia entra na fatia
+            // que ligar o endpoint da Loja (que manda voltagem e cor por item).
             itens: validos.map((i) => ({
               produtoCatalogoId: i.produtoCatalogoId,
               descricao: i.descricao.trim(),
@@ -425,6 +456,46 @@ export function ModalFechamento({
                       >
                         {formatarBRL(it.quantidade * it.valorUnitario)}
                       </span>
+                    </div>
+                    {/* Voltagem e cor do item (opcionais). Pre-preenchidos pelo
+                        catalogo; conferidos/ajustados pelo vendedor. */}
+                    <div className="mt-2 flex items-end gap-2">
+                      <label className="flex shrink-0 flex-col gap-0.5 text-xs text-medio/60">
+                        Voltagem
+                        <select
+                          value={it.voltagem}
+                          onChange={(e) =>
+                            setItens((p) =>
+                              p.map((x) => (x.key === it.key ? { ...x, voltagem: e.target.value } : x)),
+                            )
+                          }
+                          className="campo w-24"
+                        >
+                          <option value="">—</option>
+                          {/* Valor vindo do catalogo fora da lista: nao some do select. */}
+                          {it.voltagem && !VOLTAGENS.includes(it.voltagem as (typeof VOLTAGENS)[number]) && (
+                            <option value={it.voltagem}>{it.voltagem}</option>
+                          )}
+                          {VOLTAGENS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs text-medio/60">
+                        Cor
+                        <input
+                          value={it.cor}
+                          onChange={(e) =>
+                            setItens((p) =>
+                              p.map((x) => (x.key === it.key ? { ...x, cor: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="Opcional"
+                          className="campo w-full"
+                        />
+                      </label>
                     </div>
                     {/* Garantia (so pos-venda): item nao soma no total cobrado. */}
                     {ehPeca && (

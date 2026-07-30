@@ -1310,6 +1310,10 @@ model ProdutoCatalogo {
   // "Climatizadores (Antigos)" (sem flag booleana). Motor/Motor Swing/Placas/
   // Bomba d'agua e Inversor|Capacitor sao eletricas; demais pecas ficam null.
   voltagem      String?
+  // Cor do PRODUTO (aditivo, nullable). A Loja manda voltagem e cor por item do
+  // pedido; aqui e o valor de referencia do catalogo, usado para pre-preencher o
+  // item na tela de Ganho. null = sem cor definida.
+  cor           String?
   precoSugerido Decimal?     @db.Decimal(12, 2)
   tipo          TipoCatalogo @default(PRODUTO)
   ativo         Boolean      @default(true)

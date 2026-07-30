@@ -26,7 +26,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const itens = await prisma.produtoCatalogo.findMany({
     where,
     orderBy: [{ categoria: "asc" }, { ordem: "asc" }, { nome: "asc" }],
-    select: { id: true, nome: true, categoria: true, modelo: true, precoSugerido: true, tipo: true },
+    // voltagem/cor: valores de referencia do catalogo, usados para pre-preencher
+    // o item na tela de Ganho (o vendedor ainda pode ajustar).
+    select: {
+      id: true,
+      nome: true,
+      categoria: true,
+      modelo: true,
+      voltagem: true,
+      cor: true,
+      precoSugerido: true,
+      tipo: true,
+    },
   });
   return NextResponse.json({
     itens: itens.map((i) => ({
