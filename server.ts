@@ -24,6 +24,7 @@ import {
   seedPecas,
   seedVoltagemPecasEletricas,
   seedPrecosMotorSwing,
+  seedProdutoSX120Prime,
   backfillAcesso,
   purgarDadosTeste,
   backfillNegocios,
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   await seedPecas();
   await seedVoltagemPecasEletricas();
   await seedPrecosMotorSwing();
+  await seedProdutoSX120Prime();
   await backfillAcesso();
   await purgarDadosTeste();
   await backfillNegocios();

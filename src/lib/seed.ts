@@ -1212,6 +1212,54 @@ export async function seedVoltagemPecasEletricas(): Promise<void> {
   }
 }
 
+// O "Climatizador SX120 Prime" e vendido no site mas NUNCA entrou no catalogo do
+// CRM: o que existe e o "Climatizador SX120" (id seed-clima-sx120), de outra
+// geracao, que NAO e vendido no site. Sem este registro o casamento com a Loja
+// fecha 11/12 e todo pedido de SX120 Prime cai em texto livre.
+//
+// Id ESTAVEL e proprio (seed-clima-sx120-prime) para nao colidir com o antigo,
+// que fica INTOCADO (nao alteramos nem desativamos — so nao entra no casamento).
+// Sem preco: a Sol e o Ganho remetem o cliente ao site para preco/condicoes.
+// Idempotente: existindo por NOME (qualquer id), nao cria nem sobrescreve.
+export async function seedProdutoSX120Prime(): Promise<void> {
+  try {
+    const NOME = "Climatizador SX120 Prime";
+    const ja = await prisma.produtoCatalogo.findFirst({
+      where: { tipo: TipoCatalogo.PRODUTO, nome: NOME },
+      select: { id: true },
+    });
+    if (ja) {
+      console.log(`[seed] sx120-prime: ja existe (${ja.id}); nada a fazer`);
+      return;
+    }
+    const ultima = await prisma.produtoCatalogo.findFirst({
+      orderBy: { ordem: "desc" },
+      select: { ordem: true },
+    });
+    const criado = await prisma.produtoCatalogo.create({
+      data: {
+        id: "seed-clima-sx120-prime",
+        nome: NOME,
+        categoria: "Climatizador",
+        modelo: "SX120 Prime",
+        // SX120 Prime e so 220V (mesma regra do numeroModelo: >100 => so 220V).
+        voltagem: "220V",
+        cor: null,
+        precoSugerido: null,
+        tipo: TipoCatalogo.PRODUTO,
+        ativo: true,
+        ordem: (ultima?.ordem ?? 0) + 1,
+      },
+      select: { id: true },
+    });
+    console.log(`[seed] sx120-prime: criado (${criado.id})`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha ao semear o SX120 Prime: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Precos corretos do "Motor Swing" (peca de climatizador) por modelo (Fatia R).
 // O valor vale para AMBAS as voltagens do mesmo modelo. As 34 linhas ja existem
 // no banco, mas foram semeadas na faixa do Motor principal (R$500-1000); os
