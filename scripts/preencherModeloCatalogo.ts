@@ -1,42 +1,26 @@
 // Preenche `modelo` e padroniza `categoria` dos 12 produtos do site no
-// ProdutoCatalogo, para casar com a grafia da Loja (Blocos 2 e 3).
+// ProdutoCatalogo, para casar com a grafia da Loja.
+//
+// ATALHO PELO TERMINAL — a via normal e a TELA: Admin > Catalogo > "Casar com a
+// Loja" (GET/POST /api/admin/catalogo/casar-loja), que faz exatamente isto no
+// navegador, sem DATABASE_URL. Mapa e regra sao os MESMOS (lib/casarLoja).
 //
 // MODO SEGURO — por padrao NAO grava nada:
 //   npx tsx scripts/preencherModeloCatalogo.ts            -> SIMULACAO (de -> para)
 //   npx tsx scripts/preencherModeloCatalogo.ts --aplicar  -> GRAVA
 //
-// Regras (nao negociaveis):
-//  * so mexe em tipo=PRODUTO cujo NOME bate EXATO no mapa abaixo (12 registros);
+// Regras (nao negociaveis, iguais as da rota):
+//  * so mexe em tipo=PRODUTO cujo NOME bate EXATO no mapa (12 registros);
 //  * NAO toca em PECA nem em nenhum produto fora do mapa;
-//  * se QUALQUER um dos 12 nomes nao for encontrado, NAO grava NADA (nem os que
-//    bateram) e lista o que faltou + os nomes reais do catalogo, para ajustarmos
-//    o mapa antes;
+//  * se QUALQUER um dos 12 nao casar (ou houver nome duplicado), NAO grava NADA
+//    e lista o que faltou + os nomes reais do catalogo;
 //  * um unico --aplicar grava as duas colunas (modelo e categoria).
 //
-// Idempotente: rodar 2x nao quebra (na 2a vez nada esta "de -> para" e o script
-// reporta 0 alteracoes).
+// Idempotente: rodar 2x nao quebra (na 2a vez nada esta "de -> para").
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 import { TipoCatalogo } from "../src/generated/prisma/enums";
-
-// Grafia da Loja, confirmada. A chave e o NOME EXATO do produto no catalogo.
-const ALVO: Record<string, { modelo: string; categoria: string }> = {
-  "Aspirador Vertical Sixxis Bravo S2": { modelo: "Bravo S2", categoria: "Aspirador" },
-  "Bicicleta Ergométrica Spinning Sixxis Cardio": {
-    modelo: "Spinning Cardio",
-    categoria: "Bike Spinning",
-  },
-  "Bicicleta Spinning Sixxis Life": { modelo: "Spinning Life", categoria: "Bike Spinning" },
-  "Climatizador M45 Trend": { modelo: "M45 Trend", categoria: "Climatizador" },
-  "Climatizador SX040 Trend": { modelo: "SX040 Trend", categoria: "Climatizador" },
-  "Climatizador SX060 Prime": { modelo: "SX060 Prime", categoria: "Climatizador" },
-  "Climatizador SX070 Trend": { modelo: "SX070 Trend", categoria: "Climatizador" },
-  "Climatizador SX100 Trend": { modelo: "SX100 Trend", categoria: "Climatizador" },
-  "Climatizador SX120 Prime": { modelo: "SX120 Prime", categoria: "Climatizador" },
-  "Climatizador SX180 Trend": { modelo: "SX180 Trend", categoria: "Climatizador" },
-  "Climatizador SX200 Prime": { modelo: "SX200 Prime", categoria: "Climatizador" },
-  "Climatizador SX200 Trend": { modelo: "SX200 Trend", categoria: "Climatizador" },
-};
+import { NOMES_CASAR_LOJA, MAPA_CASAR_LOJA, simularCasamento } from "../src/lib/casarLoja";
 
 const APLICAR = process.argv.includes("--aplicar");
 
@@ -46,53 +30,39 @@ function col(v: string | null | undefined, largura: number): string {
 }
 
 async function main(): Promise<void> {
-  const nomes = Object.keys(ALVO);
   console.log(
     `[catalogo] modo: ${APLICAR ? "APLICAR (grava)" : "SIMULACAO (nao grava)"} — ` +
-      `${nomes.length} produtos no mapa`,
+      `${NOMES_CASAR_LOJA.length} produtos no mapa`,
   );
 
-  // Busca so os PRODUTOs com nome exatamente igual a alguma chave do mapa.
   const achados = await prisma.produtoCatalogo.findMany({
-    where: { tipo: TipoCatalogo.PRODUTO, nome: { in: nomes } },
+    where: { tipo: TipoCatalogo.PRODUTO, nome: { in: NOMES_CASAR_LOJA } },
     select: { id: true, nome: true, modelo: true, categoria: true },
-    orderBy: { nome: "asc" },
   });
-
-  // Trava: um nome do mapa sem correspondencia = grafia divergente. Nao grava nada.
-  const encontrados = new Set(achados.map((a) => a.nome));
-  const faltando = nomes.filter((n) => !encontrados.has(n));
-  // Nome duplicado no catalogo tambem e ambiguo demais para gravar as cegas.
-  const duplicados = nomes.filter((n) => achados.filter((a) => a.nome === n).length > 1);
+  const sim = simularCasamento(achados);
 
   console.log("");
   console.log(
-    "nome" .padEnd(46) + "| " + "modelo (de -> para)".padEnd(38) + "| categoria (de -> para)",
+    "nome".padEnd(46) + "| " + "modelo (de -> para)".padEnd(38) + "| categoria (de -> para)",
   );
   console.log("-".repeat(46) + "+-" + "-".repeat(38) + "+" + "-".repeat(34));
-  let mudariam = 0;
-  for (const p of achados) {
-    const alvo = ALVO[p.nome];
-    const mudaModelo = (p.modelo ?? "") !== alvo.modelo;
-    const mudaCategoria = (p.categoria ?? "") !== alvo.categoria;
-    if (mudaModelo || mudaCategoria) mudariam += 1;
+  for (const l of sim.linhas) {
     console.log(
-      col(p.nome, 46) +
+      col(l.nome, 46) +
         "| " +
-        col(`${p.modelo ?? "—"} -> ${alvo.modelo}`, 38) +
+        col(`${l.modeloAtual ?? "—"} -> ${l.modeloNovo}`, 38) +
         "| " +
-        `${p.categoria ?? "—"} -> ${alvo.categoria}` +
-        (mudaModelo || mudaCategoria ? "" : "  (ja ok)"),
+        `${l.categoriaAtual ?? "—"} -> ${l.categoriaNova}` +
+        (l.muda ? "" : "  (ja ok)"),
     );
-    console.log("  id: " + p.id);
+    console.log("  id: " + l.id);
   }
 
-  if (faltando.length > 0 || duplicados.length > 0) {
-    console.log("\n[catalogo] NAO GRAVEI NADA — o mapa precisa de ajuste antes.");
-    if (faltando.length > 0) {
-      console.log(`\nNomes do mapa NAO encontrados no catalogo (${faltando.length}):`);
-      for (const n of faltando) console.log("  - " + n);
-      // Ajuda a corrigir a grafia: mostra os nomes reais de PRODUTO no catalogo.
+  if (!sim.ok) {
+    console.log("\n[catalogo] NAO GRAVEI NADA — o catalogo precisa de ajuste antes.");
+    if (sim.faltando.length > 0) {
+      console.log(`\nNomes do mapa NAO encontrados no catalogo (${sim.faltando.length}):`);
+      for (const n of sim.faltando) console.log("  - " + n);
       const todos = await prisma.produtoCatalogo.findMany({
         where: { tipo: TipoCatalogo.PRODUTO },
         select: { id: true, nome: true, modelo: true, categoria: true },
@@ -105,9 +75,9 @@ async function main(): Promise<void> {
         );
       }
     }
-    if (duplicados.length > 0) {
+    if (sim.duplicados.length > 0) {
       console.log(`\nNomes com MAIS DE UM registro (ambiguo):`);
-      for (const n of duplicados) console.log("  - " + n);
+      for (const n of sim.duplicados) console.log("  - " + n);
     }
     await prisma.$disconnect();
     process.exitCode = 1;
@@ -115,8 +85,8 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n[catalogo] ${achados.length}/${nomes.length} produtos casaram; ` +
-      `${mudariam} teriam alteracao.`,
+    `\n[catalogo] ${sim.casados}/${sim.esperados} produtos casaram; ` +
+      `${sim.mudariam} teriam alteracao.`,
   );
 
   if (!APLICAR) {
@@ -126,15 +96,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Grava: uma transacao, update por id (nunca por nome), so nos 12 casados.
-  const updates = achados.map((p) =>
-    prisma.produtoCatalogo.update({
-      where: { id: p.id },
-      data: { modelo: ALVO[p.nome].modelo, categoria: ALVO[p.nome].categoria },
-    }),
+  await prisma.$transaction(
+    sim.linhas.map((l) =>
+      prisma.produtoCatalogo.update({
+        where: { id: l.id },
+        data: {
+          modelo: MAPA_CASAR_LOJA[l.nome].modelo,
+          categoria: MAPA_CASAR_LOJA[l.nome].categoria,
+        },
+      }),
+    ),
   );
-  await prisma.$transaction(updates);
-  console.log(`[catalogo] APLICADO: ${updates.length} produtos atualizados (modelo + categoria).`);
+  console.log(`[catalogo] APLICADO: ${sim.linhas.length} produtos atualizados (modelo + categoria).`);
   await prisma.$disconnect();
 }
 

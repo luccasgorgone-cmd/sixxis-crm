@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Boxes } from "lucide-react";
 import { Cabecalho } from "./VendedoresAdmin";
+import { CasarLoja } from "./CasarLoja";
 import { EstadoErro } from "@/components/ui/Estado";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
@@ -94,6 +95,9 @@ export function CatalogoAdmin() {
           </button>
         ))}
       </div>
+
+      {/* Casamento com a Loja: so faz sentido em PRODUTO (os 12 do site). */}
+      {tipo === "PRODUTO" && <CasarLoja onAplicado={() => void carregar()} />}
 
       {erro ? (
         <EstadoErro mensagem="Nao foi possivel carregar o catalogo." onRetry={carregar} />
