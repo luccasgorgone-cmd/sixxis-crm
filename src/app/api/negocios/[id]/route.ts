@@ -24,6 +24,7 @@ import { dispararPurchase } from "@/lib/metaCapi";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
 import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
+import { dataSomenteDia } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -928,8 +929,10 @@ export async function PATCH(
             if (decisao === "GANHO") {
               const nfNumero =
                 typeof body.nf?.numero === "string" ? body.nf.numero.trim() : "";
-              const nfData =
-                body.nf?.dataNF != null ? new Date(String(body.nf.dataNF)) : null;
+              // Data "so dia" ancorada ao MEIO-DIA UTC (ponto unico: lib/data):
+              // "2026-07-15" a meia-noite UTC vira 14/07 no fuso BR — e a dataNF
+              // e o relogio da garantia.
+              const nfData = dataSomenteDia(body.nf?.dataNF ?? null);
               if (nfNumero && nfData && !Number.isNaN(nfData.getTime())) {
                 await tx.notaFiscal.create({
                   data: {

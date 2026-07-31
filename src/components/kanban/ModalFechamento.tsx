@@ -6,7 +6,7 @@
 // Sem itens, cai no modo simples (so valor). PERDIDO pede o motivo. O total do
 // pedido vira o `valor` do negocio (usado inclusive pela conversao Meta).
 import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Plus, Trash2, ShieldCheck, Info } from "lucide-react";
+import { X, Loader2, Plus, Trash2, ShieldCheck, Info, DownloadCloud } from "lucide-react";
 import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
 import { formatarBRL } from "@/lib/format";
 import {
@@ -16,6 +16,13 @@ import {
   type LinhaPagamentoUI,
 } from "@/components/pecas/SecaoPagamento";
 import { lerPagamentos, type LinhaPagamento } from "@/lib/pagamento";
+import {
+  normalizarItemLoja,
+  metodoDaFormaPagamento,
+  dataParaInput,
+  rotuloPedidoLoja,
+  type PedidoCrmLoja,
+} from "@/lib/pedidoLoja";
 
 type CatalogoItem = {
   id: string;
@@ -189,6 +196,105 @@ export function ModalFechamento({
       vivo = false;
     };
   }, [ehGanho, negocioId, pagamentosIniciais]);
+
+  // ---- "Puxar do site": traz o pedido da Loja para PRE-PREENCHER o Ganho ----
+  // Nunca confirma nada: o vendedor confere e clica em Confirmar como sempre.
+  // Disponivel so na VENDA e quando sabemos o negocio (a rota resolve o telefone
+  // do cliente pelo negocio, server-side, com a chave da Loja).
+  const podePuxar = ehGanho && !ehPeca && !!negocioId;
+  const [puxando, setPuxando] = useState(false);
+  const [avisoLoja, setAvisoLoja] = useState<string | null>(null);
+  // Lista para escolher quando o cliente tem mais de um pedido no site.
+  const [escolhaLoja, setEscolhaLoja] = useState<PedidoCrmLoja[] | null>(null);
+
+  async function puxarDoSite() {
+    if (!negocioId || puxando) return;
+    setPuxando(true);
+    setAvisoLoja(null);
+    setEscolhaLoja(null);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/puxar-loja`, { method: "POST" });
+      const d = (await r.json()) as { ok?: boolean; mensagem?: string; pedidos?: PedidoCrmLoja[] };
+      if (!r.ok || d.ok === false) {
+        setAvisoLoja(d.mensagem ?? "Nao foi possivel consultar o site agora.");
+      } else {
+        const pedidos = d.pedidos ?? [];
+        if (pedidos.length === 0) {
+          setAvisoLoja("Nenhum pedido encontrado para este telefone.");
+        } else if (pedidos.length === 1) {
+          aplicarPedidoLoja(pedidos[0]);
+        } else {
+          setEscolhaLoja(pedidos);
+        }
+      }
+    } catch {
+      setAvisoLoja("Nao foi possivel consultar o site agora.");
+    }
+    setPuxando(false);
+  }
+
+  // Casa o item do pedido com o catalogo pelo MODELO, exato. "SX200 Prime" nunca
+  // vira "SX200": sem casamento exato, o item cai em texto livre com o nome que
+  // a Loja mandou (nao inventamos produtoCatalogoId).
+  function casarPorModelo(modelo: string): CatalogoItem | null {
+    if (!modelo) return null;
+    return catalogo.find((c) => (c.modelo ?? "") === modelo) ?? null;
+  }
+
+  function aplicarPedidoLoja(p: PedidoCrmLoja) {
+    setEscolhaLoja(null);
+    setAvisoLoja(null);
+
+    const linhas: Linha[] = (p.itens ?? []).map((cru) => {
+      const it = normalizarItemLoja(cru);
+      const c = casarPorModelo(it.modelo);
+      contador.current += 1;
+      return {
+        key: `l${contador.current}`,
+        produtoCatalogoId: c?.id ?? null,
+        descricao: c ? rotuloCatalogo(c) : it.nome || it.modelo,
+        quantidade: it.quantidade,
+        valorUnitario: it.valorUnitario,
+        garantia: false,
+        voltagem: it.voltagem || c?.voltagem || "",
+        cor: it.cor || c?.cor || "",
+      };
+    });
+    setItens(linhas);
+
+    // Frete: valor + quem paga. Ausente = zera (nao herda o que estava na tela).
+    const freteValor = typeof p.frete?.valor === "number" ? p.frete.valor : 0;
+    setFrete(freteValor > 0 ? String(freteValor) : "");
+    setFretePagoPelaEmpresa(p.frete?.pagoPelaEmpresa === true);
+
+    // Valor final: o total do pedido do site manda (pode ter desconto que a soma
+    // dos itens nao reproduz). Sem total, volta a espelhar o calculado.
+    const totalLoja = typeof p.total === "number" && p.total > 0 ? p.total : null;
+    if (totalLoja != null) {
+      setValorFinalStr(String(totalLoja));
+      setEditouFinal(true);
+    } else {
+      setValorFinalStr("");
+      setEditouFinal(false);
+    }
+
+    // Forma de pagamento: uma linha a vista com o total. Grafia nao reconhecida
+    // => nao mexe (o vendedor escolhe na mao).
+    const metodo = metodoDaFormaPagamento(p.formaPagamento);
+    if (metodo) {
+      const somaItens = linhas.reduce((a, l) => a + l.quantidade * l.valorUnitario, 0);
+      const valorPago =
+        totalLoja ?? somaItens + (p.frete?.pagoPelaEmpresa === true ? 0 : freteValor);
+      setPagamentos(paraUI([{ metodo, valor: Math.max(0, valorPago), parcelas: 1 }]));
+    }
+
+    // NF e rastreio: so preenchem o que veio (a gravacao ancora a data ao
+    // meio-dia UTC, como todo campo "so dia").
+    setNfNumero(p.nf?.numero?.trim() ?? "");
+    setNfData(dataParaInput(p.nf?.data));
+    setRastCodigo(p.rastreio?.codigo?.trim() ?? "");
+    setRastTransp(p.rastreio?.transportadora?.trim() ?? "");
+  }
 
   // Catalogo agrupado por categoria (para os optgroups).
   const grupos = new Map<string, CatalogoItem[]>();
@@ -381,6 +487,59 @@ export function ModalFechamento({
         <div className="scroll-fino flex-1 overflow-y-auto p-5">
           {ehGanho ? (
             <div className="space-y-3">
+              {/* Puxar do site: pre-preenche a partir do pedido da Loja. */}
+              {podePuxar && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => void puxarDoSite()}
+                    disabled={puxando}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-tiffany/40 bg-tiffany/5 py-2 text-sm font-semibold text-tiffany transition-colors hover:bg-tiffany/10 disabled:opacity-60"
+                  >
+                    {puxando ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="h-4 w-4" />
+                    )}
+                    Puxar do site
+                  </button>
+                  {avisoLoja && (
+                    <p className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:bg-amber-500/10">
+                      <Info className="h-3.5 w-3.5 shrink-0" />
+                      {avisoLoja}
+                    </p>
+                  )}
+                  {/* Mais de um pedido: o vendedor escolhe qual pre-preenche. */}
+                  {escolhaLoja && escolhaLoja.length > 0 && (
+                    <div className="space-y-1 rounded-lg border border-black/5 bg-fundo p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-medio/50">
+                          {escolhaLoja.length} pedidos no site — escolha um
+                        </p>
+                        <button
+                          onClick={() => setEscolhaLoja(null)}
+                          className="rounded p-0.5 text-medio/50 hover:bg-black/5"
+                          title="Fechar"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {escolhaLoja.map((p, i) => (
+                        <button
+                          key={p.id ?? p.numero ?? i}
+                          onClick={() => aplicarPedidoLoja(p)}
+                          className="flex w-full items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-sm text-escuro transition-colors hover:bg-tiffany/5"
+                        >
+                          <span className="min-w-0 truncate">{rotuloPedidoLoja(p)}</span>
+                          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-medio/70">
+                            {typeof p.total === "number" ? formatarBRL(p.total) : ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Itens do pedido */}
               <div className="space-y-2">
                 {itens.map((it) => (

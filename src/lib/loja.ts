@@ -1,6 +1,7 @@
 // Cliente server-side da API interna da loja. A chave (STORE_INTERNAL_KEY)
 // NUNCA vai para o browser: so e usada aqui, no servidor.
 // Tipos espelham o contrato de /api/interno/* da loja.
+import type { PedidoCrmLoja } from "./pedidoLoja";
 
 export type ProdutoLoja = {
   id: string;
@@ -81,6 +82,34 @@ async function chamar<T>(caminho: string): Promise<T> {
   });
   if (!resp.ok) throw new Error(`loja respondeu ${resp.status}`);
   return (await resp.json()) as T;
+}
+
+// Mesma chamada, por POST com body JSON. Lanca igual a `chamar`.
+async function chamarPost<T>(caminho: string, corpo: unknown): Promise<T> {
+  const cfg = baseConfig();
+  if (!cfg) throw new Error("loja nao configurada");
+  const resp = await fetch(`${cfg.base}${caminho}`, {
+    method: "POST",
+    headers: { "x-internal-key": cfg.key, "content-type": "application/json" },
+    body: JSON.stringify(corpo),
+    cache: "no-store",
+  });
+  if (!resp.ok) throw new Error(`loja respondeu ${resp.status}`);
+  return (await resp.json()) as T;
+}
+
+// ---- Pedidos por telefone (Ganho > "Puxar do site") ----
+// O contrato (tipos + normalizadores) vive em lib/pedidoLoja, que o front
+// tambem importa. Aqui fica so a chamada, porque so ela precisa da chave.
+// A chave x-internal-key vai daqui (servidor) — NUNCA do navegador.
+export async function buscarPedidosPorTelefone(
+  telefone: string,
+): Promise<PedidoCrmLoja[]> {
+  const d = await chamarPost<{ pedidos?: PedidoCrmLoja[] | null }>(
+    "/api/interno/crm/pedidos-por-telefone",
+    { telefone },
+  );
+  return d.pedidos ?? [];
 }
 
 // ---- Produtos com cache curto em memoria (por termo de busca) ----
