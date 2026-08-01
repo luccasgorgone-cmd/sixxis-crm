@@ -657,6 +657,12 @@ model Negocio {
   // Tambem e o relogio do arquivamento por prazo (Bloco 3): mensagem nova
   // reseta o prazo. null = negocio que nunca teve mensagem (cai no atualizadoEm).
   ultimaMensagemEm DateTime?
+  // ARQUIVAMENTO (Bloco 3): "sair do Kanban" NUNCA e apagar. O job de prazo
+  // marca arquivado=true em negocios PERDIDO/GANHO parados ha X dias; o card
+  // some do quadro e todo o dado (lead, historico, valores) continua no banco.
+  // Negocio ABERTO nunca e arquivado. Voltar a falar reabre e desarquiva.
+  arquivado     Boolean            @default(false)
+  arquivadoEm   DateTime?
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
   lembretes     Lembrete[]
@@ -677,6 +683,8 @@ model Negocio {
   // Bloco 4: mesmo papel do indice acima para as colunas TERMINAIS (Vendido/
   // Perdido), que passam a ordenar por ultimaMensagemEm em vez de entrouEtapaEm.
   @@index([etapaId, ultimaMensagemEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_ultima_msg_idx")
+  // Bloco 3: varredura do job de arquivamento (status + arquivado + relogio).
+  @@index([status, arquivado, ultimaMensagemEm], map: "Negocio_arquivamento_idx")
   // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
   // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
   @@index([leadId, status])
@@ -1167,6 +1175,16 @@ model ConfiguracaoCRM {
   metaPixelId        String?
   metaCapiToken      String?
   metaTestEventCode  String?
+  // ESVAZIAR O KANBAN POR PRAZO (Bloco 3). Recurso OPT-IN em duas travas:
+  //  - diasArquivarPerdido / diasArquivarGanho: null ou 0 = nao arquiva nada
+  //    daquele lado. Sao dias SEM NOVA INTERACAO (ultimaMensagemEm do negocio;
+  //    na falta dela, atualizadoEm).
+  //  - arquivamentoAtivo: interruptor MESTRE. Com ele false (o padrao) o job
+  //    roda em MODO LOG — conta quantos arquivaria e NAO arquiva nada. Nenhum
+  //    card some do quadro ate o dono ligar isto no admin.
+  diasArquivarPerdido Int?
+  diasArquivarGanho   Int?
+  arquivamentoAtivo   Boolean @default(false)
   atualizadoEm       DateTime @updatedAt
 }
 

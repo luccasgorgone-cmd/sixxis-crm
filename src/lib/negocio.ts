@@ -123,6 +123,10 @@ export async function garantirNegocioParaLead(
         etapaId: etapa.id,
         entrouEtapaEm: agora,
         fechadoEm: null,
+        // Bloco 3: voltar a falar traz o card de volta ao quadro. Um negocio
+        // arquivado pelo prazo que reabre NAO pode continuar invisivel.
+        arquivado: false,
+        arquivadoEm: null,
         // Limpa o motivo (agora esta aberto); a PERDA anterior permanece no
         // HistoricoNegocio, entao o registro da perda NAO some.
         motivoPerda: null,

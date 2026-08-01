@@ -10,6 +10,7 @@ import { iniciarManutencao } from "./src/lib/manutencao";
 import { iniciarAlertas } from "./src/lib/alertas";
 import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import { iniciarRecaptacao } from "./src/lib/recaptacao";
+import { iniciarArquivamento } from "./src/lib/arquivamento";
 import {
   seedAdmin,
   seedFunil,
@@ -92,6 +93,9 @@ async function main(): Promise<void> {
   // SOL-4: motor da recaptacao em ondas. Agendar NAO envia nada — ele so age se
   // houver campanha ARMADA pelo dono, dentro do horario e da cota diaria.
   iniciarRecaptacao(io);
+  // Bloco 3: esvaziar o Kanban por prazo (perdidos/ganhos parados). Nasce em
+  // MODO LOG — so conta quantos arquivaria — ate o dono ligar no admin.
+  iniciarArquivamento();
 
   httpServer.listen(port, () => {
     console.log(`CRM no ar na porta ${port}`);

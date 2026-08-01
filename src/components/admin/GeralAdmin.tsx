@@ -20,6 +20,10 @@ type Config = {
   mensagemForaHorario: string | null;
   avisoForaHorarioAtivo: boolean;
   mensagensAutomaticasAtivas: boolean;
+  // Bloco 3 — esvaziar o Kanban por prazo. null/0 = aquele lado nao arquiva.
+  diasArquivarPerdido: number | null;
+  diasArquivarGanho: number | null;
+  arquivamentoAtivo: boolean;
   temLogo: boolean;
   logoEm: number;
   temFavicon: boolean;
@@ -396,6 +400,86 @@ export function GeralAdmin() {
             So e enviada se o interruptor de mensagens automaticas estiver LIGADO
             e este campo tiver texto.
           </p>
+        </div>
+
+        {/* Bloco 3 — esvaziar o Kanban por prazo. Dois prazos + interruptor
+            mestre. Enquanto o mestre estiver desligado, o job so REGISTRA no
+            log quantos cards arquivaria: nada some do quadro. */}
+        <div className="rounded-xl border border-black/5 bg-white p-4">
+          <span className="block text-sm font-medium text-escuro">
+            Esvaziar o Kanban por prazo
+          </span>
+          <span className="mt-0.5 block text-xs text-medio/60">
+            Tira do quadro os cards de Perdido e Vendido parados ha muito tempo.
+            Arquivar NAO apaga nada: o cliente, o historico e os valores
+            continuam no sistema e nas telas de clientes — o card so deixa de
+            ocupar o Kanban. Qualquer mensagem nova reinicia a contagem e traz o
+            card de volta. Negocio em aberto nunca e arquivado.
+          </span>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-escuro">
+                Arquivar Perdido apos (dias sem contato)
+              </span>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={config.diasArquivarPerdido ?? ""}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    diasArquivarPerdido:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vazio = nunca arquiva"
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-escuro">
+                Arquivar Vendido apos (dias sem contato)
+              </span>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={config.diasArquivarGanho ?? ""}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    diasArquivarGanho:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vazio = nunca arquiva"
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
+              />
+            </label>
+          </div>
+
+          <label className="mt-4 flex cursor-pointer items-start justify-between gap-3 border-t border-black/5 pt-4">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-escuro">
+                Arquivar de verdade
+              </span>
+              <span className="mt-0.5 block text-xs text-medio/60">
+                Desligado (padrao), o sistema apenas ANOTA no log quantos cards
+                arquivaria com os prazos acima — nada sai do quadro. Ligue
+                depois de conferir que o numero faz sentido.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={config.arquivamentoAtivo}
+              onChange={(e) =>
+                setConfig({ ...config, arquivamentoAtivo: e.target.checked })
+              }
+              className="mt-0.5 h-5 w-5 shrink-0 accent-tiffany"
+            />
+          </label>
         </div>
 
         <div className="flex items-center gap-3">

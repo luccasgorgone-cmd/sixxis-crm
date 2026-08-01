@@ -509,6 +509,9 @@ export async function PATCH(
       // Etapa ABERTA: reabre se estava fechado.
       data.status = StatusNeg.ABERTO;
       data.fechadoEm = null;
+      // Bloco 3: voltar para uma etapa aberta traz o card de volta ao quadro.
+      data.arquivado = false;
+      data.arquivadoEm = null;
       historicos.push({
         tipo: TipoHistorico.ETAPA,
         descricao: `Movido para "${destino.nome}"`,

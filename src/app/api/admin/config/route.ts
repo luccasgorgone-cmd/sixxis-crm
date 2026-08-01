@@ -41,6 +41,10 @@ export async function GET(): Promise<NextResponse> {
       mensagemForaHorario: config.mensagemForaHorario,
       avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
       mensagensAutomaticasAtivas: config.mensagensAutomaticasAtivas,
+      // Bloco 3 — esvaziar o Kanban por prazo (arquivamento).
+      diasArquivarPerdido: config.diasArquivarPerdido,
+      diasArquivarGanho: config.diasArquivarGanho,
+      arquivamentoAtivo: config.arquivamentoAtivo,
       temLogo: Boolean(config.logoData),
       logoEm: config.logoEm?.getTime() ?? 0,
       temFavicon: Boolean(config.faviconData),
@@ -64,6 +68,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     mensagemForaHorario?: string;
     avisoForaHorarioAtivo?: boolean;
     mensagensAutomaticasAtivas?: boolean;
+    diasArquivarPerdido?: number | null;
+    diasArquivarGanho?: number | null;
+    arquivamentoAtivo?: boolean;
     logoData?: unknown;
     logoMime?: unknown;
     // Sinal explicito para remover a logo atual.
@@ -107,6 +114,26 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     }
     if (body.mensagensAutomaticasAtivas !== undefined) {
       data.mensagensAutomaticasAtivas = body.mensagensAutomaticasAtivas === true;
+    }
+
+    // Bloco 3 — prazos de arquivamento (em DIAS sem nova interacao) e o
+    // interruptor mestre. Valor invalido, 0 ou negativo viram null = DESLIGADO;
+    // com null o job nao arquiva aquele lado. Teto de 3650 dias (10 anos) so
+    // para barrar digitacao absurda.
+    const dias = (v: unknown): number | null => {
+      if (v === null || v === "") return null;
+      const n = Math.trunc(Number(v));
+      if (!Number.isFinite(n) || n < 1) return null;
+      return Math.min(n, 3650);
+    };
+    if (body.diasArquivarPerdido !== undefined) {
+      data.diasArquivarPerdido = dias(body.diasArquivarPerdido);
+    }
+    if (body.diasArquivarGanho !== undefined) {
+      data.diasArquivarGanho = dias(body.diasArquivarGanho);
+    }
+    if (body.arquivamentoAtivo !== undefined) {
+      data.arquivamentoAtivo = body.arquivamentoAtivo === true;
     }
 
     // Logo: remover, ou validar/sanitizar e salvar com nova versao (logoEm).
@@ -200,6 +227,10 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         mensagemForaHorario: config.mensagemForaHorario,
         avisoForaHorarioAtivo: config.avisoForaHorarioAtivo,
         mensagensAutomaticasAtivas: config.mensagensAutomaticasAtivas,
+      // Bloco 3 — esvaziar o Kanban por prazo (arquivamento).
+      diasArquivarPerdido: config.diasArquivarPerdido,
+      diasArquivarGanho: config.diasArquivarGanho,
+      arquivamentoAtivo: config.arquivamentoAtivo,
         temLogo: Boolean(config.logoData),
         logoEm: config.logoEm?.getTime() ?? 0,
         temFavicon: Boolean(config.faviconData),

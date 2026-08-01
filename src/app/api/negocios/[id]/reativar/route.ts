@@ -93,6 +93,10 @@ export async function POST(
         entrouEtapaEm: agora,
         fechadoEm: null,
         temperatura: Temperatura.MORNO,
+        // Bloco 3: reativar traz de volta ao quadro (um perdido arquivado pelo
+        // prazo nao pode voltar a ABERTO e continuar invisivel no Kanban).
+        arquivado: false,
+        arquivadoEm: null,
         // Limpa o motivo do negocio ATIVO (preservado acima no historico).
         motivoPerda: null,
         motivoPerdaObs: null,

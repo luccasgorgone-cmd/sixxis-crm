@@ -48,6 +48,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const where: Prisma.NegocioWhereInput = {};
 
+  // Bloco 3 — ARQUIVADOS FORA DO QUADRO. Vale para as duas rotas (quadro e
+  // "carregar mais") e tambem para o `resumo`, que reusa este mesmo `where`:
+  // um card arquivado nao aparece na coluna nem conta no total do cabecalho.
+  // Isto inclui a BUSCA server-side: o Kanban e o quadro de trabalho ATIVO.
+  // Para reencontrar um negocio arquivado, a via e a busca de /clientes (nivel
+  // cliente), que nao filtra por arquivamento de negocio — nada se perde.
+  where.arquivado = false;
+
   // Finalidades visiveis:
   //  - ADMIN: a do parametro (alterna Vendas|Pos-venda).
   //  - Colaborador: SO as que ele tem acesso (1 -> funil unico; 2 -> uniao).
