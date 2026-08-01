@@ -13,6 +13,7 @@ import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import {
   seedAdmin,
   seedFunil,
+  seedEtapasIntermediarias,
   seedModelos,
   seedEmpresasFaturadas,
   seedProdutosInteresse,
@@ -52,6 +53,9 @@ async function main(): Promise<void> {
   await seedVendedorTeste();
   await seedRoteamentoEPresets();
   await seedFinalidadeEInstancias();
+  // Depois do funil de pos-venda existir: cria as etapas "1"/"2"/"3" da venda e
+  // leva as duas listas para a ordem alvo (sequencia global venda -> pos-venda).
+  await seedEtapasIntermediarias();
   await seedConfiguracoes();
   await seedAssistenteEscrita();
   await seedPecas();

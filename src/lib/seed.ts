@@ -126,14 +126,53 @@ const ETAPAS_PADRAO: {
   { nome: "Novo", cor: "#64748b", tipo: TipoEtapa.ABERTA, ordem: 1 },
   { nome: "Em atendimento", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA, ordem: 2 },
   { nome: "Negociando", cor: "#0ea5e9", tipo: TipoEtapa.ABERTA, ordem: 3 },
+  // Etapas intermediarias "1", "2" e "3" (Bloco 2): entram entre Negociando e
+  // Aguardando pagamento. Sao ABERTAS — contam como negocio ativo.
+  { nome: "1", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA, ordem: 4 },
+  { nome: "2", cor: "#2aa79b", tipo: TipoEtapa.ABERTA, ordem: 5 },
+  { nome: "3", cor: "#1d8f84", tipo: TipoEtapa.ABERTA, ordem: 6 },
   {
     nome: "Aguardando pagamento",
     cor: "#f59e0b",
     tipo: TipoEtapa.ABERTA,
-    ordem: 4,
+    ordem: 7,
   },
-  { nome: "Vendido", cor: "#16a34a", tipo: TipoEtapa.GANHO, ordem: 5 },
-  { nome: "Perdido", cor: "#dc2626", tipo: TipoEtapa.PERDIDO, ordem: 6 },
+  { nome: "Vendido", cor: "#16a34a", tipo: TipoEtapa.GANHO, ordem: 8 },
+  { nome: "Perdido", cor: "#dc2626", tipo: TipoEtapa.PERDIDO, ordem: 9 },
+];
+
+// ORDEM ALVO do quadro (Bloco 2). O seed leva o funil de PRODUCAO a este estado
+// toda vez que roda, casando por (finalidade, nome) — idempotente. So mexe em
+// `ordem`: nenhum card muda de etapa (o etapaId dos negocios nao e tocado).
+//
+// A `ordem` e uma sequencia GLOBAL (o reordenar do admin numera a lista inteira,
+// as duas finalidades juntas), entao o pos-venda precisa vir DEPOIS do funil de
+// venda ja com as 3 etapas novas — senao as ordens 7/8/9 colidiriam e os dois
+// funis apareceriam intercalados para quem tem acesso aos dois.
+const ORDEM_ALVO_VENDA = [
+  "Novo",
+  "Em atendimento",
+  "Negociando",
+  "1",
+  "2",
+  "3",
+  "Aguardando pagamento",
+  "Vendido",
+  "Perdido",
+];
+const ORDEM_ALVO_POS_VENDA = [
+  "Aberto",
+  "Em atendimento",
+  "Aguardando cliente",
+  "Resolvido",
+  "Encerrado sem solucao",
+];
+
+// As 3 etapas ABERTAS novas do funil de VENDA, em tons de tiffany (sem emoji).
+const ETAPAS_INTERMEDIARIAS: { nome: string; cor: string }[] = [
+  { nome: "1", cor: "#3cbfb3" },
+  { nome: "2", cor: "#2aa79b" },
+  { nome: "3", cor: "#1d8f84" },
 ];
 
 // Etiquetas padrao. So semeia se NENHUMA existir (idempotente).
@@ -515,6 +554,111 @@ export async function seedFunil(): Promise<void> {
   } catch (erro) {
     console.error(
       `[seed] falha ao semear funil: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Bloco 2: garante as 3 etapas ABERTAS "1", "2" e "3" no funil de VENDA, entre
+// "Negociando" e "Aguardando pagamento", e leva TODO o funil para a ORDEM ALVO.
+//
+// IDEMPOTENTE em producao, onde as etapas ja existem com ordem 1-6: casa por
+// (finalidade, nome), CRIA so o que falta e ATUALIZA so a coluna `ordem`. Rodar
+// de novo nao duplica nem bagunca. Nenhum negocio muda de etapa — o etapaId dos
+// cards nao e tocado, apenas a ordem em que as colunas aparecem.
+//
+// Etapas fora das listas alvo (criadas a mao pelo admin) NAO sao apagadas nem
+// renomeadas: vao para o fim preservando a ordem relativa, com aviso no log.
+export async function seedEtapasIntermediarias(): Promise<void> {
+  try {
+    const antes = await prisma.etapa.findMany({
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: { id: true, nome: true, ordem: true, finalidade: true },
+    });
+    if (antes.length === 0) {
+      console.log("[seed] etapas 1/2/3: funil vazio; nada a fazer");
+      return;
+    }
+
+    // 1) Cria as intermediarias que faltarem (casa por nome DENTRO da VENDA).
+    const nomesVenda = new Set(
+      antes
+        .filter((e) => e.finalidade === FinalidadeEtapa.VENDA)
+        .map((e) => e.nome.trim().toLowerCase()),
+    );
+    let ordemLivre = antes.reduce((m, e) => Math.max(m, e.ordem), 0) + 1;
+    let criadas = 0;
+    for (const nova of ETAPAS_INTERMEDIARIAS) {
+      if (nomesVenda.has(nova.nome.toLowerCase())) continue;
+      await prisma.etapa.create({
+        data: {
+          nome: nova.nome,
+          cor: nova.cor,
+          tipo: TipoEtapa.ABERTA,
+          finalidade: FinalidadeEtapa.VENDA,
+          ativo: true,
+          // Lugar provisorio no fim; a ordem definitiva vem do passo 2.
+          ordem: ordemLivre++,
+        },
+      });
+      criadas++;
+    }
+
+    // 2) Renumera para a ordem alvo (venda -> pos-venda -> o que sobrar).
+    const linhas =
+      criadas > 0
+        ? await prisma.etapa.findMany({
+            orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+            select: { id: true, nome: true, ordem: true, finalidade: true },
+          })
+        : antes;
+
+    const usados = new Set<string>();
+    const alvo: { id: string; nome: string; ordem: number }[] = [];
+    let ordem = 0;
+    const aplicar = (finalidade: FinalidadeEtapa, nomes: string[]) => {
+      for (const nome of nomes) {
+        const e = linhas.find(
+          (x) =>
+            !usados.has(x.id) &&
+            x.finalidade === finalidade &&
+            x.nome.trim().toLowerCase() === nome.toLowerCase(),
+        );
+        if (!e) continue; // etapa apagada pelo admin: pula, sem buraco na sequencia
+        usados.add(e.id);
+        alvo.push({ id: e.id, nome: e.nome, ordem: ++ordem });
+      }
+    };
+    aplicar(FinalidadeEtapa.VENDA, ORDEM_ALVO_VENDA);
+    aplicar(FinalidadeEtapa.POS_VENDA, ORDEM_ALVO_POS_VENDA);
+    const sobras = linhas.filter((e) => !usados.has(e.id));
+    for (const e of sobras) {
+      alvo.push({ id: e.id, nome: e.nome, ordem: ++ordem });
+    }
+    if (sobras.length > 0) {
+      console.warn(
+        `[seed] etapas 1/2/3: ${sobras.length} etapa(s) fora do padrao ficaram no fim: ${sobras
+          .map((s) => s.nome)
+          .join(", ")}`,
+      );
+    }
+
+    const ordemAtual = new Map(linhas.map((e) => [e.id, e.ordem]));
+    const mudancas = alvo.filter((a) => ordemAtual.get(a.id) !== a.ordem);
+    if (mudancas.length > 0) {
+      await prisma.$transaction(
+        mudancas.map((m) =>
+          prisma.etapa.update({ where: { id: m.id }, data: { ordem: m.ordem } }),
+        ),
+      );
+    }
+    console.log(
+      criadas > 0 || mudancas.length > 0
+        ? `[seed] etapas 1/2/3: ${criadas} criadas, ${mudancas.length} ordens ajustadas`
+        : "[seed] etapas 1/2/3 ok (ordem ja no alvo)",
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha nas etapas 1/2/3: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }
