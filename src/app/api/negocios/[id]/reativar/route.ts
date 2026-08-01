@@ -41,6 +41,7 @@ export async function POST(
       finalidade: true,
       motivoPerda: true,
       motivoPerdaObs: true,
+      fechadoEm: true,
       lead: { select: { donoId: true, donoPosVendaId: true } },
     },
   });
@@ -100,6 +101,16 @@ export async function POST(
         // Limpa o motivo do negocio ATIVO (preservado acima no historico).
         motivoPerda: null,
         motivoPerdaObs: null,
+        // Bloco 5: antes de limpar, guarda a MEMORIA da perda — o selo do painel
+        // continua mostrando "ja foi dado como perdido" depois da reativacao.
+        jaFoiPerdido: true,
+        ...(negocio.motivoPerda
+          ? {
+              ultimoMotivoPerda: negocio.motivoPerda,
+              ultimoMotivoPerdaObs: negocio.motivoPerdaObs,
+            }
+          : {}),
+        ultimaPerdaEm: negocio.fechadoEm ?? agora,
         historicos: {
           create: {
             tipo: TipoHistorico.ETAPA,

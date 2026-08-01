@@ -178,6 +178,18 @@ export async function GET(
         ? rotuloMotivo(negocio.motivoPerda)
         : null,
       motivoPerdaObs: negocio.motivoPerdaObs,
+      // Bloco 5 — MEMORIA da perda para o selo do painel. E historia, nao estado:
+      // continua valendo depois de o cliente voltar e o negocio reabrir. Quando o
+      // negocio esta perdido AGORA, o motivo vivo (motivoPerda) tambem serve de
+      // fonte — assim o selo nao depende de ja ter havido uma reabertura.
+      jaFoiPerdido: negocio.jaFoiPerdido || negocio.status === StatusNeg.PERDIDO,
+      ultimoMotivoPerda: negocio.ultimoMotivoPerda ?? negocio.motivoPerda,
+      ultimoMotivoPerdaLabel:
+        negocio.ultimoMotivoPerda ?? negocio.motivoPerda
+          ? rotuloMotivo(negocio.ultimoMotivoPerda ?? negocio.motivoPerda)
+          : null,
+      ultimoMotivoPerdaObs: negocio.ultimoMotivoPerdaObs ?? negocio.motivoPerdaObs,
+      ultimaPerdaEm: negocio.ultimaPerdaEm,
       // Transporte + rastreio (venda e pos-venda).
       transportadora: negocio.transportadora,
       dataEnvio: negocio.dataEnvio,
@@ -423,6 +435,10 @@ export async function PATCH(
       data.valor = valorEfetivo;
       data.status = StatusNeg.GANHO;
       data.fechadoEm = agora;
+      // Simetrico da perda (Bloco 1/5): a data do ganho fica preservada, porque
+      // o retorno do cliente reabre o negocio e o status sai de GANHO.
+      data.jaFoiGanho = true;
+      data.ultimoGanhoEm = agora;
       // Fechamento de pedido: grava os itens (substitui os anteriores deste
       // negocio) + valorProdutos + frete. O historico do cliente guarda o pedido.
       if (temPedido) {
@@ -498,6 +514,13 @@ export async function PATCH(
       data.motivoPerdaObs = obs;
       data.status = StatusNeg.PERDIDO;
       data.fechadoEm = agora;
+      // Bloco 5: grava a MEMORIA da perda no mesmo instante em que ela acontece.
+      // Assim o selo do painel sobrevive a qualquer reabertura futura (retorno do
+      // cliente ou "reativar"), que limpam motivoPerda/motivoPerdaObs.
+      data.jaFoiPerdido = true;
+      data.ultimoMotivoPerda = motivo;
+      data.ultimoMotivoPerdaObs = obs;
+      data.ultimaPerdaEm = agora;
       const rotulo = rotuloMotivo(motivo);
       historicos.push({
         tipo: TipoHistorico.PERDA,

@@ -37,6 +37,7 @@ import {
   SecaoSegmento,
   SecaoDecisoes,
   SecaoEtiquetas,
+  SeloJaFoiPerdido,
 } from "@/components/shared/SecoesPainel";
 import { useToast } from "@/components/ui/Toast";
 import type {
@@ -230,6 +231,10 @@ export function PainelClienteInbox({
               atualizando...
             </div>
           )}
+
+          {/* Selo "ja foi perdido" (Bloco 5): memoria da perda, no topo dos
+              dados. So aparece quando a conversa tem negocio e houve perda. */}
+          {detalhe && <SeloJaFoiPerdido detalhe={detalhe} />}
 
           {/* (a) Dados do cliente (sempre). key por lead forca remontagem ao trocar
               de cliente — reforca o reset do avatar residual (Fatia 3.18). */}

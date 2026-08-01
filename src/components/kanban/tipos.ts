@@ -127,6 +127,13 @@ export type DetalheNegocio = CardNegocio & {
   dono: { id: string; nome: string } | null;
   produtos: unknown;
   motivoPerda: string | null;
+  // Bloco 5 — memoria da perda (selo "cliente ja foi dado como perdido"). Vale
+  // mesmo depois de o negocio reabrir: e historia, nao estado atual.
+  jaFoiPerdido?: boolean;
+  ultimoMotivoPerda?: string | null;
+  ultimoMotivoPerdaLabel?: string | null;
+  ultimoMotivoPerdaObs?: string | null;
+  ultimaPerdaEm?: string | null;
   // Transporte + rastreio do negocio (venda e pos-venda).
   transportadora: string | null;
   dataEnvio: string | null;

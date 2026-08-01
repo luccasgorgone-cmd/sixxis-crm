@@ -73,6 +73,7 @@ import {
   SecaoSegmento,
   SecaoDecisoes,
   SecaoEtiquetas,
+  SeloJaFoiPerdido,
 } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
@@ -463,6 +464,10 @@ export function PainelNegocio({
                     7. Orcamento(+decisoes)  8. Orcamentos anteriores  9. Pedidos
                     10. Assistencia(pos-venda)  11. Acompanhamento  12. Rastreio
                     13. Agendar  14. Gestao  15. Historico/Negocio/Loja/Notas */}
+
+                {/* 0. Selo "ja foi perdido" (Bloco 5): memoria da perda, no
+                    topo dos dados. Some so quando nunca houve perda. */}
+                <SeloJaFoiPerdido detalhe={detalhe} />
 
                 {/* 1. Dados do cliente + enderecos */}
                 <BlocoCliente

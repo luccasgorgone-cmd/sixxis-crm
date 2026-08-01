@@ -18,6 +18,7 @@ import {
   XCircle,
   Trophy,
   RotateCcw,
+  History,
 } from "lucide-react";
 import { BadgeTemperatura } from "@/components/badges";
 import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
@@ -637,6 +638,35 @@ function BlocoPendencia({
           )}
           Desmarcar pendencia
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Bloco 5 — SELO "JA FOI PERDIDO". Memoria, nao estado atual: aparece sempre que
+// o negocio do cliente tem uma perda no historico, INCLUSIVE depois de ele voltar
+// e o card reabrir em "Novo". Mostra o motivo traduzido; a observacao livre da
+// perda (quando existe) fica em uma linha secundaria, so quando ha texto.
+// Usado IGUAL nos dois paineis (Kanban e Inbox), logo no topo dos dados.
+export function SeloJaFoiPerdido({ detalhe }: { detalhe: DetalheNegocio }) {
+  if (!detalhe.jaFoiPerdido) return null;
+  const motivo = detalhe.ultimoMotivoPerdaLabel?.trim();
+  const obs = detalhe.ultimoMotivoPerdaObs?.trim();
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <div className="flex items-start gap-2">
+        <History className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-amber-800">
+            Cliente já foi dado como perdido
+            {motivo ? ` — motivo: ${motivo}` : ""}
+          </p>
+          {obs && (
+            <p className="mt-0.5 whitespace-pre-wrap text-xs text-amber-900/80">
+              {obs}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
