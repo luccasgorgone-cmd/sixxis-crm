@@ -31,7 +31,10 @@ export async function primeiraEtapaAberta(finalidade: Finalidade) {
 }
 
 // Garante UM negocio aberto para o lead NAQUELA finalidade. Idempotente.
-// Retorna o id do negocio aberto (existente ou criado) ou null se sem funil.
+// Retorna o id do negocio aberto (existente, reaberto ou criado) ou null se sem
+// funil. INVARIANTE (Bloco 1): um lead + finalidade tem no MAXIMO um negocio —
+// se ja existe qualquer negocio (aberto, ganho ou perdido), ele e REUSADO; esta
+// funcao so cria um negocio para quem ainda nao tem nenhum.
 export async function garantirNegocioParaLead(
   leadId: string,
   finalidade: Finalidade = Finalidade.VENDA,
@@ -57,36 +60,71 @@ export async function garantirNegocioParaLead(
   });
   const agenteId = leadDono ? leadDono[campoDono(finalidade)] : null;
 
-  // LEAD PERDIDO QUE VOLTA: sem negocio aberto, mas ha um PERDIDO na finalidade ->
-  // REABRE o mesmo negocio (nao cria duplicata). Preserva TODO o historico: o
-  // registro da PERDA (HistoricoNegocio.PERDA) e os rastreios continuam ligados a
-  // este negocio; apenas volta a ficar ABERTO na 1a etapa e registra o retorno.
-  const perdido = await prisma.negocio.findFirst({
-    where: { leadId, finalidade, status: StatusNeg.PERDIDO },
-    orderBy: { atualizadoEm: "desc" },
-    select: { id: true, motivoPerda: true },
+  // CLIENTE QUE VOLTA (Bloco 1): sem negocio ABERTO, mas ha um negocio FECHADO na
+  // finalidade — PERDIDO **ou GANHO** -> REABRE esse mesmo negocio. Nunca cria um
+  // segundo card: um lead + finalidade = no maximo UM negocio, sempre reusado.
+  //
+  // O caso GANHO era o buraco que gerava a DUPLICATA: o cliente vendido mandava
+  // mensagem, nao havia negocio ABERTO nem PERDIDO, e um negocio novo nascia na
+  // 1a etapa — ficando um card em "Vendido" E outro em "Novo" para o mesmo lead.
+  //
+  // Preserva TODO o historico: HistoricoNegocio (a PERDA e o GANHO), rastreios,
+  // itens do pedido, orcamentos e valores continuam ligados a este negocio. O que
+  // e limpo (motivo da perda) fica gravado na MEMORIA DE FECHAMENTO abaixo.
+  const anterior = await prisma.negocio.findFirst({
+    where: {
+      leadId,
+      finalidade,
+      status: { in: [StatusNeg.PERDIDO, StatusNeg.GANHO] },
+    },
+    orderBy: [{ fechadoEm: { sort: "desc", nulls: "last" } }, { atualizadoEm: "desc" }],
+    select: {
+      id: true,
+      status: true,
+      motivoPerda: true,
+      motivoPerdaObs: true,
+      fechadoEm: true,
+    },
   });
-  if (perdido) {
+  if (anterior) {
+    const agora = new Date();
+    const eraPerdido = anterior.status === StatusNeg.PERDIDO;
     const reaberto = await prisma.negocio.update({
-      where: { id: perdido.id },
+      where: { id: anterior.id },
       data: {
         status: StatusNeg.ABERTO,
         etapaId: etapa.id,
-        entrouEtapaEm: new Date(),
+        entrouEtapaEm: agora,
         fechadoEm: null,
         // Limpa o motivo (agora esta aberto); a PERDA anterior permanece no
         // HistoricoNegocio, entao o registro da perda NAO some.
         motivoPerda: null,
         motivoPerdaObs: null,
+        // MEMORIA DE FECHAMENTO (Bloco 5): grava o que sera limpo ANTES de limpar.
+        // So marca; nunca desmarca (o selo do painel e memoria, nao estado atual).
+        ...(eraPerdido
+          ? {
+              jaFoiPerdido: true,
+              ...(anterior.motivoPerda
+                ? {
+                    ultimoMotivoPerda: anterior.motivoPerda,
+                    ultimoMotivoPerdaObs: anterior.motivoPerdaObs,
+                  }
+                : {}),
+              ultimaPerdaEm: anterior.fechadoEm ?? agora,
+            }
+          : { jaFoiGanho: true, ultimoGanhoEm: anterior.fechadoEm ?? agora }),
         // Reatribui ao dono da finalidade quando houver (nao apaga um agenteId ja
         // definido se o lead estiver sem dono no momento).
         ...(agenteId ? { agenteId } : {}),
         historicos: {
           create: {
             tipo: TipoHistorico.NOTA,
-            descricao: `Cliente retornou apos perda${
-              perdido.motivoPerda ? " (perda anterior preservada no historico)" : ""
-            }`,
+            descricao: eraPerdido
+              ? `Cliente retornou apos perda${
+                  anterior.motivoPerda ? " (perda anterior preservada no historico)" : ""
+                }`
+              : "Cliente retornou apos a venda (ganho anterior preservado no historico)",
           },
         },
       },

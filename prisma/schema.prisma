@@ -623,6 +623,21 @@ model Negocio {
   // motivoPerda guarda o CODE (ver lib/motivosPerda); obs e a observacao livre.
   motivoPerda   String?
   motivoPerdaObs String?           @db.Text
+  // MEMORIA DE FECHAMENTO (Bloco 1/5 da fatia "Organizacao do Kanban"). Um lead
+  // + finalidade tem no MAXIMO um negocio, que e REUSADO quando o cliente volta:
+  // ao reabrir, motivoPerda/motivoPerdaObs sao limpos (o negocio esta aberto de
+  // novo) e o que foi limpo fica gravado AQUI. Sao campos de HISTORIA, nunca de
+  // estado atual: uma vez true, jaFoiPerdido/jaFoiGanho nao voltam para false.
+  // Alimentam o selo "cliente ja foi dado como perdido" nos paineis.
+  jaFoiPerdido        Boolean       @default(false)
+  ultimoMotivoPerda   String?
+  ultimoMotivoPerdaObs String?      @db.Text
+  ultimaPerdaEm       DateTime?
+  // Simetrico do acima para a VENDA: quando um negocio GANHO e reaberto porque o
+  // cliente voltou a falar, o status sai de GANHO (some das metricas de venda,
+  // que filtram por status) — entao a data do ganho fica preservada aqui.
+  jaFoiGanho          Boolean       @default(false)
+  ultimoGanhoEm       DateTime?
   // Transporte da entrega (vale para venda e pos-venda). transportadora e a
   // PRINCIPAL do negocio; cada RastreioNegocio pode ter a sua se o dono digitar.
   transportadora  String?
