@@ -14,12 +14,19 @@ export const LIMITE_MAX = 100;
 export const TETO_FIXADAS = 200;
 
 // Ordenacao DETERMINISTICA da coluna (o "carregar mais" nao repete nem pula):
-// terminais pelo fechamento, ativas pela entrada na etapa; desempate por id desc.
+// desempate final sempre por id desc.
+//
+// Bloco 4 — nas colunas TERMINAIS (Vendido/Perdido) o criterio passa a ser a
+// ULTIMA MENSAGEM: quem voltou a falar sobe ao topo, para o vendedor ver de
+// cara quem interagiu depois de fechado. Quem nunca teve mensagem (null) cai
+// para o fim e e ordenado pelo fechamento, como antes.
+// As colunas ABERTAS seguem pela entrada na etapa (intocadas).
 export function ordemDaEtapa(
   tipo: TipoEtapa,
 ): Prisma.NegocioOrderByWithRelationInput[] {
   if (tipo === TipoEtapa.GANHO || tipo === TipoEtapa.PERDIDO) {
     return [
+      { ultimaMensagemEm: { sort: "desc", nulls: "last" } },
       { fechadoEm: { sort: "desc", nulls: "last" } },
       { atualizadoEm: "desc" },
       { id: "desc" },

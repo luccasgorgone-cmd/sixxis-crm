@@ -650,6 +650,13 @@ model Negocio {
   notasFiscais  NotaFiscal[]
   entrouEtapaEm DateTime           @default(now())
   fechadoEm     DateTime?
+  // Ultima INTERACAO (mensagem IN ou OUT) na conversa da finalidade deste
+  // negocio. Espelha Conversa.ultimaMensagemEm no nivel do negocio porque o
+  // Kanban precisa ORDENAR por ela (Bloco 4: nas colunas terminais, quem falou
+  // por ultimo aparece no topo) e o Prisma nao ordena por campo de lista.
+  // Tambem e o relogio do arquivamento por prazo (Bloco 3): mensagem nova
+  // reseta o prazo. null = negocio que nunca teve mensagem (cai no atualizadoEm).
+  ultimaMensagemEm DateTime?
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
   lembretes     Lembrete[]
@@ -667,6 +674,9 @@ model Negocio {
   // ele o Postgres ordena a coluna inteira antes do LIMIT — a coluna "Novo"
   // tem 1.241 cards. Declarado aqui para o schema nao divergir da migracao.
   @@index([etapaId, entrouEtapaEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_entrada_idx")
+  // Bloco 4: mesmo papel do indice acima para as colunas TERMINAIS (Vendido/
+  // Perdido), que passam a ordenar por ultimaMensagemEm em vez de entrouEtapaEm.
+  @@index([etapaId, ultimaMensagemEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_ultima_msg_idx")
   // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
   // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
   @@index([leadId, status])

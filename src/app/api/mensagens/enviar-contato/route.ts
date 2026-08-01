@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
+import { marcarInteracaoNoNegocio } from "@/lib/negocio";
 import { enviarContato, enviarTexto } from "@/lib/evolution";
 import { DirecaoMsg, TipoMsg, StatusEnvio, Prisma } from "@/generated/prisma/client";
 
@@ -136,6 +137,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ...(conversa.agenteId ? {} : { agenteId }),
     },
   });
+  // Bloco 4: espelha a interacao no negocio (card terminal sobe na coluna e o
+  // relogio do arquivamento por prazo reinicia).
+  await marcarInteracaoNoNegocio(conversa.lead.id, conversa.finalidade, agora);
 
   const payloadMsg = {
     id: mensagem.id,

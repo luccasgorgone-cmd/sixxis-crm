@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { obterAgente } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
+import { marcarInteracaoNoNegocio } from "@/lib/negocio";
 import { enviarMidia } from "@/lib/evolution";
 import { enviarParaR2ComRetry } from "@/lib/r2";
 import { checarAcessoNegocio, montarDadosPdfOrcamento } from "@/lib/orcamentoDados";
@@ -134,6 +135,9 @@ export async function POST(
       ...(conversa.agenteId ? {} : { agenteId: agente.id }),
     },
   });
+  // Bloco 4: espelha a interacao no negocio (card terminal sobe na coluna e o
+  // relogio do arquivamento por prazo reinicia).
+  await marcarInteracaoNoNegocio(montagem.leadId, montagem.finalidade, agora);
 
   const payloadMsg = {
     id: mensagem.id,

@@ -30,6 +30,33 @@ export async function primeiraEtapaAberta(finalidade: Finalidade) {
   });
 }
 
+// Bloco 4 — marca a INTERACAO (mensagem IN ou OUT) no negocio da finalidade.
+// Espelha Conversa.ultimaMensagemEm no nivel do Negocio, que e o que o Kanban
+// consegue ORDENAR: nas colunas terminais (Vendido/Perdido) quem falou por
+// ultimo sobe ao topo. Tambem reseta o relogio do arquivamento por prazo.
+//
+// updateMany sem filtro de status: vale para negocio aberto, ganho e perdido —
+// e justamente o fechado que precisa disto. Best-effort: NUNCA quebra a
+// ingestao/envio de mensagem (o registro da mensagem ja aconteceu antes).
+export async function marcarInteracaoNoNegocio(
+  leadId: string,
+  finalidade: Finalidade,
+  hora: Date,
+): Promise<void> {
+  try {
+    await prisma.negocio.updateMany({
+      where: { leadId, finalidade },
+      data: { ultimaMensagemEm: hora },
+    });
+  } catch (erro) {
+    console.warn(
+      `[negocio] falha ao marcar interacao do lead ${leadId}: ${
+        erro instanceof Error ? erro.message : String(erro)
+      }`,
+    );
+  }
+}
+
 // Garante UM negocio aberto para o lead NAQUELA finalidade. Idempotente.
 // Retorna o id do negocio aberto (existente, reaberto ou criado) ou null se sem
 // funil. INVARIANTE (Bloco 1): um lead + finalidade tem no MAXIMO um negocio —

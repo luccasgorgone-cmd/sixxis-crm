@@ -9,7 +9,7 @@ import type { Server } from "socket.io";
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { normalizarJid } from "./phone";
-import { garantirNegocioParaLead } from "./negocio";
+import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono, filtroEquipe } from "./dono";
@@ -275,6 +275,7 @@ async function processarCampanha(
           where: { id: conversa.id },
           data: { ultimaMensagemEm: msg.hora },
         });
+        await marcarInteracaoNoNegocio(d.leadId, campanha.finalidade, msg.hora);
         (io ?? getIO())?.emit("mensagem:nova", {
           leadId: d.leadId,
           leadNome: nomeEfetivo(d.lead),
@@ -1088,6 +1089,8 @@ async function responderForaHorarioSePreciso(
     instancia: string;
     instanciaId: string | null;
     foraHorarioAvisadoEm: Date | null;
+    // Bloco 4: setor da conversa, para marcar a interacao no negocio certo.
+    finalidade: Finalidade;
   },
   telefone: string,
   lead: {
@@ -1177,6 +1180,7 @@ async function responderForaHorarioSePreciso(
       where: { id: conversa.id },
       data: { foraHorarioAvisadoEm: agora, ultimaMensagemEm: agora },
     });
+    await marcarInteracaoNoNegocio(lead.id, conversa.finalidade, agora);
 
     (io ?? getIO())?.emit("mensagem:nova", {
       leadId: lead.id,
@@ -1210,7 +1214,13 @@ async function responderForaHorarioSePreciso(
 // fora do horario. So age quando ativo=true. Nunca trava a ingestao (best-effort).
 // ---------------------------------------------------------------------------
 
-type ConvLuna = { id: string; instancia: string; instanciaId: string | null };
+type ConvLuna = {
+  id: string;
+  instancia: string;
+  instanciaId: string | null;
+  // Bloco 4: setor da conversa, para marcar a interacao no negocio certo.
+  finalidade: Finalidade;
+};
 type LeadLuna = {
   id: string;
   nome: string | null;
@@ -1586,6 +1596,7 @@ async function enviarMensagensLuna(
       where: { id: conversa.id },
       data: { ultimaMensagemEm: agora },
     });
+    await marcarInteracaoNoNegocio(lead.id, conversa.finalidade, agora);
 
     (io ?? getIO())?.emit("mensagem:nova", {
       leadId: lead.id,
@@ -2193,6 +2204,12 @@ async function processarEvento(
       select: { naoLidas: true },
     });
 
+    // Bloco 4: espelha a interacao no NEGOCIO da finalidade (IN e OUT). E o que
+    // faz um card ja fechado subir ao topo da coluna terminal e o que reseta o
+    // relogio do arquivamento por prazo. Roda ANTES do corte de bloqueado: uma
+    // mensagem de contato silenciado tambem e interacao real.
+    await marcarInteracaoNoNegocio(lead.id, finalidade, mensagem.hora);
+
     // Tempo real: notifica os clientes conectados sobre a nova mensagem.
     // O payload carrega o suficiente para a UI atualizar lista E thread.
     // Reply: leva o MESMO preview da citada que a rota da thread devolve, senao
@@ -2252,7 +2269,12 @@ async function processarEvento(
     // nao insistimos com quem disse nao.
     if (direcao === DirecaoMsg.IN && !optOutRecaptacao) {
       const lunaAssumiu = await responderComLunaSePreciso(
-        { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId },
+        {
+          id: conversa.id,
+          instancia: conversa.instancia,
+          instanciaId: conversa.instanciaId,
+          finalidade: conversa.finalidade,
+        },
         telefone,
         lead,
         finalidade,
@@ -2260,7 +2282,13 @@ async function processarEvento(
       );
       if (!lunaAssumiu) {
         await responderForaHorarioSePreciso(
-          { id: conversa.id, instancia: conversa.instancia, instanciaId: conversa.instanciaId, foraHorarioAvisadoEm: conversa.foraHorarioAvisadoEm },
+          {
+            id: conversa.id,
+            instancia: conversa.instancia,
+            instanciaId: conversa.instanciaId,
+            foraHorarioAvisadoEm: conversa.foraHorarioAvisadoEm,
+            finalidade: conversa.finalidade,
+          },
           telefone,
           lead,
           io,

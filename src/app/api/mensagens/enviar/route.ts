@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
+import { marcarInteracaoNoNegocio } from "@/lib/negocio";
 import { enviarTexto } from "@/lib/evolution";
 import { previewCitada } from "@/lib/citada";
 import {
@@ -216,6 +217,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ...(fixarRespostaId ? { instanciaRespostaId: fixarRespostaId } : {}),
     },
   });
+  // Bloco 4: espelha a interacao no negocio (card terminal sobe na coluna e o
+  // relogio do arquivamento por prazo reinicia).
+  await marcarInteracaoNoNegocio(conversa.lead.id, conversa.finalidade, agora);
 
   // Reply: mesmo preview da citada que a rota da thread devolve, para quem ve a
   // conversa por socket (outro atendente, supervisao, drawer do Kanban) receber
