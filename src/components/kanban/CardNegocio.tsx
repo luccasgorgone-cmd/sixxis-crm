@@ -3,9 +3,19 @@
 // Card do Kanban (negocio). Arrastavel via @dnd-kit. Mostra cliente (avatar),
 // valor, etiquetas, temperatura, dono (avatar) e tempo na etapa. Acento lateral
 // pela finalidade; badge de finalidade para o admin.
+import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, UserPlus, BellRing, ShieldCheck, ShieldOff, Pin } from "lucide-react";
+import {
+  Clock,
+  UserPlus,
+  BellRing,
+  ShieldCheck,
+  ShieldOff,
+  Pin,
+  MoreVertical,
+  CircleDot,
+} from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
 import { BadgeTemperatura } from "@/components/BadgeTemperatura";
@@ -22,6 +32,7 @@ export function CardNegocio({
   onAssumir,
   onAtribuir,
   onFixar,
+  onMarcarNaoLida,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
@@ -31,9 +42,11 @@ export function CardNegocio({
   onAssumir?: (negocioId: string) => void;
   onAtribuir?: (card: Card) => void;
   onFixar?: (card: Card) => void;
+  onMarcarNaoLida?: (card: Card) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
+  const [menu, setMenu] = useState(false);
 
   const nome = card.leadNome?.trim() || card.leadTelefone;
   const cor = corFinalidade(card.finalidade);
@@ -114,6 +127,55 @@ export function CardNegocio({
               variante="ponto"
               className="mt-1.5"
             />
+          )}
+          {/* Menu de acoes da conversa (padrao do Inbox), depois do badge e do
+              marcador para nao disputar espaco com eles nem com o pin. */}
+          {onMarcarNaoLida && card.conversaId && (
+            <div
+              className="relative mt-0.5"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setMenu((v) => !v)}
+                aria-label="Acoes da conversa"
+                aria-expanded={menu}
+                className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-black/5 hover:text-escuro ${
+                  menu ? "bg-black/5 text-escuro" : "text-medio/30"
+                }`}
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </button>
+              {menu && (
+                <>
+                  {/* Camada para fechar ao clicar fora. */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setMenu(false)}
+                  />
+                  <div className="absolute right-0 top-6 z-20 w-56 overflow-hidden rounded-lg border border-black/10 bg-white py-1 shadow-lg">
+                    <button
+                      type="button"
+                      disabled={card.marcadaNaoLida}
+                      title={
+                        card.marcadaNaoLida
+                          ? "Ja marcada. Abrir a conversa marca como lida."
+                          : undefined
+                      }
+                      onClick={() => {
+                        onMarcarNaoLida(card);
+                        setMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro transition-colors hover:bg-fundo disabled:cursor-default disabled:text-medio/40 disabled:hover:bg-transparent"
+                    >
+                      <CircleDot className="h-4 w-4 text-medio/60" />
+                      Marcar como nao lida
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>

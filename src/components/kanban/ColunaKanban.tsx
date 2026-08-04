@@ -22,6 +22,7 @@ export function ColunaKanban({
   onAssumir,
   onAtribuir,
   onFixar,
+  onMarcarNaoLida,
   ehEntrada = false,
   onAtribuirMassa,
   temMais = false,
@@ -41,6 +42,8 @@ export function ColunaKanban({
   onAtribuir?: (card: Card) => void;
   // Pin clicavel no card (fixa/desafixa a conversa da finalidade).
   onFixar?: (card: Card) => void;
+  // Menu do card: marcar a conversa como nao lida.
+  onMarcarNaoLida?: (card: Card) => void;
   ehEntrada?: boolean;
   onAtribuirMassa?: (negocioIds: string[]) => void;
   // Fatia Q: ha mais cards no banco alem dos carregados nesta coluna.
@@ -109,6 +112,7 @@ export function ColunaKanban({
               onAssumir={onAssumir}
               onAtribuir={onAtribuir}
               onFixar={onFixar}
+              onMarcarNaoLida={onMarcarNaoLida}
             />
           ))
         )}

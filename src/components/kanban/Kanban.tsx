@@ -94,6 +94,24 @@ function acharPorConversa(
   return null;
 }
 
+// Troca a marcacao manual de nao-lida de UM card, sem reordenar (marcar nao
+// muda a ordem da coluna) e sem tocar em card que nao esta na tela.
+function marcarNoCard(
+  colunas: Record<string, Card[]>,
+  etapaId: string,
+  cardId: string,
+  marcada: boolean,
+): Record<string, Card[]> {
+  const atuais = colunas[etapaId];
+  if (!atuais?.some((c) => c.id === cardId)) return colunas;
+  return {
+    ...colunas,
+    [etapaId]: atuais.map((c) =>
+      c.id === cardId ? { ...c, marcadaNaoLida: marcada } : c,
+    ),
+  };
+}
+
 // Recoloca UM card na coluna depois de fixar/desafixar, sem mexer nos outros.
 function reposicionarPin(
   colunas: Record<string, Card[]>,
@@ -332,7 +350,7 @@ export function Kanban({
   // entao o casamento possivel e finalidade + janela curta. Ecos de OUTRAS
   // origens (roteamento, transferencia, marcar nao lida, pin feito no Inbox)
   // continuam recarregando; a janela expira sozinha.
-  const ecoPinRef = useRef<{ finalidade: string; ate: number } | null>(null);
+  const ecoLocalRef = useRef<{ finalidade: string; ate: number } | null>(null);
   useEffect(() => {
     const socket = getSocket();
     function onEvt(_e: EventoNegocio) {
@@ -343,14 +361,14 @@ export function Kanban({
     // primeiro) — recarrega o quadro para refletir o pin ao vivo.
     function onConversa(e?: { finalidade?: string }) {
       if (arrastandoRef.current) return;
-      const eco = ecoPinRef.current;
+      const eco = ecoLocalRef.current;
       if (
         eco &&
         Date.now() < eco.ate &&
         (!e?.finalidade || e.finalidade === eco.finalidade)
       ) {
         // Consome UM eco: o proximo evento volta a recarregar normalmente.
-        ecoPinRef.current = null;
+        ecoLocalRef.current = null;
         return;
       }
       void carregar();
@@ -472,7 +490,7 @@ export function Kanban({
     const novo = anterior ? null : new Date().toISOString();
     setColunas((prev) => reposicionarPin(prev, etapaId, card.id, novo));
     // Bloco 3: a tela ja refletiu — o eco deste pin nao precisa recarregar.
-    ecoPinRef.current = { finalidade: card.finalidade, ate: Date.now() + 1500 };
+    ecoLocalRef.current = { finalidade: card.finalidade, ate: Date.now() + 1500 };
     try {
       const r = await fetch(`/api/conversas/${card.conversaId}/fixar`, {
         method: "POST",
@@ -483,6 +501,29 @@ export function Kanban({
       toast.erro(
         novo ? "Nao foi possivel fixar." : "Nao foi possivel desafixar.",
       );
+    }
+  }
+
+  // Marcar como nao lida pelo card — mesma rota que o menu do Inbox usa, sobre a
+  // mesma Conversa.marcadaNaoLida. Otimista e local (marcar nao muda a ordem da
+  // coluna), sem recarregar; falha reverte. A volta ("marcar como lida") e o
+  // proprio ato de abrir a conversa, que so zera para o dono — regra do servidor
+  // que esta fatia nao toca.
+  async function marcarNaoLida(card: Card) {
+    if (!card.conversaId || !card.etapaId || card.marcadaNaoLida) return;
+    const etapaId = card.etapaId;
+    setColunas((prev) => marcarNoCard(prev, etapaId, card.id, true));
+    // Esta rota tambem emite conversa:atualizada: pula o eco da propria acao.
+    ecoLocalRef.current = { finalidade: card.finalidade, ate: Date.now() + 1500 };
+    try {
+      const r = await fetch(
+        `/api/conversas/${card.conversaId}/marcar-nao-lida`,
+        { method: "POST" },
+      );
+      if (!r.ok) throw new Error();
+    } catch {
+      setColunas((prev) => marcarNoCard(prev, etapaId, card.id, false));
+      toast.erro("Nao foi possivel marcar como nao lida.");
     }
   }
 
@@ -745,6 +786,7 @@ export function Kanban({
                             })
                           }
                           onFixar={(c) => void alternarFixar(c)}
+                          onMarcarNaoLida={(c) => void marcarNaoLida(c)}
                           ehEntrada={j === 0}
                           onAtribuirMassa={(ids) =>
                             setAtribuir({
@@ -781,6 +823,7 @@ export function Kanban({
                     })
                   }
                   onFixar={(c) => void alternarFixar(c)}
+                  onMarcarNaoLida={(c) => void marcarNaoLida(c)}
                   ehEntrada={j === 0}
                   onAtribuirMassa={(ids) =>
                     setAtribuir({
