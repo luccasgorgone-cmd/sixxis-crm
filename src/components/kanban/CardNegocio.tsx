@@ -74,15 +74,21 @@ export function CardNegocio({
             {nome}
           </p>
         </div>
-        {ehPosVenda ? (
-          <GarantiaMarcador garantia={card.garantia} />
-        ) : (
-          <BadgeTemperatura
-            temperatura={card.temperatura}
-            variante="ponto"
-            className="mt-1.5"
+        <div className="flex shrink-0 items-start gap-1.5">
+          <SeloNaoLida
+            naoLidas={card.naoLidas}
+            marcadaNaoLida={card.marcadaNaoLida}
           />
-        )}
+          {ehPosVenda ? (
+            <GarantiaMarcador garantia={card.garantia} />
+          ) : (
+            <BadgeTemperatura
+              temperatura={card.temperatura}
+              variante="ponto"
+              className="mt-1.5"
+            />
+          )}
+        </div>
       </div>
 
       {card.valor != null && (
@@ -187,6 +193,40 @@ export function CardNegocio({
       </div>
     </div>
   );
+}
+
+// Indicador de nao-lida — o MESMO do inbox (ListaConversas): badge tiffany com o
+// contador automatico, ou ponto tiffany quando so ha marcacao manual. O mt-1
+// alinha o selo com a linha do nome (avatar de 28px), ao lado do marcador de
+// temperatura/garantia, sem disputar espaco com o pin de fixada.
+function SeloNaoLida({
+  naoLidas,
+  marcadaNaoLida,
+}: {
+  naoLidas: number;
+  marcadaNaoLida: boolean;
+}) {
+  if (naoLidas > 0) {
+    return (
+      <span
+        title={`${naoLidas} ${naoLidas === 1 ? "mensagem nao lida" : "mensagens nao lidas"}`}
+        aria-label={`${naoLidas} ${naoLidas === 1 ? "mensagem nao lida" : "mensagens nao lidas"}`}
+        className="mt-1 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-tiffany px-1.5 text-[11px] font-semibold text-white"
+      >
+        {naoLidas > 99 ? "99+" : naoLidas}
+      </span>
+    );
+  }
+  if (marcadaNaoLida) {
+    return (
+      <span
+        className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-tiffany"
+        title="Marcada como nao lida"
+        aria-label="Nao lida"
+      />
+    );
+  }
+  return null;
 }
 
 // Marcador de garantia no card de pos-venda: verde (com), ambar (sem), cinza
