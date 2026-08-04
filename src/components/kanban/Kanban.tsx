@@ -51,23 +51,24 @@ function compararFluxo(a: Card, b: Card): number {
   );
 }
 
-// Recoloca UM card na coluna depois de fixar/desafixar, sem mexer nos outros:
-// fixado vai para o topo (pin mais recente primeiro, como o servidor monta a
-// coluna); desafixado volta ao fluxo, logo abaixo das fixadas que restaram, na
-// posicao que a ordenacao da coluna lhe da.
-function reposicionarPin(
+// Reencaixa um card JA ATUALIZADO na coluna em que ele esta: fixado vai ao topo
+// (pin mais recente primeiro, como o servidor monta a coluna); nao fixado entra
+// na posicao que compararFluxo lhe da, logo abaixo das fixadas.
+//
+// REGRA DE OURO do tempo real: esta funcao so REORDENA DENTRO da coluna. Nunca
+// troca de etapa, nunca cria e nunca remove card — se o card nao estiver na
+// coluna informada, devolve o estado intacto (no-op).
+function recolocarNaColuna(
   colunas: Record<string, Card[]>,
   etapaId: string,
-  cardId: string,
-  fixadaEm: string | null,
+  atualizado: Card,
 ): Record<string, Card[]> {
   const atuais = colunas[etapaId];
-  const alvo = atuais?.find((c) => c.id === cardId);
-  if (!atuais || !alvo) return colunas;
-  const atualizado: Card = { ...alvo, fixadaEm };
-  const resto = atuais.filter((c) => c.id !== cardId);
+  if (!atuais) return colunas;
+  const resto = atuais.filter((c) => c.id !== atualizado.id);
+  if (resto.length === atuais.length) return colunas;
   let pos = 0;
-  if (!fixadaEm) {
+  if (!atualizado.fixadaEm) {
     const i = resto.findIndex(
       (c) => !c.fixadaEm && compararFluxo(atualizado, c) <= 0,
     );
@@ -77,6 +78,32 @@ function reposicionarPin(
     ...colunas,
     [etapaId]: [...resto.slice(0, pos), atualizado, ...resto.slice(pos)],
   };
+}
+
+// Localiza um card pela conversa (chave que os eventos de socket carregam).
+// Devolve tambem a etapa em que ele ESTA — e ela que manda no reencaixe, nunca
+// o evento. Fora da tela (paginado, filtrado, outro funil) -> null -> no-op.
+function acharPorConversa(
+  colunas: Record<string, Card[]>,
+  conversaId: string,
+): { etapaId: string; card: Card } | null {
+  for (const [etapaId, cards] of Object.entries(colunas)) {
+    const card = cards.find((c) => c.conversaId === conversaId);
+    if (card) return { etapaId, card };
+  }
+  return null;
+}
+
+// Recoloca UM card na coluna depois de fixar/desafixar, sem mexer nos outros.
+function reposicionarPin(
+  colunas: Record<string, Card[]>,
+  etapaId: string,
+  cardId: string,
+  fixadaEm: string | null,
+): Record<string, Card[]> {
+  const alvo = colunas[etapaId]?.find((c) => c.id === cardId);
+  if (!alvo) return colunas;
+  return recolocarNaColuna(colunas, etapaId, { ...alvo, fixadaEm });
 }
 
 type Pendente = {
@@ -309,11 +336,36 @@ export function Kanban({
       if (arrastandoRef.current) return;
       void carregar();
     }
+    // CIRURGICO: mensagem nova mexe em UM card que JA esta na tela — sobe na
+    // propria coluna e atualiza o badge de nao-lida. Sem recarga: as colunas
+    // expandidas com "carregar mais" continuam expandidas. Card fora do estado
+    // (paginado, filtrado, outro funil) e IGNORADO — o F5 resolve.
+    function onMensagem(e: {
+      conversaId?: string;
+      naoLidas?: number;
+      ultimaMensagemEm?: string;
+    }) {
+      if (arrastandoRef.current || !e?.conversaId) return;
+      const conversaId = e.conversaId;
+      setColunas((prev) => {
+        const achado = acharPorConversa(prev, conversaId);
+        if (!achado) return prev;
+        return recolocarNaColuna(prev, achado.etapaId, {
+          ...achado.card,
+          // Defensivo: so aceita o que o evento realmente trouxe.
+          naoLidas:
+            typeof e.naoLidas === "number" ? e.naoLidas : achado.card.naoLidas,
+          ultimaMensagemEm: e.ultimaMensagemEm ?? achado.card.ultimaMensagemEm,
+        });
+      });
+    }
     socket.on("negocio:atualizado", onEvt);
     socket.on("conversa:atualizada", onConversa);
+    socket.on("mensagem:nova", onMensagem);
     return () => {
       socket.off("negocio:atualizado", onEvt);
       socket.off("conversa:atualizada", onConversa);
+      socket.off("mensagem:nova", onMensagem);
     };
   }, [carregar]);
 
