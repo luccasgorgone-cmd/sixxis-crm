@@ -20,7 +20,12 @@ export const TETO_FIXADAS = 200;
 // ULTIMA MENSAGEM: quem voltou a falar sobe ao topo, para o vendedor ver de
 // cara quem interagiu depois de fechado. Quem nunca teve mensagem (null) cai
 // para o fim e e ordenado pelo fechamento, como antes.
-// As colunas ABERTAS seguem pela entrada na etapa (intocadas).
+//
+// TODAS as colunas sobem por ultima mensagem: as ABERTAS passam a usar o MESMO
+// criterio das terminais — o cliente mandou mensagem, o card sobe ao topo da
+// coluna ONDE ELE ESTA (a etapa nao muda; ordenar nao e mover). O desempate
+// segue a entrada na etapa, entao quem nunca teve mensagem (ultimaMensagemEm
+// null) cai para o fim exatamente na ordem de antes.
 export function ordemDaEtapa(
   tipo: TipoEtapa,
 ): Prisma.NegocioOrderByWithRelationInput[] {
@@ -32,7 +37,11 @@ export function ordemDaEtapa(
       { id: "desc" },
     ];
   }
-  return [{ entrouEtapaEm: "desc" }, { id: "desc" }];
+  return [
+    { ultimaMensagemEm: { sort: "desc", nulls: "last" } },
+    { entrouEtapaEm: "desc" },
+    { id: "desc" },
+  ];
 }
 
 // "Card fixado" = o lead tem conversa nao arquivada, da MESMA finalidade do
