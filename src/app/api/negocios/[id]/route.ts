@@ -87,6 +87,7 @@ export async function GET(
           conversas: {
             where: { arquivada: false },
             select: {
+              id: true,
               finalidade: true,
               fixadaEm: true,
               naoLidas: true,

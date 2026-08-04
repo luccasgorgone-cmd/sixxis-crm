@@ -23,9 +23,11 @@ export const includeCard = {
       // Fatia Y: pin da conversa da mesma finalidade do negocio — o card herda o
       // "fixada" para subir ao topo da coluna (ordenacao no /api/negocios).
       // naoLidas/marcadaNaoLida: mesmo indicador do inbox, exibido no card.
+      // id: o card precisa dele para chamar /api/conversas/[id]/fixar (pin).
       conversas: {
         where: { arquivada: false },
         select: {
+          id: true,
           finalidade: true,
           fixadaEm: true,
           naoLidas: true,
@@ -78,6 +80,12 @@ export function cardNegocio(n: NegocioCard) {
     entrouEtapaEm: n.entrouEtapaEm,
     // Fatia Y: null = nao fixada; data = fixada (sobe ao topo da coluna + pin no card).
     fixadaEm: conversaDaFinalidade?.fixadaEm ?? null,
+    // Alvo do pin clicavel no card: POST /api/conversas/[id]/fixar (a mesma rota
+    // que o Inbox usa). null = negocio sem conversa ativa -> pin desabilitado.
+    conversaId: conversaDaFinalidade?.id ?? null,
+    // Chave da ordenacao das colunas: o card carrega a propria para a tela
+    // reinserir na posicao certa ao desafixar, sem recarregar o quadro.
+    ultimaMensagemEm: n.ultimaMensagemEm,
     // Nao-lida herdada da mesma conversa: contador automatico da ingestao e
     // marcacao manual. So exibicao — quem zera e a abertura da conversa.
     naoLidas: conversaDaFinalidade?.naoLidas ?? 0,

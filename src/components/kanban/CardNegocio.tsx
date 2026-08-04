@@ -21,6 +21,7 @@ export function CardNegocio({
   ehAdmin = false,
   onAssumir,
   onAtribuir,
+  onFixar,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
@@ -29,6 +30,7 @@ export function CardNegocio({
   ehAdmin?: boolean;
   onAssumir?: (negocioId: string) => void;
   onAtribuir?: (card: Card) => void;
+  onFixar?: (card: Card) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
@@ -64,12 +66,37 @@ export function CardNegocio({
             fotoUrl={card.leadFoto}
             tamanho={28}
           />
-          {card.fixadaEm && (
+          {/* Pin CLICAVEL (sempre visivel, discreto quando inativo): fixa/desafixa
+              a conversa da finalidade pela mesma rota do Inbox. Sem conversa ativa
+              (ou sem handler, como no card fantasma do arraste) volta a ser so o
+              icone de leitura. */}
+          {onFixar && card.conversaId ? (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFixar(card);
+              }}
+              title={card.fixadaEm ? "Desafixar conversa" : "Fixar conversa"}
+              aria-label={card.fixadaEm ? "Desafixar conversa" : "Fixar conversa"}
+              aria-pressed={!!card.fixadaEm}
+              className={`shrink-0 rounded transition-colors ${
+                card.fixadaEm
+                  ? "text-tiffany hover:text-tiffany-escuro"
+                  : "text-medio/25 hover:text-tiffany"
+              }`}
+            >
+              <Pin
+                className={`h-3.5 w-3.5 ${card.fixadaEm ? "fill-current" : ""}`}
+              />
+            </button>
+          ) : card.fixadaEm ? (
             <Pin
-              className="h-3 w-3 shrink-0 text-medio/50"
+              className="h-3 w-3 shrink-0 text-tiffany"
               aria-label="Conversa fixada"
             />
-          )}
+          ) : null}
           <p className="min-w-0 truncate text-sm font-semibold text-escuro">
             {nome}
           </p>

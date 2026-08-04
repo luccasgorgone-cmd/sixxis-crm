@@ -38,6 +38,46 @@ import type {
   FiltroDono,
   Finalidade,
 } from "./tipos";
+import { compararPin } from "@/lib/ordenacao";
+
+// Ordem das NAO fixadas dentro da coluna, espelhando o servidor (ordemDaEtapa):
+// ultima mensagem desc com os sem-mensagem no fim, desempate pela entrada na
+// etapa e pelo id desc. Usada so para reencaixar um card desafixado.
+function compararFluxo(a: Card, b: Card): number {
+  return (
+    compararPin(a.ultimaMensagemEm, b.ultimaMensagemEm) ||
+    compararPin(a.entrouEtapaEm, b.entrouEtapaEm) ||
+    (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
+  );
+}
+
+// Recoloca UM card na coluna depois de fixar/desafixar, sem mexer nos outros:
+// fixado vai para o topo (pin mais recente primeiro, como o servidor monta a
+// coluna); desafixado volta ao fluxo, logo abaixo das fixadas que restaram, na
+// posicao que a ordenacao da coluna lhe da.
+function reposicionarPin(
+  colunas: Record<string, Card[]>,
+  etapaId: string,
+  cardId: string,
+  fixadaEm: string | null,
+): Record<string, Card[]> {
+  const atuais = colunas[etapaId];
+  const alvo = atuais?.find((c) => c.id === cardId);
+  if (!atuais || !alvo) return colunas;
+  const atualizado: Card = { ...alvo, fixadaEm };
+  const resto = atuais.filter((c) => c.id !== cardId);
+  let pos = 0;
+  if (!fixadaEm) {
+    const i = resto.findIndex(
+      (c) => !c.fixadaEm && compararFluxo(atualizado, c) <= 0,
+    );
+    pos = i === -1 ? resto.length : i;
+  }
+  return {
+    ...colunas,
+    [etapaId]: [...resto.slice(0, pos), atualizado, ...resto.slice(pos)],
+  };
+}
 
 type Pendente = {
   tipo: "ganho" | "perdido";
@@ -326,6 +366,30 @@ export function Kanban({
     }
   }
 
+  // Pin do card (Fatia Y, agora acionavel tambem no Kanban): fixa/desafixa a
+  // conversa da finalidade pela MESMA rota do Inbox — e a mesma fixadaEm, entao
+  // o pin feito aqui aparece la e vice-versa. Otimista e LOCAL: reposiciona so o
+  // card tocado dentro da coluna, sem chamar carregar(), para nao colapsar as
+  // colunas que o usuario ja expandiu com "carregar mais". Falha reverte.
+  async function alternarFixar(card: Card) {
+    if (!card.conversaId || !card.etapaId) return;
+    const etapaId = card.etapaId;
+    const anterior = card.fixadaEm ?? null;
+    const novo = anterior ? null : new Date().toISOString();
+    setColunas((prev) => reposicionarPin(prev, etapaId, card.id, novo));
+    try {
+      const r = await fetch(`/api/conversas/${card.conversaId}/fixar`, {
+        method: "POST",
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      setColunas((prev) => reposicionarPin(prev, etapaId, card.id, anterior));
+      toast.erro(
+        novo ? "Nao foi possivel fixar." : "Nao foi possivel desafixar.",
+      );
+    }
+  }
+
   // Assumir (atribuir a si): mesmo endpoint do seletor de vendedor do painel.
   async function assumir(negocioId: string) {
     try {
@@ -584,6 +648,7 @@ export function Kanban({
                               titulo: "Atribuir cliente",
                             })
                           }
+                          onFixar={(c) => void alternarFixar(c)}
                           ehEntrada={j === 0}
                           onAtribuirMassa={(ids) =>
                             setAtribuir({
@@ -619,6 +684,7 @@ export function Kanban({
                       titulo: "Atribuir cliente",
                     })
                   }
+                  onFixar={(c) => void alternarFixar(c)}
                   ehEntrada={j === 0}
                   onAtribuirMassa={(ids) =>
                     setAtribuir({
