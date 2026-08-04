@@ -83,7 +83,16 @@ export async function GET(
           // Enxuto (Fatia L): so id/nome/cor da etiqueta (usados na UI).
           etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
           // Fatia Y: pin herdado pelo card (mesma finalidade). Ver cardNegocio.
-          conversas: { where: { arquivada: false }, select: { finalidade: true, fixadaEm: true } },
+          // naoLidas/marcadaNaoLida: indicador de nao-lida no card do kanban.
+          conversas: {
+            where: { arquivada: false },
+            select: {
+              finalidade: true,
+              fixadaEm: true,
+              naoLidas: true,
+              marcadaNaoLida: true,
+            },
+          },
           notas: {
             orderBy: { criadoEm: "desc" },
             include: { agente: { select: { nome: true } } },

@@ -51,6 +51,10 @@ export type CardNegocio = {
   // Fatia Y: pin herdado da conversa da mesma finalidade (null = nao fixada).
   // Cards fixados sobem ao topo da coluna e exibem o icone de pin.
   fixadaEm?: string | null;
+  // Nao-lida herdada da conversa da mesma finalidade (mesmo indicador do inbox):
+  // contador automatico e marcacao manual. Zera ao abrir a conversa.
+  naoLidas: number;
+  marcadaNaoLida: boolean;
   agente: AgenteResumo | null;
   etiquetas: EtiquetaChip[];
   // Quantidade de alertas de SLA abertos (selo no card).

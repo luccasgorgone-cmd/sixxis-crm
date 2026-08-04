@@ -22,7 +22,16 @@ export const includeCard = {
       etiquetas: { select: { etiqueta: { select: { id: true, nome: true, cor: true } } } },
       // Fatia Y: pin da conversa da mesma finalidade do negocio — o card herda o
       // "fixada" para subir ao topo da coluna (ordenacao no /api/negocios).
-      conversas: { where: { arquivada: false }, select: { finalidade: true, fixadaEm: true } },
+      // naoLidas/marcadaNaoLida: mesmo indicador do inbox, exibido no card.
+      conversas: {
+        where: { arquivada: false },
+        select: {
+          finalidade: true,
+          fixadaEm: true,
+          naoLidas: true,
+          marcadaNaoLida: true,
+        },
+      },
     },
   },
   agente: { select: { id: true, nome: true, avatarUrl: true } },
@@ -69,6 +78,10 @@ export function cardNegocio(n: NegocioCard) {
     entrouEtapaEm: n.entrouEtapaEm,
     // Fatia Y: null = nao fixada; data = fixada (sobe ao topo da coluna + pin no card).
     fixadaEm: conversaDaFinalidade?.fixadaEm ?? null,
+    // Nao-lida herdada da mesma conversa: contador automatico da ingestao e
+    // marcacao manual. So exibicao — quem zera e a abertura da conversa.
+    naoLidas: conversaDaFinalidade?.naoLidas ?? 0,
+    marcadaNaoLida: conversaDaFinalidade?.marcadaNaoLida ?? false,
     alertasSla: n.alertasSla.length,
     agente: n.agente
       ? { id: n.agente.id, nome: n.agente.nome, avatarUrl: n.agente.avatarUrl }
