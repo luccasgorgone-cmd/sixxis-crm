@@ -324,6 +324,15 @@ export function Kanban({
   // Tempo real: qualquer mudanca de negocio recarrega o quadro (exceto durante
   // um arraste em andamento, para nao "pular" o card).
   const arrastandoRef = useRef(false);
+  // Bloco 3 — eco do PROPRIO pin. A rota /fixar emite conversa:atualizada para
+  // todos os clientes, e o listener abaixo recarrega o quadro: depois de um pin
+  // feito AQUI (ja refletido otimista) isso so serviria para colapsar as colunas
+  // expandidas. Marcamos a janela do nosso pin e PULAMOS UM unico eco dentro
+  // dela. O payload do evento nao carrega conversaId (so leadId + finalidade),
+  // entao o casamento possivel e finalidade + janela curta. Ecos de OUTRAS
+  // origens (roteamento, transferencia, marcar nao lida, pin feito no Inbox)
+  // continuam recarregando; a janela expira sozinha.
+  const ecoPinRef = useRef<{ finalidade: string; ate: number } | null>(null);
   useEffect(() => {
     const socket = getSocket();
     function onEvt(_e: EventoNegocio) {
@@ -332,8 +341,18 @@ export function Kanban({
     }
     // Fatia Y: fixar/desafixar uma conversa altera a ordem da coluna (fixadas
     // primeiro) — recarrega o quadro para refletir o pin ao vivo.
-    function onConversa() {
+    function onConversa(e?: { finalidade?: string }) {
       if (arrastandoRef.current) return;
+      const eco = ecoPinRef.current;
+      if (
+        eco &&
+        Date.now() < eco.ate &&
+        (!e?.finalidade || e.finalidade === eco.finalidade)
+      ) {
+        // Consome UM eco: o proximo evento volta a recarregar normalmente.
+        ecoPinRef.current = null;
+        return;
+      }
       void carregar();
     }
     // CIRURGICO: mensagem nova mexe em UM card que JA esta na tela — sobe na
@@ -452,6 +471,8 @@ export function Kanban({
     const anterior = card.fixadaEm ?? null;
     const novo = anterior ? null : new Date().toISOString();
     setColunas((prev) => reposicionarPin(prev, etapaId, card.id, novo));
+    // Bloco 3: a tela ja refletiu — o eco deste pin nao precisa recarregar.
+    ecoPinRef.current = { finalidade: card.finalidade, ate: Date.now() + 1500 };
     try {
       const r = await fetch(`/api/conversas/${card.conversaId}/fixar`, {
         method: "POST",
