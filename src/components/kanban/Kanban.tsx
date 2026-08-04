@@ -359,13 +359,36 @@ export function Kanban({
         });
       });
     }
+    // CIRURGICO: conversa aberta -> some o badge daquele card. O servidor SO
+    // emite este evento quando quem abriu e o DONO da conversa (a inspecao do
+    // admin nao zera contador alheio, e isso e proposital) — aqui a tela apenas
+    // REFLETE o que ja aconteceu no banco, sem regra propria de permissao.
+    // Ler nao muda ordem: nao reposiciona nada.
+    function onLida(e: { conversaId?: string }) {
+      if (!e?.conversaId) return;
+      const conversaId = e.conversaId;
+      setColunas((prev) => {
+        const achado = acharPorConversa(prev, conversaId);
+        if (!achado) return prev;
+        const { etapaId, card } = achado;
+        if (card.naoLidas === 0 && !card.marcadaNaoLida) return prev;
+        return {
+          ...prev,
+          [etapaId]: prev[etapaId].map((c) =>
+            c.id === card.id ? { ...c, naoLidas: 0, marcadaNaoLida: false } : c,
+          ),
+        };
+      });
+    }
     socket.on("negocio:atualizado", onEvt);
     socket.on("conversa:atualizada", onConversa);
     socket.on("mensagem:nova", onMensagem);
+    socket.on("conversa:lida", onLida);
     return () => {
       socket.off("negocio:atualizado", onEvt);
       socket.off("conversa:atualizada", onConversa);
       socket.off("mensagem:nova", onMensagem);
+      socket.off("conversa:lida", onLida);
     };
   }, [carregar]);
 
