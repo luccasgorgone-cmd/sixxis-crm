@@ -1,10 +1,11 @@
 // Lista rica de clientes do usuario logado. Colaborador ve os seus (por dono);
 // admin ve todos, podendo filtrar por colaborador (agenteId) ou sem dono.
-// Filtros: etiqueta, temperatura, status (ABERTO/GANHO/PERDIDO/PENDENTE), periodo
-// (por ultimo contato/criacao). A busca textual e feita no cliente (acentos).
+// Filtros: etiqueta, temperatura, status (ABERTO/GANHO/PERDIDO/PENDENTE), etapa
+// do funil (etapaId), periodo (por ultimo contato/criacao). A busca textual e
+// feita no cliente (acentos).
 //
 // GET /api/clientes?finalidade?&agenteId?(admin)&semDono?(admin)&etiqueta?
-//                  &temperatura?&status?&periodo?&inicio?&fim?
+//                  &temperatura?&status?&etapaId?&periodo?&inicio?&fim?
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
@@ -110,6 +111,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   else if (status === "ABERTO" || status === "GANHO" || status === "PERDIDO") {
     negFiltro.status = status as StatusNeg;
   }
+
+  // Etapa do funil (coluna do Kanban): o cliente entra se tem um negocio NAQUELA
+  // etapa. Entra no MESMO `some` de status/temperatura, entao os filtros se
+  // combinam por AND dentro do mesmo negocio ("um negocio na etapa X com status
+  // Y"), coerente com o resto da barra. Id desconhecido: ignora o filtro em vez
+  // de devolver lista vazia ou quebrar.
+  const etapaId = (sp.get("etapaId") ?? "").trim();
+  if (etapaId) {
+    const etapa = await prisma.etapa.findUnique({
+      where: { id: etapaId },
+      select: { id: true },
+    });
+    if (etapa) negFiltro.etapaId = etapa.id;
+  }
+
   if (Object.keys(negFiltro).length > 0) {
     where.negocios = { some: negFiltro };
   }
