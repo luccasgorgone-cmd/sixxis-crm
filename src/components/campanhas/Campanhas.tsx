@@ -116,100 +116,105 @@ export function Campanhas() {
   const outras = campanhas.filter((c) => c.status !== "RASCUNHO");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      {/* Cabecalho */}
-      <div className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-tiffany/10 text-tiffany">
-          <Megaphone className="h-5 w-5" />
-        </span>
-        <div>
-          <h2 className="text-lg font-semibold text-escuro">Campanhas</h2>
-          <p className="text-sm text-medio/60">Revise e dispare — o disparo e sua acao</p>
-        </div>
-      </div>
-
-      {/* Nota honesta */}
-      <div className="flex items-start gap-2 rounded-lg border border-black/5 bg-white px-3 py-2 text-xs text-medio/70">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tiffany" />
-        <span>
-          O Oracle pode PREPARAR rascunhos, mas NUNCA dispara. Nada e enviado ate voce
-          revisar e clicar em disparar aqui.
-        </span>
-      </div>
-
-      {erro ? (
-        <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-          Nao foi possivel carregar as campanhas.
-        </div>
-      ) : carregando && campanhas.length === 0 ? (
-        <ListaSkeleton />
-      ) : campanhas.length === 0 ? (
-        <Vazio />
-      ) : (
-        <div className="space-y-5">
-          {rascunhos.length > 0 && (
-            <section className="space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">
-                <Sparkles className="h-3.5 w-3.5 text-tiffany" /> Rascunhos (aguardando seu disparo)
-              </p>
-              {rascunhos.map((c) => (
-                <CardCampanha
-                  key={c.id}
-                  c={c}
-                  onDisparar={() => setConfirmar(c)}
-                  onDescartar={() => void descartar(c)}
-                />
-              ))}
-            </section>
-          )}
-          {outras.length > 0 && (
-            <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
-                Enviadas e em andamento
-              </p>
-              {outras.map((c) => (
-                <CardCampanha key={c.id} c={c} />
-              ))}
-            </section>
-          )}
-        </div>
-      )}
-
-      {/* Modal de confirmacao de disparo */}
-      {confirmar && (
-        <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="mb-2 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-erro" />
-              <h3 className="text-sm font-semibold text-escuro">Disparar campanha</h3>
-            </div>
-            <p className="text-sm text-medio/80">
-              Voce vai ENVIAR esta mensagem para{" "}
-              <strong className="text-escuro">{confirmar.total}</strong>{" "}
-              {confirmar.total === 1 ? "pessoa" : "pessoas"} via{" "}
-              {CANAL[confirmar.canal] ?? confirmar.canal}. Esta acao envia de verdade e
-              nao pode ser desfeita. Confirmar?
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmar(null)}
-                disabled={ocupado}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => void disparar(confirmar)}
-                disabled={ocupado}
-                className="flex items-center gap-1.5 rounded-lg bg-tiffany px-4 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
-              >
-                {ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Disparar agora
-              </button>
-            </div>
+    // O <main> do layout e overflow-hidden (o Kanban depende disso), entao a
+    // pagina precisa do proprio scroll: wrapper externo rola em toda a altura
+    // disponivel e o miolo segue centralizado no max-w-3xl de sempre.
+    <div className="scroll-fino h-full overflow-y-auto">
+      <div className="mx-auto max-w-3xl space-y-4 p-6">
+        {/* Cabecalho */}
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-tiffany/10 text-tiffany">
+            <Megaphone className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-escuro">Campanhas</h2>
+            <p className="text-sm text-medio/60">Revise e dispare — o disparo e sua acao</p>
           </div>
         </div>
-      )}
+
+        {/* Nota honesta */}
+        <div className="flex items-start gap-2 rounded-lg border border-black/5 bg-white px-3 py-2 text-xs text-medio/70">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tiffany" />
+          <span>
+            O Oracle pode PREPARAR rascunhos, mas NUNCA dispara. Nada e enviado ate voce
+            revisar e clicar em disparar aqui.
+          </span>
+        </div>
+
+        {erro ? (
+          <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+            Nao foi possivel carregar as campanhas.
+          </div>
+        ) : carregando && campanhas.length === 0 ? (
+          <ListaSkeleton />
+        ) : campanhas.length === 0 ? (
+          <Vazio />
+        ) : (
+          <div className="space-y-5">
+            {rascunhos.length > 0 && (
+              <section className="space-y-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-medio/50">
+                  <Sparkles className="h-3.5 w-3.5 text-tiffany" /> Rascunhos (aguardando seu disparo)
+                </p>
+                {rascunhos.map((c) => (
+                  <CardCampanha
+                    key={c.id}
+                    c={c}
+                    onDisparar={() => setConfirmar(c)}
+                    onDescartar={() => void descartar(c)}
+                  />
+                ))}
+              </section>
+            )}
+            {outras.length > 0 && (
+              <section className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-medio/50">
+                  Enviadas e em andamento
+                </p>
+                {outras.map((c) => (
+                  <CardCampanha key={c.id} c={c} />
+                ))}
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* Modal de confirmacao de disparo */}
+        {confirmar && (
+          <div className="fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="modal-in scroll-fino max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-erro" />
+                <h3 className="text-sm font-semibold text-escuro">Disparar campanha</h3>
+              </div>
+              <p className="text-sm text-medio/80">
+                Voce vai ENVIAR esta mensagem para{" "}
+                <strong className="text-escuro">{confirmar.total}</strong>{" "}
+                {confirmar.total === 1 ? "pessoa" : "pessoas"} via{" "}
+                {CANAL[confirmar.canal] ?? confirmar.canal}. Esta acao envia de verdade e
+                nao pode ser desfeita. Confirmar?
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmar(null)}
+                  disabled={ocupado}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-medio hover:bg-black/5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void disparar(confirmar)}
+                  disabled={ocupado}
+                  className="flex items-center gap-1.5 rounded-lg bg-tiffany px-4 py-2 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
+                >
+                  {ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Disparar agora
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
