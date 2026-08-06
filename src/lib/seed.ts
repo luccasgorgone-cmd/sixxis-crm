@@ -126,11 +126,11 @@ const ETAPAS_PADRAO: {
   { nome: "Novo", cor: "#64748b", tipo: TipoEtapa.ABERTA, ordem: 1 },
   { nome: "Em atendimento", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA, ordem: 2 },
   { nome: "Negociando", cor: "#0ea5e9", tipo: TipoEtapa.ABERTA, ordem: 3 },
-  // Etapas intermediarias "1", "2" e "3" (Bloco 2): entram entre Negociando e
+  // Etapas de follow-up (antigas "1"/"2"/"3"): entram entre Negociando e
   // Aguardando pagamento. Sao ABERTAS — contam como negocio ativo.
-  { nome: "1", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA, ordem: 4 },
-  { nome: "2", cor: "#2aa79b", tipo: TipoEtapa.ABERTA, ordem: 5 },
-  { nome: "3", cor: "#1d8f84", tipo: TipoEtapa.ABERTA, ordem: 6 },
+  { nome: "FollowUp - 1", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA, ordem: 4 },
+  { nome: "FollowUp - 2", cor: "#2aa79b", tipo: TipoEtapa.ABERTA, ordem: 5 },
+  { nome: "FollowUp - 3", cor: "#1d8f84", tipo: TipoEtapa.ABERTA, ordem: 6 },
   {
     nome: "Aguardando pagamento",
     cor: "#f59e0b",
@@ -153,9 +153,9 @@ const ORDEM_ALVO_VENDA = [
   "Novo",
   "Em atendimento",
   "Negociando",
-  "1",
-  "2",
-  "3",
+  "FollowUp - 1",
+  "FollowUp - 2",
+  "FollowUp - 3",
   "Aguardando pagamento",
   "Vendido",
   "Perdido",
@@ -168,11 +168,19 @@ const ORDEM_ALVO_POS_VENDA = [
   "Encerrado sem solucao",
 ];
 
-// As 3 etapas ABERTAS novas do funil de VENDA, em tons de tiffany (sem emoji).
-const ETAPAS_INTERMEDIARIAS: { nome: string; cor: string }[] = [
-  { nome: "1", cor: "#3cbfb3" },
-  { nome: "2", cor: "#2aa79b" },
-  { nome: "3", cor: "#1d8f84" },
+// As 3 etapas ABERTAS de follow-up do funil de VENDA, em tons de tiffany (sem
+// emoji). `nomeAntigo` e a grafia anterior ("1"/"2"/"3"): se ela ainda existir na
+// VENDA, o seed RENOMEIA em vez de criar uma etapa nova — assim nenhum card fica
+// preso numa coluna orfa caso o seed rode antes da migracao (o `npm start` roda
+// `prisma migrate deploy` antes, mas o `npm run dev` nao).
+const ETAPAS_INTERMEDIARIAS: {
+  nome: string;
+  cor: string;
+  nomeAntigo: string;
+}[] = [
+  { nome: "FollowUp - 1", cor: "#3cbfb3", nomeAntigo: "1" },
+  { nome: "FollowUp - 2", cor: "#2aa79b", nomeAntigo: "2" },
+  { nome: "FollowUp - 3", cor: "#1d8f84", nomeAntigo: "3" },
 ];
 
 // Etiquetas padrao. So semeia se NENHUMA existir (idempotente).
@@ -558,8 +566,9 @@ export async function seedFunil(): Promise<void> {
   }
 }
 
-// Bloco 2: garante as 3 etapas ABERTAS "1", "2" e "3" no funil de VENDA, entre
-// "Negociando" e "Aguardando pagamento", e leva TODO o funil para a ORDEM ALVO.
+// Bloco 2: garante as 3 etapas ABERTAS de follow-up ("FollowUp - 1/2/3", antes
+// "1"/"2"/"3") no funil de VENDA, entre "Negociando" e "Aguardando pagamento",
+// e leva TODO o funil para a ORDEM ALVO.
 //
 // IDEMPOTENTE em producao, onde as etapas ja existem com ordem 1-6: casa por
 // (finalidade, nome), CRIA so o que falta e ATUALIZA so a coluna `ordem`. Rodar
@@ -575,20 +584,37 @@ export async function seedEtapasIntermediarias(): Promise<void> {
       select: { id: true, nome: true, ordem: true, finalidade: true },
     });
     if (antes.length === 0) {
-      console.log("[seed] etapas 1/2/3: funil vazio; nada a fazer");
+      console.log("[seed] etapas FollowUp: funil vazio; nada a fazer");
       return;
     }
 
-    // 1) Cria as intermediarias que faltarem (casa por nome DENTRO da VENDA).
-    const nomesVenda = new Set(
+    // 1) Garante as intermediarias no funil de VENDA (casa por nome DENTRO da
+    // VENDA). Se a etapa ainda estiver com a grafia antiga ("1"/"2"/"3") — seed
+    // rodando antes da migracao de rename —, RENOMEIA em vez de criar uma nova:
+    // o id e preservado, entao nenhum card muda de etapa e nao sobra coluna orfa.
+    const porNomeVenda = new Map(
       antes
         .filter((e) => e.finalidade === FinalidadeEtapa.VENDA)
-        .map((e) => e.nome.trim().toLowerCase()),
+        .map((e) => [e.nome.trim().toLowerCase(), e] as const),
     );
     let ordemLivre = antes.reduce((m, e) => Math.max(m, e.ordem), 0) + 1;
     let criadas = 0;
+    let renomeadas = 0;
     for (const nova of ETAPAS_INTERMEDIARIAS) {
-      if (nomesVenda.has(nova.nome.toLowerCase())) continue;
+      if (porNomeVenda.has(nova.nome.toLowerCase())) continue;
+      const antiga = porNomeVenda.get(nova.nomeAntigo.toLowerCase());
+      if (antiga) {
+        await prisma.etapa.update({
+          where: { id: antiga.id },
+          data: { nome: nova.nome },
+        });
+        // Mantem a lista em memoria coerente para o passo 2 (mesmo objeto).
+        antiga.nome = nova.nome;
+        porNomeVenda.delete(nova.nomeAntigo.toLowerCase());
+        porNomeVenda.set(nova.nome.toLowerCase(), antiga);
+        renomeadas++;
+        continue;
+      }
       await prisma.etapa.create({
         data: {
           nome: nova.nome,
@@ -604,6 +630,8 @@ export async function seedEtapasIntermediarias(): Promise<void> {
     }
 
     // 2) Renumera para a ordem alvo (venda -> pos-venda -> o que sobrar).
+    // Renomes ja estao refletidos em `antes` (mesmo objeto), entao so releio o
+    // banco quando alguma etapa foi de fato criada.
     const linhas =
       criadas > 0
         ? await prisma.etapa.findMany({
@@ -636,7 +664,7 @@ export async function seedEtapasIntermediarias(): Promise<void> {
     }
     if (sobras.length > 0) {
       console.warn(
-        `[seed] etapas 1/2/3: ${sobras.length} etapa(s) fora do padrao ficaram no fim: ${sobras
+        `[seed] etapas FollowUp: ${sobras.length} etapa(s) fora do padrao ficaram no fim: ${sobras
           .map((s) => s.nome)
           .join(", ")}`,
       );
@@ -652,13 +680,13 @@ export async function seedEtapasIntermediarias(): Promise<void> {
       );
     }
     console.log(
-      criadas > 0 || mudancas.length > 0
-        ? `[seed] etapas 1/2/3: ${criadas} criadas, ${mudancas.length} ordens ajustadas`
-        : "[seed] etapas 1/2/3 ok (ordem ja no alvo)",
+      criadas > 0 || renomeadas > 0 || mudancas.length > 0
+        ? `[seed] etapas FollowUp: ${criadas} criadas, ${renomeadas} renomeadas, ${mudancas.length} ordens ajustadas`
+        : "[seed] etapas FollowUp ok (ordem ja no alvo)",
     );
   } catch (erro) {
     console.error(
-      `[seed] falha nas etapas 1/2/3: ${erro instanceof Error ? erro.message : String(erro)}`,
+      `[seed] falha nas etapas FollowUp: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }
