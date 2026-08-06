@@ -132,6 +132,9 @@ export function ListaClientes({
   const [etiquetaF, setEtiquetaF] = useState("");
   const [temperaturaF, setTemperaturaF] = useState("");
   const [statusF, setStatusF] = useState("");
+  // Etapa do funil (coluna do Kanban). Separado do status, que e o macro
+  // (ABERTO/GANHO/PERDIDO/PENDENTE). "" = qualquer etapa.
+  const [etapaF, setEtapaF] = useState("");
   const [empresaF, setEmpresaF] = useState("");
   const [produtoInteresseF, setProdutoInteresseF] = useState("");
   const [origemF, setOrigemF] = useState("");
@@ -232,6 +235,7 @@ export function ListaClientes({
       if (etiquetaF) p.set("etiqueta", etiquetaF);
       if (temperaturaF) p.set("temperatura", temperaturaF);
       if (statusF) p.set("status", statusF);
+      if (etapaF) p.set("etapaId", etapaF);
       if (empresaF) p.set("empresa", empresaF);
       if (produtoInteresseF) p.set("produtoInteresse", produtoInteresseF);
       if (origemF) p.set("origem", origemF);
@@ -255,11 +259,38 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo, mostrarBloqueados]);
+  }, [etiquetaF, temperaturaF, statusF, etapaF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo, mostrarBloqueados]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Etapas oferecidas no filtro, na ORDEM do funil. Segue a mesma visibilidade
+  // por acesso dos outros filtros (temperatura = venda, garantia = pos-venda):
+  // quem so tem venda nao ve colunas de pos-venda e vice-versa; AMBAS aparece
+  // para os dois. Os dois funis tem etapa "Em atendimento", entao quando os dois
+  // estao visiveis as opcoes vao agrupadas por finalidade.
+  const etapasFiltro = useMemo(() => {
+    const visiveis = etapas
+      .filter((e) => {
+        if (e.finalidade === "VENDA") return podeVenda;
+        if (e.finalidade === "POS_VENDA") return podePosVenda;
+        return podeVenda || podePosVenda; // AMBAS (ou sem finalidade)
+      })
+      .sort((a, b) => a.ordem - b.ordem);
+    const venda = visiveis.filter((e) => e.finalidade === "VENDA");
+    const posVenda = visiveis.filter((e) => e.finalidade === "POS_VENDA");
+    const outras = visiveis.filter(
+      (e) => e.finalidade !== "VENDA" && e.finalidade !== "POS_VENDA",
+    );
+    return {
+      visiveis,
+      venda,
+      posVenda,
+      outras,
+      agrupar: venda.length > 0 && posVenda.length > 0,
+    };
+  }, [etapas, podeVenda, podePosVenda]);
 
   // UFs presentes nos clientes carregados (para o seletor de Estado).
   const ufsDisponiveis = useMemo(() => {
@@ -846,6 +877,40 @@ export function ListaClientes({
           <option value="PERDIDO">Perdido</option>
           <option value="PENDENTE">Pendente</option>
         </select>
+        {etapasFiltro.visiveis.length > 0 && (
+          <select value={etapaF} onChange={(e) => setEtapaF(e.target.value)} className="campo">
+            <option value="">Etapa: todas</option>
+            {etapasFiltro.agrupar ? (
+              <>
+                <optgroup label="Venda">
+                  {etapasFiltro.venda.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Pos-venda">
+                  {etapasFiltro.posVenda.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </optgroup>
+                {etapasFiltro.outras.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nome}
+                  </option>
+                ))}
+              </>
+            ) : (
+              etapasFiltro.visiveis.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome}
+                </option>
+              ))
+            )}
+          </select>
+        )}
         <select value={empresaF} onChange={(e) => setEmpresaF(e.target.value)} className="campo">
           <option value="">Empresa: todas</option>
           {empresas.map((e) => (
