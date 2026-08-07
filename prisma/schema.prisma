@@ -35,6 +35,16 @@ enum StatusNeg {
   PERDIDO
 }
 
+// Tipo do GANHO no POS-VENDA: separa nos relatorios o atendimento que era so
+// duvida (sem problema nem venda), o que virou venda de peca/servico com
+// PAGAMENTO e o resolvido dentro da GARANTIA (sem cobrar). Vale SO para
+// finalidade POS_VENDA — a venda nao tem tipo de ganho.
+enum TipoGanho {
+  DUVIDA
+  PAGAMENTO
+  GARANTIA
+}
+
 // Quem esta conduzindo o atendimento da conversa.
 enum AtendidoPor {
   HUMANO
@@ -610,6 +620,11 @@ model Negocio {
   itensPedido   ItemPedido[]
   produtos      Json?
   status        StatusNeg          @default(ABERTO)
+  // Tipo do ganho de POS-VENDA, escolhido no fechamento (ver enum TipoGanho).
+  // Nasce null e NUNCA e preenchido na VENDA. null tambem nos ganhos antigos,
+  // anteriores a esta fatia: contam no total e aparecem como "nao classificado"
+  // nos relatorios. So e gravado no fechamento de GANHO do pos-venda.
+  tipoGanho     TipoGanho?
   temperatura   Temperatura        @default(MORNO)
   finalidade    Finalidade         @default(VENDA)
   // Pendencia operacional: negocio travado aguardando algo (orcamento, peca,
