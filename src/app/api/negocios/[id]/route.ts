@@ -18,6 +18,7 @@ import {
 } from "@/generated/prisma/enums";
 import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
 import { rotuloMotivo } from "@/lib/motivosPerda";
+import { lerTipoGanho, rotuloTipoGanho } from "@/lib/tipoGanho";
 import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { dispararPurchase } from "@/lib/metaCapi";
@@ -253,6 +254,9 @@ export async function PATCH(
   let body: {
     etapaId?: string;
     valor?: number | null;
+    // Tipo do ganho de POS-VENDA (DUVIDA/PAGAMENTO/GARANTIA). So e gravado no
+    // fechamento de ganho do pos-venda; ignorado na venda e nos demais PATCHes.
+    tipoGanho?: string | null;
     temperatura?: Temperatura;
     agenteId?: string | null;
     motivoPerda?: string;
@@ -360,6 +364,12 @@ export async function PATCH(
   // VENDA nada disso executa (fluxo e conversao Meta preservados).
   const ehPosVenda = negocio.finalidade === Finalidade.POS_VENDA;
 
+  // Tipo do ganho: so existe no POS-VENDA e so e gravado no fechamento de GANHO
+  // (abaixo). Valor fora da lista vira null e o filtro `ehPosVenda` descarta o
+  // que venha numa venda. NUNCA e escrito como null num PATCH comum — o valor ja
+  // gravado fica preservado.
+  const tipoGanhoInformado = ehPosVenda ? lerTipoGanho(body.tipoGanho) : null;
+
   // ---- Fechamento de PEDIDO (opcional): itens + frete ----
   // Normaliza os itens e calcula os totais. Quando ha itens, o VALOR do negocio
   // (total) passa a ser produtos COBRAVEIS + frete — itens em garantia (so
@@ -421,28 +431,39 @@ export async function PATCH(
     data.entrouEtapaEm = agora;
 
     if (destino.tipo === TipoEtapa.GANHO) {
+      // "So duvida" (pos-venda): atendimento sem pedido e sem cobranca. Fecha
+      // com ZERO sem exigir itens nem valor — sem esse caso o ganho de duvida
+      // cairia no 422 abaixo.
+      const soDuvida = tipoGanhoInformado === "DUVIDA";
       // Total: do PEDIDO (produtos + frete) quando ha itens; senao o valor
-      // informado (fluxo antigo) ou o valor atual do negocio.
+      // informado (fluxo antigo) ou o valor atual do negocio. Em "so duvida" o
+      // padrao e zero (nao herda o valor do rascunho: nada foi cobrado).
       const valorEfetivo =
         totalPedido != null
           ? totalPedido
           : body.valor != null
             ? body.valor
-            : negocio.valor != null
-              ? Number(negocio.valor)
-              : null;
-      // Total ZERO e legitimo SO na pos-venda com pedido (todas as pecas em
-      // garantia -> cliente nao paga nada). VENDA continua exigindo valor > 0;
-      // valorEfetivo == null nunca fecha ganho (pos-venda sem itens e sem valor
-      // tambem cai aqui). O front (ModalFechamento) ja permite esse caso.
-      const zeroGarantia = ehPosVenda && temPedido && valorEfetivo === 0;
-      if (valorEfetivo == null || (valorEfetivo <= 0 && !zeroGarantia)) {
+            : soDuvida
+              ? 0
+              : negocio.valor != null
+                ? Number(negocio.valor)
+                : null;
+      // Total ZERO e legitimo SO na pos-venda: com pedido (todas as pecas em
+      // garantia -> cliente nao paga nada) ou em "so duvida". VENDA continua
+      // exigindo valor > 0; valorEfetivo == null nunca fecha ganho (pos-venda
+      // sem itens, sem valor e sem tipo tambem cai aqui). O front
+      // (ModalFechamento) ja permite os mesmos casos.
+      const zeroSemCobranca = ehPosVenda && (temPedido || soDuvida) && valorEfetivo === 0;
+      if (valorEfetivo == null || (valorEfetivo <= 0 && !zeroSemCobranca)) {
         return NextResponse.json(
           { erro: "valor e obrigatorio para marcar como ganho" },
           { status: 422 },
         );
       }
       data.valor = valorEfetivo;
+      // Tipo do ganho: gravado SO aqui (fechamento de ganho, pos-venda). Ausente
+      // ou invalido nao escreve nada — nunca sobrescreve com null.
+      if (tipoGanhoInformado) data.tipoGanho = tipoGanhoInformado;
       data.status = StatusNeg.GANHO;
       data.fechadoEm = agora;
       // Simetrico da perda (Bloco 1/5): a data do ganho fica preservada, porque
@@ -502,7 +523,9 @@ export async function PATCH(
         : "";
       historicos.push({
         tipo: TipoHistorico.GANHO,
-        descricao: `Negocio ganho (${brl(valorEfetivo)})${detalhePedido}`,
+        descricao: `Negocio ganho (${brl(valorEfetivo)})${
+          tipoGanhoInformado ? ` — ${rotuloTipoGanho(tipoGanhoInformado)}` : ""
+        }${detalhePedido}`,
       });
     } else if (destino.tipo === TipoEtapa.PERDIDO) {
       const motivo = body.motivoPerda?.trim() || negocio.motivoPerda || "";
