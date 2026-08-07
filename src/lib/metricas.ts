@@ -2,7 +2,7 @@
 // Escopo opcional por agenteId e/ou finalidade. Periodo obrigatorio.
 import { prisma } from "./prisma";
 import { Prisma } from "../generated/prisma/client";
-import { StatusNeg, Finalidade } from "../generated/prisma/enums";
+import { StatusNeg, Finalidade, TipoGanho } from "../generated/prisma/enums";
 
 export type Periodo = { inicio: Date; fim: Date };
 
@@ -82,6 +82,14 @@ export type Metricas = {
   msgRecebidas: number;
   tempoPrimeiraRespostaSeg: number; // media
   tempoResolucaoSeg: number; // media
+  // Detalhamento do GANHO de POS-VENDA por tipo (Negocio.tipoGanho). A soma dos
+  // quatro = ganhos de pos-venda do escopo; "SemTipo" sao os ganhos anteriores a
+  // essa escolha existir (tipoGanho null), que continuam contando no total. Em
+  // escopo de VENDA os quatro sao 0 — a venda nao tem tipo de ganho.
+  posVendaGanhoDuvida: number;
+  posVendaGanhoPagamento: number;
+  posVendaGanhoGarantia: number;
+  posVendaGanhoSemTipo: number;
 };
 
 function negocioWhere(
@@ -207,6 +215,23 @@ export async function calcularMetricas(
     }),
   ]);
 
+  // Ganhos de POS-VENDA do escopo, quebrados por tipoGanho. Mesma janela e mesmo
+  // escopo do `ganhos` acima, com finalidade fixada em POS_VENDA — no escopo de
+  // VENDA nem vai ao banco (o campo e sempre null la).
+  const porTipoGanho =
+    e.finalidade === Finalidade.VENDA
+      ? []
+      : await prisma.negocio.groupBy({
+          by: ["tipoGanho"],
+          _count: { _all: true },
+          where: {
+            ...negocioWhere(p, e, [StatusNeg.GANHO], true),
+            finalidade: Finalidade.POS_VENDA,
+          },
+        });
+  const contaTipo = (t: TipoGanho | null) =>
+    porTipoGanho.find((g) => g.tipoGanho === t)?._count._all ?? 0;
+
   const valorVendido =
     (somaBase._sum.valor ? Number(somaBase._sum.valor) : 0) +
     (somaAjuste._sum.valorAjustado ? Number(somaAjuste._sum.valorAjustado) : 0);
@@ -240,6 +265,10 @@ export async function calcularMetricas(
     msgRecebidas,
     tempoPrimeiraRespostaSeg,
     tempoResolucaoSeg,
+    posVendaGanhoDuvida: contaTipo(TipoGanho.DUVIDA),
+    posVendaGanhoPagamento: contaTipo(TipoGanho.PAGAMENTO),
+    posVendaGanhoGarantia: contaTipo(TipoGanho.GARANTIA),
+    posVendaGanhoSemTipo: contaTipo(null),
   };
 }
 

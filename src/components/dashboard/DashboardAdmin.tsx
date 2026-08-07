@@ -236,6 +236,7 @@ export function DashboardAdmin() {
             <RecorteFinalidade
               titulo="Pos-venda"
               m={dados.porFinalidade.posVenda}
+              detalharGanho
             />
             <ChartCard titulo="Conversao geral" subtitulo={`${formatarPct(g.conversao)} de aproveitamento`}>
               {g.ganhos + g.perdidos === 0 ? (
@@ -399,7 +400,21 @@ function Th({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function RecorteFinalidade({ titulo, m }: { titulo: string; m: Metricas }) {
+function RecorteFinalidade({
+  titulo,
+  m,
+  detalharGanho = false,
+}: {
+  titulo: string;
+  m: Metricas;
+  // Pos-venda: quebra os resolvidos por tipo de ganho (ver lib/tipoGanho).
+  detalharGanho?: boolean;
+}) {
+  const resolvidos =
+    m.posVendaGanhoDuvida +
+    m.posVendaGanhoPagamento +
+    m.posVendaGanhoGarantia +
+    m.posVendaGanhoSemTipo;
   return (
     <div className="rounded-xl border border-black/5 bg-white p-4">
       <p className="mb-3 text-sm font-semibold text-escuro">{titulo}</p>
@@ -409,6 +424,18 @@ function RecorteFinalidade({ titulo, m }: { titulo: string; m: Metricas }) {
         <Mini rotulo="Conversao" valor={formatarPct(m.conversao)} />
         <Mini rotulo="Valor" valor={formatarBRL(m.valorVendido)} />
       </div>
+      {detalharGanho && resolvidos > 0 && (
+        <p className="mt-3 border-t border-black/5 pt-2 text-xs text-medio/60">
+          <span className="font-semibold text-medio/70">
+            Resolvidos: {resolvidos}
+          </span>{" "}
+          — duvida {m.posVendaGanhoDuvida}, pagamento {m.posVendaGanhoPagamento},
+          garantia {m.posVendaGanhoGarantia}
+          {m.posVendaGanhoSemTipo > 0
+            ? `, nao classificado ${m.posVendaGanhoSemTipo}`
+            : ""}
+        </p>
+      )}
     </div>
   );
 }

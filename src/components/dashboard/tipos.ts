@@ -14,6 +14,12 @@ export type Metricas = {
   msgRecebidas: number;
   tempoPrimeiraRespostaSeg: number;
   tempoResolucaoSeg: number;
+  // Detalhamento do ganho de POS-VENDA por tipo (ver lib/metricas). Soma = ganhos
+  // de pos-venda; "SemTipo" = ganho antigo, sem classificacao. Zero na venda.
+  posVendaGanhoDuvida: number;
+  posVendaGanhoPagamento: number;
+  posVendaGanhoGarantia: number;
+  posVendaGanhoSemTipo: number;
 };
 
 export type PontoTendencia = {

@@ -44,6 +44,13 @@ const COLS_METRICA = [
   "msgRecebidas",
   "tempoPrimeiraRespostaSeg",
   "tempoResolucaoSeg",
+  // Detalhamento do ganho de POS-VENDA por tipo. Somam os ganhos de pos-venda do
+  // escopo; "SemTipo" sao os resolvidos antigos, sem classificacao. Na linha de
+  // Venda vem zerado (a venda nao tem tipo de ganho).
+  "posVendaGanhoDuvida",
+  "posVendaGanhoPagamento",
+  "posVendaGanhoGarantia",
+  "posVendaGanhoSemTipo",
 ] as const;
 
 export function RelatoriosAdmin() {
@@ -145,7 +152,7 @@ export function RelatoriosAdmin() {
       <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
         <Cartao
           titulo="Metricas (geral + por colaborador)"
-          descricao="Clientes, casos, conversao, valor, tempos e finalidade."
+          descricao="Clientes, casos, conversao, valor, tempos, finalidade e o ganho de pos-venda por tipo."
           ocupado={ocupado === "metricas"}
           onClick={() => void exportarMetricas()}
         />
