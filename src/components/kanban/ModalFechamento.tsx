@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Loader2, Plus, Trash2, ShieldCheck, Info, DownloadCloud } from "lucide-react";
 import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
+import { TIPOS_GANHO, type CodigoTipoGanho } from "@/lib/tipoGanho";
 import { formatarBRL } from "@/lib/format";
 import {
   SecaoPagamento,
@@ -65,6 +66,9 @@ type Linha = {
 
 export type DadosFechamento = {
   valor?: number;
+  // POS-VENDA: tipo do ganho escolhido no fechamento (ver lib/tipoGanho).
+  // Obrigatorio no ganho de pos-venda; a VENDA nunca envia (fica null no banco).
+  tipoGanho?: CodigoTipoGanho;
   motivoPerda?: string;
   motivoPerdaObs?: string;
   itens?: {
@@ -126,6 +130,9 @@ export function ModalFechamento({
   const ehGanho = tipo === "ganho";
   const ehPeca = finalidade === "POS_VENDA";
   const [valor, setValor] = useState(valorInicial != null ? String(valorInicial) : "");
+  // Tipo do ganho (so pos-venda). Nasce sem selecao e e obrigatorio para
+  // confirmar — assim o relatorio de resolvidos nunca ganha buraco novo.
+  const [tipoGanho, setTipoGanho] = useState<CodigoTipoGanho | "">("");
   const [motivo, setMotivo] = useState("");
   const [obs, setObs] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -386,9 +393,20 @@ export function ModalFechamento({
     return extras;
   }
 
+  // Payload do tipo de ganho: SO no pos-venda. Na venda sai vazio e o campo do
+  // negocio permanece null.
+  function tipoGanhoPayload(): Pick<DadosFechamento, "tipoGanho"> {
+    return ehPeca && tipoGanho ? { tipoGanho } : {};
+  }
+
   async function confirmar() {
     setErro(null);
     if (ehGanho) {
+      // Pos-venda: o tipo do ganho e obrigatorio (nao deixa fechar sem).
+      if (ehPeca && !tipoGanho) {
+        setErro("Escolha o tipo do ganho.");
+        return;
+      }
       if (itens.length > 0) {
         const validos = itens.filter((i) => i.descricao.trim() && i.valorUnitario >= 0);
         if (validos.length === 0) {
@@ -405,6 +423,7 @@ export function ModalFechamento({
         try {
           await onConfirmar({
             valor: total,
+            ...tipoGanhoPayload(),
             frete: freteNum,
             fretePagoPelaEmpresa,
             // Valor final cobrado (com desconto/frete) -> valorAjustado, venda e
@@ -431,16 +450,20 @@ export function ModalFechamento({
         }
         return;
       }
-      // Modo simples: so valor total.
+      // Modo simples: so valor total. "So duvida" (pos-venda) e a excecao —
+      // atendimento sem pedido e sem cobranca fecha com zero, sem exigir itens
+      // nem valor. Os demais tipos e a VENDA seguem exigindo valor > 0.
+      const soDuvida = ehPeca && tipoGanho === "DUVIDA";
       const v = Number(valor.replace(",", "."));
-      if (!v || v <= 0) {
+      if (!soDuvida && (!v || v <= 0)) {
         setErro("Informe um valor ou adicione produtos.");
         return;
       }
       setSalvando(true);
       try {
         await onConfirmar({
-          valor: v,
+          valor: soDuvida ? (v > 0 ? v : 0) : v,
+          ...tipoGanhoPayload(),
           orcPagamentos: paraPersistir(pagamentos),
           ...checkoutExtras(),
         });
@@ -487,6 +510,39 @@ export function ModalFechamento({
         <div className="scroll-fino flex-1 overflow-y-auto p-5">
           {ehGanho ? (
             <div className="space-y-3">
+              {/* Tipo do ganho (POS-VENDA). Vem primeiro porque condiciona o
+                  resto: "So duvida" fecha sem itens e sem cobranca. */}
+              {ehPeca && (
+                <div className="rounded-lg border border-black/5 bg-fundo p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-medio/50">
+                    Tipo do ganho
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {TIPOS_GANHO.map((t) => {
+                      const ativo = tipoGanho === t.code;
+                      return (
+                        <button
+                          key={t.code}
+                          onClick={() => setTipoGanho(t.code)}
+                          aria-pressed={ativo}
+                          className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                            ativo
+                              ? "border-tiffany bg-tiffany text-white"
+                              : "border-black/10 bg-white text-medio hover:bg-black/5"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-medio/60">
+                    {TIPOS_GANHO.find((t) => t.code === tipoGanho)?.ajuda ??
+                      "Escolha como este atendimento foi resolvido."}
+                  </p>
+                </div>
+              )}
+
               {/* Puxar do site: pre-preenche a partir do pedido da Loja. */}
               {podePuxar && (
                 <div className="space-y-2">
