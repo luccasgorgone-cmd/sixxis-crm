@@ -6,18 +6,30 @@
 // esses casos pela data do ganho. O que esta errado e o CARD: status, valor e
 // coluna no funil. E uma correcao de TELA.
 //
-// DOIS CASOS, tratados diferente — e a diferenca e o coracao desta rota:
+// SAO DUAS PERGUNTAS INDEPENDENTES, e confundi-las foi o bug da primeira versao:
 //
-//   JA TEVE GANHO (jaFoiGanho ou evento GANHO valido no historico): a venda ja
-//   esta registrada, so o card se perdeu. Ajusta status/valor/etapa e NAO cria
-//   evento novo — criar duplicaria a venda no historico de compras do cliente e
-//   inflaria o contador, exatamente o que a Fatia 9 existe para desfazer.
-//   fechadoEm REUSA a data do ganho original: carimbar hoje moveria a venda de
-//   mes no relatorio.
+//   "DE QUANDO FOI A VENDA?" -> qualquer VESTIGIO responde: jaFoiGanho, ou a
+//   data de um evento GANHO, ate de um NEUTRALIZADO pelo dedup (ele foi
+//   descartado como prova de compra, mas a data dele continua verdadeira).
+//   Havendo vestigio, fechadoEm REUSA essa data — carimbar hoje moveria a venda
+//   de mes no relatorio. Sem vestigio nenhum, e agora: e quando o CRM soube.
 //
-//   NUNCA TEVE GANHO (venda so no site): a venda nao existe no CRM. Aqui SIM
-//   cria-se UM evento de ganho, porque esta e a hora em que ela passa a existir.
-//   fechadoEm = agora, que e quando o CRM soube.
+//   "PRECISO CRIAR O EVENTO?" -> so um evento VALIDO responde. E aqui esta o
+//   ponto: o historico de compras (lib/compras) conta EVENTOS, nao a flag. Um
+//   negocio com jaFoiGanho=true cujo unico evento foi neutralizado tem ZERO
+//   compras para o cliente — e a primeira versao desta rota, olhando so a flag,
+//   se recusava a criar o evento e o deixava presos em zero para sempre.
+//
+//   Quando o evento e criado, ele nasce DATADO NA VENDA (criadoEm = fechadoEm),
+//   nao em hoje, para o historico de compras mostrar a data certa.
+//
+// NUNCA cria evento havendo um valido: seria duplicar a compra e inflar o
+// contador, exatamente o que a Fatia 9 existe para desfazer.
+//
+// A ROTA CONFERE O QUE GRAVOU. Depois do update ela rele o negocio dentro da
+// mesma transacao e compara valor/status/etapa; se nao bater, derruba a
+// transacao e reporta o item como falho. Antes, "aplicado" significava so
+// "nenhuma excecao" — a intencao de gravar, nao o resultado.
 //
 // CONTADOR vezesGanho: +1 so na TRANSICAO para GANHO, a mesma regra do PATCH de
 // negocios. Quem ja esta GANHO no momento da execucao nao conta de novo.
@@ -65,10 +77,16 @@ type Plano = {
   etapaDestino: string | null;
   fechadoEmPrevisto: string | null;
   origemFechadoEm: string | null;
-  // As duas decisoes que separam os dois casos.
+  // As decisoes que separam os dois casos.
   jaTinhaGanho: boolean;
+  ganhosValidos: number;
+  eventosNeutralizados: number;
   criaEvento: boolean;
   contaMais1: boolean;
+  // O que o BANCO tem depois de aplicar. Preenchido so no POST: e a prova de que
+  // gravou, em vez da intencao de gravar.
+  valorDepois?: number | null;
+  statusDepois?: string | null;
   // Preenchido quando o item nao pode ser aplicado.
   problema: string | null;
 };
@@ -137,6 +155,8 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
       fechadoEmPrevisto: null,
       origemFechadoEm: null,
       jaTinhaGanho: false,
+      ganhosValidos: 0,
+      eventosNeutralizados: 0,
       criaEvento: false,
       contaMais1: false,
       problema,
@@ -174,28 +194,41 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
       continue;
     }
 
-    // Prova de ganho anterior: a memoria no negocio OU um evento valido no
-    // historico (os duplicados de movimentacao da Fatia 9 nao valem como prova).
     const eventos = await prisma.historicoNegocio.findMany({
       where: { negocioId: n.id, tipo: TipoHistorico.GANHO },
       orderBy: { criadoEm: "desc" },
       select: { criadoEm: true, descricao: true },
     });
+    // DUAS perguntas diferentes, que a primeira versao desta rota confundiu:
+    //
+    //   "de quando foi a venda?"  -> qualquer VESTIGIO serve. Ate um evento
+    //   neutralizado pela Fatia 9 carrega a data verdadeira, e a flag jaFoiGanho
+    //   diz que houve ganho mesmo sem evento sobrando.
+    //
+    //   "preciso criar o evento?" -> so um evento VALIDO responde. O historico de
+    //   compras (lib/compras) conta EVENTOS, nao a flag: um negocio com
+    //   jaFoiGanho=true cujo unico evento foi neutralizado aparece com ZERO
+    //   compras para o cliente, e nunca sairia disso porque a rota achava que ja
+    //   havia ganho e se recusava a criar. Era o caso do card que motivou a
+    //   correcao.
     const validos = eventos.filter((e) => !ehGanhoDesconsiderado(e.descricao));
-    const jaTinhaGanho = n.jaFoiGanho || validos.length > 0;
+    const temVestigioDeGanho = n.jaFoiGanho || eventos.length > 0;
+    const criaEvento = validos.length === 0;
 
     const destino = await primeiraEtapaGanho(n.finalidade);
 
-    // fechadoEm: reusa a data do ganho ORIGINAL quando ele existe. Carimbar hoje
+    // fechadoEm: reusa a data do ganho ORIGINAL quando ela existe. Carimbar hoje
     // moveria uma venda antiga para o mes atual no relatorio.
     let fechadoEm: Date;
     let origem: string;
-    if (jaTinhaGanho) {
+    if (temVestigioDeGanho) {
       if (n.ultimoGanhoEm) {
         fechadoEm = n.ultimoGanhoEm;
         origem = "ultimoGanhoEm (ganho original)";
-      } else if (validos[0]) {
-        fechadoEm = validos[0].criadoEm;
+      } else if (eventos[0]) {
+        // eventos[0] e o mais recente, valido ou nao: o neutralizado foi
+        // descartado como PROVA, mas a data dele continua sendo verdade.
+        fechadoEm = eventos[0].criadoEm;
         origem = "historico GANHO (ganho original)";
       } else if (n.fechadoEm) {
         fechadoEm = n.fechadoEm;
@@ -221,9 +254,12 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
       etapaDestino: destino?.nome ?? null,
       fechadoEmPrevisto: fechadoEm.toISOString(),
       origemFechadoEm: origem,
-      jaTinhaGanho,
-      // Evento novo SO quando a venda ainda nao existe no CRM.
-      criaEvento: !jaTinhaGanho,
+      jaTinhaGanho: temVestigioDeGanho,
+      // Quantos eventos de ganho AINDA CONTAM. Zero com jaTinhaGanho=true e
+      // exatamente o caso que quebrava: ha vestigio, mas nao ha compra contavel.
+      ganhosValidos: validos.length,
+      eventosNeutralizados: eventos.length - validos.length,
+      criaEvento,
       // +1 so na transicao, como no PATCH.
       contaMais1: n.status !== StatusNeg.GANHO,
       problema: destino ? null : "funil sem etapa de ganho para esta finalidade",
@@ -283,85 +319,152 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         continue;
       }
 
-      const ok = await prisma.$transaction(async (tx) => {
-        // Rele DENTRO da transacao: entre a previa e agora o card pode ter sido
-        // mexido na mao. O estado de agora e que decide o +1 e o evento.
-        const atual = await tx.negocio.findUnique({
-          where: { id: plano.negocioId },
-          select: {
-            status: true,
-            jaFoiGanho: true,
-            arquivado: true,
-            leadId: true,
-            finalidade: true,
-          },
-        });
-        if (!atual) return false;
+      // Etapa resolvida FORA da transacao de proposito: primeiraEtapaGanho usa o
+      // cliente global, e chamar o cliente global de dentro de uma transacao
+      // interativa emprestaria outra conexao do pool no meio dela — caminho
+      // conhecido para travar sob concorrencia.
+      const destinoPre = await primeiraEtapaGanho(
+        (plano.finalidade ?? "VENDA") as "VENDA" | "POS_VENDA",
+      );
+      if (!destinoPre) {
+        pulados.push({ ...plano, problema: "funil sem etapa de ganho" });
+        continue;
+      }
 
-        const eventos = await tx.historicoNegocio.findMany({
-          where: { negocioId: plano.negocioId, tipo: TipoHistorico.GANHO },
-          select: { descricao: true },
-        });
-        const temGanho =
-          atual.jaFoiGanho ||
-          eventos.some((e) => !ehGanhoDesconsiderado(e.descricao));
-
-        const criaEvento = !temGanho;
-        const contaMais1 = atual.status !== StatusNeg.GANHO;
-        const destino = await primeiraEtapaGanho(atual.finalidade);
-        if (!destino) return false;
-
-        await tx.negocio.update({
-          where: { id: plano.negocioId },
-          data: {
-            status: StatusNeg.GANHO,
-            valor: plano.valorNovo,
-            etapaId: destino.id,
-            entrouEtapaEm: new Date(),
-            fechadoEm: plano.fechadoEmPrevisto
-              ? new Date(plano.fechadoEmPrevisto)
-              : undefined,
-            // Memoria do ganho, para a venda sobreviver a uma reabertura futura.
-            jaFoiGanho: true,
-            ultimoGanhoEm: plano.fechadoEmPrevisto
-              ? new Date(plano.fechadoEmPrevisto)
-              : undefined,
-            // Volta ao quadro em Vendido.
-            arquivado: false,
-            arquivadoEm: null,
-            arquivadoMotivo: null,
-            ...(contaMais1 ? { vezesGanho: { increment: 1 } } : {}),
-            historicos: {
-              create: criaEvento
-                ? {
-                    // A venda passa a existir no CRM agora: evento de GANHO, com
-                    // o valor estruturado que o historico de compras soma.
-                    tipo: TipoHistorico.GANHO,
-                    descricao: `Negocio ganho (${formatarBRL(plano.valorNovo)}) — venda confirmada no site, registrada por ${admin.nome ?? "admin"}`,
-                    valorGanho: plano.valorNovo,
-                    agenteId: admin.id,
-                  }
-                : {
-                    // A venda ja existe: so o card estava errado. NOTA, nunca
-                    // GANHO — um evento novo duplicaria a compra do cliente.
-                    tipo: TipoHistorico.NOTA,
-                    descricao: `Card corrigido para venda confirmada (${formatarBRL(plano.valorNovo)}) — sem novo evento de ganho`,
-                    agenteId: admin.id,
-                  },
+      // Cada item tem a SUA transacao e o SEU try: um card que falha a
+      // verificacao nao pode derrubar os outros do lote nem virar um 500 que
+      // esconde o que ja deu certo.
+      let resultado:
+        | { ok: true; valorDepois: number | null; statusDepois: string }
+        | { ok: false; motivo: string };
+      try {
+        resultado = await prisma.$transaction(async (tx) => {
+          // Rele DENTRO da transacao: entre a previa e agora o card pode ter sido
+          // mexido na mao. O estado de agora e que decide o +1 e o evento.
+          const atual = await tx.negocio.findUnique({
+            where: { id: plano.negocioId },
+            select: {
+              status: true,
+              jaFoiGanho: true,
+              arquivado: true,
+              leadId: true,
+              finalidade: true,
             },
-          },
-        });
-        if (atual.arquivado) {
-          desarquivar.push({
-            leadId: atual.leadId,
-            finalidade: atual.finalidade,
           });
-        }
-        return true;
-      });
+          if (!atual) return { ok: false, motivo: "negocio sumiu" } as const;
 
-      if (ok) aplicados.push(plano);
-      else pulados.push({ ...plano, problema: "mudou entre a previa e a execucao" });
+          const eventos = await tx.historicoNegocio.findMany({
+            where: { negocioId: plano.negocioId, tipo: TipoHistorico.GANHO },
+            select: { descricao: true },
+          });
+          // Mesma separacao da previa: o evento so e criado quando NAO ha nenhum
+          // ganho valido. jaFoiGanho nao substitui um evento — o historico de
+          // compras conta eventos.
+          const criaEvento = !eventos.some(
+            (e) => !ehGanhoDesconsiderado(e.descricao),
+          );
+          const contaMais1 = atual.status !== StatusNeg.GANHO;
+          const destino = destinoPre;
+
+          await tx.negocio.update({
+            where: { id: plano.negocioId },
+            data: {
+              status: StatusNeg.GANHO,
+              valor: plano.valorNovo,
+              etapaId: destino.id,
+              entrouEtapaEm: new Date(),
+              fechadoEm: plano.fechadoEmPrevisto
+                ? new Date(plano.fechadoEmPrevisto)
+                : undefined,
+              // Memoria do ganho, para a venda sobreviver a uma reabertura futura.
+              jaFoiGanho: true,
+              ultimoGanhoEm: plano.fechadoEmPrevisto
+                ? new Date(plano.fechadoEmPrevisto)
+                : undefined,
+              // Volta ao quadro em Vendido.
+              arquivado: false,
+              arquivadoEm: null,
+              arquivadoMotivo: null,
+              ...(contaMais1 ? { vezesGanho: { increment: 1 } } : {}),
+              historicos: {
+                create: criaEvento
+                  ? {
+                      // A venda passa a existir no CRM agora: evento de GANHO, com
+                      // o valor estruturado que o historico de compras soma.
+                      tipo: TipoHistorico.GANHO,
+                      descricao: `Negocio ganho (${formatarBRL(plano.valorNovo)}) — venda confirmada no site, registrada por ${admin.nome ?? "admin"}`,
+                      valorGanho: plano.valorNovo,
+                      agenteId: admin.id,
+                      // DATADO NA VENDA, nao em hoje: o historico de compras do
+                      // cliente mostra "comprou em DD/MM", e carimbar agora poria
+                      // uma venda de agosto na data de hoje.
+                      ...(plano.fechadoEmPrevisto
+                        ? { criadoEm: new Date(plano.fechadoEmPrevisto) }
+                        : {}),
+                    }
+                  : {
+                      // A venda ja existe: so o card estava errado. NOTA, nunca
+                      // GANHO — um evento novo duplicaria a compra do cliente.
+                      tipo: TipoHistorico.NOTA,
+                      descricao: `Card corrigido para venda confirmada (${formatarBRL(plano.valorNovo)}) — sem novo evento de ganho`,
+                      agenteId: admin.id,
+                    },
+              },
+            },
+          });
+          // CONFERE O QUE FICOU. A rota antes devolvia "aplicado" pela ausencia de
+          // excecao — isto e, relatava a INTENCAO de gravar. Se por qualquer razao
+          // o valor nao pousasse, o dono via sucesso e um card errado, sem nada
+          // que ligasse as duas coisas. Agora o sucesso significa "reli e esta la".
+          const depois = await tx.negocio.findUnique({
+            where: { id: plano.negocioId },
+            select: { valor: true, status: true, etapaId: true },
+          });
+          const valorGravado = numeroOuNull(depois?.valor);
+          const bateu =
+            depois != null &&
+            depois.status === StatusNeg.GANHO &&
+            depois.etapaId === destino.id &&
+            valorGravado != null &&
+            // Tolerancia de centavo: valor e Decimal(12,2).
+            Math.abs(valorGravado - plano.valorNovo) < 0.005;
+          if (!bateu) {
+            // Derruba a transacao de proposito: melhor nao aplicar e gritar do que
+            // aplicar pela metade e dizer que deu certo.
+            throw new Error(
+              `verificacao falhou no negocio ${plano.negocioId}: esperado valor ${plano.valorNovo} / GANHO / etapa ${destino.id}; ` +
+                `banco devolveu valor ${valorGravado} / ${depois?.status} / etapa ${depois?.etapaId}`,
+            );
+          }
+
+          if (atual.arquivado) {
+            desarquivar.push({
+              leadId: atual.leadId,
+              finalidade: atual.finalidade,
+            });
+          }
+            return {
+              ok: true as const,
+              valorDepois: valorGravado,
+              statusDepois: depois.status as string,
+            };
+        });
+      } catch (erro) {
+        resultado = {
+          ok: false,
+          motivo: erro instanceof Error ? erro.message : String(erro),
+        };
+      }
+
+      if (resultado.ok) {
+        aplicados.push({
+          ...plano,
+          valorDepois: resultado.valorDepois,
+          statusDepois: resultado.statusDepois,
+        });
+      } else {
+        pulados.push({ ...plano, problema: resultado.motivo });
+      }
     }
 
     // Conversa de volta ao Inbox para quem estava arquivado. Best-effort.
