@@ -24,6 +24,7 @@ import { obterAdmin } from "@/lib/autorizacao";
 import {
   arquivarNegociosEConversas,
   contarArquivaveis,
+  ARQUIVO_PRAZO,
 } from "@/lib/arquivamento";
 import type { Prisma } from "@/generated/prisma/client";
 import { StatusNeg } from "@/generated/prisma/enums";
@@ -56,7 +57,9 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
   try {
-    const r = await arquivarNegociosEConversas(ALVO);
+    // PRAZO e nao MANUAL: e a MESMA regra de prazo do job, so que aplicada de
+    // uma vez ao passivo. Manual e o vendedor encerrando um card na tela.
+    const r = await arquivarNegociosEConversas(ALVO, ARQUIVO_PRAZO);
     console.log(
       `[limpeza-perdidos] ${r.total} perdidos arquivados ` +
         `(venda ${r.venda}, pos-venda ${r.posVenda}, ${r.conversas} conversas) ` +

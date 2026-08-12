@@ -131,6 +131,9 @@ export async function garantirNegocioParaLead(
         // campo, Conversa.arquivada — os dois voltam juntos).
         arquivado: false,
         arquivadoEm: null,
+        // A origem do arquivamento (Fatia 10) morre junto com o arquivamento:
+        // o card esta no quadro de novo, entao nao ha "por que saiu".
+        arquivadoMotivo: null,
         // Limpa o motivo (agora esta aberto); a PERDA anterior permanece no
         // HistoricoNegocio, entao o registro da perda NAO some.
         motivoPerda: null,

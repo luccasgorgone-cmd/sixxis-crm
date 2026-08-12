@@ -685,6 +685,11 @@ model Negocio {
   // Negocio ABERTO nunca e arquivado. Voltar a falar reabre e desarquiva.
   arquivado     Boolean            @default(false)
   arquivadoEm   DateTime?
+  // Fatia 10 — ORIGEM do arquivamento, para o dono separar depois "encerrado na
+  // mao pelo vendedor" de "saiu pelo prazo". "PRAZO" | "MANUAL" (ver
+  // lib/arquivamento). null = arquivado antes desta fatia (origem desconhecida)
+  // ou nao arquivado. Uso interno/relatorio: nao aparece para o vendedor.
+  arquivadoMotivo String?
   historicos    HistoricoNegocio[]
   atividades    Atividade[]
   lembretes     Lembrete[]

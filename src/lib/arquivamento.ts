@@ -83,6 +83,16 @@ export type ContagemArquivamento = {
   conversas: number;
 };
 
+// ORIGEM do arquivamento (Fatia 10), gravada em Negocio.arquivadoMotivo. Os dois
+// caminhos terminam no mesmo arquivado=true, entao sem esta marca o dono nao
+// separaria depois um do outro.
+//   PRAZO  = o negocio venceu o relogio (job diario ou a limpeza pontual).
+//   MANUAL = o vendedor clicou "Encerrar" no card. Nao e ganho nem perda: e um
+//            atendimento que acabou sem desfecho de venda.
+// null continua valendo para tudo que foi arquivado ANTES desta fatia.
+export const ARQUIVO_PRAZO = "PRAZO";
+export const ARQUIVO_MANUAL = "MANUAL";
+
 // Lote de ids por UPDATE. So para nao mandar um IN gigante ao Postgres quando a
 // varredura pega milhares de cards de uma vez (limpeza pontual dos perdidos).
 const LOTE = 500;
@@ -94,6 +104,7 @@ async function arquivarLado(
   where: Prisma.NegocioWhereInput,
   finalidade: Finalidade,
   agora: Date,
+  motivo: string | null,
 ): Promise<{ negocios: number; conversas: number }> {
   // `arquivado: false` aqui e o que torna tudo IDEMPOTENTE: quem ja saiu do
   // quadro nao e relido nem reescrito numa segunda passada.
@@ -110,7 +121,13 @@ async function arquivarLado(
     const [resNegocio, resConversa] = await prisma.$transaction([
       prisma.negocio.updateMany({
         where: { id: { in: ids }, arquivado: false },
-        data: { arquivado: true, arquivadoEm: agora },
+        data: {
+          arquivado: true,
+          arquivadoEm: agora,
+          // So escreve quando quem chamou disse a origem; sem motivo a coluna
+          // fica como estava, e nenhum chamador antigo muda de comportamento.
+          ...(motivo ? { arquivadoMotivo: motivo } : {}),
+        },
       }),
       // A Conversa ATIVA daquele lead+setor. O indice unico parcial
       // (leadId, finalidade) WHERE arquivada=false garante no maximo uma por
@@ -135,10 +152,11 @@ async function arquivarLado(
 // negocio ABERTO nao entra aqui em nenhum fluxo.
 export async function arquivarNegociosEConversas(
   where: Prisma.NegocioWhereInput,
+  motivo: string | null = null,
 ): Promise<ContagemArquivamento> {
   const agora = new Date();
-  const venda = await arquivarLado(where, Finalidade.VENDA, agora);
-  const pos = await arquivarLado(where, Finalidade.POS_VENDA, agora);
+  const venda = await arquivarLado(where, Finalidade.VENDA, agora, motivo);
+  const pos = await arquivarLado(where, Finalidade.POS_VENDA, agora, motivo);
   return {
     venda: venda.negocios,
     posVenda: pos.negocios,
@@ -270,7 +288,7 @@ export async function arquivarNegociosVencidos(): Promise<void> {
     // conversa juntos) e nao vale competir por conexao num job de fundo.
     const partes: string[] = [];
     for (const a of alvos) {
-      const r = await arquivarNegociosEConversas(a.where);
+      const r = await arquivarNegociosEConversas(a.where, ARQUIVO_PRAZO);
       partes.push(
         `${r.total} ${a.rotulo} (venda ${r.venda}, pos-venda ${r.posVenda}, ` +
           `${r.conversas} conversas)`,

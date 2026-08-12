@@ -99,6 +99,8 @@ export async function POST(
         // prazo nao pode voltar a ABERTO e continuar invisivel no Kanban).
         arquivado: false,
         arquivadoEm: null,
+        // Fatia 10: sem arquivamento, sem origem de arquivamento.
+        arquivadoMotivo: null,
         // Limpa o motivo do negocio ATIVO (preservado acima no historico).
         motivoPerda: null,
         motivoPerdaObs: null,
