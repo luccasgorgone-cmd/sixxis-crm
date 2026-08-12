@@ -1,10 +1,19 @@
 // Bloco 3 — job diario que ESVAZIA o Kanban por PRAZO. Espelha o padrao de
 // lib/aniversarios.ts: roda no boot e a cada 24h, e nunca derruba o servidor.
 //
-// O QUE FAZ: negocio PERDIDO sem nova interacao ha mais de `diasArquivarPerdido`
-// dias sai do quadro; idem GANHO com `diasArquivarGanho`. "Sair do quadro" =
-// arquivado=true. NADA e deletado: lead, conversa, historico, valores e o
-// proprio negocio continuam no banco e nas telas de cliente.
+// O QUE FAZ: tira do quadro os negocios PERDIDO (apos `diasArquivarPerdido`) e
+// GANHO (apos `diasArquivarGanho`). "Sair do quadro" = arquivado=true. NADA e
+// deletado: lead, conversa, historico, valores e o proprio negocio continuam no
+// banco e nas telas de cliente.
+//
+// CADA LADO TEM SEU RELOGIO — e a regra do dono:
+//   GANHO   -> ultima INTERACAO (ultimaMensagemEm). RENOVA: so sai depois de X
+//              dias sem nenhuma mensagem; o cliente falou, o prazo reinicia.
+//   PERDIDO -> ENTRADA na coluna (entrouEtapaEm). NAO RENOVA: conta fixo a
+//              partir do momento em que o negocio foi dado como perdido. Passados
+//              X dias ele sai, mesmo que o cliente tenha mandado mensagem ontem.
+//              (Se o cliente volta a falar o negocio REABRE — vira ABERTO e some
+//              deste job; o prazo do perdido so corre enquanto ele for perdido.)
 //
 // KANBAN E INBOX ANDAM JUNTOS: arquivar sao DOIS campos separados —
 // Negocio.arquivado (tira do Kanban) e Conversa.arquivada (tira do Inbox),
@@ -23,9 +32,10 @@ import { prisma } from "./prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { Finalidade, StatusNeg } from "../generated/prisma/enums";
 
-// Relogio do prazo = ultima interacao (mensagem IN ou OUT espelhada no negocio
+// RELOGIO DO GANHO: ultima interacao (mensagem IN ou OUT espelhada no negocio
 // pelo Bloco 4). Negocio que nunca teve mensagem cai no atualizadoEm — mesma
-// semantica de COALESCE(ultimaMensagemEm, atualizadoEm) < corte.
+// semantica de COALESCE(ultimaMensagemEm, atualizadoEm) < corte. RENOVA: cada
+// mensagem nova empurra o prazo para frente.
 function paradoDesde(corte: Date): Prisma.NegocioWhereInput {
   return {
     OR: [
@@ -33,6 +43,20 @@ function paradoDesde(corte: Date): Prisma.NegocioWhereInput {
       { ultimaMensagemEm: null, atualizadoEm: { lt: corte } },
     ],
   };
+}
+
+// RELOGIO DO PERDIDO: quando entrou na coluna. Marcar como perdido e um
+// movimento de etapa, e todo movimento grava entrouEtapaEm=agora (ver o PATCH
+// de /api/negocios/[id]) — entao para um negocio perdido este campo E a data em
+// que ele virou perdido. NAO RENOVA de proposito: mensagem do cliente nao
+// empurra o prazo. Se o cliente volta a falar o negocio e REABERTO (status
+// ABERTO) e sai do alcance do job, que so olha PERDIDO/GANHO.
+//
+// Sem COALESCE aqui porque nao ha o que coalescer: entrouEtapaEm e NOT NULL no
+// banco (DateTime @default(now())), entao nao existe perdido "imortal" sem
+// relogio — o proprio schema garante o que o fallback garantiria.
+function naColunaDesde(corte: Date): Prisma.NegocioWhereInput {
+  return { entrouEtapaEm: { lt: corte } };
 }
 
 function corteDe(dias: number): Date {
@@ -210,7 +234,8 @@ export async function arquivarNegociosVencidos(): Promise<void> {
         where: {
           status: StatusNeg.PERDIDO,
           arquivado: false,
-          ...paradoDesde(corteDe(diasPerdido)),
+          // Relogio pela ENTRADA na coluna (nao renova com interacao).
+          ...naColunaDesde(corteDe(diasPerdido)),
         },
       });
     }
