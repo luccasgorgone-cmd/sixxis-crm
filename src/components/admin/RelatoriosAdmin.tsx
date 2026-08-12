@@ -2,8 +2,8 @@
 
 // Admin > Relatorios: exporta CSV do dashboard (geral + por colaborador) e da
 // lista de atendimentos, no periodo selecionado. Reusa as APIs de metricas.
-import { useState } from "react";
-import { Download, Loader2, FileSpreadsheet } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, Loader2, FileSpreadsheet, Archive } from "lucide-react";
 import { Cabecalho } from "./VendedoresAdmin";
 import { FiltroPeriodo } from "@/components/dashboard/FiltroPeriodo";
 import { queryDoFiltro, type FiltroValor } from "@/components/dashboard/tipos";
@@ -163,6 +163,127 @@ export function RelatoriosAdmin() {
           onClick={() => void exportarAtendimentos()}
         />
       </div>
+
+      <EncerramentosManuais filtro={filtro} />
+    </div>
+  );
+}
+
+type LinhaEncerramento = {
+  agenteId: string | null;
+  nome: string;
+  total: number;
+  venda: number;
+  posVenda: number;
+};
+
+type RespostaEncerramentos = {
+  total: number;
+  porVendedor: LinhaEncerramento[];
+  desde: string | null;
+};
+
+// Quem encerra atendimento na mao, e quanto. O botao "Encerrar" tira o card do
+// quadro sem marcar venda nem perda — legitimo para o cliente que volta so com
+// uma duvida, e tambem a saida mais facil para se livrar de um atendimento. O
+// numero por vendedor e o que deixa um exagero visivel.
+//
+// Usa o MESMO periodo do resto da tela (o seletor do cabecalho), entao trocar o
+// periodo la recarrega esta lista junto.
+function EncerramentosManuais({ filtro }: { filtro: FiltroValor }) {
+  const [dados, setDados] = useState<RespostaEncerramentos | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    fetch(`/api/admin/encerramentos-manuais?${queryDoFiltro(filtro)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: RespostaEncerramentos) => {
+        if (!vivo) return;
+        setDados(d);
+        setErro(false);
+      })
+      .catch(() => {
+        if (vivo) setErro(true);
+      })
+      .finally(() => {
+        if (vivo) setCarregando(false);
+      });
+    // Ignora a resposta de um periodo que ja nao esta na tela.
+    return () => {
+      vivo = false;
+    };
+  }, [filtro]);
+
+  return (
+    <div className="mt-4 max-w-2xl rounded-xl border border-black/5 bg-white p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <Archive className="h-5 w-5 text-tiffany" />
+        <p className="text-sm font-semibold text-escuro">
+          Encerramentos manuais
+        </p>
+      </div>
+      <p className="mb-3 text-xs text-medio/60">
+        Atendimentos tirados do quadro pelo botao &quot;Encerrar&quot;, sem virar
+        venda nem perda, no periodo selecionado.
+      </p>
+
+      {carregando ? (
+        <div className="skeleton h-24 rounded-lg" />
+      ) : erro ? (
+        <p className="text-xs text-medio/60">
+          Nao foi possivel carregar os encerramentos.
+        </p>
+      ) : !dados || dados.total === 0 ? (
+        <p className="text-xs text-medio/60">
+          Nenhum encerramento manual no periodo.
+        </p>
+      ) : (
+        <>
+          <p className="mb-2 text-2xl font-semibold text-escuro">
+            {dados.total}
+            <span className="ml-1.5 text-xs font-normal text-medio/60">
+              {dados.total === 1 ? "encerramento" : "encerramentos"}
+            </span>
+          </p>
+          <ul className="divide-y divide-black/5">
+            {dados.porVendedor.map((v) => (
+              <li
+                key={v.agenteId ?? "sem-dono"}
+                className="flex items-baseline justify-between gap-3 py-1.5"
+              >
+                <span className="truncate text-sm text-escuro">{v.nome}</span>
+                <span className="flex items-baseline gap-2">
+                  {/* A quebra so aparece quando ha os dois lados: numa base so
+                      de venda ela seria ruido repetindo o total. */}
+                  {v.venda > 0 && v.posVenda > 0 && (
+                    <span className="text-[11px] text-medio/50">
+                      {v.venda} venda · {v.posVenda} pos-venda
+                    </span>
+                  )}
+                  <span className="text-sm font-semibold text-escuro">
+                    {v.total}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/* O relatorio so enxerga o que foi encerrado DEPOIS do recurso existir:
+          arquivamento antigo nao guarda a origem. Dizer isso evita ler um numero
+          baixo como "quase ninguem encerra" quando e so historico curto. */}
+      {!carregando && !erro && dados?.desde && (
+        <p className="mt-3 border-t border-black/5 pt-2 text-[11px] text-medio/50">
+          Conta a partir de{" "}
+          {new Date(dados.desde).toLocaleDateString("pt-BR")}, quando o
+          encerramento manual passou a ser registrado. Cards arquivados antes
+          disso nao guardam a origem e ficam de fora.
+        </p>
+      )}
     </div>
   );
 }
