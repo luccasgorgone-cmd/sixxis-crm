@@ -648,11 +648,18 @@ model Negocio {
   ultimoMotivoPerda   String?
   ultimoMotivoPerdaObs String?      @db.Text
   ultimaPerdaEm       DateTime?
+  // CONTAGEM de fechamentos (o booleano acima so diz sim/nao). Incrementa SO na
+  // TRANSICAO de status: um negocio ja PERDIDO que recebe outro PATCH nao conta
+  // de novo; perder -> reabrir -> perder outra vez conta 2. Como jaFoiPerdido,
+  // e HISTORIA: nunca decrementa. Alimenta o "ja foi perdido 3x" dos paineis.
+  vezesPerdido        Int           @default(0)
   // Simetrico do acima para a VENDA: quando um negocio GANHO e reaberto porque o
   // cliente voltou a falar, o status sai de GANHO (some das metricas de venda,
   // que filtram por status) — entao a data do ganho fica preservada aqui.
   jaFoiGanho          Boolean       @default(false)
   ultimoGanhoEm       DateTime?
+  // Simetrico de vezesPerdido: quantas vezes este negocio ja foi GANHO.
+  vezesGanho          Int           @default(0)
   // Transporte da entrega (vale para venda e pos-venda). transportadora e a
   // PRINCIPAL do negocio; cada RastreioNegocio pode ter a sua se o dono digitar.
   transportadora  String?
