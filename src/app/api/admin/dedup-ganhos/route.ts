@@ -16,7 +16,7 @@
 // venda. O primeiro fica; os seguintes sao repeticao de movimentacao.
 //
 // A janela conta do PRIMEIRO evento do ciclo, nao do anterior. Encadear pelo
-// anterior deixaria uma corrente longa colapsar sem limite (um ganho a cada 20h
+// anterior deixaria uma corrente longa colapsar sem limite (um ganho a cada 5h
 // por um mes viraria uma compra so). Ancorada no primeiro, um ciclo cobre no
 // maximo JANELA_HORAS — e uma recompra de verdade, que vem dias depois, abre
 // ciclo novo e continua contando como compra.

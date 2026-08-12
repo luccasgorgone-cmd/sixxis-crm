@@ -6,9 +6,16 @@
 // Ver /api/admin/dedup-ganhos para o que e feito com o resultado.
 
 // Janela do mesmo ciclo de venda. Movimentar o card para frente e para tras
-// acontece em minutos ou horas; recompra de verdade leva dias. 24h separa os
-// dois casos com folga dos dois lados.
-export const JANELA_HORAS = 24;
+// acontece em minutos ou horas; recompra de verdade leva dias.
+//
+// 6h (decisao do dono, ajustada de 24h antes da primeira execucao da rota). O
+// caso real de movimentacao repetida ficou em ~2h, entao 6h ainda o pega com
+// folga — e, do outro lado, uma janela curta protege quem compra DUAS VEZES DE
+// VERDADE no mesmo dia: com 24h essas duas vendas virariam uma so. Entre errar
+// deixando uma repeticao passar e errar apagando uma venda real, o barato e
+// deixar passar: repeticao sobrando o dono ve e manda rodar de novo, venda
+// apagada ninguem percebe.
+export const JANELA_HORAS = 6;
 const JANELA_MS = JANELA_HORAS * 60 * 60 * 1000;
 
 export const CRITERIO_DEDUP =
@@ -21,7 +28,7 @@ export type Ciclo<T> = { mantido: T; repetidos: T[] };
 // ordenados por criadoEm ASC.
 //
 // A janela conta do PRIMEIRO evento do ciclo, nao do anterior. Encadear pelo
-// anterior deixaria uma corrente longa colapsar sem limite (um ganho a cada 20h
+// anterior deixaria uma corrente longa colapsar sem limite (um ganho a cada 5h
 // por um mes viraria uma compra so). Ancorada no primeiro, um ciclo cobre no
 // maximo JANELA_HORAS — e uma recompra de verdade, que vem dias depois, abre
 // ciclo novo e continua contando como compra.
