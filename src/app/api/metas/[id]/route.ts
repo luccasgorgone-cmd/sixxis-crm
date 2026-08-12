@@ -8,6 +8,11 @@ import { nomeEfetivo } from "@/lib/cliente";
 import { calcularMetricas } from "@/lib/metricas";
 import { analisarPerdidosWhere } from "@/lib/perdidos";
 import {
+  whereVendaNoPeriodo,
+  comEscopo,
+  dataDaVenda,
+} from "@/lib/vendasPeriodo";
+import {
   calcularProgresso,
   podeEditarMeta,
   metaSeAplica,
@@ -56,6 +61,9 @@ function mapItem(n: {
   id: string;
   valor: Prisma.Decimal | null;
   fechadoEm: Date | null;
+  // So os ganhos selecionam este campo. Ausente nas outras listas, onde
+  // dataDaVenda cai no fechadoEm e o resultado fica igual ao de sempre.
+  ultimoGanhoEm?: Date | null;
   motivoPendencia: string | null;
   lead: LeadSel;
 }) {
@@ -66,7 +74,9 @@ function mapItem(n: {
     telefone: n.lead.telefone,
     fotoUrl: n.lead.fotoUrl,
     valor: n.valor != null ? Number(n.valor) : null,
-    fechadoEm: n.fechadoEm,
+    // Data da VENDA (Fatia 14): num negocio reaberto o fechadoEm foi zerado, e
+    // mostrar "—" esconderia a venda que a fatia recuperou.
+    fechadoEm: dataDaVenda(n),
     motivoPendencia: n.motivoPendencia,
   };
 }
@@ -159,24 +169,26 @@ export async function GET(
 
   const base = whereNegociosMeta(meta);
 
-  // Drill-downs: ganhos/perdidos no periodo (por fechadoEm); abertos/pendentes
-  // pelo estado atual.
+  // Drill-downs: ganhos/perdidos no periodo; abertos/pendentes pelo estado
+  // atual. Os ganhos saem por "HOUVE venda no periodo" (Fatia 14) — a mesma
+  // regra que o progresso da meta usa via calcularMetricas, para a lista nunca
+  // discordar do numero grande em cima dela.
   const [ganhos, abertos, pendentes, perdidos] = await Promise.all([
     prisma.negocio.findMany({
-      where: {
-        AND: [
-          base,
-          {
-            status: StatusNeg.GANHO,
-            fechadoEm: { gte: meta.inicio, lte: meta.fim },
-          },
-        ],
-      },
-      orderBy: { fechadoEm: "desc" },
+      where: comEscopo(base, whereVendaNoPeriodo({
+        inicio: meta.inicio,
+        fim: meta.fim,
+      })),
+      // Pela data do ganho: o reaberto tem fechadoEm null e cairia no fim.
+      orderBy: [
+        { ultimoGanhoEm: { sort: "desc", nulls: "last" } },
+        { fechadoEm: "desc" },
+      ],
       select: {
         id: true,
         valor: true,
         fechadoEm: true,
+        ultimoGanhoEm: true,
         motivoPendencia: true,
         lead: { select: selectCliente },
       },
@@ -214,7 +226,9 @@ export async function GET(
     meta.fim,
     meta.alvo,
     ganhos.map((g) => ({
-      fechadoEm: g.fechadoEm,
+      // A serie e por DIA: sem a data resolvida, toda venda reaberta (fechadoEm
+      // null) seria descartada do grafico e a curva ficaria abaixo do progresso.
+      fechadoEm: dataDaVenda(g),
       valor: g.valor != null ? Number(g.valor) : null,
     })),
   );
