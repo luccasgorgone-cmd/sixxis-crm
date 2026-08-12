@@ -564,46 +564,6 @@ export function Kanban({
     }
   }
 
-  // EXCLUIR (Fatia 15-A): "isto nao foi venda". Alem de tirar o card do quadro,
-  // os ganhos dele param de contar como compra do cliente. Mesma remocao
-  // otimista e cirurgica do encerrar, com o card voltando ao lugar exato se a
-  // chamada falhar.
-  async function excluir(card: Card) {
-    const etapaId = card.etapaId;
-    if (!etapaId) return;
-    let indice = -1;
-    setColunas((prev) => {
-      const atuais = prev[etapaId];
-      if (!atuais) return prev;
-      indice = atuais.findIndex((c) => c.id === card.id);
-      if (indice < 0) return prev;
-      return { ...prev, [etapaId]: atuais.filter((c) => c.id !== card.id) };
-    });
-    if (indice < 0) return;
-    try {
-      const r = await fetch(`/api/negocios/${card.id}/excluir`, {
-        method: "POST",
-      });
-      if (!r.ok) throw new Error();
-      const d = await r.json().catch(() => null);
-      const n = d?.ganhosNeutralizados ?? 0;
-      toast.sucesso(
-        n > 0
-          ? `Card excluido. ${n === 1 ? "1 compra saiu" : `${n} compras sairam`} do historico do cliente.`
-          : "Card excluido.",
-      );
-    } catch {
-      setColunas((prev) => {
-        const atuais = prev[etapaId] ?? [];
-        if (atuais.some((c) => c.id === card.id)) return prev;
-        const volta = [...atuais];
-        volta.splice(Math.min(indice, volta.length), 0, card);
-        return { ...prev, [etapaId]: volta };
-      });
-      toast.erro("Nao foi possivel excluir.");
-    }
-  }
-
   // Assumir (atribuir a si): mesmo endpoint do seletor de vendedor do painel.
   async function assumir(negocioId: string) {
     try {
@@ -865,7 +825,6 @@ export function Kanban({
                           onFixar={(c) => void alternarFixar(c)}
                           onMarcarNaoLida={(c) => void marcarNaoLida(c)}
                           onEncerrar={(c) => void encerrar(c)}
-                          onExcluir={(c) => void excluir(c)}
                           ehEntrada={j === 0}
                           onAtribuirMassa={(ids) =>
                             setAtribuir({
@@ -904,7 +863,6 @@ export function Kanban({
                   onFixar={(c) => void alternarFixar(c)}
                   onMarcarNaoLida={(c) => void marcarNaoLida(c)}
                   onEncerrar={(c) => void encerrar(c)}
-                  onExcluir={(c) => void excluir(c)}
                   ehEntrada={j === 0}
                   onAtribuirMassa={(ids) =>
                     setAtribuir({

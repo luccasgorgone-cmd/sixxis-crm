@@ -92,14 +92,8 @@ export type ContagemArquivamento = {
 //   MANUAL = o vendedor clicou "Encerrar" no card. Nao e ganho nem perda: e um
 //            atendimento que acabou sem desfecho de venda.
 // null continua valendo para tudo que foi arquivado ANTES desta fatia.
-//   EXCLUIDO = o vendedor EXCLUIU o card dizendo que aquilo nao foi venda. Sai
-//              do quadro como o MANUAL, mas alem disso os ganhos do negocio
-//              deixam de contar como compra do cliente (Fatia 15-A). Separado do
-//              MANUAL porque encerrar um atendimento e dizer "acabou"; excluir e
-//              dizer "nao aconteceu".
 export const ARQUIVO_PRAZO = "PRAZO";
 export const ARQUIVO_MANUAL = "MANUAL";
-export const ARQUIVO_EXCLUIDO = "EXCLUIDO";
 
 // Lote de ids por UPDATE. So para nao mandar um IN gigante ao Postgres quando a
 // varredura pega milhares de cards de uma vez (limpeza pontual dos perdidos).

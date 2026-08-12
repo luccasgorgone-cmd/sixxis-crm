@@ -24,7 +24,6 @@ export function ColunaKanban({
   onFixar,
   onMarcarNaoLida,
   onEncerrar,
-  onExcluir,
   ehEntrada = false,
   onAtribuirMassa,
   temMais = false,
@@ -48,8 +47,6 @@ export function ColunaKanban({
   onMarcarNaoLida?: (card: Card) => void;
   // Menu do card (Fatia 10): encerrar o atendimento (arquiva, sem desfecho).
   onEncerrar?: (card: Card) => void;
-  // Menu do card (Fatia 15-A): excluir — nao foi venda.
-  onExcluir?: (card: Card) => void;
   ehEntrada?: boolean;
   onAtribuirMassa?: (negocioIds: string[]) => void;
   // Fatia Q: ha mais cards no banco alem dos carregados nesta coluna.
@@ -120,7 +117,6 @@ export function ColunaKanban({
               onFixar={onFixar}
               onMarcarNaoLida={onMarcarNaoLida}
               onEncerrar={onEncerrar}
-              onExcluir={onExcluir}
             />
           ))
         )}

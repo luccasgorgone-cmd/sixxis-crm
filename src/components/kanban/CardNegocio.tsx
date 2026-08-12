@@ -16,7 +16,6 @@ import {
   MoreVertical,
   CircleDot,
   Archive,
-  Trash2,
 } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -36,7 +35,6 @@ export function CardNegocio({
   onFixar,
   onMarcarNaoLida,
   onEncerrar,
-  onExcluir,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
@@ -50,18 +48,10 @@ export function CardNegocio({
   // Fatia 10: encerrar o atendimento (arquiva o card, sem virar ganho nem
   // perda). Disponivel em QUALQUER card, com ou sem conversa.
   onEncerrar?: (card: Card) => void;
-  // Fatia 15-A: excluir — "isto nao foi venda". Arquiva E tira os ganhos deste
-  // card do historico de compras do cliente.
-  onExcluir?: (card: Card) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
   const [menu, setMenu] = useState(false);
-  // Excluir mexe no historico de compras do cliente, entao pede confirmacao.
-  // Em DOIS TOQUES no proprio menu, e nao num confirm() do navegador: o card
-  // vive dentro de um contexto de arrastar, e um dialogo nativo trava a pagina
-  // inteira enquanto espera. O segundo toque fica em vermelho e explicito.
-  const [confirmandoExcluir, setConfirmandoExcluir] = useState(false);
 
   const nome = card.leadNome?.trim() || card.leadTelefone;
   const cor = corFinalidade(card.finalidade);
@@ -148,7 +138,7 @@ export function CardNegocio({
               "Marcar como nao lida" depende de haver conversa; "Encerrar" nao —
               por isso a condicao do MENU e a soma das duas, e cada item se
               esconde sozinho. Antes o menu inteiro sumia num card sem conversa. */}
-          {((onMarcarNaoLida && card.conversaId) || onEncerrar || onExcluir) && (
+          {((onMarcarNaoLida && card.conversaId) || onEncerrar) && (
             <div
               className="relative mt-0.5"
               onPointerDown={(e) => e.stopPropagation()}
@@ -156,12 +146,7 @@ export function CardNegocio({
             >
               <button
                 type="button"
-                onClick={() => {
-                  setMenu((v) => !v);
-                  // Fechar e reabrir desarma a exclusao: o menu nunca reabre
-                  // com o gatilho vermelho ja engatilhado de antes.
-                  setConfirmandoExcluir(false);
-                }}
+                onClick={() => setMenu((v) => !v)}
                 aria-label="Acoes da conversa"
                 aria-expanded={menu}
                 className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-black/5 hover:text-escuro ${
@@ -175,10 +160,7 @@ export function CardNegocio({
                   {/* Camada para fechar ao clicar fora. */}
                   <div
                     className="fixed inset-0 z-10"
-                    onClick={() => {
-                      setMenu(false);
-                      setConfirmandoExcluir(false);
-                    }}
+                    onClick={() => setMenu(false)}
                   />
                   <div className="absolute right-0 top-6 z-20 w-56 overflow-hidden rounded-lg border border-black/10 bg-white py-1 shadow-lg">
                     {onMarcarNaoLida && card.conversaId && (
@@ -214,38 +196,6 @@ export function CardNegocio({
                       >
                         <Archive className="h-4 w-4 text-medio/60" />
                         Encerrar atendimento
-                      </button>
-                    )}
-                    {/* Fatia 15-A — excluir: o card sai do quadro E os ganhos
-                        dele param de contar como compra do cliente. Dois
-                        toques, porque mexe no historico. */}
-                    {onExcluir && (
-                      <button
-                        type="button"
-                        title="Para quando o card virou Vendido sem ter havido venda (duvida, pos-venda, engano). O card sai do quadro e a compra sai do historico do cliente."
-                        onClick={() => {
-                          if (!confirmandoExcluir) {
-                            setConfirmandoExcluir(true);
-                            return;
-                          }
-                          onExcluir(card);
-                          setConfirmandoExcluir(false);
-                          setMenu(false);
-                        }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
-                          confirmandoExcluir
-                            ? "bg-red-50 font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300"
-                            : "text-escuro hover:bg-fundo"
-                        }`}
-                      >
-                        <Trash2
-                          className={`h-4 w-4 ${
-                            confirmandoExcluir ? "text-red-600" : "text-medio/60"
-                          }`}
-                        />
-                        {confirmandoExcluir
-                          ? "Confirmar: nao foi venda"
-                          : "Excluir (nao foi venda)"}
                       </button>
                     )}
                   </div>
