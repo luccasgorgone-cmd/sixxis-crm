@@ -26,8 +26,10 @@
 //   1) prazo null/0 => aquele lado nao arquiva (o recurso nasce desligado);
 //   2) arquivamentoAtivo=false (padrao) => MODO LOG: conta quantos arquivaria e
 //      NAO escreve nada. O dono liga no admin quando confiar no numero;
-//   3) o filtro de status e explicito (PERDIDO / GANHO): negocio ABERTO NUNCA e
-//      arquivado, qualquer que seja a configuracao.
+//   3) o filtro de status e explicito (PERDIDO / GANHO): o JOB nunca arquiva um
+//      negocio ABERTO, qualquer que seja a configuracao. (Desde a Fatia 10 ha um
+//      caminho que arquiva ABERTO: o "Encerrar" do card, pedido a mao pelo
+//      vendedor em /api/negocios/[id]/encerrar. Nenhum automatismo faz isso.)
 import { prisma } from "./prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { Finalidade, StatusNeg } from "../generated/prisma/enums";
@@ -148,8 +150,12 @@ async function arquivarLado(
 // numero que o job loga e que a limpeza pontual devolve para conferencia.
 //
 // NUNCA deleta nada: so vira dois booleanos. Quem chama e responsavel por
-// filtrar o STATUS (o job e a limpeza filtram PERDIDO/GANHO explicitamente);
-// negocio ABERTO nao entra aqui em nenhum fluxo.
+// filtrar o STATUS — o job e a limpeza filtram PERDIDO/GANHO explicitamente; o
+// "Encerrar" do card (Fatia 10) passa um id direto, sem filtro de status, e e o
+// unico caminho pelo qual um negocio ABERTO chega aqui.
+//
+// `motivo` grava a ORIGEM em Negocio.arquivadoMotivo (ARQUIVO_PRAZO /
+// ARQUIVO_MANUAL). null nao toca a coluna.
 export async function arquivarNegociosEConversas(
   where: Prisma.NegocioWhereInput,
   motivo: string | null = null,
