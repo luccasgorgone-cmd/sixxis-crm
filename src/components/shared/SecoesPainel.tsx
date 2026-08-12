@@ -648,22 +648,59 @@ function BlocoPendencia({
 // e o card reabrir em "Novo". Mostra o motivo traduzido; a observacao livre da
 // perda (quando existe) fica em uma linha secundaria, so quando ha texto.
 // Usado IGUAL nos dois paineis (Kanban e Inbox), logo no topo dos dados.
+//
+// Fatia 3/4 — QUANTAS VEZES. O "3x" so aparece a partir de 2: o selo ja diz que
+// aconteceu ao menos uma vez, entao "1x" seria ruido. O selo tambem passa a
+// aparecer (em tom neutro, sem o alerta ambar) para o cliente que nunca foi
+// perdido mas ja comprou 2+ vezes — e o mesmo "vai e volta" que o vendedor
+// precisa enxergar. Contador zerado daquele lado nao mostra nada.
 export function SeloJaFoiPerdido({ detalhe }: { detalhe: DetalheNegocio }) {
-  if (!detalhe.jaFoiPerdido) return null;
+  const perdido = !!detalhe.jaFoiPerdido;
+  const vezesPerdido = detalhe.vezesPerdido ?? 0;
+  const vezesGanho = detalhe.vezesGanho ?? 0;
+  const recompra = vezesGanho >= 2;
+  if (!perdido && !recompra) return null;
+
   const motivo = detalhe.ultimoMotivoPerdaLabel?.trim();
   const obs = detalhe.ultimoMotivoPerdaObs?.trim();
+  const nPerdido = vezesPerdido >= 2 ? ` ${vezesPerdido}x` : "";
+  // Com varias perdas, "motivo" vira "ultimo motivo" (e o da perda mais recente).
+  const rotuloMotivo = nPerdido ? "último motivo" : "motivo";
+
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+    <div
+      className={
+        perdido
+          ? "rounded-lg border border-amber-200 bg-amber-50 p-3"
+          : "rounded-lg border border-black/5 bg-fundo p-3"
+      }
+    >
       <div className="flex items-start gap-2">
-        <History className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <History
+          className={`mt-0.5 h-4 w-4 shrink-0 ${
+            perdido ? "text-amber-600" : "text-medio/60"
+          }`}
+        />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-amber-800">
-            Cliente já foi dado como perdido
-            {motivo ? ` — motivo: ${motivo}` : ""}
-          </p>
-          {obs && (
+          {perdido && (
+            <p className="text-xs font-semibold text-amber-800">
+              Cliente já foi dado como perdido
+              {nPerdido}
+              {motivo ? ` — ${rotuloMotivo}: ${motivo}` : ""}
+            </p>
+          )}
+          {obs && perdido && (
             <p className="mt-0.5 whitespace-pre-wrap text-xs text-amber-900/80">
               {obs}
+            </p>
+          )}
+          {recompra && (
+            <p
+              className={`text-xs font-semibold ${
+                perdido ? "mt-1 text-amber-800" : "text-escuro"
+              }`}
+            >
+              Já foi vendido para este cliente {vezesGanho}x
             </p>
           )}
         </div>

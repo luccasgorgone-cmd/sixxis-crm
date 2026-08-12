@@ -144,6 +144,9 @@ export type DetalheNegocio = CardNegocio & {
   ultimoMotivoPerdaLabel?: string | null;
   ultimoMotivoPerdaObs?: string | null;
   ultimaPerdaEm?: string | null;
+  // Quantas vezes o negocio ja foi fechado de cada lado (0 = nunca).
+  vezesPerdido?: number;
+  vezesGanho?: number;
   // Transporte + rastreio do negocio (venda e pos-venda).
   transportadora: string | null;
   dataEnvio: string | null;

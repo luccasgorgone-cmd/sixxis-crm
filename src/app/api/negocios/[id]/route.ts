@@ -202,6 +202,10 @@ export async function GET(
           : null,
       ultimoMotivoPerdaObs: negocio.ultimoMotivoPerdaObs ?? negocio.motivoPerdaObs,
       ultimaPerdaEm: negocio.ultimaPerdaEm,
+      // Fatia 3/4 — QUANTAS vezes, para o selo do painel ("ja foi perdido 3x").
+      // Como o selo acima, e historia: vale depois de o negocio reabrir.
+      vezesPerdido: negocio.vezesPerdido,
+      vezesGanho: negocio.vezesGanho,
       // Transporte + rastreio (venda e pos-venda).
       transportadora: negocio.transportadora,
       dataEnvio: negocio.dataEnvio,
