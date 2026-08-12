@@ -19,6 +19,26 @@ export const MOTIVOS_PERDA: MotivoPerda[] = [
   { code: "OUTRO", label: "Outro" },
 ];
 
+// MARCADOR dos duplicados NEUTRALIZADOS por /api/admin/corrigir-duplicados: um
+// negocio que era copia de outro e virou perdido so para sair da carteira (o
+// mesmo valor contava duas vezes). Nao e uma perda de verdade e por isso nao
+// entra na analise de perdas — ver lib/perdidos.
+//
+// O QUE IDENTIFICA e o PAR code + observacao exata, nunca o code sozinho:
+// "Contato errado / duplicado" tambem e escolhido A MAO por atendente numa
+// perda legitima, e essa tem de continuar contando normalmente.
+export const MOTIVO_DUPLICADO = "CONTATO_ERRADO";
+export const OBS_DUPLICADO_AUTO = "Duplicado corrigido automaticamente";
+
+export function ehDuplicadoNeutralizado(n: {
+  motivoPerda: string | null;
+  motivoPerdaObs: string | null;
+}): boolean {
+  return (
+    n.motivoPerda === MOTIVO_DUPLICADO && n.motivoPerdaObs === OBS_DUPLICADO_AUTO
+  );
+}
+
 const POR_CODE = new Map(MOTIVOS_PERDA.map((m) => [m.code, m]));
 
 export function ehCodigoMotivo(code: string): boolean {

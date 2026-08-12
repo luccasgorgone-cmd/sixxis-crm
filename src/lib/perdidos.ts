@@ -4,7 +4,7 @@
 import { prisma } from "./prisma";
 import { campoDono } from "./dono";
 import { nomeEfetivo } from "./cliente";
-import { rotuloMotivo } from "./motivosPerda";
+import { rotuloMotivo, ehDuplicadoNeutralizado } from "./motivosPerda";
 import { Finalidade, StatusNeg } from "../generated/prisma/enums";
 import type { Prisma } from "../generated/prisma/client";
 
@@ -89,18 +89,26 @@ export async function analisarPerdidosWhere(
     },
   });
 
-  const itens: PerdidoItem[] = negocios.map((n) => ({
-    negocioId: n.id,
-    leadId: n.lead.id,
-    nome: nomeEfetivo(n.lead),
-    telefone: n.lead.telefone,
-    fotoUrl: n.lead.fotoUrl,
-    motivoCode: n.motivoPerda,
-    motivoLabel: rotuloMotivo(n.motivoPerda),
-    obs: n.motivoPerdaObs,
-    valor: n.valor != null ? Number(n.valor) : null,
-    fechadoEm: n.fechadoEm,
-  }));
+  // Fatia 5 — os DUPLICADOS neutralizados nao sao perda: sao a mesma venda
+  // contada duas vezes, marcada como perdida so para sair da carteira. Ficam de
+  // fora de tudo o que sai daqui (total, valorTotal, porMotivo e itens, que sao
+  // todos derivados desta lista). O filtro e em JS, sobre as linhas ja lidas:
+  // e "diferente de" com nulos no meio, que em SQL exige cuidado com a logica
+  // de tres valores — aqui a comparacao e exata e obvia.
+  const itens: PerdidoItem[] = negocios
+    .filter((n) => !ehDuplicadoNeutralizado(n))
+    .map((n) => ({
+      negocioId: n.id,
+      leadId: n.lead.id,
+      nome: nomeEfetivo(n.lead),
+      telefone: n.lead.telefone,
+      fotoUrl: n.lead.fotoUrl,
+      motivoCode: n.motivoPerda,
+      motivoLabel: rotuloMotivo(n.motivoPerda),
+      obs: n.motivoPerdaObs,
+      valor: n.valor != null ? Number(n.valor) : null,
+      fechadoEm: n.fechadoEm,
+    }));
 
   const total = itens.length;
   const valorTotal = itens.reduce((s, i) => s + (i.valor ?? 0), 0);

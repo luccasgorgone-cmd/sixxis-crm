@@ -37,13 +37,11 @@ import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
 import { campoDono } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
+import { MOTIVO_DUPLICADO, OBS_DUPLICADO_AUTO } from "@/lib/motivosPerda";
 import { StatusNeg, Finalidade } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MOTIVO_DUPLICADO = "CONTATO_ERRADO";
-const OBS_DUPLICADO = "Duplicado corrigido automaticamente";
 
 // Os negocios NAO arquivados desses leads. Lista curta (sao poucos grupos).
 function buscarNegociosDosLeads(leadIds: string[]) {
@@ -266,7 +264,7 @@ export async function POST(): Promise<NextResponse> {
           data: {
             status: StatusNeg.PERDIDO,
             motivoPerda: MOTIVO_DUPLICADO,
-            motivoPerdaObs: OBS_DUPLICADO,
+            motivoPerdaObs: OBS_DUPLICADO_AUTO,
             arquivado: true,
             arquivadoEm: agora,
           },
