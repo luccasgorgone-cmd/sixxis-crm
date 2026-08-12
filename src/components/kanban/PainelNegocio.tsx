@@ -75,6 +75,7 @@ import {
   SecaoEtiquetas,
   SeloJaFoiPerdido,
   BlocoCompras,
+  BlocoAtendimentosAnteriores,
 } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
@@ -473,6 +474,8 @@ export function PainelNegocio({
                 {/* 0b. Historico de compras (Fatia 7): quantas, total e as
                     ultimas. So para quem ja comprou. */}
                 <BlocoCompras detalhe={detalhe} />
+                {/* Fatia 16: os atendimentos que NAO converteram, datados. */}
+                <BlocoAtendimentosAnteriores detalhe={detalhe} />
 
                 {/* 1. Dados do cliente + enderecos */}
                 <BlocoCliente

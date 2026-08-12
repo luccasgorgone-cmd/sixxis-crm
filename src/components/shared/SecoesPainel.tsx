@@ -665,8 +665,15 @@ export function SeloJaFoiPerdido({ detalhe }: { detalhe: DetalheNegocio }) {
   const recompra = vezesGanho >= 2 && (detalhe.compras?.qtd ?? 0) === 0;
   if (!perdido && !recompra) return null;
 
-  const motivo = detalhe.ultimoMotivoPerdaLabel?.trim();
-  const obs = detalhe.ultimoMotivoPerdaObs?.trim();
+  // O motivo so sai AQUI quando o bloco de atendimentos anteriores (logo abaixo)
+  // nao vai aparecer. Ele lista TODAS as perdas com data e motivo; repetir o
+  // ultimo motivo aqui em cima seria o mesmo dado em dois lugares, com o de cima
+  // sendo a versao pobre. O selo continua existindo como marcador de atencao.
+  const temBlocoPerdas = (detalhe.perdas?.qtd ?? 0) > 0;
+  const motivo = temBlocoPerdas
+    ? undefined
+    : detalhe.ultimoMotivoPerdaLabel?.trim();
+  const obs = temBlocoPerdas ? undefined : detalhe.ultimoMotivoPerdaObs?.trim();
   const nPerdido = vezesPerdido >= 2 ? ` ${vezesPerdido}x` : "";
   // Com varias perdas, "motivo" vira "ultimo motivo" (e o da perda mais recente).
   const rotuloMotivo = nPerdido ? "último motivo" : "motivo";
@@ -753,6 +760,69 @@ export function BlocoCompras({ detalhe }: { detalhe: DetalheNegocio }) {
               }
             >
               {c.valor == null ? "valor nao registrado" : formatarBRL(c.valor)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {ocultas > 0 && !verTudo && (
+        <button
+          onClick={() => setVerTudo(true)}
+          className="mt-1.5 text-xs font-semibold text-tiffany hover:underline"
+        >
+          ver mais {ocultas}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Fatia 16 — ATENDIMENTOS ANTERIORES que nao converteram. Simetrico do
+// BlocoCompras: la o que o cliente comprou, aqui o que nao fechou, os dois
+// datados. Juntos, o painel conta a historia inteira do cliente — quem atende
+// alguem que voltou precisa saber que ele desistiu duas vezes por preco, nao so
+// que "ja foi perdido".
+//
+// So aparece para quem TEM perda (qtd > 0). O motivo sai do selo acima quando
+// este bloco aparece, para o mesmo dado nao viver em dois lugares.
+//
+// SO EXIBICAO: nada aqui apaga, oculta ou reinterpreta historico. O texto do
+// motivo e o que foi gravado no fechamento, sem o prefixo repetitivo.
+export function BlocoAtendimentosAnteriores({
+  detalhe,
+}: {
+  detalhe: DetalheNegocio;
+}) {
+  const [verTudo, setVerTudo] = useState(false);
+  const perdas = detalhe.perdas;
+  if (!perdas || perdas.qtd === 0) return null;
+
+  const VISIVEIS = 5;
+  const lista = verTudo ? perdas.itens : perdas.itens.slice(0, VISIVEIS);
+  const ocultas = perdas.itens.length - lista.length + perdas.mais;
+
+  return (
+    <div className="rounded-lg border border-black/5 bg-fundo p-3">
+      <TituloSecao icone={History}>Atendimentos anteriores</TituloSecao>
+      <p className="text-xs font-semibold text-escuro">
+        {perdas.qtd === 1
+          ? "1 atendimento nao converteu"
+          : `${perdas.qtd} atendimentos nao converteram`}
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {lista.map((p, i) => (
+          <li key={`${p.data}-${i}`} className="flex items-baseline gap-2 text-xs">
+            <span className="shrink-0 text-medio/60">
+              {new Date(p.data).toLocaleDateString("pt-BR")}
+            </span>
+            <span className="min-w-0 flex-1 text-medio/80">
+              {p.motivo}
+              {/* A finalidade so aparece na pos-venda: na venda ela seria ruido
+                  repetido em toda linha. */}
+              {p.finalidade === "POS_VENDA" && (
+                <span className="ml-1 text-[11px] text-medio/50">
+                  (pos-venda)
+                </span>
+              )}
             </span>
           </li>
         ))}

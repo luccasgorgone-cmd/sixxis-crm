@@ -157,6 +157,17 @@ export type DetalheNegocio = CardNegocio & {
     mais: number;
     itens: { valor: number | null; data: string }[];
   };
+  // Fatia 16 — atendimentos anteriores que NAO converteram, com data e motivo.
+  // qtd = 0 -> o bloco nao aparece.
+  perdas?: {
+    qtd: number;
+    mais: number;
+    itens: {
+      data: string;
+      motivo: string;
+      finalidade: "VENDA" | "POS_VENDA";
+    }[];
+  };
   // Transporte + rastreio do negocio (venda e pos-venda).
   transportadora: string | null;
   dataEnvio: string | null;

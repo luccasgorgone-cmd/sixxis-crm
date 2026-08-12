@@ -28,6 +28,7 @@ import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
 import { dataSomenteDia } from "@/lib/data";
 import { desarquivarConversaDoLead } from "@/lib/arquivamento";
 import { resumoComprasDoLead } from "@/lib/compras";
+import { resumoPerdasDoLead } from "@/lib/perdasCliente";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,6 +157,10 @@ export async function GET(
   // tempo, somadas por numero (HistoricoNegocio.valorGanho). Ver lib/compras
   // para a regra (so VENDA, sem os duplicados neutralizados).
   const compras = await resumoComprasDoLead(negocio.lead.id);
+  // Fatia 16 — o outro lado do historico: os atendimentos que NAO converteram,
+  // com data e motivo de cada um. Junto com as compras acima, o painel passa a
+  // contar a historia inteira do cliente em vez de so a parte boa.
+  const perdas = await resumoPerdasDoLead(negocio.lead.id);
 
   // Lembretes pendentes deste cliente (para a secao "Agendar contato").
   const lembretes = await prisma.lembrete.findMany({
@@ -219,6 +224,12 @@ export async function GET(
         semValor: compras.semValor,
         mais: compras.mais,
         itens: compras.compras,
+      },
+      // Fatia 16 — atendimentos anteriores que nao converteram.
+      perdas: {
+        qtd: perdas.qtd,
+        mais: perdas.mais,
+        itens: perdas.perdas,
       },
       // Transporte + rastreio (venda e pos-venda).
       transportadora: negocio.transportadora,
