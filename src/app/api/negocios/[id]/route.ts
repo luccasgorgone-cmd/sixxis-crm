@@ -26,6 +26,7 @@ import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
 import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
 import { dataSomenteDia } from "@/lib/data";
+import { desarquivarConversaDoLead } from "@/lib/arquivamento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1124,6 +1125,13 @@ export async function PATCH(
       negocio.finalidade,
       body.agenteId,
     );
+  }
+
+  // Kanban e Inbox andam juntos: se este PATCH desarquivou o negocio (voltou
+  // para uma etapa ABERTA), a conversa do mesmo lead+setor volta ao Inbox.
+  // No-op quando ela ja esta ativa.
+  if (data.arquivado === false) {
+    await desarquivarConversaDoLead(negocio.leadId, negocio.finalidade);
   }
 
   const card = cardNegocio(atualizado);

@@ -2,6 +2,7 @@
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { campoDono } from "./dono";
+import { desarquivarConversaDoLead } from "./arquivamento";
 import {
   StatusNeg,
   TipoEtapa,
@@ -125,6 +126,8 @@ export async function garantirNegocioParaLead(
         fechadoEm: null,
         // Bloco 3: voltar a falar traz o card de volta ao quadro. Um negocio
         // arquivado pelo prazo que reabre NAO pode continuar invisivel.
+        // A CONVERSA e desarquivada logo apos o update (o Inbox e o outro
+        // campo, Conversa.arquivada — os dois voltam juntos).
         arquivado: false,
         arquivadoEm: null,
         // Limpa o motivo (agora esta aberto); a PERDA anterior permanece no
@@ -161,6 +164,12 @@ export async function garantirNegocioParaLead(
       },
       select: { id: true, etapaId: true },
     });
+    // CLIENTE QUE VOLTA, PARTE 2: o card voltou ao Kanban; a conversa tem que
+    // voltar ao Inbox. Na ingestao a conversa ja foi reaberta antes daqui
+    // (garantirConversaUnificada) e isto vira no-op; nos outros caminhos que
+    // reabrem o negocio (ex.: "Conversar"/cadastro manual) e o que evita o
+    // card reaparecer no quadro e a conversa seguir sumida do Inbox.
+    await desarquivarConversaDoLead(leadId, finalidade);
     if (emitir) {
       getIO()?.emit("negocio:atualizado", {
         negocioId: reaberto.id,

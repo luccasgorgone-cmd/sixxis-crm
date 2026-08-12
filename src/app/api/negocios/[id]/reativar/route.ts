@@ -9,6 +9,7 @@ import { primeiraEtapaAberta } from "@/lib/negocio";
 import { includeCard, cardNegocio } from "@/lib/serializar";
 import { rotuloMotivo } from "@/lib/motivosPerda";
 import { estornarSaidasNegocio } from "@/lib/pecas";
+import { desarquivarConversaDoLead } from "@/lib/arquivamento";
 import { getIO } from "@/lib/socket";
 import {
   StatusNeg,
@@ -133,6 +134,11 @@ export async function POST(
     }
     return upd;
   });
+
+  // Kanban e Inbox andam juntos: o card voltou ao quadro (arquivado=false
+  // acima), entao a conversa do mesmo lead+setor volta ao Inbox. No-op quando
+  // ela ja esta ativa. Best-effort — nao derruba a reativacao.
+  await desarquivarConversaDoLead(negocio.leadId, negocio.finalidade);
 
   // Espelha na linha do tempo do cliente, com quem reativou.
   await prisma.atividade.create({
