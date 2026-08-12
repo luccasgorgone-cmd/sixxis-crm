@@ -10,7 +10,7 @@ import { CAPITAIS } from "@/lib/capitais";
 import { mapaPopulacao } from "@/lib/ibge";
 import { nomeEfetivo } from "@/lib/cliente";
 import { formatarTelefone } from "@/lib/format";
-import { rotuloMotivo } from "@/lib/motivosPerda";
+import { rotuloMotivo, ehDuplicadoNeutralizado } from "@/lib/motivosPerda";
 import { totalGastoPorLead } from "@/lib/compras";
 import { lerValorMin, passaValorMin } from "@/lib/faixasValor";
 import {
@@ -116,7 +116,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const valorAberto = lead.negocios
       .filter((n) => n.status === "ABERTO")
       .reduce((s, n) => s + toNum(n.valor), 0);
-    const ganhos = lead.negocios.filter((n) => n.status === "GANHO");
+    // Fatia 14.2: mesma nocao de "ja vendeu" do resumo do estado. Sem isto o
+    // resumo diria que a UF vendeu R$ X e a aba Compradores viria vazia — o
+    // cliente que voltou a falar tem o negocio reaberto e sumia daqui.
+    // (Segue medindo o valor ATUAL dos negocios vendidos, nao o historico de
+    // compras: para recompra no mesmo negocio, Negocio.valor guarda so a ultima.
+    // Ver a nota da Fatia 8 sobre "comprado" x "total gasto".)
+    const ganhos = lead.negocios.filter(
+      (n) =>
+        (n.status === "GANHO" || n.jaFoiGanho) && !ehDuplicadoNeutralizado(n),
+    );
     const valorComprado = ganhos.reduce((s, n) => s + toNum(n.valor), 0);
 
     // Motivo do perdido mais recente (para a aba Perdidos).

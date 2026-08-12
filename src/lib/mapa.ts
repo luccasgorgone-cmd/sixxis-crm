@@ -5,6 +5,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { ufPorTelefone, infoPorUF } from "./ddd";
 import { classificarProduto, type CategoriaProduto } from "./classificar-produto";
+import { ehDuplicadoNeutralizado } from "./motivosPerda";
 
 // Shape minimo do lead lido do banco (select em selectLeadMapa). valor fica como
 // unknown porque o Prisma retorna Decimal; converta sempre com toNum.
@@ -15,6 +16,8 @@ export type NegocioMapa = {
   temperatura: "QUENTE" | "MORNO" | "FRIO";
   finalidade: "VENDA" | "POS_VENDA";
   valor: unknown;
+  // Fatia 14.2: memoria do ganho — sobrevive a reabertura no pos-venda.
+  jaFoiGanho: boolean;
   etapaId: string | null;
   criadoEm: Date;
   fechadoEm: Date | null;
@@ -65,6 +68,7 @@ export const selectLeadMapa = {
       temperatura: true,
       finalidade: true,
       valor: true,
+      jaFoiGanho: true,
       etapaId: true,
       criadoEm: true,
       fechadoEm: true,
@@ -198,14 +202,30 @@ export function montarResumo(
     }
 
     for (const n of lead.negocios) {
+      // Pipeline: pelo estado ATUAL, como sempre foi.
       if (n.status === "ABERTO") {
         negocios.abertos++;
         valorAberto += toNum(n.valor);
-      } else if (n.status === "GANHO") {
-        negocios.ganhos++;
-        faturamento += toNum(n.valor);
       } else if (n.status === "PERDIDO") {
         negocios.perdidos++;
+      }
+      // VENDA (Fatia 14.2): pela MEMORIA do ganho, nao pelo status de agora —
+      // a mesma nocao que carteira, metas, dashboard e oracle ja usam. Cliente
+      // vendido que volta a falar tem o negocio reaberto para ABERTO, e o mapa
+      // mostrava MENOS faturamento por estado do que o real.
+      //
+      // Este recorte nao tem periodo (e o acumulado do estado), entao aqui a
+      // pergunta e so "ja vendeu?" — nao da para reusar whereVendaNoPeriodo, que
+      // e um WHERE de janela para o banco; o que se compartilha e a exclusao dos
+      // duplicados de negocio, e ela vem da mesma funcao de sempre.
+      //
+      // Sem a exclusao, o duplicado neutralizado somaria a MESMA venda junto com
+      // o negocio que ficou GANHO — a dobra que a Fatia 14.1 tapou.
+      const vendeu =
+        (n.status === "GANHO" || n.jaFoiGanho) && !ehDuplicadoNeutralizado(n);
+      if (vendeu) {
+        negocios.ganhos++;
+        faturamento += toNum(n.valor);
       }
     }
 
