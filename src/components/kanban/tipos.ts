@@ -147,6 +147,16 @@ export type DetalheNegocio = CardNegocio & {
   // Quantas vezes o negocio ja foi fechado de cada lado (0 = nunca).
   vezesPerdido?: number;
   vezesGanho?: number;
+  // Historico de COMPRAS do cliente (todas as vendas dele, nao so este negocio).
+  // qtd = 0 -> o bloco de compras nao aparece. semValor = compras antigas sem
+  // valor estruturado (o total e a soma das demais, logo um MINIMO).
+  compras?: {
+    qtd: number;
+    total: number;
+    semValor: number;
+    mais: number;
+    itens: { valor: number | null; data: string }[];
+  };
   // Transporte + rastreio do negocio (venda e pos-venda).
   transportadora: string | null;
   dataEnvio: string | null;

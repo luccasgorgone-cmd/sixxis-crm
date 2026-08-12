@@ -24,6 +24,7 @@ import { BadgeTemperatura } from "@/components/badges";
 import { BadgeSegmento } from "@/components/cliente/BlocoCliente";
 import { useToast } from "@/components/ui/Toast";
 import { MOTIVOS_PENDENCIA } from "@/lib/motivosPendencia";
+import { formatarBRL } from "@/lib/format";
 import { avisarOrcamentosAtualizados } from "@/components/pecas/BlocoOrcamento";
 import {
   TEMPERATURA_INFO,
@@ -658,7 +659,10 @@ export function SeloJaFoiPerdido({ detalhe }: { detalhe: DetalheNegocio }) {
   const perdido = !!detalhe.jaFoiPerdido;
   const vezesPerdido = detalhe.vezesPerdido ?? 0;
   const vezesGanho = detalhe.vezesGanho ?? 0;
-  const recompra = vezesGanho >= 2;
+  // A contagem de vendas so aparece AQUI quando o bloco de compras (Fatia 7,
+  // logo abaixo no painel) nao vai aparecer — senao o mesmo numero sairia em
+  // dois lugares. O bloco de compras e a versao rica: total e lista.
+  const recompra = vezesGanho >= 2 && (detalhe.compras?.qtd ?? 0) === 0;
   if (!perdido && !recompra) return null;
 
   const motivo = detalhe.ultimoMotivoPerdaLabel?.trim();
@@ -705,6 +709,62 @@ export function SeloJaFoiPerdido({ detalhe }: { detalhe: DetalheNegocio }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Fatia 7 — HISTORICO DE COMPRAS do cliente. Complementa o selo acima: em vez de
+// so "ja foi ganho Nx", mostra quantas compras, o TOTAL comprado e as ultimas
+// com data e valor. A contagem sai do selo quando este bloco aparece, para o
+// mesmo numero nao viver em dois lugares.
+//
+// So aparece para quem ja comprou (qtd > 0). Conta so VENDA — ver lib/compras.
+// Compra sem valor estruturado (ganho antigo cujo valor nao deu para recuperar)
+// entra na lista como "valor nao registrado" e fica FORA da soma; quando ha
+// alguma assim, o total e anunciado como "no minimo", nunca como exato.
+export function BlocoCompras({ detalhe }: { detalhe: DetalheNegocio }) {
+  const [verTudo, setVerTudo] = useState(false);
+  const compras = detalhe.compras;
+  if (!compras || compras.qtd === 0) return null;
+
+  const VISIVEIS = 5;
+  const lista = verTudo ? compras.itens : compras.itens.slice(0, VISIVEIS);
+  const ocultas = compras.itens.length - lista.length + compras.mais;
+
+  return (
+    <div className="rounded-lg border border-black/5 bg-fundo p-3">
+      <TituloSecao icone={Trophy}>Historico de compras</TituloSecao>
+      <p className="text-xs font-semibold text-escuro">
+        {compras.qtd === 1 ? "Comprou 1 vez" : `Ja comprou ${compras.qtd} vezes`}
+        {" · "}
+        {compras.semValor > 0 ? "Total no minimo " : "Total "}
+        {formatarBRL(compras.total)}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {lista.map((c, i) => (
+          <li
+            key={`${c.data}-${i}`}
+            className="flex items-baseline justify-between gap-3 text-xs text-medio/80"
+          >
+            <span>{new Date(c.data).toLocaleDateString("pt-BR")}</span>
+            <span
+              className={
+                c.valor == null ? "text-medio/50" : "font-medium text-escuro"
+              }
+            >
+              {c.valor == null ? "valor nao registrado" : formatarBRL(c.valor)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {ocultas > 0 && !verTudo && (
+        <button
+          onClick={() => setVerTudo(true)}
+          className="mt-1.5 text-xs font-semibold text-tiffany hover:underline"
+        >
+          ver mais {ocultas}
+        </button>
+      )}
     </div>
   );
 }

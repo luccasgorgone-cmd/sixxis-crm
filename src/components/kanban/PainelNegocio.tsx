@@ -74,6 +74,7 @@ import {
   SecaoDecisoes,
   SecaoEtiquetas,
   SeloJaFoiPerdido,
+  BlocoCompras,
 } from "@/components/shared/SecoesPainel";
 import { formatarBRL, formatarTelefone, dataNascParaInput, formatarNumeroPedido, calcularTotalFinal } from "@/lib/format";
 import { useAgente } from "@/components/shell/AgenteContext";
@@ -468,6 +469,10 @@ export function PainelNegocio({
                 {/* 0. Selo "ja foi perdido" (Bloco 5): memoria da perda, no
                     topo dos dados. Some so quando nunca houve perda. */}
                 <SeloJaFoiPerdido detalhe={detalhe} />
+
+                {/* 0b. Historico de compras (Fatia 7): quantas, total e as
+                    ultimas. So para quem ja comprou. */}
+                <BlocoCompras detalhe={detalhe} />
 
                 {/* 1. Dados do cliente + enderecos */}
                 <BlocoCliente
