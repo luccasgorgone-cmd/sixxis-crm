@@ -27,6 +27,7 @@ import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento
 import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
 import { dataSomenteDia } from "@/lib/data";
 import { desarquivarConversaDoLead } from "@/lib/arquivamento";
+import { resumoComprasDoLead } from "@/lib/compras";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -151,6 +152,11 @@ export async function GET(
     select: { id: true, atendidoPor: true },
   });
 
+  // Historico de COMPRAS do cliente (Fatia 7): todas as vendas dele ao longo do
+  // tempo, somadas por numero (HistoricoNegocio.valorGanho). Ver lib/compras
+  // para a regra (so VENDA, sem os duplicados neutralizados).
+  const compras = await resumoComprasDoLead(negocio.lead.id);
+
   // Lembretes pendentes deste cliente (para a secao "Agendar contato").
   const lembretes = await prisma.lembrete.findMany({
     where: { leadId: negocio.lead.id, status: "PENDENTE" },
@@ -206,6 +212,14 @@ export async function GET(
       // Como o selo acima, e historia: vale depois de o negocio reabrir.
       vezesPerdido: negocio.vezesPerdido,
       vezesGanho: negocio.vezesGanho,
+      // Fatia 7 — historico de compras do CLIENTE (nao so deste negocio).
+      compras: {
+        qtd: compras.qtd,
+        total: compras.total,
+        semValor: compras.semValor,
+        mais: compras.mais,
+        itens: compras.compras,
+      },
       // Transporte + rastreio (venda e pos-venda).
       transportadora: negocio.transportadora,
       dataEnvio: negocio.dataEnvio,
