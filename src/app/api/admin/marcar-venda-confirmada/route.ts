@@ -26,10 +26,18 @@
 // NUNCA cria evento havendo um valido: seria duplicar a compra e inflar o
 // contador, exatamente o que a Fatia 9 existe para desfazer.
 //
-// A ROTA CONFERE O QUE GRAVOU. Depois do update ela rele o negocio dentro da
-// mesma transacao e compara valor/status/etapa; se nao bater, derruba a
-// transacao e reporta o item como falho. Antes, "aplicado" significava so
-// "nenhuma excecao" — a intencao de gravar, nao o resultado.
+// CUIDADO COM valorAjustado — foi ele que fez uma venda gravada aparecer como
+// ZERO em todo lugar. NENHUMA tela do sistema le `Negocio.valor` direto: card do
+// Kanban, GET do negocio, carteira, dashboard e oracle leem
+// `valorAjustado ?? valor` (ver lib/serializar e somaValorDerivado). Um ajuste
+// velho pendurado no negocio SOBRESCREVE o valor gravado aqui, e nenhuma
+// reexecucao resolve, porque o campo reescrito nao e o campo lido. Por isso esta
+// rota zera valorAjustado: quem chama declara o valor FINAL da venda.
+//
+// A ROTA CONFERE O QUE GRAVOU, e confere o valor EFETIVO (valorAjustado ??
+// valor), nao o campo cru — verificacao que nao olha o que o usuario ve nao
+// verifica nada. Nao batendo, derruba a transacao e reporta o item como falho.
+// Antes, "aplicado" significava so "nenhuma excecao": a intencao de gravar.
 //
 // CONTADOR vezesGanho: +1 so na TRANSICAO para GANHO, a mesma regra do PATCH de
 // negocios. Quem ja esta GANHO no momento da execucao nao conta de novo.
@@ -70,7 +78,13 @@ type Plano = {
   // Estado ATUAL.
   statusAtual: string | null;
   etapaAtual: string | null;
+  // valorAtual e o campo cru; valorExibidoAtual e o que as TELAS mostram
+  // (valorAjustado ?? valor). Quando os dois diferem, quem manda na tela e no
+  // faturamento e o ajustado — foi assim que uma venda gravada em `valor`
+  // aparecia como zero em todo lugar.
   valorAtual: number | null;
+  valorAjustadoAtual: number | null;
+  valorExibidoAtual: number | null;
   arquivado: boolean;
   // O que vira.
   valorNovo: number;
@@ -149,6 +163,8 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
       statusAtual: null,
       etapaAtual: null,
       valorAtual: null,
+      valorAjustadoAtual: null,
+      valorExibidoAtual: null,
       arquivado: false,
       valorNovo: p.valor,
       etapaDestino: null,
@@ -173,6 +189,7 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
         id: true,
         status: true,
         valor: true,
+        valorAjustado: true,
         finalidade: true,
         arquivado: true,
         jaFoiGanho: true,
@@ -249,6 +266,9 @@ async function montarPlano(pedidos: Pedido[]): Promise<Plano[]> {
       statusAtual: n.status,
       etapaAtual: n.etapa?.nome ?? null,
       valorAtual: numeroOuNull(n.valor),
+      valorAjustadoAtual: numeroOuNull(n.valorAjustado),
+      valorExibidoAtual:
+        numeroOuNull(n.valorAjustado) ?? numeroOuNull(n.valor),
       arquivado: n.arquivado,
       valorNovo: p.valor,
       etapaDestino: destino?.nome ?? null,
@@ -371,6 +391,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             data: {
               status: StatusNeg.GANHO,
               valor: plano.valorNovo,
+              // LIMPA O AJUSTE. Toda leitura do sistema — card do Kanban, GET do
+              // negocio, carteira, dashboard, oracle — mostra
+              // `valorAjustado ?? valor`, nunca o valor cru. Um ajuste velho
+              // pendurado no negocio SOBRESCREVE o valor que esta rota acabou de
+              // gravar, e o card continua exibindo o numero antigo como se nada
+              // tivesse acontecido. Quem chama aqui esta declarando o valor FINAL
+              // da venda confirmada: nao existe ajuste a preservar em cima dele.
+              valorAjustado: null,
               etapaId: destino.id,
               entrouEtapaEm: new Date(),
               fechadoEm: plano.fechadoEmPrevisto
@@ -418,9 +446,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           // que ligasse as duas coisas. Agora o sucesso significa "reli e esta la".
           const depois = await tx.negocio.findUnique({
             where: { id: plano.negocioId },
-            select: { valor: true, status: true, etapaId: true },
+            select: { valor: true, valorAjustado: true, status: true, etapaId: true },
           });
-          const valorGravado = numeroOuNull(depois?.valor);
+          // Confere o valor EFETIVO (valorAjustado ?? valor), que e o que as
+          // telas e o faturamento leem — nao o campo cru. A primeira versao
+          // conferia so `valor` e por isso dava "gravou 2802,50" enquanto o
+          // Kanban mostrava zero: os dois estavam certos, olhando campos
+          // diferentes. Verificacao que nao olha o que o usuario ve nao verifica
+          // nada.
+          const valorGravado =
+            numeroOuNull(depois?.valorAjustado) ?? numeroOuNull(depois?.valor);
           const bateu =
             depois != null &&
             depois.status === StatusNeg.GANHO &&
@@ -432,8 +467,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             // Derruba a transacao de proposito: melhor nao aplicar e gritar do que
             // aplicar pela metade e dizer que deu certo.
             throw new Error(
-              `verificacao falhou no negocio ${plano.negocioId}: esperado valor ${plano.valorNovo} / GANHO / etapa ${destino.id}; ` +
-                `banco devolveu valor ${valorGravado} / ${depois?.status} / etapa ${depois?.etapaId}`,
+              `verificacao falhou no negocio ${plano.negocioId}: esperado valor efetivo ${plano.valorNovo} / GANHO / etapa ${destino.id}; ` +
+                `banco devolveu efetivo ${valorGravado} (valor ${depois?.valor}, ajustado ${depois?.valorAjustado}) / ${depois?.status} / etapa ${depois?.etapaId}`,
             );
           }
 
