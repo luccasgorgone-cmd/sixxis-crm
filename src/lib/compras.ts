@@ -65,6 +65,7 @@ function whereGanhosVenda(leadIds: string[]) {
 const SELECT_GANHO = {
   criadoEm: true,
   valorGanho: true,
+  descricao: true,
   negocio: {
     select: { leadId: true, motivoPerda: true, motivoPerdaObs: true },
   },
@@ -74,12 +75,30 @@ type EventoGanho = {
   criadoEm: Date;
   // Decimal do Prisma; convertido so por valorDaCompra.
   valorGanho: unknown;
+  descricao: string;
   negocio: {
     leadId: string;
     motivoPerda: string | null;
     motivoPerdaObs: string | null;
   };
 };
+
+// Marcador dos ganhos REPETIDOS por movimentacao do card (marcar ganho ->
+// reabrir -> marcar ganho de novo), desconsiderados por /api/admin/dedup-ganhos.
+// Fica aqui, junto de quem le, para o marcador e a regra de exclusao nunca se
+// separarem: quem gravar o sufixo sem esta funcao (ou vice-versa) quebra o build.
+//
+// O sufixo e a marca porque a dedup NAO deleta o evento — ele continua inteiro
+// na linha do tempo do negocio, so que dito. Nao basta zerar valorGanho: null
+// ali significa "compra antiga sem valor recuperado", que CONTA como compra e
+// aparece como "valor nao registrado". Repetido de movimentacao nao e compra
+// nenhuma, entao sai da lista e da contagem, nao so da soma.
+export const SUFIXO_GANHO_DUPLICADO =
+  " [duplicado de movimentacao — desconsiderado]";
+
+export function ehGanhoDesconsiderado(descricao: string): boolean {
+  return descricao.endsWith(SUFIXO_GANHO_DUPLICADO);
+}
 
 // null = compra antiga sem valor estruturado (backfill nao casou). NUNCA vira 0:
 // o zero somaria silenciosamente e faria o total mentir para menos sem avisar.
@@ -95,6 +114,8 @@ function valorDaCompra(v: unknown): number | null {
 function comprasDosEventos(eventos: EventoGanho[]): CompraItem[] {
   return eventos
     .filter((e) => !ehDuplicadoNeutralizado(e.negocio))
+    // Fatia 9: ganho repetido por movimentacao do card nao e compra.
+    .filter((e) => !ehGanhoDesconsiderado(e.descricao))
     .map((e) => ({ valor: valorDaCompra(e.valorGanho), data: e.criadoEm }));
 }
 
