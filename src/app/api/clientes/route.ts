@@ -5,17 +5,20 @@
 // feita no cliente (acentos).
 //
 // GET /api/clientes?finalidade?&agenteId?(admin)&semDono?(admin)&etiqueta?
-//                  &temperatura?&status?&etapaId?&periodo?&inicio?&fim?
+//                  &temperatura?&status?&etapaId?&periodo?&inicio?&fim?&valorMin?
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { nomeEfetivo } from "@/lib/cliente";
 import { normalizarTexto } from "@/lib/format";
 import { resolverPeriodo } from "@/lib/metricas";
+import { totalGastoPorLead } from "@/lib/compras";
+import { lerValorMin, passaValorMin } from "@/lib/faixasValor";
 import {
   Finalidade,
   StatusNeg,
   Temperatura,
+  TipoHistorico,
 } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -90,6 +93,30 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       rastreioF === "com"
         ? { negocios: { some: { rastreios: { some: {} } } } }
         : { negocios: { none: { rastreios: { some: {} } } } };
+    where.AND = Array.isArray(where.AND)
+      ? [...where.AND, cond]
+      : where.AND
+        ? [where.AND, cond]
+        : [cond];
+  }
+
+  // VALOR GASTO (Fatia 8): so clientes que ja gastaram MAIS que valorMin. O
+  // total e uma agregacao do historico de ganhos, entao nao cabe num where — ele
+  // e calculado depois, sobre os leads ja filtrados. O que cabe no where e o
+  // PRE-FILTRO barato abaixo: quem nao tem nenhum ganho de venda nao tem como
+  // passar de valorMin, e sair fora daqui evita duas coisas — agregar o historico
+  // de quem nunca comprou e, principalmente, gastar o teto de 500 leads com
+  // gente que o filtro descartaria depois.
+  const valorMin = lerValorMin(sp.get("valorMin"));
+  if (valorMin != null) {
+    const cond: Prisma.LeadWhereInput = {
+      negocios: {
+        some: {
+          finalidade: Finalidade.VENDA,
+          historicos: { some: { tipo: TipoHistorico.GANHO } },
+        },
+      },
+    };
     where.AND = Array.isArray(where.AND)
       ? [...where.AND, cond]
       : where.AND
@@ -213,6 +240,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     anuncioTitulo: string | null;
     anuncioUrl: string | null;
     bloqueado: boolean;
+    // Total ja gasto pelo cliente (Fatia 8). null quando o filtro de valor esta
+    // desligado: sem ele a agregacao nem roda, e a lista sai exatamente como
+    // saia antes desta fatia.
+    totalGasto: number | null;
+    // Tem compra antiga sem valor estruturado? Entao totalGasto e um MINIMO.
+    gastoParcial: boolean;
   };
 
   // Filtros de localizacao (endereco principal ou primeiro). cidade = contains.
@@ -305,19 +338,41 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       anuncioTitulo: l.anuncioTitulo,
       anuncioUrl: l.anuncioUrl,
       bloqueado: l.bloqueado,
+      totalGasto: null,
+      gastoParcial: false,
     });
   }
 
+  // Filtro de VALOR GASTO (Fatia 8). Roda depois dos outros porque o total vem
+  // de uma agregacao: uma consulta so, em lote, para os leads que sobraram — e
+  // sobrou pouco, porque o pre-filtro la em cima ja tirou quem nunca comprou.
+  // Mesma funcao que alimenta o painel do cliente (lib/compras), entao os dois
+  // lugares mostram o mesmo numero para o mesmo cliente.
+  let clientesFiltrados = clientes;
+  if (valorMin != null) {
+    const gastos = await totalGastoPorLead(clientes.map((c) => c.leadId));
+    clientesFiltrados = [];
+    for (const c of clientes) {
+      const g = gastos.get(c.leadId);
+      // Ausente = nenhum ganho de venda aproveitavel: total 0, nao passa.
+      const total = g?.total ?? 0;
+      if (!passaValorMin(total, valorMin)) continue;
+      c.totalGasto = total;
+      c.gastoParcial = (g?.semValor ?? 0) > 0;
+      clientesFiltrados.push(c);
+    }
+  }
+
   // Ordena por ultimo contato desc (sem contato vai pro fim).
-  clientes.sort((a, b) => {
+  clientesFiltrados.sort((a, b) => {
     const ta = a.ultimoContato ? a.ultimoContato.getTime() : 0;
     const tb = b.ultimoContato ? b.ultimoContato.getTime() : 0;
     return tb - ta;
   });
 
   return NextResponse.json({
-    total: clientes.length,
+    total: clientesFiltrados.length,
     finalidade: (sp.get("finalidade") as Finalidade) ?? null,
-    clientes,
+    clientes: clientesFiltrados,
   });
 }

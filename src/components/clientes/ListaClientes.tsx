@@ -52,6 +52,7 @@ import { ModalExcluirClientes } from "./ModalExcluirClientes";
 import { ModalBloquear } from "./ModalBloquear";
 import type { Etapa, EtiquetaChip, AgenteResumo } from "@/components/kanban/tipos";
 import { formatarBRL, formatarTelefone } from "@/lib/format";
+import { FAIXAS_VALOR_GASTO, rotuloFaixaValor } from "@/lib/faixasValor";
 
 type Cliente = {
   leadId: string;
@@ -77,6 +78,11 @@ type Cliente = {
   anuncioTitulo: string | null;
   anuncioUrl: string | null;
   bloqueado: boolean;
+  // Total ja gasto (Fatia 8). So vem preenchido quando o filtro de valor esta
+  // ligado — sem filtro a rota nem calcula. gastoParcial = ha compra antiga sem
+  // valor estruturado, entao o total e um minimo.
+  totalGasto?: number | null;
+  gastoParcial?: boolean;
 };
 
 // Espelha o take da rota /api/clientes: a lista carrega no maximo 500 do recorte.
@@ -143,6 +149,8 @@ export function ListaClientes({
   const [rastreioF, setRastreioF] = useState("");
   const [ufF, setUfF] = useState("");
   const [cidadeF, setCidadeF] = useState("");
+  // Valor gasto (Fatia 8): "" = qualquer, senao o piso da faixa em reais.
+  const [valorMinF, setValorMinF] = useState("");
   const [agenteSel, setAgenteSel] = useState(""); // admin
   const [semDono, setSemDono] = useState(false); // admin
 
@@ -242,6 +250,7 @@ export function ListaClientes({
       if (garantiaF) p.set("garantia", garantiaF);
       if (segmentoF) p.set("segmento", segmentoF);
       if (rastreioF) p.set("rastreio", rastreioF);
+      if (valorMinF) p.set("valorMin", valorMinF);
       if (ehAdmin && semDono) p.set("semDono", "1");
       else if (ehAdmin && agenteSel) p.set("agenteId", agenteSel);
       if (ehAdmin && mostrarBloqueados) p.set("mostrarBloqueados", "1");
@@ -259,7 +268,7 @@ export function ListaClientes({
     } finally {
       setCarregando(false);
     }
-  }, [etiquetaF, temperaturaF, statusF, etapaF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, semDono, agenteSel, ehAdmin, periodo, mostrarBloqueados]);
+  }, [etiquetaF, temperaturaF, statusF, etapaF, empresaF, produtoInteresseF, origemF, garantiaF, segmentoF, rastreioF, valorMinF, semDono, agenteSel, ehAdmin, periodo, mostrarBloqueados]);
 
   useEffect(() => {
     void carregar();
@@ -588,6 +597,25 @@ export function ListaClientes({
       sortValue: (c) => (c.ultimoContato ? new Date(c.ultimoContato).getTime() : 0),
       render: (c) => <span className="text-medio/70">{dataCurta(c.ultimoContato)}</span>,
     },
+    // Total gasto: aparece SO com o filtro de valor ligado — e o numero pelo
+    // qual a lista foi filtrada, entao sem o filtro a coluna nao teria o que
+    // mostrar (a rota nem calcula) e a tabela fica igual a de antes.
+    ...(valorMinF
+      ? [
+          {
+            chave: "totalGasto",
+            rotulo: "Total gasto",
+            align: "right" as const,
+            sortValue: (c: Cliente) => c.totalGasto ?? 0,
+            render: (c: Cliente) => (
+              <span className="font-medium text-escuro">
+                {c.gastoParcial ? "≥ " : ""}
+                {formatarBRL(c.totalGasto ?? 0)}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       chave: "valorAberto",
       rotulo: "Em aberto",
@@ -954,6 +982,20 @@ export function ListaClientes({
           <option value="">Rastreio: todos</option>
           <option value="com">Com rastreio</option>
           <option value="sem">Sem rastreio</option>
+        </select>
+        {/* Valor gasto (Fatia 8): faixas de FAIXAS_VALOR_GASTO, as mesmas que o
+            back-end usa. "Acima de" e estrito — ver lib/faixasValor. */}
+        <select
+          value={valorMinF}
+          onChange={(e) => setValorMinF(e.target.value)}
+          className="campo"
+        >
+          <option value="">Valor gasto: qualquer</option>
+          {FAIXAS_VALOR_GASTO.map((v) => (
+            <option key={v} value={String(v)}>
+              {rotuloFaixaValor(v)}
+            </option>
+          ))}
         </select>
         <select value={ufF} onChange={(e) => setUfF(e.target.value)} className="campo">
           <option value="">Estado: todos</option>
