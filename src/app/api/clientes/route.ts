@@ -25,6 +25,9 @@ import type { Prisma } from "@/generated/prisma/client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Teto de leads lidos por consulta (o recorte, nao a base toda).
+const TETO = 500;
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const agente = await obterAgente();
   if (!agente) {
@@ -160,7 +163,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const leads = await prisma.lead.findMany({
     where,
     orderBy: { criadoEm: "desc" },
-    take: 500,
+    take: TETO,
     select: {
       id: true,
       nome: true,
@@ -373,6 +376,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     total: clientesFiltrados.length,
     finalidade: (sp.get("finalidade") as Finalidade) ?? null,
+    // A consulta bateu no teto: existem candidatos que nem foram lidos. Importa
+    // sobretudo com o filtro de valor, porque ai a lista sai MENOR que o teto e
+    // o aviso antigo ("selecionando os 500 carregados") nao dispara mais — sem
+    // este sinal, "3 clientes acima de 20 mil" pareceria a base inteira quando
+    // e so o que coube no recorte.
+    truncado: leads.length >= TETO,
     clientes: clientesFiltrados,
   });
 }

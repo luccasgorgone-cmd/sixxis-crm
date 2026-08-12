@@ -151,6 +151,8 @@ export function ListaClientes({
   const [cidadeF, setCidadeF] = useState("");
   // Valor gasto (Fatia 8): "" = qualquer, senao o piso da faixa em reais.
   const [valorMinF, setValorMinF] = useState("");
+  // A consulta bateu no teto de 500: ha candidatos que nem foram lidos.
+  const [truncado, setTruncado] = useState(false);
   const [agenteSel, setAgenteSel] = useState(""); // admin
   const [semDono, setSemDono] = useState(false); // admin
 
@@ -261,10 +263,17 @@ export function ListaClientes({
         p.set("periodo", periodo.preset);
       }
       const r = await fetch(`/api/clientes?${p.toString()}`);
-      if (r.ok) setClientes((await r.json()).clientes ?? []);
-      else setClientes([]);
+      if (r.ok) {
+        const d = await r.json();
+        setClientes(d.clientes ?? []);
+        setTruncado(!!d.truncado);
+      } else {
+        setClientes([]);
+        setTruncado(false);
+      }
     } catch {
       setClientes([]);
+      setTruncado(false);
     } finally {
       setCarregando(false);
     }
@@ -1013,6 +1022,17 @@ export function ListaClientes({
         />
         <FiltroPeriodo valor={periodo} onChange={setPeriodo} />
       </div>
+
+      {/* Com o filtro de valor ligado a lista sai menor que o teto, entao o
+          aviso de selecao ("os 500 carregados") nao dispara — e sem nada no
+          lugar o resultado pareceria a base inteira. Aqui o corte fica dito. */}
+      {valorMinF && truncado && (
+        <p className="text-xs text-medio/60">
+          Consulta limitada aos {TETO_CLIENTES} clientes mais recentes do
+          recorte; pode haver quem passe da faixa fora dela. Estreite o periodo
+          ou os outros filtros para varrer o resto.
+        </p>
+      )}
 
       {/* Tabela */}
       {carregando ? (
