@@ -14,6 +14,11 @@ import { fimDoDia } from "@/lib/lembrete";
 import { calcularMetricas, resolverPeriodo } from "@/lib/metricas";
 import { analisarPerdidos } from "@/lib/perdidos";
 import {
+  whereVendaNoPeriodo,
+  comEscopo,
+  dataDaVenda,
+} from "@/lib/vendasPeriodo";
+import {
   Finalidade,
   StatusLembrete,
   StatusNeg,
@@ -96,19 +101,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         orderBy: { nome: "asc" },
         select: { id: true, nome: true, cor: true },
       }),
-      // Ganhos NO PERIODO (por fechadoEm).
+      // Ganhos NO PERIODO — por "HOUVE venda no periodo" (Fatia 14), nao por
+      // "esta GANHO agora". Cliente vendido que volta a falar tem o negocio
+      // reaberto e o fechadoEm zerado; pelo criterio antigo a venda sumia da
+      // carteira mesmo tendo acontecido. Ver lib/vendasPeriodo.
       prisma.negocio.findMany({
-        where: {
-          finalidade,
-          lead: { [campo]: alvoId },
-          status: StatusNeg.GANHO,
-          fechadoEm: { gte: inicio, lte: fim },
-        },
-        orderBy: { fechadoEm: "desc" },
+        where: comEscopo(
+          { finalidade, lead: { [campo]: alvoId } },
+          whereVendaNoPeriodo({ inicio, fim }),
+        ),
+        // Pela data do GANHO, nao por fechadoEm: o reaberto tem fechadoEm null e
+        // iria parar no fim da lista como se fosse a venda mais antiga.
+        orderBy: [
+          { ultimoGanhoEm: { sort: "desc", nulls: "last" } },
+          { fechadoEm: "desc" },
+        ],
         select: {
           id: true,
           valor: true,
           fechadoEm: true,
+          ultimoGanhoEm: true,
           lead: { select: selectCliente },
         },
       }),
@@ -141,6 +153,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     pendente?: boolean;
     motivoPendencia?: string | null;
     fechadoEm?: Date | null;
+    ultimoGanhoEm?: Date | null;
     lead: {
       id: string;
       nome: string | null;
@@ -161,7 +174,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       status: n.status ?? null,
       pendente: n.pendente ?? false,
       motivoPendencia: n.motivoPendencia ?? null,
-      fechadoEm: n.fechadoEm ?? null,
+      // DATA DA VENDA. Continua saindo como `fechadoEm` (o front ja le assim),
+      // mas resolvida por lib/vendasPeriodo: num negocio reaberto o fechadoEm
+      // foi zerado, e mostrar "—" ali esconderia justamente a venda que a Fatia
+      // 14 recuperou. ultimoGanhoEm e a data em que a venda realmente ocorreu.
+      fechadoEm: dataDaVenda(n),
       etiquetas: n.lead.etiquetas.map((le) => ({
         id: le.etiqueta.id,
         nome: le.etiqueta.nome,
