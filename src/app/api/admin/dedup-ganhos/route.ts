@@ -47,6 +47,7 @@ import { obterAdmin } from "@/lib/autorizacao";
 import { nomeEfetivo } from "@/lib/cliente";
 import {
   SUFIXO_GANHO_DUPLICADO,
+  WHERE_GANHO_VALIDO,
   ehGanhoDesconsiderado,
 } from "@/lib/compras";
 import {
@@ -67,7 +68,7 @@ function buscarEventos(negocioIds: string[]) {
     where: {
       tipo: TipoHistorico.GANHO,
       negocioId: { in: negocioIds },
-      NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+      ...WHERE_GANHO_VALIDO,
     },
     orderBy: { criadoEm: "asc" },
     select: {
@@ -129,7 +130,7 @@ async function levantar(): Promise<NegocioAfetado[]> {
     by: ["negocioId"],
     where: {
       tipo: TipoHistorico.GANHO,
-      NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+      ...WHERE_GANHO_VALIDO,
     },
     _count: { id: true },
     having: { id: { _count: { gt: 1 } } },
@@ -245,7 +246,7 @@ export async function POST(): Promise<NextResponse> {
           where: {
             tipo: TipoHistorico.GANHO,
             negocioId: a.negocioId,
-            NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+            ...WHERE_GANHO_VALIDO,
           },
           orderBy: { criadoEm: "asc" },
           select: {

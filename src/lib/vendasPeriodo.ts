@@ -92,6 +92,14 @@ export function whereVendaNoPeriodo(j: JanelaVenda): Prisma.NegocioWhereInput {
               some: {
                 tipo: TipoHistorico.GANHO,
                 criadoEm: { gte: j.inicio, lte: j.fim },
+                // SO o marcador de DUPLICADO, de proposito — nao o de "excluido,
+                // nao foi venda" (Fatia 15-A). Duplicado e um fantasma: a mesma
+                // venda contada duas vezes, e tirar e correcao. Excluido e um
+                // julgamento do vendedor sobre o historico de COMPRAS do
+                // cliente; leva-lo ao faturamento mudaria o numero do dono por
+                // uma decisao que ele nao tomou aqui. Para que excluir tambem
+                // tire do faturamento, basta trocar por WHERE_GANHO_VALIDO — e
+                // uma decisao a tomar, nao um esquecimento.
                 NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
               },
             },
