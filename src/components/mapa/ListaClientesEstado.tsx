@@ -163,6 +163,16 @@ export function ListaClientesItens({
                 {c.cidade && (
                   <span className="text-[11px] text-medio/50">{c.cidade}</span>
                 )}
+                {/* Total gasto (Fatia 8): so vem preenchido com o filtro de
+                    valor ligado, e e o numero pelo qual a lista foi filtrada.
+                    Rotulo proprio para nao se confundir com "comprado", que soma
+                    o valor atual dos negocios ganhos e conta outra coisa. */}
+                {c.totalGasto != null && (
+                  <span className="text-xs font-semibold text-escuro">
+                    {c.gastoParcial ? "≥ " : ""}
+                    {formatarBRL(c.totalGasto)} total gasto
+                  </span>
+                )}
                 {destaqueValorComprado ? (
                   <span className="text-xs font-semibold text-sucesso">
                     {formatarBRL(c.valorComprado)} comprado

@@ -2,7 +2,7 @@
 // do agregado) + lista de clientes enriquecida + recortes: top compradores,
 // recorrentes, perdidos e pendentes (negocios abertos). UF via Endereco.uf ->
 // fallback DDD. Sempre 200 (400 so para uf invalida). Somente leitura.
-// GET /api/mapa/estado?uf=XX  (agente logado -> 401)
+// GET /api/mapa/estado?uf=XX&valorMin?  (agente logado -> 401)
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, escopoLeadWhere } from "@/lib/autorizacao";
@@ -11,6 +11,8 @@ import { mapaPopulacao } from "@/lib/ibge";
 import { nomeEfetivo } from "@/lib/cliente";
 import { formatarTelefone } from "@/lib/format";
 import { rotuloMotivo } from "@/lib/motivosPerda";
+import { totalGastoPorLead } from "@/lib/compras";
+import { lerValorMin, passaValorMin } from "@/lib/faixasValor";
 import {
   selectLeadMapa,
   resolverUF,
@@ -52,6 +54,14 @@ type ClienteMapa = {
   totalCompras: number;
   valorComprado: number;
   motivoPerda: string | null;
+  // Total ja gasto pelo cliente (Fatia 8), da MESMA fonte do painel do cliente e
+  // do filtro da aba Clientes. null quando o filtro de valor esta desligado: sem
+  // ele a agregacao nem roda. Distinto de valorComprado, que soma Negocio.valor
+  // — como um negocio e reusado a cada recompra, aquele campo guarda so a ultima
+  // venda; este soma o historico inteiro.
+  totalGasto: number | null;
+  // Tem compra antiga sem valor estruturado? Entao totalGasto e um MINIMO.
+  gastoParcial: boolean;
 };
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -75,9 +85,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   ]);
 
   const leads = leadsTodos.filter((l) => resolverUF(l) === uf);
+  // O RESUMO da UF continua sobre TODOS os leads do estado, mesmo com o filtro
+  // de valor ligado: ele e o retrato do estado, e a agregacao do mapa nao muda
+  // nesta fatia. Quem responde ao filtro sao as LISTAS de clientes — entao a UI
+  // mostra "8 de 120", com o 120 do resumo e o 8 da lista.
   const resumo = montarResumo(uf, leads, populacaoPorUF.get(uf) ?? null);
 
-  const clientes: ClienteMapa[] = leads.map((lead) => {
+  // VALOR GASTO (Fatia 8). Uma consulta em lote sobre os leads da UF, so quando
+  // o filtro esta ligado. Nao da para pre-filtrar por Negocio.status === GANHO
+  // aqui: o negocio e REUSADO na recompra, entao um cliente que ja comprou e
+  // voltou aparece com o negocio ABERTO — e ele e justamente quem mais gastou.
+  // O historico de ganhos e a unica fonte que enxerga essas compras.
+  const valorMin = lerValorMin(req.nextUrl.searchParams.get("valorMin"));
+  const gastos =
+    valorMin != null ? await totalGastoPorLead(leads.map((l) => l.id)) : null;
+
+  const clientesTodos: ClienteMapa[] = leads.map((lead) => {
     const principal = negocioPrincipal(lead);
 
     // Conversa de referencia: a de contato mais recente.
@@ -130,8 +153,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       totalCompras: ganhos.length,
       valorComprado,
       motivoPerda,
+      totalGasto: gastos ? (gastos.get(lead.id)?.total ?? 0) : null,
+      gastoParcial: (gastos?.get(lead.id)?.semValor ?? 0) > 0,
     };
   });
+
+  // Filtro de valor: vale para TODAS as listas do drawer, para as abas nao se
+  // contradizerem (um cliente na aba Compradores que sumiu da aba Clientes).
+  const clientes =
+    valorMin == null
+      ? clientesTodos
+      : clientesTodos.filter((c) => passaValorMin(c.totalGasto ?? 0, valorMin));
 
   // Recortes derivados (calculados sobre o conjunto completo, depois limitados).
   const topCompradores = clientes

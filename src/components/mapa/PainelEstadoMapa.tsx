@@ -10,6 +10,7 @@ import { EstadoErro } from "@/components/ui/Estado";
 import { Reveal } from "@/components/inteligencia/Reveal";
 import { formatarBRL } from "@/lib/format";
 import { paramsEscopo } from "@/lib/escopo";
+import { FAIXAS_VALOR_GASTO, rotuloFaixaValor } from "@/lib/faixasValor";
 import { BreakdownProdutos } from "./BreakdownProdutos";
 import {
   ListaClientesEstado,
@@ -46,6 +47,9 @@ export function PainelEstadoMapa({
   const [aba, setAba] = useState<Aba>("geral");
   const [editando, setEditando] = useState<string | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
+  // Faixa de valor gasto (Fatia 8): "" = qualquer. Filtra no servidor, entao
+  // vale para as listas de todas as abas do drawer.
+  const [valorMinF, setValorMinF] = useState("");
 
   const carregar = useCallback(
     async (silencioso = false) => {
@@ -53,6 +57,7 @@ export function PainelEstadoMapa({
       try {
         const p = new URLSearchParams({ uf });
         for (const [k, v] of paramsEscopo(escopo)) p.set(k, v);
+        if (valorMinF) p.set("valorMin", valorMinF);
         const r = await fetch(`/api/mapa/estado?${p.toString()}`);
         if (!r.ok) throw new Error();
         setDados(await r.json());
@@ -63,7 +68,7 @@ export function PainelEstadoMapa({
         if (!silencioso) setCarregando(false);
       }
     },
-    [uf, escopo],
+    [uf, escopo, valorMinF],
   );
 
   useEffect(() => {
@@ -141,9 +146,13 @@ export function PainelEstadoMapa({
             <div>
               <p className="text-sm font-semibold text-escuro">{titulo}</p>
               <p className="text-xs text-medio/60">
-                {dados
-                  ? `${dados.resumo.clientes} clientes · ${dados.resumo.negocios.ganhos} vendas`
-                  : "carregando..."}
+                {!dados
+                  ? "carregando..."
+                  : valorMinF
+                    ? // Com o filtro ligado, o resumo continua sendo o do estado
+                      // inteiro — o "de N" deixa claro que a lista e um recorte.
+                      `${dados.total} de ${dados.resumo.clientes} clientes · ${rotuloFaixaValor(Number(valorMinF)).toLowerCase()}`
+                    : `${dados.resumo.clientes} clientes · ${dados.resumo.negocios.ganhos} vendas`}
               </p>
             </div>
             <button
@@ -153,6 +162,24 @@ export function PainelEstadoMapa({
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+
+          {/* Faixa de valor gasto (Fatia 8): mesmas faixas da aba Clientes, e o
+              recorte vale para as listas de todas as abas. O resumo do estado
+              nao muda — ver o contador "N de M" acima. */}
+          <div className="mt-2">
+            <select
+              value={valorMinF}
+              onChange={(e) => setValorMinF(e.target.value)}
+              className="campo w-full text-xs"
+            >
+              <option value="">Valor gasto: qualquer</option>
+              {FAIXAS_VALOR_GASTO.map((v) => (
+                <option key={v} value={String(v)}>
+                  {rotuloFaixaValor(v)}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Abas */}

@@ -64,6 +64,11 @@ export type ClienteMapa = {
   totalCompras: number;
   valorComprado: number;
   motivoPerda: string | null;
+  // Total ja gasto (Fatia 8), mesma fonte do painel do cliente. So vem
+  // preenchido com o filtro de valor ligado. gastoParcial = ha compra antiga
+  // sem valor estruturado, entao o total e um minimo.
+  totalGasto?: number | null;
+  gastoParcial?: boolean;
 };
 
 export type EstadoDetalheResp = {
