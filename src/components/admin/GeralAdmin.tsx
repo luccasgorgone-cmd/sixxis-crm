@@ -410,11 +410,12 @@ export function GeralAdmin() {
             Esvaziar o Kanban por prazo
           </span>
           <span className="mt-0.5 block text-xs text-medio/60">
-            Tira do quadro os cards de Perdido e Vendido parados ha muito tempo.
-            Arquivar NAO apaga nada: o cliente, o historico e os valores
-            continuam no sistema e nas telas de clientes — o card so deixa de
-            ocupar o Kanban. Qualquer mensagem nova reinicia a contagem e traz o
-            card de volta. Negocio em aberto nunca e arquivado.
+            Tira do quadro os cards de Perdido e Vendido parados ha muito tempo,
+            e junto tira a conversa do Inbox. Arquivar NAO apaga nada: o
+            cliente, o historico e os valores continuam no sistema e nas telas
+            de clientes. Qualquer mensagem nova reinicia a contagem e traz de
+            volta os dois (card e conversa). Negocio em aberto nunca e
+            arquivado.
           </span>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
