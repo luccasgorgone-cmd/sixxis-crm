@@ -471,6 +471,12 @@ export async function PATCH(
       // o retorno do cliente reabre o negocio e o status sai de GANHO.
       data.jaFoiGanho = true;
       data.ultimoGanhoEm = agora;
+      // CONTADOR: +1 so na TRANSICAO de verdade. Um negocio que ja esta GANHO e
+      // recebe outro PATCH (editar valor, mover entre etapas de ganho) nao conta
+      // de novo. Ganhar -> cliente volta (reabre) -> ganhar outra vez conta 2.
+      if (negocio.status !== StatusNeg.GANHO) {
+        data.vezesGanho = { increment: 1 };
+      }
       // Fechamento de pedido: grava os itens (substitui os anteriores deste
       // negocio) + valorProdutos + frete. O historico do cliente guarda o pedido.
       if (temPedido) {
@@ -555,6 +561,11 @@ export async function PATCH(
       data.ultimoMotivoPerda = motivo;
       data.ultimoMotivoPerdaObs = obs;
       data.ultimaPerdaEm = agora;
+      // CONTADOR: mesma regra do ganho — so na transicao. Trocar o motivo da
+      // perda de um negocio ja perdido nao conta uma segunda perda.
+      if (negocio.status !== StatusNeg.PERDIDO) {
+        data.vezesPerdido = { increment: 1 };
+      }
       const rotulo = rotuloMotivo(motivo);
       historicos.push({
         tipo: TipoHistorico.PERDA,
