@@ -101,10 +101,31 @@ function numeroOuNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Ordem de escolha do MANTIDO: valor DESC (sem valor por ultimo), depois
-// atualizadoEm DESC, depois criadoEm DESC, e o id so para desempate total
-// (deixa a previa e a execucao escolherem SEMPRE o mesmo).
+// PRIORIDADE POR STATUS — o criterio mais importante, antes do valor.
+// A VENDA QUE ACONTECEU MANDA: entre duplicados, o GANHO fica; depois o ABERTO
+// (negociacao viva); o PERDIDO e o primeiro a sair.
+//
+// POR QUE ISTO VEM ANTES DO VALOR: nos pares ABERTO + GANHO os dois cards tem o
+// MESMO valor — e a mesma venda duplicada. Com valor empatado o desempate caia
+// na data e podia manter o ABERTO, neutralizando o GANHO: uma venda real viraria
+// perdida e o faturamento SUMIRIA da carteira. O objetivo e tirar a DOBRA, nunca
+// apagar a venda.
+const PESO_STATUS: Record<StatusNeg, number> = {
+  [StatusNeg.GANHO]: 0,
+  [StatusNeg.ABERTO]: 1,
+  [StatusNeg.PERDIDO]: 2,
+};
+
+// Ordem de escolha do MANTIDO (o primeiro depois de ordenar):
+//   1) status: GANHO > ABERTO > PERDIDO (peso ASC);
+//   2) valor DESC, sem valor por ultimo — desempata DENTRO do mesmo status
+//      (ex.: GANHO + GANHO fica com o de maior valor);
+//   3) atualizadoEm DESC; 4) criadoEm DESC;
+//   5) id — desempate final, para o comparador ser TOTAL: nunca sobra ambiguidade
+//      e a previa e a execucao escolhem sempre exatamente o mesmo negocio.
 function ordenarCandidatos(a: NegocioDup, b: NegocioDup): number {
+  const ps = PESO_STATUS[a.status] - PESO_STATUS[b.status];
+  if (ps !== 0) return ps;
   const va = numeroOuNull(a.valor);
   const vb = numeroOuNull(b.valor);
   if (va !== vb) {
