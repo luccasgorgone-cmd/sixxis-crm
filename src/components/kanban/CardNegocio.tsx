@@ -15,6 +15,7 @@ import {
   Pin,
   MoreVertical,
   CircleDot,
+  Archive,
 } from "lucide-react";
 import type { CardNegocio as Card } from "./tipos";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -33,6 +34,7 @@ export function CardNegocio({
   onAtribuir,
   onFixar,
   onMarcarNaoLida,
+  onEncerrar,
 }: {
   card: Card;
   onAbrir?: (id: string) => void;
@@ -43,6 +45,9 @@ export function CardNegocio({
   onAtribuir?: (card: Card) => void;
   onFixar?: (card: Card) => void;
   onMarcarNaoLida?: (card: Card) => void;
+  // Fatia 10: encerrar o atendimento (arquiva o card, sem virar ganho nem
+  // perda). Disponivel em QUALQUER card, com ou sem conversa.
+  onEncerrar?: (card: Card) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, data: { etapaId: card.etapaId } });
@@ -128,9 +133,12 @@ export function CardNegocio({
               className="mt-1.5"
             />
           )}
-          {/* Menu de acoes da conversa (padrao do Inbox), depois do badge e do
-              marcador para nao disputar espaco com eles nem com o pin. */}
-          {onMarcarNaoLida && card.conversaId && (
+          {/* Menu de acoes do card (padrao do Inbox), depois do badge e do
+              marcador para nao disputar espaco com eles nem com o pin.
+              "Marcar como nao lida" depende de haver conversa; "Encerrar" nao —
+              por isso a condicao do MENU e a soma das duas, e cada item se
+              esconde sozinho. Antes o menu inteiro sumia num card sem conversa. */}
+          {((onMarcarNaoLida && card.conversaId) || onEncerrar) && (
             <div
               className="relative mt-0.5"
               onPointerDown={(e) => e.stopPropagation()}
@@ -155,23 +163,41 @@ export function CardNegocio({
                     onClick={() => setMenu(false)}
                   />
                   <div className="absolute right-0 top-6 z-20 w-56 overflow-hidden rounded-lg border border-black/10 bg-white py-1 shadow-lg">
-                    <button
-                      type="button"
-                      disabled={card.marcadaNaoLida}
-                      title={
-                        card.marcadaNaoLida
-                          ? "Ja marcada. Abrir a conversa marca como lida."
-                          : undefined
-                      }
-                      onClick={() => {
-                        onMarcarNaoLida(card);
-                        setMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro transition-colors hover:bg-fundo disabled:cursor-default disabled:text-medio/40 disabled:hover:bg-transparent"
-                    >
-                      <CircleDot className="h-4 w-4 text-medio/60" />
-                      Marcar como nao lida
-                    </button>
+                    {onMarcarNaoLida && card.conversaId && (
+                      <button
+                        type="button"
+                        disabled={card.marcadaNaoLida}
+                        title={
+                          card.marcadaNaoLida
+                            ? "Ja marcada. Abrir a conversa marca como lida."
+                            : undefined
+                        }
+                        onClick={() => {
+                          onMarcarNaoLida(card);
+                          setMenu(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro transition-colors hover:bg-fundo disabled:cursor-default disabled:text-medio/40 disabled:hover:bg-transparent"
+                      >
+                        <CircleDot className="h-4 w-4 text-medio/60" />
+                        Marcar como nao lida
+                      </button>
+                    )}
+                    {/* Fatia 10 — encerrar: um clique, sem modal e sem motivo.
+                        O card so sai do quadro; nao vira ganho nem perda. */}
+                    {onEncerrar && (
+                      <button
+                        type="button"
+                        title="Tira o card do quadro sem marcar venda nem perda. Se o cliente voltar a falar, ele reabre."
+                        onClick={() => {
+                          onEncerrar(card);
+                          setMenu(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-escuro transition-colors hover:bg-fundo"
+                      >
+                        <Archive className="h-4 w-4 text-medio/60" />
+                        Encerrar atendimento
+                      </button>
+                    )}
                   </div>
                 </>
               )}

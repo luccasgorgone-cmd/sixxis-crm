@@ -527,6 +527,43 @@ export function Kanban({
     }
   }
 
+  // ENCERRAR (Fatia 10): tira o card do quadro sem virar ganho nem perda — o
+  // servidor so arquiva. Um clique, sem modal e sem motivo.
+  //
+  // Otimista e CIRURGICO: some da coluna na hora, sem recarregar o quadro (as
+  // colunas expandidas por "carregar mais" continuam expandidas). Falhou, o card
+  // volta para a MESMA posicao em que estava — por isso o indice e guardado
+  // antes; um push no fim reordenaria a coluna na cara do vendedor.
+  async function encerrar(card: Card) {
+    const etapaId = card.etapaId;
+    if (!etapaId) return;
+    let indice = -1;
+    setColunas((prev) => {
+      const atuais = prev[etapaId];
+      if (!atuais) return prev;
+      indice = atuais.findIndex((c) => c.id === card.id);
+      if (indice < 0) return prev;
+      return { ...prev, [etapaId]: atuais.filter((c) => c.id !== card.id) };
+    });
+    if (indice < 0) return;
+    try {
+      const r = await fetch(`/api/negocios/${card.id}/encerrar`, {
+        method: "POST",
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      setColunas((prev) => {
+        const atuais = prev[etapaId] ?? [];
+        // Ja voltou por outro caminho (recarga, evento): nao duplica.
+        if (atuais.some((c) => c.id === card.id)) return prev;
+        const volta = [...atuais];
+        volta.splice(Math.min(indice, volta.length), 0, card);
+        return { ...prev, [etapaId]: volta };
+      });
+      toast.erro("Nao foi possivel encerrar.");
+    }
+  }
+
   // Assumir (atribuir a si): mesmo endpoint do seletor de vendedor do painel.
   async function assumir(negocioId: string) {
     try {
@@ -787,6 +824,7 @@ export function Kanban({
                           }
                           onFixar={(c) => void alternarFixar(c)}
                           onMarcarNaoLida={(c) => void marcarNaoLida(c)}
+                          onEncerrar={(c) => void encerrar(c)}
                           ehEntrada={j === 0}
                           onAtribuirMassa={(ids) =>
                             setAtribuir({
@@ -824,6 +862,7 @@ export function Kanban({
                   }
                   onFixar={(c) => void alternarFixar(c)}
                   onMarcarNaoLida={(c) => void marcarNaoLida(c)}
+                  onEncerrar={(c) => void encerrar(c)}
                   ehEntrada={j === 0}
                   onAtribuirMassa={(ids) =>
                     setAtribuir({
