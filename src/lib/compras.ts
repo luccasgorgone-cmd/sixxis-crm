@@ -96,9 +96,31 @@ type EventoGanho = {
 export const SUFIXO_GANHO_DUPLICADO =
   " [duplicado de movimentacao — desconsiderado]";
 
+// Fatia 15-A: o vendedor EXCLUIU o card dizendo que aquilo nao foi venda (era
+// duvida, pos-venda, engano). Sufixo PROPRIO, e nao o de duplicado, porque a
+// linha do tempo do negocio mostra este texto para gente ler: chamar de
+// "duplicado de movimentacao" um card que o vendedor excluiu a mao seria contar
+// uma historia que nao aconteceu.
+export const SUFIXO_GANHO_EXCLUIDO = " [excluido — nao foi venda]";
+
+// Todo motivo pelo qual um evento de ganho para de valer como compra.
+const SUFIXOS_DESCONSIDERADO = [
+  SUFIXO_GANHO_DUPLICADO,
+  SUFIXO_GANHO_EXCLUIDO,
+] as const;
+
 export function ehGanhoDesconsiderado(descricao: string): boolean {
-  return descricao.endsWith(SUFIXO_GANHO_DUPLICADO);
+  return SUFIXOS_DESCONSIDERADO.some((s) => descricao.endsWith(s));
 }
+
+// A MESMA regra em WHERE, para quem filtra no banco. Colada na versao JS de
+// proposito — as duas ja divergiram uma vez nesta base (ver Fatia 14.1), e
+// separadas voltam a divergir. Sem cuidado com NULL aqui: descricao e NOT NULL.
+export const WHERE_GANHO_VALIDO = {
+  NOT: {
+    OR: SUFIXOS_DESCONSIDERADO.map((s) => ({ descricao: { endsWith: s } })),
+  },
+};
 
 // null = compra antiga sem valor estruturado (backfill nao casou). NUNCA vira 0:
 // o zero somaria silenciosamente e faria o total mentir para menos sem avisar.
