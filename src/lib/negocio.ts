@@ -32,6 +32,22 @@ export async function primeiraEtapaAberta(finalidade: Finalidade) {
   });
 }
 
+// Etapa de GANHO do funil da finalidade ("Vendido" na venda, "Resolvido" no
+// pos-venda). Simetrica da de cima, e o destino de quem fecha ganho. Fica aqui
+// porque as correcoes administrativas precisam dela e cada uma resolvendo por
+// conta viraria N copias da mesma consulta.
+export async function primeiraEtapaGanho(finalidade: Finalidade) {
+  return prisma.etapa.findFirst({
+    where: {
+      tipo: TipoEtapa.GANHO,
+      ativo: true,
+      finalidade: { in: etapasDaFinalidade(finalidade) },
+    },
+    orderBy: { ordem: "asc" },
+    select: { id: true, nome: true },
+  });
+}
+
 // Bloco 4 — marca a INTERACAO (mensagem IN ou OUT) no negocio da finalidade.
 // Espelha Conversa.ultimaMensagemEm no nivel do Negocio, que e o que o Kanban
 // consegue ORDENAR: nas colunas terminais (Vendido/Perdido) quem falou por
