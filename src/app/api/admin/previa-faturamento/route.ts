@@ -27,6 +27,7 @@ import { obterAdmin } from "@/lib/autorizacao";
 import { campoDono } from "@/lib/dono";
 import { nomeEfetivo } from "@/lib/cliente";
 import { resolverPeriodo } from "@/lib/metricas";
+import { ehDuplicadoNeutralizado } from "@/lib/motivosPerda";
 import {
   whereVendaNoPeriodo,
   whereVendaNoPeriodoAntigo,
@@ -46,6 +47,11 @@ const selectVenda = {
   fechadoEm: true,
   ultimoGanhoEm: true,
   jaFoiGanho: true,
+  // Para a auditoria enxergar POR QUE um negocio PERDIDO esta entrando: se e um
+  // duplicado neutralizado (nao deveria entrar) ou uma perda de verdade depois
+  // de uma venda de verdade (entra, e o dono decide se concorda).
+  motivoPerda: true,
+  motivoPerdaObs: true,
   etapa: { select: { nome: true } },
   lead: {
     select: {
@@ -185,6 +191,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         n.status !== "GANHO"
           ? `reaberto: status atual ${n.status}${n.fechadoEm ? "" : " e fechadoEm zerado"}`
           : "fechadoEm fora do periodo (ou ausente), mas o ganho e do periodo",
+      // Um PERDIDO entrando merece olhar. Estes dois campos dizem qual dos dois
+      // casos e: duplicado neutralizado (nao deve entrar — se aparecer, e bug)
+      // ou perda real depois de venda real (entra; a venda aconteceu).
+      motivoPerda: n.motivoPerda,
+      duplicadoNeutralizado: ehDuplicadoNeutralizado(n),
     };
   };
 

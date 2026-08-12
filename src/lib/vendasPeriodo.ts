@@ -24,12 +24,26 @@
 // mais. Faturamento so anda para cima aqui, e cada real a mais tem um ganho
 // datado atras dele.
 //
-// NAO CONTA EM DOBRO: o filtro e sobre o NEGOCIO, entao cada negocio entra uma
-// vez, casando por uma fonte ou por tres. Isso tambem torna inofensivos os
-// ganhos repetidos que a Fatia 9 neutraliza — quatro eventos de ganho no mesmo
-// negocio continuam sendo UM negocio vendido. Ainda assim, a fonte 3 ignora os
-// eventos marcados como duplicados de movimentacao: repeticao de card nao e
-// venda, e nao pode sozinha colocar um negocio no faturamento.
+// NAO CONTA EM DOBRO — e ha DOIS tipos de duplicado a barrar, que e onde a
+// primeira versao desta regra errou:
+//
+//   a) DUPLICADO DE MOVIMENTACAO (Fatia 9): varios eventos GANHO no MESMO
+//      negocio, de mover o card ganho -> reaberto -> ganho. Inofensivo por
+//      construcao, porque o filtro e sobre o NEGOCIO: quatro eventos continuam
+//      sendo um negocio vendido. A fonte 3 ainda assim ignora os marcados, para
+//      repeticao de card nunca colocar sozinha um negocio no faturamento.
+//
+//   b) DUPLICADO DE NEGOCIO (corrigir-duplicados): DOIS negocios do mesmo
+//      cliente para a mesma venda. O perdedor vira PERDIDO com o marcador de
+//      neutralizado, mas guarda o ganho antigo no historico — entao as fontes 2
+//      e 3 o traziam de volta, somando a MESMA venda junto com o negocio que
+//      ficou GANHO. Era dobra real no faturamento, achada em auditoria. Agora as
+//      duas fontes novas descartam o neutralizado (ver lib/motivosPerda), que e
+//      a mesma exclusao que lib/compras e lib/perdidos ja faziam.
+//
+// A fonte 1 (regra antiga) NAO leva nenhum desses filtros, de proposito: e ela
+// que garante o superconjunto, e um filtro novo ali poderia derrubar algo que
+// hoje conta. Na pratica um neutralizado nunca casa com ela — esta PERDIDO.
 //
 // NOTA SOBRE GRANULARIDADE: aqui a unidade e o NEGOCIO (uma venda por negocio,
 // valor = Negocio.valor), como carteira e metas sempre contaram. O historico de
@@ -40,6 +54,7 @@
 import type { Prisma } from "../generated/prisma/client";
 import { StatusNeg, TipoHistorico } from "../generated/prisma/enums";
 import { SUFIXO_GANHO_DUPLICADO } from "./compras";
+import { WHERE_NAO_DUPLICADO_NEUTRALIZADO } from "./motivosPerda";
 
 export type JanelaVenda = { inicio: Date; fim: Date };
 
@@ -55,22 +70,34 @@ export type JanelaVenda = { inicio: Date; fim: Date };
 export function whereVendaNoPeriodo(j: JanelaVenda): Prisma.NegocioWhereInput {
   return {
     OR: [
-      // 1) Regra antiga, preservada inteira.
+      // 1) Regra antiga, preservada INTEIRA e sem nenhum filtro extra. E ela que
+      //    garante o superconjunto: nada que contava antes pode deixar de
+      //    contar por causa de um filtro novo posto aqui.
       {
         status: StatusNeg.GANHO,
         fechadoEm: { gte: j.inicio, lte: j.fim },
       },
       // 2) Memoria do ganho — sobrevive a reabertura no pos-venda.
-      { ultimoGanhoEm: { gte: j.inicio, lte: j.fim } },
+      {
+        AND: [
+          { ultimoGanhoEm: { gte: j.inicio, lte: j.fim } },
+          WHERE_NAO_DUPLICADO_NEUTRALIZADO,
+        ],
+      },
       // 3) Prova documental, para o que e anterior a memoria existir.
       {
-        historicos: {
-          some: {
-            tipo: TipoHistorico.GANHO,
-            criadoEm: { gte: j.inicio, lte: j.fim },
-            NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+        AND: [
+          {
+            historicos: {
+              some: {
+                tipo: TipoHistorico.GANHO,
+                criadoEm: { gte: j.inicio, lte: j.fim },
+                NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+              },
+            },
           },
-        },
+          WHERE_NAO_DUPLICADO_NEUTRALIZADO,
+        ],
       },
     ],
   };
