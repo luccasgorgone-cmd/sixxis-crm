@@ -1,5 +1,6 @@
 // Helpers de dominio do Negocio compartilhados por worker, backfill e APIs.
 import { prisma } from "./prisma";
+import { Prisma } from "../generated/prisma/client";
 import { getIO } from "./socket";
 import { campoDono } from "./dono";
 import { desarquivarConversaDoLead } from "./arquivamento";
@@ -180,24 +181,46 @@ export async function garantirNegocioParaLead(
     return reaberto.id;
   }
 
-  const negocio = await prisma.negocio.create({
-    data: {
-      leadId,
-      etapaId: etapa.id,
-      agenteId,
-      status: StatusNeg.ABERTO,
-      temperatura: Temperatura.MORNO,
-      finalidade,
-      entrouEtapaEm: new Date(),
-      historicos: {
-        create: {
-          tipo: TipoHistorico.CRIACAO,
-          descricao: "Negocio criado a partir da conversa",
+  let negocio: { id: string; etapaId: string | null };
+  try {
+    negocio = await prisma.negocio.create({
+      data: {
+        leadId,
+        etapaId: etapa.id,
+        agenteId,
+        status: StatusNeg.ABERTO,
+        temperatura: Temperatura.MORNO,
+        finalidade,
+        entrouEtapaEm: new Date(),
+        historicos: {
+          create: {
+            tipo: TipoHistorico.CRIACAO,
+            descricao: "Negocio criado a partir da conversa",
+          },
         },
       },
-    },
-    select: { id: true, etapaId: true },
-  });
+      select: { id: true, etapaId: true },
+    });
+  } catch (erro) {
+    // CORRIDA: duas mensagens do mesmo lead+finalidade chegando juntas podem
+    // passar as duas pelas buscas acima e tentar criar o negocio ao mesmo tempo.
+    // Hoje isso gera um duplicado silencioso; com o indice unico parcial
+    // aplicado (prisma/manual/20260812020000_negocio_unico_ativo.sql) o segundo
+    // bate em P2002. Aqui ele REUSA o que o primeiro criou em vez de estourar —
+    // mesmo padrao de garantirConversaUnificada. Sem o indice no banco este
+    // catch nunca dispara.
+    if (
+      erro instanceof Prisma.PrismaClientKnownRequestError &&
+      erro.code === "P2002"
+    ) {
+      const criadoNaCorrida = await prisma.negocio.findFirst({
+        where: { leadId, finalidade, arquivado: false },
+        select: { id: true },
+      });
+      if (criadoNaCorrida) return criadoNaCorrida.id;
+    }
+    throw erro;
+  }
 
   if (emitir) {
     getIO()?.emit("negocio:atualizado", {

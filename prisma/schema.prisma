@@ -707,6 +707,15 @@ model Negocio {
   @@index([etapaId, ultimaMensagemEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_ultima_msg_idx")
   // Bloco 3: varredura do job de arquivamento (status + arquivado + relogio).
   @@index([status, arquivado, ultimaMensagemEm], map: "Negocio_arquivamento_idx")
+  // TRAVA ANTI-DUPLICACAO (fatia 4/4): no maximo UM negocio ATIVO por
+  // (leadId, finalidade), igual a Conversa. Vive so no banco, como indice unico
+  // PARCIAL (WHERE arquivado = false) — o SQL esta em
+  // prisma/manual/20260812020000_negocio_unico_ativo.sql e e aplicado A MAO,
+  // depois de /api/admin/corrigir-duplicados confirmar 0 duplicados (criar
+  // unique com duplicados na tabela FALHA e derrubaria o deploy).
+  // NAO declarar @@unique([leadId, finalidade]) aqui: o Prisma nao expressa
+  // indice parcial e geraria um unique TOTAL, que quebraria por causa dos
+  // negocios ARQUIVADOS duplicados — que sao legitimos e continuam no banco.
   // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
   // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
   @@index([leadId, status])
