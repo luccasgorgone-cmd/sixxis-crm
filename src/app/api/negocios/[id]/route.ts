@@ -359,7 +359,14 @@ export async function PATCH(
   }
 
   const data: Prisma.NegocioUncheckedUpdateInput = {};
-  const historicos: { tipo: TipoHistorico; descricao: string }[] = [];
+  // valorGanho: so o evento de GANHO preenche (Fatia 7). Fica no historico de
+  // forma estruturada para o "historico de compras" do painel somar por numero,
+  // e nao por parsing da descricao.
+  const historicos: {
+    tipo: TipoHistorico;
+    descricao: string;
+    valorGanho?: number;
+  }[] = [];
   // Descricao da Atividade(PENDENCIA), registrada a parte (PENDENCIA nao existe
   // em TipoHistorico, so em AtividadeTipo).
   let atividadePendencia: string | null = null;
@@ -537,6 +544,8 @@ export async function PATCH(
         descricao: `Negocio ganho (${brl(valorEfetivo)})${
           tipoGanhoInformado ? ` — ${rotuloTipoGanho(tipoGanhoInformado)}` : ""
         }${detalhePedido}`,
+        // MESMO numero que vai no texto acima (e o que grava Negocio.valor).
+        valorGanho: valorEfetivo,
       });
     } else if (destino.tipo === TipoEtapa.PERDIDO) {
       const motivo = body.motivoPerda?.trim() || negocio.motivoPerda || "";
@@ -814,6 +823,7 @@ export async function PATCH(
       create: historicos.map((h) => ({
         tipo: h.tipo,
         descricao: h.descricao,
+        valorGanho: h.valorGanho ?? null,
         agenteId: agente.id,
       })),
     },

@@ -768,6 +768,13 @@ model HistoricoNegocio {
   agente    Agente?       @relation(fields: [agenteId], references: [id])
   tipo      TipoHistorico
   descricao String        @db.Text
+  // Valor da venda, ESTRUTURADO, so nos eventos tipo GANHO (null em todos os
+  // outros tipos). Existe porque o valor da compra vivia apenas dentro do TEXTO
+  // da descricao ("Negocio ganho (R$ 1.200,00)"), e somar historico de compras
+  // por parsing de texto e frageil. A descricao continua igual — este campo e
+  // COMPLEMENTO, nao substituto. E o mesmo numero gravado em Negocio.valor no
+  // fechamento (total do pedido: produtos + frete).
+  valorGanho Decimal?     @db.Decimal(12, 2)
   criadoEm  DateTime      @default(now())
 
   @@index([negocioId, criadoEm])
