@@ -3,6 +3,7 @@
 import { prisma } from "./prisma";
 import { Prisma } from "../generated/prisma/client";
 import { StatusNeg, Finalidade, TipoGanho } from "../generated/prisma/enums";
+import { whereVendaNoPeriodo, comEscopo } from "./vendasPeriodo";
 
 export type Periodo = { inicio: Date; fim: Date };
 
@@ -106,6 +107,39 @@ function negocioWhere(
   return w;
 }
 
+// Só o escopo (agente/finalidade), sem status nem janela — para compor com os
+// fragmentos de janela da Fatia 14, que ja trazem OR proprio.
+function apenasEscopo(e: Escopo): Prisma.NegocioWhereInput {
+  const w: Prisma.NegocioWhereInput = {};
+  if (e.agenteId) w.agenteId = e.agenteId;
+  if (e.finalidade) w.finalidade = e.finalidade;
+  return w;
+}
+
+// VENDAS do periodo (Fatia 14): "houve ganho cuja data cai no periodo", nao
+// "esta GANHO agora". Ver lib/vendasPeriodo.
+function whereVendas(p: Periodo, e: Escopo): Prisma.NegocioWhereInput {
+  return comEscopo(apenasEscopo(e), whereVendaNoPeriodo({
+    inicio: p.inicio,
+    fim: p.fim,
+  }));
+}
+
+// PERDIDOS do periodo, EXCLUINDO quem tambem conta como venda no mesmo periodo.
+// O caso existe de verdade agora: um negocio ganho, reaberto pelo retorno do
+// cliente e depois dado como perdido cairia nos dois lados, inflando
+// `finalizados` e afundando a conversao com um negocio que, de fato, vendeu. A
+// venda aconteceu — ela ganha a disputa.
+function wherePerdidos(p: Periodo, e: Escopo): Prisma.NegocioWhereInput {
+  return {
+    AND: [
+      apenasEscopo(e),
+      { status: StatusNeg.PERDIDO, fechadoEm: { gte: p.inicio, lt: p.fim } },
+      { NOT: whereVendaNoPeriodo({ inicio: p.inicio, fim: p.fim }) },
+    ],
+  };
+}
+
 // Fragmentos SQL opcionais para os calculos de tempo medio.
 function condConversa(e: Escopo) {
   const partes: Prisma.Sql[] = [];
@@ -124,7 +158,7 @@ export async function calcularMetricas(
 
   const [
     abertos,
-    finalizados,
+    perdidos,
     ganhos,
     somaBase,
     somaAjuste,
@@ -138,22 +172,21 @@ export async function calcularMetricas(
     prisma.negocio.count({
       where: negocioWhere(p, e, [StatusNeg.ABERTO]),
     }),
-    prisma.negocio.count({
-      where: negocioWhere(p, e, [StatusNeg.GANHO, StatusNeg.PERDIDO], true),
-    }),
-    prisma.negocio.count({
-      where: negocioWhere(p, e, [StatusNeg.GANHO], true),
-    }),
+    // PERDIDOS contados direto (antes eram `finalizados - ganhos`). Com a regra
+    // nova os ganhos crescem, e a subtracao antiga passaria a devolver menos
+    // perdidos do que existem — ou ate um numero negativo.
+    prisma.negocio.count({ where: wherePerdidos(p, e) }),
+    prisma.negocio.count({ where: whereVendas(p, e) }),
     // Valor vendido = SUM(COALESCE(valorAjustado, valor)) — Fatia 3.09: o cobrado
     // real (com desconto/frete) quando ha ajuste, senao o valor. Feito em dois
     // agregados para nao buscar linhas: base (sem ajuste) + os ajustes.
     prisma.negocio.aggregate({
       _sum: { valor: true },
-      where: { ...negocioWhere(p, e, [StatusNeg.GANHO], true), valorAjustado: null },
+      where: { AND: [whereVendas(p, e), { valorAjustado: null }] },
     }),
     prisma.negocio.aggregate({
       _sum: { valorAjustado: true },
-      where: { ...negocioWhere(p, e, [StatusNeg.GANHO], true), valorAjustado: { not: null } },
+      where: { AND: [whereVendas(p, e), { valorAjustado: { not: null } }] },
     }),
     // Pendentes: conversa aberta com cliente aguardando (nao lidas>0) ou sem
     // resposta ha mais de 24h.
@@ -225,8 +258,7 @@ export async function calcularMetricas(
           by: ["tipoGanho"],
           _count: { _all: true },
           where: {
-            ...negocioWhere(p, e, [StatusNeg.GANHO], true),
-            finalidade: Finalidade.POS_VENDA,
+            AND: [whereVendas(p, e), { finalidade: Finalidade.POS_VENDA }],
           },
         });
   const contaTipo = (t: TipoGanho | null) =>
@@ -235,7 +267,10 @@ export async function calcularMetricas(
   const valorVendido =
     (somaBase._sum.valor ? Number(somaBase._sum.valor) : 0) +
     (somaAjuste._sum.valorAjustado ? Number(somaAjuste._sum.valorAjustado) : 0);
-  const perdidos = finalizados - ganhos;
+  // Finalizados = o que fechou de um jeito ou de outro. Derivado das duas
+  // contagens (e nao mais o contrario), com os dois lados contados no banco e
+  // sem interseccao — ver wherePerdidos.
+  const finalizados = ganhos + perdidos;
   const conversao = finalizados > 0 ? ganhos / finalizados : 0;
   const ticketMedio = ganhos > 0 ? valorVendido / ganhos : 0;
   const clientesAtendidos = Number(clientesRaw[0]?.total ?? 0);

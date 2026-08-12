@@ -11,6 +11,7 @@
 import { prisma } from "./prisma";
 import { escopoLeadWhere, ehAdmin, type SessaoAgente } from "./autorizacao";
 import { resolverPeriodo } from "./metricas";
+import { whereVendaNoPeriodo, comEscopo } from "./vendasPeriodo";
 import { ufPorTelefone } from "./ddd";
 import {
   contarSegmentoOracle,
@@ -273,7 +274,9 @@ async function consultarVendas(
   const base = escopoNegocio(agente);
   const fin = finalidadeDe(input.finalidade);
   const wfin = fin ? { finalidade: fin } : {};
-  const whereGanho = { ...base, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: inicio, lte: fim } };
+  // Fatia 14: "houve venda no periodo", nao "esta GANHO agora" — venda cujo
+  // cliente voltou a falar tem o negocio reaberto e o fechadoEm zerado.
+  const whereGanho = comEscopo({ ...base, ...wfin }, whereVendaNoPeriodo({ inicio, fim }));
   const ganhos = await prisma.negocio.count({ where: whereGanho });
   const perdidos = await prisma.negocio.count({
     where: { ...base, ...wfin, status: StatusNeg.PERDIDO, fechadoEm: { gte: inicio, lte: fim } },
@@ -372,12 +375,11 @@ async function consultarDesempenhoVendedores(
   const numDe = async (agenteId: string) => {
     // Desempenho de VENDEDORES conta apenas VENDA: pedidos de pecas (pos-venda)
     // e itens de garantia NAO entram como venda de usuario (Fatia 3.02).
-    const w = {
-      agenteId,
-      finalidade: Finalidade.VENDA,
-      status: StatusNeg.GANHO,
-      fechadoEm: { gte: inicio, lte: fim },
-    };
+    // Fatia 14: conta a venda pela data do ganho, nao pelo status de agora.
+    const w: Prisma.NegocioWhereInput = comEscopo(
+      { agenteId, finalidade: Finalidade.VENDA },
+      whereVendaNoPeriodo({ inicio, fim }),
+    );
     // Valor OFICIAL: COALESCE(valorAjustado, valor) — Fatia 3.10.
     const [qtd, valorGanhos] = await Promise.all([
       prisma.negocio.count({ where: w }),
@@ -409,7 +411,7 @@ async function consultarMapa(agente: SessaoAgente) {
     select: {
       telefone: true,
       enderecos: { select: { uf: true } },
-      negocios: { select: { status: true, valor: true } },
+      negocios: { select: { status: true, valor: true, jaFoiGanho: true } },
     },
   });
   const mapa = new Map<string, { uf: string; clientes: number; vendas: number; faturamento: number }>();
@@ -419,7 +421,10 @@ async function consultarMapa(agente: SessaoAgente) {
     const e = mapa.get(uf) ?? { uf, clientes: 0, vendas: 0, faturamento: 0 };
     e.clientes += 1;
     for (const n of l.negocios) {
-      if (n.status === StatusNeg.GANHO) {
+      // Fatia 14: vale a MEMORIA do ganho, nao so o status de agora. Este
+      // recorte nao tem periodo (e o acumulado), entao a pergunta e simplesmente
+      // "ja vendeu?" — e um negocio reaberto no pos-venda ja vendeu.
+      if (n.status === StatusNeg.GANHO || n.jaFoiGanho) {
         e.vendas += 1;
         e.faturamento += num(n.valor);
       }
@@ -486,11 +491,12 @@ async function consultarMetas(agente: SessaoAgente) {
     metas.map(async (m) => {
       let atual: number | null = null;
       if (m.metrica === MetricaMeta.VALOR_VENDIDO || m.metrica === MetricaMeta.QTD_GANHOS) {
-        const w: Prisma.NegocioWhereInput = {
-          status: StatusNeg.GANHO,
-          fechadoEm: { gte: m.inicio, lte: m.fim },
-          ...(m.agenteId ? { agenteId: m.agenteId } : {}),
-        };
+        // Fatia 14: mesma regra da tela de metas, para o oracle nao dar um
+        // numero e a tela outro.
+        const w: Prisma.NegocioWhereInput = comEscopo(
+          m.agenteId ? { agenteId: m.agenteId } : {},
+          whereVendaNoPeriodo({ inicio: m.inicio, fim: m.fim }),
+        );
         if (m.metrica === MetricaMeta.VALOR_VENDIDO) {
           const agg = await prisma.negocio.aggregate({ where: w, _sum: { valor: true } });
           atual = num(agg._sum.valor);
@@ -1112,16 +1118,14 @@ async function compararPeriodos(
     switch (metrica) {
       case "vendas": {
         // Valor OFICIAL: COALESCE(valorAjustado, valor) — Fatia 3.10.
-        return somaValorDerivado({
-          ...bn,
-          ...wfin,
-          status: StatusNeg.GANHO,
-          fechadoEm: { gte: ini, lt: fim },
-        });
+        // Fatia 14: pela data do ganho.
+        return somaValorDerivado(
+          comEscopo({ ...bn, ...wfin }, whereVendaNoPeriodo({ inicio: ini, fim })),
+        );
       }
       case "negocios_ganhos":
         return prisma.negocio.count({
-          where: { ...bn, ...wfin, status: StatusNeg.GANHO, fechadoEm: { gte: ini, lt: fim } },
+          where: comEscopo({ ...bn, ...wfin }, whereVendaNoPeriodo({ inicio: ini, fim })),
         });
       case "negocios_perdidos":
         return prisma.negocio.count({
