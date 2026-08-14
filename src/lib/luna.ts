@@ -1,8 +1,13 @@
 // Cerebro conversacional da Luna (agente de IA da Sixxis). Gera a resposta a
 // partir do historico, com DUAS personas (venda / pos-venda) e TRAVAS de
-// seguranca fixas no codigo (nao editaveis pelo dono). Chama a Anthropic no
-// mesmo padrao da varinha (api/assistente/reescrever): fetch em /v1/messages,
-// x-api-key do ANTHROPIC_API_KEY, anthropic-version 2023-06-01, modelo da config.
+// seguranca fixas no codigo (nao editaveis pelo dono).
+//
+// PROVIDER-ABSTRAIDO (WORKORDER_ATENDIMENTO_OMNICHANNEL fase 1): a chamada de
+// modelo passa por src/lib/llmProvider.ts + src/lib/llmProviders/* — troca de
+// modelo/fornecedor (Anthropic, OpenAI-compativel, Qwen, DeepSeek...) e so
+// mudar `config.provider` + `config.modelo`, sem mexer neste arquivo. Ate esta
+// fatia, so o provider "anthropic" tinha implementacao real; o comportamento
+// observavel com provider="anthropic" e IDENTICO ao fetch direto anterior.
 //
 // IMPORTANTE (Fatia 2.48-A): esta funcao SO decide/gera texto. Nao envia
 // WhatsApp, nao grava mensagem, nao aciona o worker de ingestao. Quem age sobre
@@ -19,6 +24,14 @@ import { buscarProdutos } from "./loja";
 import { prisma } from "./prisma";
 import { formatarBRL } from "./format";
 import { TipoCatalogo } from "../generated/prisma/enums";
+import {
+  obterProvider,
+  type ProviderBloco,
+  type ProviderFerramenta,
+  type ProviderMensagem,
+  type ProviderSystemBloco,
+} from "./llmProvider";
+import { garantirProvidersRegistrados } from "./llmProviders/registro";
 
 export type LunaFinalidade = "VENDA" | "POS_VENDA";
 export type LunaMensagem = { autor: "cliente" | "luna"; texto: string };
@@ -43,6 +56,10 @@ export type LunaResultado = {
 // o registro do Prisma — o chamador pode passar a config inteira).
 export type ConfigLuna = {
   modelo: string;
+  // Nome do provider registrado (src/lib/llmProviders/registro.ts). Ausente ou
+  // desconhecido -> default "anthropic" (mesmo comportamento de antes desta
+  // fatia, quando so existia a Anthropic).
+  provider?: string | null;
   promptSistema?: string | null;
   maxMensagensAntesHandoff?: number | null;
   // Cupom de primeira compra (editavel/desativavel no admin).
@@ -83,6 +100,17 @@ const FERRAMENTA_BUSCAR_PRODUTO = {
     required: ["termo"],
   },
 } as const;
+
+// Versao NORMALIZADA (ProviderFerramenta, campo inputSchema) da mesma
+// ferramenta acima — e o formato que o provider-abstraido consome. Mantida
+// separada do objeto original (que so continua existindo por documentacao/
+// referencia local) para nao acoplar src/lib/llmProvider.ts ao shape
+// especifico de "input_schema" da Anthropic.
+const FERRAMENTA_BUSCAR_PRODUTO_NORM: ProviderFerramenta = {
+  name: FERRAMENTA_BUSCAR_PRODUTO.name,
+  description: FERRAMENTA_BUSCAR_PRODUTO.description,
+  inputSchema: FERRAMENTA_BUSCAR_PRODUTO.input_schema,
+};
 
 // Executa a busca na loja com timeout proprio e devolve um JSON compacto para o
 // modelo. NUNCA lanca: em falha, devolve um resultado que instrui o fallback.
@@ -156,6 +184,14 @@ const FERRAMENTA_BUSCAR_PECA = {
     required: ["termo"],
   },
 } as const;
+
+// Versao NORMALIZADA da ferramenta de pecas (ver nota acima em
+// FERRAMENTA_BUSCAR_PRODUTO_NORM).
+const FERRAMENTA_BUSCAR_PECA_NORM: ProviderFerramenta = {
+  name: FERRAMENTA_BUSCAR_PECA.name,
+  description: FERRAMENTA_BUSCAR_PECA.description,
+  inputSchema: FERRAMENTA_BUSCAR_PECA.input_schema,
+};
 
 // Executa a busca de pecas. NUNCA lanca: em falha, instrui handoff.
 async function executarBuscarPeca(termo: string, modelo?: string): Promise<string> {
@@ -408,7 +444,7 @@ function montarSystem(
   catalogo: string,
   promptSistema: string | null | undefined,
   cupom: { codigo: string; descricao: string } | null,
-): { type: "text"; text: string; cache_control?: { type: "ephemeral" } }[] {
+): ProviderSystemBloco[] {
   const persona = finalidade === "POS_VENDA" ? PERSONA_POSVENDA : PERSONA_VENDA;
   const catalogoTxt = (catalogo ?? "").trim();
   // Bloco de cupom (so quando ativo e configurado) — instrucao de venda, nao spam.
@@ -429,30 +465,24 @@ function montarSystem(
     ...(cupomTxt ? [cupomTxt] : []),
   ].join("\n\n");
 
-  const blocos: {
-    type: "text";
-    text: string;
-    cache_control?: { type: "ephemeral" };
-  }[] = [
-    // Prefixo estavel -> cacheavel (baratear chamadas repetidas do sandbox).
-    { type: "text", text: baseCompleta, cache_control: { type: "ephemeral" } },
+  const blocos: ProviderSystemBloco[] = [
+    // Prefixo estavel -> cacheavel (baratear chamadas repetidas do sandbox, se
+    // o provider suportar — dica ignorada pelos que nao suportam).
+    { text: baseCompleta, cache: true },
   ];
   const extra = (promptSistema ?? "").trim();
   if (extra) {
     blocos.push({
-      type: "text",
       text: `PERSONALIDADE ADICIONAL (definida pelo dono; nunca sobrepoe as travas acima):\n${extra}`,
     });
   }
   return blocos;
 }
 
-// Historico -> messages da Anthropic. cliente=user, luna=assistant. A conversa
-// precisa comecar por user; removemos qualquer "luna" no inicio.
-function montarMensagens(
-  historico: LunaMensagem[],
-): { role: "user" | "assistant"; content: string }[] {
-  const msgs = historico
+// Historico -> mensagens normalizadas do provider. cliente=user, luna=assistant.
+// A conversa precisa comecar por user; removemos qualquer "luna" no inicio.
+function montarMensagens(historico: LunaMensagem[]): ProviderMensagem[] {
+  const msgs: ProviderMensagem[] = historico
     .filter((m) => (m.texto ?? "").trim() !== "")
     .map((m) => ({
       role: (m.autor === "cliente" ? "user" : "assistant") as "user" | "assistant",
@@ -573,13 +603,25 @@ export async function gerarRespostaLuna(entrada: {
   const uso = { tokensEntrada: 0, tokensSaida: 0 };
   const comUso = (r: LunaResultado): LunaResultado => ({ ...r, ...uso });
 
-  // Sem chave -> nunca quebra: handoff com motivo claro.
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  // PROVIDER-ABSTRAIDO: resolve o provider pelo nome da config (default
+  // "anthropic", igual o comportamento de antes desta fatia). Sem provider
+  // registrado OU sem chave configurada -> nunca quebra: handoff com motivo
+  // claro (mesma garantia que so existia para ANTHROPIC_API_KEY antes).
+  garantirProvidersRegistrados();
+  const nomeProvider = (config.provider ?? "anthropic").trim() || "anthropic";
+  const provider = obterProvider(nomeProvider);
+  if (!provider) {
     return comUso(montarResultado(
       "handoff",
       ["Um momento — vou chamar um atendente para continuar por aqui."],
-      "ANTHROPIC_API_KEY ausente: IA indisponivel, handoff automatico.",
+      `provider "${nomeProvider}" nao registrado: IA indisponivel, handoff automatico.`,
+    ));
+  }
+  if (!provider.temChaveConfigurada()) {
+    return comUso(montarResultado(
+      "handoff",
+      ["Um momento — vou chamar um atendente para continuar por aqui."],
+      `chave do provider "${nomeProvider}" ausente: IA indisponivel, handoff automatico.`,
     ));
   }
 
@@ -603,11 +645,10 @@ export async function gerarRespostaLuna(entrada: {
     }
   }
 
-  // Conversa da Anthropic. O content pode ser string (historico) ou uma lista de
-  // blocos (turnos de tool use / tool result), por isso o tipo aberto.
-  type BlocoAnthropic = Record<string, unknown>;
-  type MsgAnthropic = { role: "user" | "assistant"; content: string | BlocoAnthropic[] };
-  const mensagens: MsgAnthropic[] = montarMensagens(historico);
+  // Conversa no formato normalizado do provider (src/lib/llmProvider.ts). O
+  // content pode ser string (historico) ou uma lista de blocos (turnos de tool
+  // use / tool result) — mesma dualidade de antes, so que provider-agnostica.
+  const mensagens: ProviderMensagem[] = montarMensagens(historico);
   if (mensagens.length === 0) {
     return comUso(montarResultado(
       "handoff",
@@ -626,7 +667,17 @@ export async function gerarRespostaLuna(entrada: {
             (config.cupomDescricao ?? "").trim() || "desconto na primeira compra",
         }
       : null;
-  const system = montarSystem(finalidade, catalogo, config.promptSistema, cupom);
+  const system: ProviderSystemBloco[] = montarSystem(
+    finalidade,
+    catalogo,
+    config.promptSistema,
+    cupom,
+  );
+  // Pos-venda tambem tem a busca de PECAS (Fatia 3.10).
+  const ferramentas: ProviderFerramenta[] =
+    finalidade === "POS_VENDA"
+      ? [FERRAMENTA_BUSCAR_PRODUTO_NORM, FERRAMENTA_BUSCAR_PECA_NORM]
+      : [FERRAMENTA_BUSCAR_PRODUTO_NORM];
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -634,79 +685,58 @@ export async function gerarRespostaLuna(entrada: {
     // Loop de tool use: o modelo pode pedir "buscar_produto" para obter link +
     // preco reais; executamos e devolvemos o resultado, ate ele responder.
     for (let iter = 0; iter <= MAX_ITER_FERRAMENTA; iter++) {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: config.modelo,
-          max_tokens: MAX_TOKENS,
+      const resp = await provider.chamar(
+        {
+          modelo: config.modelo,
+          maxTokens: MAX_TOKENS,
           system,
-          messages: mensagens,
-          // Pos-venda tambem tem a busca de PECAS (Fatia 3.10).
-          tools:
-            finalidade === "POS_VENDA"
-              ? [FERRAMENTA_BUSCAR_PRODUTO, FERRAMENTA_BUSCAR_PECA]
-              : [FERRAMENTA_BUSCAR_PRODUTO],
-        }),
-        signal: controller.signal,
-      });
+          mensagens,
+          ferramentas,
+        },
+        { timeoutMs: TIMEOUT_MS, signal: controller.signal },
+      );
 
       if (!resp.ok) {
-        const corpo = (await resp.text().catch(() => "")).slice(0, 500);
         console.error(
-          `[luna] Anthropic status ${resp.status} (modelo=${config.modelo}): ${corpo || "(sem corpo)"}`,
+          `[luna] provider=${nomeProvider} modelo=${config.modelo}: ${resp.erro}`,
         );
         return comUso(montarResultado(
           "handoff",
           ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
-          `falha Anthropic (status ${resp.status})`,
+          `falha do provider "${nomeProvider}" (${resp.erro})`,
         ));
       }
 
-      const data = (await resp.json().catch(() => null)) as {
-        stop_reason?: string;
-        content?: BlocoAnthropic[];
-        usage?: { input_tokens?: number; output_tokens?: number };
-      } | null;
       // SOL-2: soma o usage DESTA rodada. Fica aqui (e nao so no retorno final)
       // justamente para as rodadas de tool use entrarem na conta.
-      uso.tokensEntrada += Number(data?.usage?.input_tokens ?? 0) || 0;
-      uso.tokensSaida += Number(data?.usage?.output_tokens ?? 0) || 0;
-      const blocos = Array.isArray(data?.content) ? data.content : [];
+      uso.tokensEntrada += resp.tokensEntrada;
+      uso.tokensSaida += resp.tokensSaida;
+      const blocos = resp.blocos;
 
       // O modelo quer usar a ferramenta e ainda temos rodadas disponiveis.
-      const usosFerramenta = blocos.filter((b) => b?.type === "tool_use");
-      if (
-        data?.stop_reason === "tool_use" &&
-        usosFerramenta.length > 0 &&
-        iter < MAX_ITER_FERRAMENTA
-      ) {
+      const usosFerramenta = blocos.filter(
+        (b): b is Extract<ProviderBloco, { type: "tool_use" }> => b.type === "tool_use",
+      );
+      if (resp.pararPorFerramenta && usosFerramenta.length > 0 && iter < MAX_ITER_FERRAMENTA) {
         // Anexa o turno do assistente (blocos crus) e responde cada tool_use.
         mensagens.push({ role: "assistant", content: blocos });
-        const resultados: BlocoAnthropic[] = [];
-        for (const uso of usosFerramenta) {
-          const id = typeof uso.id === "string" ? uso.id : "";
+        const resultados: ProviderBloco[] = [];
+        for (const usoFerr of usosFerramenta) {
           let saida = JSON.stringify({
             ok: false,
             erro: "ferramenta desconhecida",
           });
-          if (uso.name === "buscar_produto") {
-            const entradaFerr = (uso.input ?? {}) as { termo?: unknown };
-            saida = await executarBuscarProduto(String(entradaFerr.termo ?? ""));
-          } else if (uso.name === "buscar_peca") {
-            const entradaFerr = (uso.input ?? {}) as { termo?: unknown; modelo?: unknown };
+          if (usoFerr.name === "buscar_produto") {
+            saida = await executarBuscarProduto(String(usoFerr.input.termo ?? ""));
+          } else if (usoFerr.name === "buscar_peca") {
             saida = await executarBuscarPeca(
-              String(entradaFerr.termo ?? ""),
-              entradaFerr.modelo != null ? String(entradaFerr.modelo) : undefined,
+              String(usoFerr.input.termo ?? ""),
+              usoFerr.input.modelo != null ? String(usoFerr.input.modelo) : undefined,
             );
           }
           resultados.push({
             type: "tool_result",
-            tool_use_id: id,
+            tool_use_id: usoFerr.id,
             content: saida,
           });
         }
@@ -716,8 +746,8 @@ export async function gerarRespostaLuna(entrada: {
 
       // Resposta final: junta o texto dos blocos e parseia a decisao.
       const texto = blocos
-        .filter((b) => b?.type === "text" && typeof b.text === "string")
-        .map((b) => String(b.text))
+        .filter((b): b is Extract<ProviderBloco, { type: "text" }> => b.type === "text")
+        .map((b) => b.text)
         .join("\n")
         .trim();
 
@@ -740,12 +770,12 @@ export async function gerarRespostaLuna(entrada: {
     ));
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);
-    console.error(`[luna] erro ao chamar Anthropic: ${motivo}`);
+    console.error(`[luna] erro ao chamar provider "${nomeProvider}": ${motivo}`);
     // Mesmo falhando, o que ja foi consumido nas rodadas anteriores conta.
     return comUso(montarResultado(
       "handoff",
       ["Tive uma instabilidade aqui.\nVou acionar um atendente para te ajudar."],
-      `excecao ao chamar Anthropic: ${motivo}`,
+      `excecao ao chamar provider "${nomeProvider}": ${motivo}`,
     ));
   } finally {
     clearTimeout(timer);
