@@ -24,6 +24,11 @@ type Bolha = {
   mensagens?: string[];
   acao?: Acao;
   motivo?: string;
+  // Preenchido so quando a resposta usou um provider/modelo diferente do
+  // padrao — informativo, para o dono saber qual chamada gerou o que ao
+  // comparar opcoes no sandbox.
+  providerUsado?: string;
+  modeloUsado?: string;
 };
 
 const SELO: Record<Acao, { rotulo: string; classe: string; Icone: typeof Send }> = {
@@ -44,12 +49,29 @@ const SELO: Record<Acao, { rotulo: string; classe: string; Icone: typeof Send }>
   },
 };
 
+// Providers de teste conhecidos (WORKORDER_ATENDIMENTO_OMNICHANNEL fase 1).
+// So funcionam se a env var da chave correspondente existir no ambiente — sem
+// ela, gerarRespostaLuna faz handoff automatico com o motivo ("chave ausente"),
+// nunca quebra. "" = usa o provider salvo na config (comportamento padrao).
+const PROVIDERS_TESTE: { valor: string; rotulo: string }[] = [
+  { valor: "", rotulo: "Config salva (padrao)" },
+  { valor: "anthropic", rotulo: "Anthropic" },
+  { valor: "openai", rotulo: "OpenAI-compativel" },
+  { valor: "deepseek", rotulo: "DeepSeek" },
+  { valor: "qwen", rotulo: "Qwen (DashScope)" },
+];
+
 export function SandboxLuna() {
   const [finalidade, setFinalidade] = useState<Finalidade>("VENDA");
   const [mensagens, setMensagens] = useState<Bolha[]>([]);
   const [input, setInput] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Overrides de teste (Fase 1 do work order): NAO salvam nada, so valem para
+  // as chamadas desta sessao de sandbox — comparar provider/modelo antes de
+  // decidir o que vai pra ConfigAgenteIA de verdade.
+  const [providerTeste, setProviderTeste] = useState("");
+  const [modeloTeste, setModeloTeste] = useState("");
   const fimRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,7 +101,12 @@ export function SandboxLuna() {
       const r = await fetch("/api/admin/ia/testar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finalidade, historico }),
+        body: JSON.stringify({
+          finalidade,
+          historico,
+          ...(providerTeste ? { provider: providerTeste } : {}),
+          ...(modeloTeste.trim() ? { modelo: modeloTeste.trim() } : {}),
+        }),
       });
       const d = await r.json().catch(() => null);
       if (!r.ok) {
@@ -104,6 +131,9 @@ export function SandboxLuna() {
               : mensagensLuna.join("\n\n"),
           acao: (d?.acao as Acao) ?? "responder",
           motivo: typeof d?.motivo === "string" ? d.motivo : undefined,
+          providerUsado:
+            typeof d?.providerUsado === "string" ? d.providerUsado : undefined,
+          modeloUsado: typeof d?.modeloUsado === "string" ? d.modeloUsado : undefined,
         },
       ]);
     } catch {
@@ -179,6 +209,34 @@ export function SandboxLuna() {
           )}
         </div>
 
+        {/* Overrides de teste (Fase 1 do work order): NAO salvam nada, so valem
+            para o proximo envio deste sandbox — comparar provider/modelo antes
+            de decidir o que vai para ConfigAgenteIA de verdade. Sem chave de
+            env configurada para o provider escolhido, a chamada cai em handoff
+            automatico com o motivo (nunca quebra o sandbox). */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/5 bg-fundo/40 px-3 py-1.5">
+          <span className="text-[11px] font-medium text-medio/50">
+            Teste com outro provider (nao salva):
+          </span>
+          <select
+            value={providerTeste}
+            onChange={(e) => setProviderTeste(e.target.value)}
+            className="rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] text-medio outline-none focus:border-tiffany"
+          >
+            {PROVIDERS_TESTE.map((p) => (
+              <option key={p.valor} value={p.valor}>
+                {p.rotulo}
+              </option>
+            ))}
+          </select>
+          <input
+            value={modeloTeste}
+            onChange={(e) => setModeloTeste(e.target.value)}
+            placeholder="modelo (opcional, ex.: gpt-4.1-nano)"
+            className="w-56 rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] text-medio outline-none placeholder:text-medio/40 focus:border-tiffany"
+          />
+        </div>
+
         {/* Janela de chat */}
         <div className="scroll-fino flex h-80 flex-col gap-2 overflow-y-auto bg-fundo p-3">
           {mensagens.length === 0 && !enviando ? (
@@ -228,6 +286,14 @@ export function SandboxLuna() {
                   {m.motivo && (
                     <span className="text-[10px] text-medio/40">
                       motivo: {m.motivo}
+                    </span>
+                  )}
+                  {/* So aparece quando o teste usou provider diferente do
+                      padrao (Anthropic) — nao polui a leitura normal. */}
+                  {m.providerUsado && m.providerUsado !== "anthropic" && (
+                    <span className="text-[10px] text-medio/40">
+                      provider: {m.providerUsado}
+                      {m.modeloUsado ? ` (${m.modeloUsado})` : ""}
                     </span>
                   )}
                 </div>
