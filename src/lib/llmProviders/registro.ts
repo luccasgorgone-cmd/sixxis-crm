@@ -45,4 +45,19 @@ export function garantirProvidersRegistrados(): void {
         "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
     }),
   );
+
+  // Gemini / Google AI (endpoint OpenAI-compativel oficial do Google). Modelo
+  // escolhido pelo Luccas em 14/08/2026 (via `main`) pra Fase 1 do work order
+  // de atendimento: Gemini Flash-Lite, teto $10/mes — ver src/lib/orcamentoIA.ts
+  // (a checagem de teto roda em luna.ts ANTES de qualquer chamada a este
+  // provider, independente de qual provider seja).
+  registrarProvider(
+    criarProviderOpenAICompativel({
+      nome: "gemini",
+      envChave: "GEMINI_API_KEY",
+      envUrl: "GEMINI_BASE_URL",
+      urlPadrao:
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    }),
+  );
 }

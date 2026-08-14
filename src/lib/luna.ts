@@ -32,6 +32,7 @@ import {
   type ProviderSystemBloco,
 } from "./llmProvider";
 import { garantirProvidersRegistrados } from "./llmProviders/registro";
+import { verificarOrcamentoMensal } from "./orcamentoIA";
 
 export type LunaFinalidade = "VENDA" | "POS_VENDA";
 export type LunaMensagem = { autor: "cliente" | "luna"; texto: string };
@@ -622,6 +623,22 @@ export async function gerarRespostaLuna(entrada: {
       "handoff",
       ["Um momento — vou chamar um atendente para continuar por aqui."],
       `chave do provider "${nomeProvider}" ausente: IA indisponivel, handoff automatico.`,
+    ));
+  }
+
+  // TETO DE GASTO (trava bloqueante do work order, secao 5 "Travas de
+  // seguranca" — "budget global... ao atingir, corta ou degrada com aviso,
+  // nunca estoura silencioso"). Checa ANTES de qualquer chamada paga: sem
+  // preco conhecido para o modelo OU teto mensal atingido -> handoff, ZERO
+  // chamadas ao provider. `verificarOrcamentoMensal` nunca lanca (recusa por
+  // seguranca em caso de falha de leitura), entao este bloco tambem nunca
+  // quebra o atendimento.
+  const orcamento = await verificarOrcamentoMensal(config.modelo);
+  if (!orcamento.ok) {
+    return comUso(montarResultado(
+      "handoff",
+      ["Um momento — vou chamar um atendente para continuar por aqui."],
+      orcamento.motivo ?? "teto de gasto mensal da IA atingido",
     ));
   }
 

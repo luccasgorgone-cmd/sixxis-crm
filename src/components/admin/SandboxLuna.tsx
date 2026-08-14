@@ -56,6 +56,7 @@ const SELO: Record<Acao, { rotulo: string; classe: string; Icone: typeof Send }>
 const PROVIDERS_TESTE: { valor: string; rotulo: string }[] = [
   { valor: "", rotulo: "Config salva (padrao)" },
   { valor: "anthropic", rotulo: "Anthropic" },
+  { valor: "gemini", rotulo: "Gemini (Google)" },
   { valor: "openai", rotulo: "OpenAI-compativel" },
   { valor: "deepseek", rotulo: "DeepSeek" },
   { valor: "qwen", rotulo: "Qwen (DashScope)" },

@@ -7,10 +7,20 @@
 //
 // MOEDA: os valores sao em USD, como a Anthropic cobra. Nao convertemos para BRL
 // porque isso exigiria uma cotacao de cambio que nao temos — a UI rotula "US$".
+//
+// GEMINI FLASH-LITE (WORKORDER_ATENDIMENTO_OMNICHANNEL, decisao do Luccas via
+// main em 14/08/2026: modelo escolhido pra Fase 1 do sandbox): precos vindos da
+// tabela do proprio work order (nao verificados de novo nesta fatia — confirmar
+// contra a cobranca real da conta assim que a chave existir e o 1o evento cair
+// em SolEvento; ajustar aqui se divergir). Cobrindo os DOIS nomes de modelo que
+// o Google usa pra Flash-Lite (a 2.5 esta em aposentadoria anunciada pro work
+// order, mas mantida na tabela ate a chave real confirmar qual o Luccas fundou):
 const PRECO_POR_MILHAO: Record<string, { entrada: number; saida: number }> = {
   "claude-haiku-4-5": { entrada: 1.0, saida: 5.0 },
   "claude-sonnet-4-6": { entrada: 3.0, saida: 15.0 },
   "claude-opus-4-8": { entrada: 5.0, saida: 25.0 },
+  "gemini-2.5-flash-lite": { entrada: 0.1, saida: 0.4 },
+  "gemini-3.1-flash-lite": { entrada: 0.25, saida: 1.5 },
 };
 
 export function modeloTemPreco(modelo: string | null | undefined): boolean {
