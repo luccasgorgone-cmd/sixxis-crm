@@ -1,7 +1,7 @@
 "use client";
 
 // Coluna central: cabecalho do contato, mensagens (bolhas) e o compositor.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useClickFora } from "@/lib/useClickFora";
@@ -693,13 +693,24 @@ function Bolha({
 
   // Edicao: so mensagens NOSSAS (OUT), de TEXTO, nao apagadas e dentro da janela
   // do WhatsApp (~15 min). O servidor tambem valida (autor/admin + tempo).
+  // Date.now() e impuro durante o render (React Compiler acusa), entao a
+  // janela de 15min usa a hora fixada quando a mensagem chegou/foi montada.
   const JANELA_EDICAO_MS = 15 * 60 * 1000;
+  const horaMensagemMs = useMemo(
+    () => new Date(mensagem.hora).getTime(),
+    [mensagem.hora],
+  );
+  const [agoraMs, setAgoraMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAgoraMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const podeEditar =
     podeApagar &&
     ehOut &&
     !apagada &&
     mensagem.tipo === "TEXTO" &&
-    Date.now() - new Date(mensagem.hora).getTime() < JANELA_EDICAO_MS;
+    agoraMs - horaMensagemMs < JANELA_EDICAO_MS;
 
   function abrirEdicao() {
     setTextoEdicao(conteudoExibido ?? "");

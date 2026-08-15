@@ -65,7 +65,9 @@ export function PerfilColaborador({ id }: { id: string }) {
 
   // Tempo real: novas mensagens / mudancas recarregam a lista (sobretudo ao vivo).
   const listaRef = useRef(carregarLista);
-  listaRef.current = carregarLista;
+  useEffect(() => {
+    listaRef.current = carregarLista;
+  });
   useEffect(() => {
     const socket = getSocket();
     const recarregar = () => void listaRef.current();

@@ -66,7 +66,9 @@ export function Inbox({
 
   // Ref para o socket ler a conversa aberta sem recriar o listener.
   const selecionadaRef = useRef<string | null>(null);
-  selecionadaRef.current = selecionada;
+  useEffect(() => {
+    selecionadaRef.current = selecionada;
+  });
 
   // Token do fetch de mensagens (Fatia T): cada abrirConversa incrementa. Ao
   // aplicar o resultado de um fetch, so vale se o token ainda for o atual — se o

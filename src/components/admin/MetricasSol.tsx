@@ -62,14 +62,17 @@ export function MetricasSol() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Presets calculam a janela no cliente; "custom" usa os dois campos de data.
-  const query = useMemo(() => {
-    if (periodo === "custom") return `desde=${desde}&ate=${ate}`;
-    const dias = periodo === "7d" ? 7 : 30;
-    return `desde=${diaISO(new Date(Date.now() - (dias - 1) * 864e5))}&ate=${diaISO(new Date())}`;
-  }, [periodo, desde, ate]);
-
+  // Presets calculam a janela em cima do relogio real (Date.now() e impuro,
+  // por isso fica dentro do callback do fetch, nao em useMemo/render — o
+  // compilador do React nao aceita chamada impura durante o render).
   const carregar = useCallback(async () => {
+    const query =
+      periodo === "custom"
+        ? `desde=${desde}&ate=${ate}`
+        : (() => {
+            const dias = periodo === "7d" ? 7 : 30;
+            return `desde=${diaISO(new Date(Date.now() - (dias - 1) * 864e5))}&ate=${diaISO(new Date())}`;
+          })();
     setCarregando(true);
     try {
       const r = await fetch(`/api/admin/ia/metricas?${query}`);
@@ -81,7 +84,7 @@ export function MetricasSol() {
     } finally {
       setCarregando(false);
     }
-  }, [query]);
+  }, [periodo, desde, ate]);
 
   useEffect(() => {
     void carregar();

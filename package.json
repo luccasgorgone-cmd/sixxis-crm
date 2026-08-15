@@ -6,7 +6,8 @@
     "dev": "tsx watch server.ts",
     "build": "next build",
     "start": "prisma migrate deploy && tsx server.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -35,6 +36,7 @@
     "tsx": "^4.19.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/d3-geo": "^3.1.0",
@@ -43,6 +45,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/topojson-client": "^3.1.5",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"

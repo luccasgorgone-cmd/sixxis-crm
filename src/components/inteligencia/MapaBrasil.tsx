@@ -40,7 +40,6 @@ export function MapaBrasil({
       try {
         const r = await fetch("/br-estados.topojson.json");
         if (!r.ok) throw new Error("malha");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const topo: any = await r.json();
         const fc = feature(topo, topo.objects.estados) as unknown as {
           features: {
@@ -59,7 +58,6 @@ export function MapaBrasil({
         const lista: Geo[] = fc.features
           .map((f) => ({
             sigla: f.properties.sigla,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             d: path(f as any) ?? "",
           }))
           .filter((g) => g.d);

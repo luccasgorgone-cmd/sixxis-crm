@@ -89,7 +89,9 @@ export function ChatInterno() {
   const [carregando, setCarregando] = useState(true);
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const selRef = useRef<string | null>(null);
-  selRef.current = selecionado;
+  useEffect(() => {
+    selRef.current = selecionado;
+  });
 
   const carregarGrupos = useCallback(async () => {
     try {

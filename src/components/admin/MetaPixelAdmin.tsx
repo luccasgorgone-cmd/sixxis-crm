@@ -134,7 +134,7 @@ export function MetaPixelAdmin() {
             className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-tiffany"
           />
           <p className="mt-1 text-[11px] text-medio/50">
-            Com este codigo, os eventos aparecem em "Eventos de teste" e nao contam
+            Com este codigo, os eventos aparecem em &quot;Eventos de teste&quot; e nao contam
             como conversao real. Deixe vazio em producao.
           </p>
         </div>

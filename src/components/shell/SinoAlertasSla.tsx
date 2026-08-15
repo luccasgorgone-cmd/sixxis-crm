@@ -66,7 +66,6 @@ export function SinoAlertasSla({
       socket.off("alerta:novo", aoNovo);
       socket.off("alerta:atualizado", atualizar);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agenteId, ehAdmin]);
 
   if (total === 0) return null;

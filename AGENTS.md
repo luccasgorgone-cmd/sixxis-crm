@@ -41,15 +41,28 @@ Verificados no `package.json` real deste repo (não inventar o que não existe):
 | --- | --- | --- |
 | Build | `npm run build` (`next build`) | Sim |
 | Typecheck | `npx tsc --noEmit` | `typescript` é devDependency, mas não há script `typecheck` no `package.json` — rodar via `npx` |
-| Lint | — | Não existe `eslint` neste repo (sem devDependency, sem config) — não inventar `npm run lint` |
+| Lint | `npm run lint` (`eslint .`) | Sim (15/08/2026, WORKORDER Toolkit Fase 4) — `eslint.config.mjs` (flat config, `eslint-config-next`). Não é type-aware (sem `parserOptions.project`/`projectService`), por isso é seguro no pre-commit |
 | Test | — | Não existe script `test` nem framework de teste configurado — não inventar `npm test` |
 
-Regra: **build verde (`npm run build`) + `npx tsc --noEmit` limpo antes de cada
-commit.** Se lint/test forem adicionados no futuro, atualizar esta tabela e o hook de
-pre-commit — não assumir que já existem.
+Regra: **build verde (`npm run build`) + `npx tsc --noEmit` limpo + `npm run lint`
+sem erro (warnings toleradas no backlog conhecido) antes de cada commit.** Se
+test for adicionado no futuro, atualizar esta tabela e o hook de pre-commit —
+não assumir que já existe.
 
-Hook versionado em `.githooks/pre-commit` (roda `tsc --noEmit` + `next build`). É
-`core.hooksPath`, não o `.git/hooks` padrão — cada clone novo precisa rodar uma vez:
+**Burndown de lint (baseline 15/08/2026):** `react-hooks/exhaustive-deps` promovida
+de `warn` (padrão do `eslint-config-next`) para `error` — baseline tinha 0
+violações, travado pra não regredir em silêncio. `react-hooks/set-state-in-effect`
+rebaixada pra `warn` de propósito: baseline real tinha 101 erros em 80 arquivos
+(padrão `useEffect(() => { void carregarX(); }, [...])` espalhado pelo repo) —
+é refactor arquitetural real, não correção pontual, e a decisão de quando fazer
+é do Luccas (Artigo 14). Não promover essa regra a `error` sem esse refactor
+acontecer antes — senão trava todo commit novo por dívida já existente.
+`react/no-unescaped-entities`, `react-hooks/refs` e `react-hooks/purity` já
+foram zeradas (eram baratas: 4, 4 e 2 ocorrências).
+
+Hook versionado em `.githooks/pre-commit` (roda `tsc --noEmit` + `eslint .` +
+`next build`). É `core.hooksPath`, não o `.git/hooks` padrão — cada clone novo
+precisa rodar uma vez:
 
 ```
 git config core.hooksPath .githooks

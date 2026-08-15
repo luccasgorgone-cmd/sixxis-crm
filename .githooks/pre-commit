@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # Gate local antes de cada commit — só roda o que existe de verdade no package.json
-# deste repo (sem eslint, sem test runner configurados ainda). Ver AGENTS.md.
+# deste repo. Ver AGENTS.md.
 set -e
 
 echo "[pre-commit] tsc --noEmit..."
 npx tsc --noEmit
+
+# eslint.config.mjs (eslint-config-next) NÃO usa parserOptions.project/
+# projectService — é lint sintático, não type-aware, então é seguro e rápido
+# rodar aqui. Se algum dia o config ganhar regras type-aware (type-checked),
+# elas saem do pre-commit e viram gate só de CI/pré-push (WORKORDER Toolkit
+# Fase 4, Artigo 14: type-aware pesado fica fora do hook local).
+echo "[pre-commit] eslint..."
+npm run lint
 
 echo "[pre-commit] next build..."
 npm run build

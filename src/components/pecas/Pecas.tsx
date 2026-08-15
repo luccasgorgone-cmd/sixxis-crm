@@ -600,7 +600,7 @@ function ModalPeca({
           )}
           {!peca && (
             <p className="rounded-md bg-fundo px-2.5 py-1.5 text-[11px] text-medio/60">
-              O estoque começa em 0. Use "Movimentar" para dar entrada.
+              O estoque começa em 0. Use &quot;Movimentar&quot; para dar entrada.
             </p>
           )}
           {erroDup && (

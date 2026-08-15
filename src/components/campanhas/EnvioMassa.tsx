@@ -765,7 +765,9 @@ export function DetalheCampanha({
   const [c, setC] = useState<CampanhaDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
   const refC = useRef(c);
-  refC.current = c;
+  useEffect(() => {
+    refC.current = c;
+  });
 
   const carregar = useCallback(async () => {
     try {
