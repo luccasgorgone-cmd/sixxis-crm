@@ -80,10 +80,22 @@ export async function marcarInteracaoNoNegocio(
 // funil. INVARIANTE (Bloco 1): um lead + finalidade tem no MAXIMO um negocio —
 // se ja existe qualquer negocio (aberto, ganho ou perdido), ele e REUSADO; esta
 // funcao so cria um negocio para quem ainda nao tem nenhum.
+// `respeitarPrazoPerdido`: quando true, um negocio PERDIDO ainda VISIVEL no
+// Kanban (arquivado=false — dentro do prazo dos 4 dias contado da entrada na
+// coluna) NAO reabre so por causa desta chamada; o id do PERDIDO e devolvido
+// sem tocar status/etapa/entrouEtapaEm (ver bloco abaixo). Default FALSE
+// preserva o comportamento antigo (sempre reabre) para todos os fluxos
+// DELIBERADOS/manuais (vincular lead, mover finalidade, restaurar ganho,
+// iniciar conversa pelo admin etc.) — so a INGESTAO AUTOMATICA de mensagem
+// (queue.ts, mensagem de ENTRADA do WhatsApp) passa true. Ver correcao 17/08
+// (pedido direto do Luccas): reabertura automatica so pode acontecer depois
+// que o negocio ja tiver SAIDO do quadro (arquivado=true), nunca enquanto
+// ainda esta visivel em Perdidos.
 export async function garantirNegocioParaLead(
   leadId: string,
   finalidade: Finalidade = Finalidade.VENDA,
   emitir = true,
+  respeitarPrazoPerdido = false,
 ): Promise<string | null> {
   const existente = await prisma.negocio.findFirst({
     where: { leadId, finalidade, status: StatusNeg.ABERTO },
@@ -129,11 +141,35 @@ export async function garantirNegocioParaLead(
       motivoPerda: true,
       motivoPerdaObs: true,
       fechadoEm: true,
+      arquivado: true,
     },
   });
   if (anterior) {
     const agora = new Date();
     const eraPerdido = anterior.status === StatusNeg.PERDIDO;
+
+    // REGRA DOS 4 DIAS / "prazo fixo do Perdido" (correcao 17/08, pedido direto
+    // do Luccas) — SO quando o chamador pede (respeitarPrazoPerdido=true, hoje
+    // so a ingestao automatica). Enquanto o negocio PERDIDO ainda esta VISIVEL
+    // no Kanban (arquivado=false — dentro do prazo contado da entrada na
+    // coluna, ver arquivamento.ts:naColunaDesde), o card FICA em Perdidos. O
+    // cliente pode mandar mensagem a vontade: a conversa atualiza e sobe
+    // (marcarInteracaoNoNegocio, chamado por quem invocou este helper), mas o
+    // relogio dos 4 dias NAO reseta (entrouEtapaEm intocado) e o negocio NAO
+    // reabre sozinho. So volta a entrar como "Novo" quando o cliente falar de
+    // novo DEPOIS de o card ja ter saido do quadro (arquivado=true — pelo job
+    // de prazo ou por arquivamento manual/limpeza). Reativacao DELIBERADA pelo
+    // vendedor continua disponivel a qualquer momento via
+    // /api/negocios/[id]/reativar, que nao passa por aqui. Fluxos manuais
+    // (mover-finalidade, vincular lead existente, restaurar-ganho, iniciar
+    // conversa pelo admin) NAO passam respeitarPrazoPerdido=true e continuam
+    // reabrindo como sempre — e uma acao deliberada de humano, nao o bug de
+    // mensagem automatica reabrindo sozinha. GANHO segue com o comportamento
+    // antigo em qualquer chamador (fora do escopo desta correcao — ver
+    // negocio.ts:jaFoiGanho).
+    if (eraPerdido && respeitarPrazoPerdido && !anterior.arquivado) {
+      return anterior.id;
+    }
     const reaberto = await prisma.negocio.update({
       where: { id: anterior.id },
       data: {

@@ -2251,13 +2251,29 @@ async function processarEvento(
       optOutRecaptacao = rec.optOut;
     }
 
-    // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente).
-    // Registra HistoricoNegocio(CRIACAO) e emite evento.
-    await garantirNegocioParaLead(lead.id, finalidade);
-    // Roteia o negocio da finalidade para a equipe correta (sticky/round-robin).
-    // Idempotente: nao mexe em negocio ja atribuido. (Roda independentemente do
-    // horario — o lead e atribuido mesmo fora do expediente.)
-    await rotearLeadNovo(lead.id, finalidade);
+    // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente) e
+    // roteia para a equipe (sticky/round-robin). SO EM MENSAGEM DE ENTRADA
+    // (correcao 17/08): uma mensagem de SAIDA (ex.: campanha de reativacao
+    // automatica, que grava uma bolha OUT na conversa unificada) NAO e o
+    // cliente falando — nunca deve criar negocio, reabrir PERDIDO/GANHO nem
+    // disparar roteamento. Antes desta correcao o pipeline tratava qualquer
+    // interacao (IN ou OUT) como "o cliente respondeu", e negocios PERDIDO
+    // reabriam sozinhos sempre que o Pedro reenviava a mensagem de retomada —
+    // ver garantirNegocioParaLead (negocio.ts) para a segunda metade da
+    // correcao: mesmo em IN, um negocio PERDIDO ainda VISIVEL no Kanban (nao
+    // arquivado) nao reabre so por o cliente responder; so reabre depois de
+    // ja ter saido do quadro pelo prazo (Artigo do Luccas, 17/08).
+    if (direcao === DirecaoMsg.IN) {
+      // Registra HistoricoNegocio(CRIACAO) e emite evento quando cria/reabre.
+      // respeitarPrazoPerdido=true: so a INGESTAO AUTOMATICA respeita o prazo
+      // fixo dos 4 dias do PERDIDO (ver negocio.ts:garantirNegocioParaLead) —
+      // fluxos manuais (mover-finalidade, vincular lead, reativar) continuam
+      // reabrindo sempre, porque sao decisao deliberada de humano.
+      await garantirNegocioParaLead(lead.id, finalidade, true, true);
+      // Idempotente: nao mexe em negocio ja atribuido. (Roda independentemente
+      // do horario — o lead e atribuido mesmo fora do expediente.)
+      await rotearLeadNovo(lead.id, finalidade);
+    }
 
     // Atendimento automatico em mensagens de ENTRADA. Primeiro a LUNA (gated por
     // ConfigAgenteIA.ativo): se ela assumir, NAO envia o aviso fixo. Se a Luna
