@@ -35,7 +35,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <head>
         {/* Aplica o tema (claro/escuro/sistema) ANTES da pintura, sem flash.
             A preferencia fica em localStorage 'tema' (gerida no Topbar). */}
