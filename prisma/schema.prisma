@@ -1672,3 +1672,72 @@ model SolEvento {
   @@index([criadoEm])
   @@index([conversaId])
 }
+
+// ---------------------------------------------------------------------------
+// SANDBOX DE ATENDIMENTO (WORKORDER_ATENDIMENTO_OMNICHANNEL, pedido direto do
+// Luccas em 18/08/2026, aprovado via `main`): ambiente de teste isolado onde o
+// dono conversa com a Luna (ou observa clientes ficticios pre-roteirizados)
+// num mini-Kanban + Inbox, editando o prompt ao vivo, SEM tocar o atendimento
+// real. ISOLAMENTO POR CONSTRUCAO: tabelas proprias, ZERO foreign key para
+// Lead/Negocio/Conversa/Mensagem/Etapa/ConfigAgenteIA — uma query de sandbox
+// e estruturalmente incapaz de ler ou escrever dado real, mesmo por engano.
+// Todas as rotas que tocam estes models vivem isoladas em
+// src/app/api/admin/sandbox/**, que nunca importa prisma.lead/negocio/
+// conversa/mensagem nem o client Evolution nem a fila real de mensagens
+// (ver PLANO_SANDBOX_ATENDIMENTO.md no workspace do agente CRM).
+// ---------------------------------------------------------------------------
+
+// Cliente FICTICIO do sandbox. Sem telefone real, sem vinculo com Lead.
+model SandboxLead {
+  id        String            @id @default(cuid())
+  nome      String
+  // Roteiro canned que este lead fictício segue quando o simulador avança
+  // sozinho (ver lib/sandboxSimulador.ts). null = so responde quando o Luccas
+  // digita manualmente por ele ("se passar por cliente").
+  roteiro   String?
+  // Proximo passo do roteiro (indice). Avança a cada autoTick bem-sucedido.
+  roteiroPasso Int             @default(0)
+  negocios  SandboxNegocio[]
+  criadoEm  DateTime          @default(now())
+}
+
+// Etapa fixa em string (nao usa o model Etapa real, evita qualquer
+// acoplamento com o funil de producao). Kanban do sandbox tem 4 colunas fixas.
+model SandboxNegocio {
+  id           String            @id @default(cuid())
+  leadId       String
+  lead         SandboxLead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // "NOVO" | "ATENDENDO" | "TRANSFERIDO" | "ENCERRADO"
+  etapa        String            @default("NOVO")
+  finalidade   String            @default("VENDA") // "VENDA" | "POS_VENDA"
+  mensagens    SandboxMensagem[]
+  criadoEm     DateTime          @default(now())
+  atualizadoEm DateTime          @updatedAt
+
+  @@index([leadId])
+  @@index([etapa])
+}
+
+model SandboxMensagem {
+  id         String         @id @default(cuid())
+  negocioId  String
+  negocio    SandboxNegocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  direcao    DirecaoMsg
+  texto      String         @db.Text
+  // Preenchidos so nas mensagens OUT geradas pela Luna (decisao do motor).
+  acao       String?
+  motivo     String?        @db.Text
+  criadoEm   DateTime       @default(now())
+
+  @@index([negocioId, criadoEm])
+}
+
+// Config singleton do sandbox: prompt extra editavel AO VIVO pelo Luccas nesta
+// tela. NUNCA le nem escreve ConfigAgenteIA (a config real do atendimento).
+model SandboxConfig {
+  id                String   @id @default(cuid())
+  promptSistemaExtra String? @db.Text
+  provider          String?
+  modelo            String?
+  atualizadoEm      DateTime @updatedAt
+}

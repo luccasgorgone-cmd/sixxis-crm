@@ -17,6 +17,7 @@ import {
 import { Cabecalho, SkeletonTabela } from "./VendedoresAdmin";
 import { EditorHorarios, type DiaHorario } from "./EditorHorarios";
 import { SandboxLuna } from "./SandboxLuna";
+import { SandboxAtendimento } from "./SandboxAtendimento";
 import { MetricasSol } from "./MetricasSol";
 import { RecaptacaoAdmin } from "./RecaptacaoAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
@@ -624,6 +625,11 @@ export function IAAdmin() {
 
         {/* Sandbox de teste (efemero; nada e enviado a clientes) */}
         <SandboxLuna />
+
+        {/* Sandbox de Atendimento (Kanban + Inbox ficticios), pedido do
+            Luccas 18/08/2026 — ambiente isolado por tabelas proprias, ver
+            src/lib/sandboxSimulador.ts e src/app/api/admin/sandbox/**. */}
+        <SandboxAtendimento />
 
         <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-black/5 bg-fundo px-6 py-3">
           <button
