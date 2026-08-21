@@ -20,6 +20,12 @@ export type ProviderBlocoToolUse = {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  // Dado opaco especifico do provider que precisa ser ecoado de volta
+  // exatamente como veio no proximo turno (ex.: extra_content.google.
+  // thought_signature do Gemini, exigido pela API em respostas com tool use
+  // multi-turno — sem isso a chamada seguinte quebra com 400). Providers que
+  // nao usam isso simplesmente nunca preenchem.
+  metadadosProvider?: unknown;
 };
 export type ProviderBlocoToolResult = {
   type: "tool_result";

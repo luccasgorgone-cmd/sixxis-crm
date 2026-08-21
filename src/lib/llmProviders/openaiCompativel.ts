@@ -30,6 +30,10 @@ type MsgOpenAI = {
     id: string;
     type: "function";
     function: { name: string; arguments: string };
+    // Ecoa de volta o extra_content que o provider mandou na resposta
+    // original (ex.: thought_signature do Gemini) — ver metadadosProvider em
+    // llmProvider.ts. Ausente para providers que nao usam isso.
+    extra_content?: unknown;
   }[];
   tool_call_id?: string;
 };
@@ -70,8 +74,11 @@ function paraMensagensOpenAI(
         content: textos || null,
         tool_calls: usosFerramenta.map((u) => ({
           id: u.id,
-          type: "function",
+          type: "function" as const,
           function: { name: u.name, arguments: JSON.stringify(u.input) },
+          ...(u.metadadosProvider !== undefined
+            ? { extra_content: u.metadadosProvider }
+            : {}),
         })),
       });
       continue;
@@ -169,6 +176,10 @@ export function criarProviderOpenAICompativel(
               tool_calls?: {
                 id: string;
                 function: { name: string; arguments: string };
+                // Google (Gemini) anexa aqui extra_content.google.thought_signature
+                // — precisa ser ecoado de volta no proximo turno, ver
+                // metadadosProvider em llmProvider.ts.
+                extra_content?: unknown;
               }[];
             };
           }[];
@@ -194,6 +205,9 @@ export function criarProviderOpenAICompativel(
             id: tc.id,
             name: tc.function.name,
             input,
+            ...(tc.extra_content !== undefined
+              ? { metadadosProvider: tc.extra_content }
+              : {}),
           });
         }
 
