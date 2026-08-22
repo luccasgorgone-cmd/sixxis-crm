@@ -8,7 +8,7 @@ import IORedis from "ioredis";
 import type { Server } from "socket.io";
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
-import { normalizarJid } from "./phone";
+import { normalizarJid, telefoneParaLog } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
@@ -1318,7 +1318,7 @@ async function responderComLunaSePreciso(
     // Colisao com humano: se a ultima OUT foi de um humano, a Sol nao entra
     // (return "assumido" = nao dispara nem Sol nem aviso fixo). Fatia 2.98.
     if (await humanoAtivoNaConversa(conversa.id)) {
-      console.log(`[luna] humano ativo na conversa ${telefone}`);
+      console.log(`[luna] humano ativo na conversa ${telefoneParaLog(telefone)}`);
       await gravarSolEvento(conversa.id, lead.id, "colisao_humano");
       return true;
     }
@@ -1372,7 +1372,7 @@ async function executarRespostaLuna(
   // Colisao com humano: se a ultima OUT foi de um atendente, a Sol nao responde
   // (o humano ja assumiu). Re-checa no disparo (pode ter mudado no intervalo). 2.98.
   if (await humanoAtivoNaConversa(conversa.id)) {
-    console.log(`[luna] humano ativo na conversa ${telefone}`);
+    console.log(`[luna] humano ativo na conversa ${telefoneParaLog(telefone)}`);
     await gravarSolEvento(conversa.id, lead.id, "colisao_humano");
     return;
   }
@@ -2010,7 +2010,7 @@ async function processarEvento(
     select: { id: true },
   });
   if (jaExiste) {
-    console.log(`[ingest] ${telefone} duplicada ignorada ${externalId}`);
+    console.log(`[ingest] ${telefoneParaLog(telefone)} duplicada ignorada ${externalId}`);
     return;
   }
 
@@ -2165,7 +2165,7 @@ async function processarEvento(
       },
     });
 
-    console.log(`[ingest] ${telefone} ${tipo} ${externalId}`);
+    console.log(`[ingest] ${telefoneParaLog(telefone)} ${tipo} ${externalId}`);
 
     // Midia: baixa da Evolution e persiste no R2 (best-effort, em background).
     if (ehMidia(tipo)) {
@@ -2238,7 +2238,7 @@ async function processarEvento(
     // Contato bloqueado: para por aqui (registrou + emitiu). NAO roteia, NAO
     // rankeia e NAO responde. Silencioso e best-effort (nao quebra a ingestao).
     if (silenciar) {
-      console.log(`[ingest] ${telefone} bloqueado -> silenciado (sem roteio/resposta)`);
+      console.log(`[ingest] ${telefoneParaLog(telefone)} bloqueado -> silenciado (sem roteio/resposta)`);
       return;
     }
 
@@ -2315,7 +2315,7 @@ async function processarEvento(
     // Corrida: outro job gravou a mesma mensagem entre o findUnique e o create.
     // P2002 = violacao de unique (externalId). Tratamos como idempotente.
     if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002") {
-      console.log(`[ingest] ${telefone} duplicada ignorada ${externalId}`);
+      console.log(`[ingest] ${telefoneParaLog(telefone)} duplicada ignorada ${externalId}`);
       return;
     }
     throw erro;

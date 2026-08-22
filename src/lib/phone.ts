@@ -49,3 +49,12 @@ export function variantesTelefoneBR(entrada: string): string[] {
   }
   return [...todas];
 }
+
+// Redacao para log/console (LGPD): nunca escreve o telefone completo em
+// texto plano nos logs operacionais. Mantem DDI+DDD e os ultimos 4 digitos
+// (suficiente pra rastrear um caso especifico sem expor o numero inteiro).
+export function telefoneParaLog(telefone: string): string {
+  const d = (telefone ?? "").replace(/\D/g, "");
+  if (d.length < 8) return "***";
+  return `${d.slice(0, 4)}***${d.slice(-4)}`;
+}
