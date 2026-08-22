@@ -56,6 +56,20 @@ export type ProviderFerramenta = {
   inputSchema: Record<string, unknown>;
 };
 
+// Pede ao provider para FORCAR a resposta final (texto) a seguir este JSON
+// Schema, usando o mecanismo estrutural da API (response_format/json_schema),
+// nao so instrucao de prompt. Motivo: a bateria adversarial da Sol achou que
+// alguns modelos (ex.: Gemini Flash-Lite) simplesmente ignoram "responda so
+// com JSON" escrito no prompt e devolvem prosa livre — um fail-open serio,
+// porque sem o envelope JSON as acoes "handoff"/"silenciar" nunca disparam.
+// Providers que nao suportam response_format estruturado (ou nao precisam,
+// porque ja obedecem por instrucao) simplesmente ignoram este campo — o texto
+// livre ainda passa pelo parser tolerante de quem chamou.
+export type ProviderFormatoResposta = {
+  nome: string;
+  schema: Record<string, unknown>;
+};
+
 export type ProviderChamada = {
   modelo: string;
   system: ProviderSystemBloco[];
@@ -64,6 +78,7 @@ export type ProviderChamada = {
   maxTokens: number;
   // Alguns providers (chat completions classico) nao tem "system" separado do
   // array de mensagens — cada implementacao decide como embutir.
+  formatoResposta?: ProviderFormatoResposta;
 };
 
 export type ProviderRespostaOk = {

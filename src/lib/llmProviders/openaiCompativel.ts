@@ -159,6 +159,22 @@ export function criarProviderOpenAICompativel(
             ...(paraFerramentasOpenAI(chamada.ferramentas)
               ? { tools: paraFerramentasOpenAI(chamada.ferramentas) }
               : {}),
+            // Forca o formato via API (nao so instrucao de prompt) quando o
+            // chamador pediu — ver ProviderFormatoResposta em llmProvider.ts.
+            // So se aplica a resposta final em texto; nao impede o modelo de
+            // emitir tool_calls quando preferir usar uma ferramenta.
+            ...(chamada.formatoResposta
+              ? {
+                  response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                      name: chamada.formatoResposta.nome,
+                      schema: chamada.formatoResposta.schema,
+                      strict: true,
+                    },
+                  },
+                }
+              : {}),
           }),
           signal: controller.signal,
         });
