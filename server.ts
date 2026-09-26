@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
+import { registrarSinalizacaoChamada } from "./src/lib/sinalizacaoChamada";
 import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import { iniciarManutencao } from "./src/lib/manutencao";
 import { iniciarAlertas } from "./src/lib/alertas";
@@ -78,6 +79,10 @@ async function main(): Promise<void> {
   // Socket.io anexado ao MESMO httpServer. Sem CORS explicito = same-origin.
   const io = new Server(httpServer);
   setIO(io);
+
+  // F7-Calling: relay de sinalizacao de chamada (aditivo, nao mexe nos emits
+  // globais). Cria salas por agente para entregar a chamada ao browser certo.
+  registrarSinalizacaoChamada(io);
 
   // Worker da fila "messages-in" (consome os eventos enfileirados pelo webhook).
   createMessagesWorker(io);

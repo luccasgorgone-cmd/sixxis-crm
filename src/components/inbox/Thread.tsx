@@ -32,6 +32,10 @@ import {
   MessageCircle,
 } from "lucide-react";
 import type { ConversaItem, MensagemItem, Finalidade } from "./tipos";
+import { BotoesChamada } from "./BotoesChamada";
+import { PainelChamada } from "@/components/telefonia/PainelChamada";
+import { useChamada } from "@/lib/chamada/servicoChamada";
+import type { TipoChamada } from "@/lib/chamada/tipos";
 import { Compositor, type ViaOtimista } from "./Compositor";
 import { PlayerAudio } from "./PlayerAudio";
 import {
@@ -59,6 +63,7 @@ export function Thread({
   somenteLeitura = false,
   ehAdmin = false,
   embutida = false,
+  agenteIdAtual,
   otimista,
 }: {
   conversa: ConversaItem;
@@ -68,6 +73,9 @@ export function Thread({
   onExcluida?: () => void;
   somenteLeitura?: boolean;
   ehAdmin?: boolean;
+  // Agente logado: habilita os icones de chamada (voz/video) no cabecalho e a
+  // sinalizacao de chamada. Ausente em usos somente-leitura (InspecaoConversa).
+  agenteIdAtual?: string;
   // Via de render otimista do texto (Fatia 3.11): repassada ao Compositor e usada
   // pelo Reenviar. Ausente em usos somente-leitura (InspecaoConversa).
   otimista?: ViaOtimista;
@@ -78,6 +86,22 @@ export function Thread({
 }) {
   const fimRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+
+  // F7-Calling: estado da chamada (voz/video). Os icones so aparecem com agente
+  // logado e fora do modo somente-leitura.
+  const uso = useChamada(agenteIdAtual ?? "");
+  const podeChamar = !!agenteIdAtual && !somenteLeitura;
+  function ligar(tipo: TipoChamada) {
+    uso.iniciarParaCliente(
+      {
+        conversaId: conversa.id,
+        leadId: conversa.leadId,
+        nome: conversa.leadNome?.trim() || conversa.leadTelefone,
+        telefone: conversa.leadTelefone,
+      },
+      tipo,
+    );
+  }
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   // Reply: mensagem sendo respondida (citada no compositor). Fatia 2.85.
@@ -221,6 +245,7 @@ export function Thread({
             {formatarTelefone(conversa.leadTelefone)}
             {conversa.instanciaNome ? ` · ${conversa.instanciaNome}` : ""}
           </p>
+          {podeChamar && <BotoesChamada onLigar={ligar} />}
           {seloAtendimento}
           {botaoExcluir}
         </header>
@@ -247,10 +272,16 @@ export function Thread({
                 className="px-2.5 py-1 text-xs"
               />
             )}
+            {podeChamar && <BotoesChamada onLigar={ligar} />}
             {seloAtendimento}
             {botaoExcluir}
           </div>
         </header>
+      )}
+
+      {/* F7-Calling: overlay da chamada (toque/em-chamada/encerramento). */}
+      {uso.chamada && (
+        <PainelChamada uso={uso} onFechar={() => uso.encerrar()} />
       )}
 
       {/* Modal de confirmacao de exclusao (irreversivel). */}

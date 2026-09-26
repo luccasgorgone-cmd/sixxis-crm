@@ -21,3 +21,6 @@ npm-debug.log*
 # SO
 .DS_Store
 Thumbs.db
+
+# Backups operacionais (dados/PII de producao) — nunca versionar
+backups/

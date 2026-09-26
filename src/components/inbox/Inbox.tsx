@@ -517,6 +517,7 @@ export function Inbox({
             onEnviada={aoEnviada}
             otimista={otimista}
             ehAdmin={ehAdmin}
+            agenteIdAtual={agenteIdAtual}
             onExcluida={() => {
               const id = selecionadaRef.current;
               if (id) setConversas((prev) => prev.filter((c) => c.id !== id));
