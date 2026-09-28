@@ -302,6 +302,9 @@ model Lead {
   produtosInteresse LeadProdutoInteresse[]
   chamadas       Chamada[]
   itensLocal     ItemLocal[]
+  // Identidades por canal (F3 omnichannel): mapeia LID/BSUID -> este Lead sem
+  // depender de telefone. Evolution ganha de graca o fix definitivo do @lid.
+  identidadesCanal IdentidadeCanal[]
   // Notas fiscais do cliente (Fatia D): multiplas, cada uma com numero + data,
   // vinculaveis a um orcamento. O campo legado notaFiscal (acima) permanece.
   notasFiscais   NotaFiscal[]
@@ -815,7 +818,18 @@ model ConfigRoteamento {
   atualizadoEm      DateTime             @updatedAt
 }
 
-// Numero de WhatsApp (instancia Evolution) com finalidade VENDA ou POS_VENDA.
+// Provedor do canal de uma conta de WhatsApp (F3 omnichannel).
+enum ProviderCanal {
+  EVOLUTION
+  CLOUD_API
+  SANDBOX
+}
+
+// Numero de WhatsApp com finalidade VENDA ou POS_VENDA. Generaliza a "instancia"
+// para qualquer provider (F3): Evolution (Baileys) ou Cloud API oficial. No
+// cutover, a MESMA linha vira provider=CLOUD_API (preservando conversas/mensagens
+// ja ligadas por instanciaId) e ganha phoneNumberId/wabaId/credencialRef; o
+// instanciaEvolution historico permanece.
 model InstanciaWhatsApp {
   id                 String     @id @default(cuid())
   nome               String
@@ -824,9 +838,33 @@ model InstanciaWhatsApp {
   finalidade         Finalidade @default(VENDA)
   ativo              Boolean    @default(true)
   statusConexao      String?
+  // F3: provider do canal. Default EVOLUTION preserva 100% do comportamento
+  // atual das linhas existentes (backfill implicito pelo default).
+  provider           ProviderCanal @default(EVOLUTION)
+  // Cloud API (nulos enquanto provider=EVOLUTION). phoneNumberId/wabaId vem do
+  // painel da Meta; credencialRef e o NOME da env var do token (nunca o valor).
+  phoneNumberId      String?
+  wabaId             String?
+  credencialRef      String?
   conversas          Conversa[]
   criadoEm           DateTime   @default(now())
   atualizadoEm       DateTime   @updatedAt
+}
+
+// Identidade do cliente NUM canal (F3). Mapeia um id opaco (LID da Evolution,
+// wa_id/BSUID do Cloud) para o Lead, sem depender de telefone. Aditivo: nada
+// hoje escreve aqui; o parser passa a popular quando resolver identidade.
+model IdentidadeCanal {
+  id        String        @id @default(cuid())
+  leadId    String
+  lead      Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  provider  ProviderCanal
+  tipo      String // TELEFONE | LID | BSUID
+  valor     String
+  criadoEm  DateTime      @default(now())
+
+  @@unique([provider, tipo, valor])
+  @@index([leadId])
 }
 
 // Linha do tempo do CLIENTE (nivel lead): contato, atribuicao, transferencia,
