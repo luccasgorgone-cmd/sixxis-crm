@@ -2018,116 +2018,21 @@ async function processarEvento(
   }
 
   const data = payload?.data;
-  const jid = data?.key?.remoteJid;
-  const externalId = data?.key?.id;
+  // F1b: os campos ja vem do evento canonico produzido pelo EvolutionAdapter
+  // (parseEventoEvolution). A equivalencia com o parsing inline anterior esta
+  // provada em scripts/contratos/c1-evolution-parse.ts — aqui NAO se reparseia.
+  const ev = acaoIngest.evento;
+  const jid = ev.cliente.jidBruto ?? "";
+  const externalId = ev.externalId;
+  const fromMe = ev.direcao === "OUT";
+  const pushNameCliente = ev.cliente.nomePerfil;
+  const telefone = ev.cliente.telefone ?? ev.cliente.valor;
+  const resolvidoDe = ev.cliente.resolvidoDe ?? null;
+  const jidEfetivo = ev.cliente.jidEfetivo ?? jid;
 
-  // Defensivo: se faltarem campos essenciais, loga e ignora (nao quebra).
-  if (!jid || !externalId) {
-    console.warn(
-      `[ingest] evento sem jid/externalId ignorado (instance=${payload?.instance ?? "?"})`,
-    );
-    return;
-  }
-
-  const fromMe = data?.key?.fromMe === true;
-
-  // REACAO recebida (cliente reagiu a uma mensagem). Chega como upsert com
-  // message.reactionMessage = { key: { id }, text: emoji }. Ignora o eco das
-  // NOSSAS reacoes (fromMe). Best-effort: erro aqui nao quebra a ingestao.
-  // Le do cru e, se nao achar, do DESEMBRULHADO (com envelope o reactionMessage
-  // fica dentro do wrapper). Sem envelope os dois sao o mesmo objeto. Aqui o
-  // msgDesemb do fluxo principal ainda nao existe (e definido mais abaixo), por
-  // isso desembrulha localmente.
-  type MsgReacao = { reactionMessage?: { key?: { id?: string }; text?: string } };
-  const reacaoWa =
-    (data?.message as MsgReacao | undefined)?.reactionMessage ??
-    (desembrulharMessage(data?.message) as MsgReacao | null)?.reactionMessage;
-  if (reacaoWa && !fromMe) {
-    const alvo = reacaoWa.key?.id;
-    if (alvo) {
-      try {
-        await registrarReacaoCliente(alvo, reacaoWa.text ?? "", io);
-      } catch (e) {
-        console.warn(
-          `[reacao] falha ao registrar reacao do cliente: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-    }
-    return;
-  }
-
-  // GRUPOS (@g.us): caminho PARALELO e ISOLADO (chat interno). Registra na
-  // estrutura propria (GrupoInterno/MensagemGrupo) e RETORNA — nunca entra no
-  // fluxo de leads/funil/metricas. Best-effort: erro aqui nao quebra a ingestao.
-  if (jid.endsWith("@g.us")) {
-    try {
-      await processarMensagemGrupo(payload, io);
-    } catch (e) {
-      console.warn(
-        `[grupo] falha ao processar ${jid}: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-    return;
-  }
-
-  // Ignora "leads fantasma": remetentes que nao sao clientes de fato.
-  //   @broadcast -> listas de transmissao (e status@broadcast: status/stories)
-  //   @newsletter-> canais/newsletters
-  // Clientes normais (@s.whatsapp.net) seguem o fluxo. Anuncios (Click-to-
-  // WhatsApp) chegam por @s.whatsapp.net e continuam entrando.
-  if (jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) {
-    // DIAGNOSTICO (B4): so mensagens IN descartadas por filtro (nao o eco fromMe).
-    if (!fromMe) {
-      logIngestDiag({
-        evento: "descarte-filtro",
-        motivo: sufixoJid(jid),
-        instancia: payload?.instance ?? null,
-        externalId,
-        temPushName: !!data?.pushName,
-      });
-    }
-    return;
-  }
-
-  // @lid + saida = eco de mensagem enviada a um contato nao-salvo (numero
-  // mascarado); o numero real NAO vem no payload e criaria um lead fantasma.
-  // Descarta. Entrada @lid (rara) segue o fluxo normal e vira "Contato WhatsApp".
-  if (jid.endsWith("@lid") && fromMe) return;
-
-  const pushName = data?.pushName;
-  // pushName so nomeia o lead em mensagens de ENTRADA. Em mensagens de SAIDA
-  // (fromMe), o WhatsApp envia "Voce"/nome da propria conta, que NAO e o nome
-  // do cliente — usa-lo renomearia o cliente para "Voce".
-  const pushNameCliente = fromMe ? undefined : (pushName ?? undefined);
-  // Fatia 3.21: para ENTRADA "@lid" (contato nao salvo), resolve o numero REAL a
-  // partir de key.senderPn (fallback participantPn/remoteJidAlt) ANTES de extrair
-  // o telefone. Fora desse caso, jidEfetivo == jid (fluxo @s.whatsapp.net intocado).
-  const { jidEfetivo, resolvidoDe } = resolverJidReal(
-    jid,
-    data?.key as Record<string, unknown> | undefined,
-    fromMe,
-  );
-  const telefone = normalizarJid(jidEfetivo);
-  if (!telefone) {
-    console.warn(`[ingest] jid sem digitos ignorado: ${jid}`);
-    if (!fromMe) {
-      logIngestDiag({
-        evento: "descarte-filtro",
-        motivo: "jid-sem-digitos",
-        instancia: payload?.instance ?? null,
-        sufixo: sufixoJid(jid),
-        externalId,
-      });
-    }
-    return;
-  }
-
-  // DIAGNOSTICO (B4): mensagem IN com jid de sufixo NAO-padrao (nao @s.whatsapp.net)
-  // — tipicamente @lid de contato nao salvo. O `telefone` extraido pode NAO ser o
-  // numero real (sao os digitos do LID). Loga estruturado com: se casou um lead ja
-  // existente e os CAMPOS ALTERNATIVOS candidatos ao numero real (Baileys/Evolution
-  // v2: senderPn/participantPn/remoteJidAlt/participant), para o dono confirmar nos
-  // logs do Railway se o numero real vem em algum deles. NAO altera a ingestao.
+  // DIAGNOSTICO (B4): mensagem IN com jid de sufixo NAO-padrao (@lid de contato
+  // nao salvo). Identico ao anterior; le os candidatos do payload cru (data.key)
+  // para o dono confirmar nos logs do Railway se o numero real vem em algum deles.
   if (!fromMe && !jid.endsWith("@s.whatsapp.net")) {
     try {
       const keyRaw = (data?.key ?? {}) as Record<string, unknown>;
@@ -2143,7 +2048,7 @@ async function processarEvento(
         externalId,
         telefoneExtraido: telefone,
         tamanhoTelefone: telefone.length,
-        temPushName: !!pushName,
+        temPushName: !!data?.pushName,
         casouLeadExistente: !!leadExistente,
         // Fatia 3.21: campo do qual o numero real foi resolvido (null = fallback).
         resolvidoDe,
@@ -2164,40 +2069,21 @@ async function processarEvento(
     }
   }
 
-  // Desembrulha envelopes antes de mapear tipo/conteudo/midia. Fatia 2.95.
-  const msgDesemb = desembrulharMessage(data?.message);
-  const tipo = mapearTipo(tipoEfetivoMensagem(data));
-  const conteudo = extrairConteudo(msgDesemb);
-  const transcricao = extrairTranscricao(data, msgDesemb);
-  // Contato compartilhado (vCard) -> dados estruturados para renderizar o card.
-  // Le do DESEMBRULHADO: com envelope o contactMessage/contactsArrayMessage fica
-  // dentro do wrapper e o card nao era detectado.
-  const contatoInfo = extrairContato(msgDesemb);
-  // Reply: se cita uma mensagem que temos, vincula por externalId (best-effort).
-  // Le do message DESEMBRULHADO (envelope esconde o contextInfo do sub-objeto) E
-  // do nivel do EVENTO (`data`), onde a Evolution poe o contextInfo quando a
-  // resposta e TEXTO PURO (message.conversation).
-  const stanzaCitada = extrairStanzaCitada(
-    msgDesemb,
-    data as Record<string, unknown> | undefined,
-  );
-  const respostaAId = stanzaCitada
+  const tipo = ev.conteudo.tipoDominio;
+  const conteudo = ev.conteudo.texto ?? null;
+  const transcricao = ev.conteudo.transcricao ?? null;
+  const contatoInfo = ev.conteudo.contato ?? null;
+  // Sticker nunca grava URL crua (.enc nao renderiza) — ja tratado no parser.
+  const mediaUrlOriginal = ev.conteudo.midiaRef ?? null;
+  // Reply: resolve o externalId citado para o id interno (best-effort).
+  const respostaAId = ev.respondeA
     ? (
         await prisma.mensagem.findUnique({
-          where: { externalId: stanzaCitada },
+          where: { externalId: ev.respondeA },
           select: { id: true },
         })
       )?.id ?? null
     : null;
-
-  // FIGURINHA (sticker): NUNCA usar a URL crua do WhatsApp (.enc) como mediaUrl —
-  // ela nao renderiza no browser e apareceria quebrada. Fica SEM mediaUrl ate o
-  // R2 confirmar (persistirMidia baixa a .webp pro R2). As demais midias mantem o
-  // fallback atual da URL crua (substituida pelo R2 em seguida). Fatia 2.83.
-  // Sticker detectado no message DESEMBRULHADO (independe do messageType, que com
-  // envelope nao vem "stickerMessage"). Sticker NUNCA grava URL crua. Fatia 2.95.
-  const ehSticker = ehStickerMessage(data?.message);
-  const mediaUrlOriginal = ehSticker ? null : extrairMediaUrl(msgDesemb);
   const direcao: DirecaoMsg = fromMe ? DirecaoMsg.OUT : DirecaoMsg.IN;
 
   // IDEMPOTENCIA: a Evolution reenvia eventos. Se a mensagem ja existe,
@@ -2256,13 +2142,10 @@ async function processarEvento(
   // Origem por ANUNCIO (Click-to-WhatsApp): grava na 1a mensagem, sem
   // sobrescrever dados ja existentes com vazio. Registra Atividade de origem.
   if (direcao === DirecaoMsg.IN && !lead.ctwaClid && !lead.anuncioId) {
-    // Le do DESEMBRULHADO: extrairAnuncio procura contextInfo nos sub-objetos de
-    // 1o nivel; com envelope o 1o nivel e o wrapper (que nao tem contextInfo) e
-    // retornava null — o lead vindo de anuncio pago perdia ctwaClid/origem.
-    const anuncio = extrairAnuncio(
-      msgDesemb,
-      data as Record<string, unknown> | undefined,
-    );
+    // Origem de anuncio ja extraida pelo parser (mesma varredura de contextInfo/
+    // externalAdReply, inclusive com envelope). Aplicada so em IN e quando o lead
+    // ainda nao tem origem — condicao identica a de antes.
+    const anuncio = ev.origemAnuncio;
     if (anuncio && (anuncio.ctwaClid || anuncio.anuncioId)) {
       lead = await prisma.lead.update({
         where: { id: lead.id },
