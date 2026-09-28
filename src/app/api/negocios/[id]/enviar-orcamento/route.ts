@@ -10,7 +10,12 @@ import { obterAgente } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarMidia } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { enviarParaR2ComRetry } from "@/lib/r2";
 import { checarAcessoNegocio, montarDadosPdfOrcamento } from "@/lib/orcamentoDados";
 import { gerarPdfOrcamento } from "@/lib/orcamentoPdf";
@@ -88,14 +93,20 @@ export async function POST(
   const instanciaEvolution =
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
 
-  const resultado = await enviarMidia(numero, midiaParaEnviar, "document", instanciaEvolution, {
-    fileName: nomeArquivo,
-    caption: LEGENDA,
-    mimetype: "application/pdf",
-  });
+  const resultado = await enviarPeloCanal(
+    contaEvolution(instanciaEvolution),
+    destinoTelefone(numero),
+    {
+      tipo: "DOCUMENTO",
+      midiaRef: midiaParaEnviar,
+      fileName: nomeArquivo,
+      texto: LEGENDA,
+      mime: "application/pdf",
+    },
+  );
 
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   const dados = {

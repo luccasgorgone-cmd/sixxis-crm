@@ -8,7 +8,12 @@ import { obterAgente } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarTexto } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { checarAcessoNegocio } from "@/lib/orcamentoDados";
 import { formatarBRL } from "@/lib/format";
 import { Finalidade } from "@/generated/prisma/enums";
@@ -99,10 +104,14 @@ export async function POST(
     `${pagamento.initPoint}\n\n` +
     `Pagamento seguro via Mercado Pago. Qualquer dúvida, estou à disposição.`;
 
-  const resultado = await enviarTexto(numero, texto, instanciaEvolution);
+  const resultado = await enviarPeloCanal(
+    contaEvolution(instanciaEvolution),
+    destinoTelefone(numero),
+    { tipo: "TEXTO", texto },
+  );
 
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   const dados = {

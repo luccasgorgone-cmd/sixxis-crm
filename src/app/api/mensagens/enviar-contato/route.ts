@@ -8,7 +8,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarContato, enviarTexto } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { DirecaoMsg, TipoMsg, StatusEnvio, Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -86,16 +91,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Tenta sendContact; se falhar, degrada para texto formatado (o contato chega).
-  let resultado = await enviarContato(numero, instanciaEvolution, { nome, telefone });
+  const conta = contaEvolution(instanciaEvolution);
+  const destino = destinoTelefone(numero);
+  let resultado = await enviarPeloCanal(conta, destino, {
+    tipo: "CONTATO",
+    contato: { nome, telefone },
+  });
   if (!resultado.ok) {
-    resultado = await enviarTexto(
-      numero,
-      `Contato: ${nome}\n${telefone}`,
-      instanciaEvolution,
-    );
+    resultado = await enviarPeloCanal(conta, destino, {
+      tipo: "TEXTO",
+      texto: `Contato: ${nome}\n${telefone}`,
+    });
   }
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   const dados = {

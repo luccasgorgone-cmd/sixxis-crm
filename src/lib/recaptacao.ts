@@ -21,7 +21,12 @@ import type { Server } from "socket.io";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
-import { enviarTexto } from "./evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "./canal/envio";
 import { nomeEfetivo } from "./cliente";
 import { normalizarTexto } from "./format";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
@@ -251,7 +256,11 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       const texto = renderizarMensagem(campanha.mensagemTemplate, primeiroNome);
 
       // Sai pela instancia de ORIGEM: o numero que o cliente ja conhece.
-      const r = await enviarTexto(lead.telefone, texto, envio.instancia);
+      const r = await enviarPeloCanal(
+        contaEvolution(envio.instancia),
+        destinoTelefone(lead.telefone),
+        { tipo: "TEXTO", texto },
+      );
       const agora = new Date();
 
       // Registra a bolha na conversa para o atendimento aparecer no inbox.
@@ -263,7 +272,7 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       try {
         const msg = await prisma.mensagem.create({
           data: {
-            externalId: r.externalId ?? `out-recap-${randomUUID()}`,
+            externalId: externalIdEnviado(r) ?? `out-recap-${randomUUID()}`,
             conversaId: envio.conversaId,
             direcao: DirecaoMsg.OUT,
             tipo: TipoMsg.TEXTO,

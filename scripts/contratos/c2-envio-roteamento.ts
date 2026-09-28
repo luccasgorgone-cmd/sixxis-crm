@@ -11,6 +11,8 @@ import {
   resolverAdapterEnvio,
   checarCapacidade,
   enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
 } from "../../src/lib/canal/envio";
 import type {
   CapacidadesCanal,
@@ -111,6 +113,27 @@ async function main(): Promise<void> {
     const r = await enviarPeloCanal(conta, DESTINO, { tipo: "TEXTO", texto: "oi" });
     assert.equal(r.ok, false);
     if (r.ok === false) assert.equal(r.motivo, "CONFIG_AUSENTE");
+  });
+
+  await caso("contaEvolution: builder monta conta EVOLUTION a partir da instancia", () => {
+    const c = contaEvolution("sixx-venda-3");
+    assert.equal(c.provider, "EVOLUTION");
+    assert.equal(c.refExterna, "sixx-venda-3");
+    assert.equal(c.id, "sixx-venda-3");
+    assert.equal(c.finalidade, "VENDA"); // placeholder; nao lido na saida Evolution
+  });
+
+  await caso("contaEvolution: instancia null/undefined -> refExterna '' (preserva fallback env)", () => {
+    assert.equal(contaEvolution(null).refExterna, "");
+    assert.equal(contaEvolution(undefined).refExterna, "");
+    assert.equal(contaEvolution("x", "POS_VENDA").finalidade, "POS_VENDA");
+  });
+
+  await caso("destinoTelefone: builder de destino 1:1 (valor e telefone iguais)", () => {
+    const d = destinoTelefone("5511999990001");
+    assert.equal(d.tipo, "TELEFONE");
+    assert.equal(d.valor, "5511999990001");
+    assert.equal(d.telefone, "5511999990001");
   });
 
   console.log(`\nC2 fachada de saida: ${ok} ok, ${falhou} falha(s)`);

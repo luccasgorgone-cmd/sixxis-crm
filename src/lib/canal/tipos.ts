@@ -96,6 +96,10 @@ export interface SaidaCanonica {
   fileName?: string;
   // Reply: externalId da mensagem citada (o adaptador resolve o formato do quote).
   citarExternalId?: string;
+  // A mensagem citada foi enviada por NOS (OUT)? Info canonica e neutra: a
+  // Evolution precisa disto no quoted.key.fromMe; o Cloud API ignora (o reply so
+  // usa o message_id). Ausente/false = citando mensagem do cliente (IN).
+  citarEhSaida?: boolean;
   contato?: { nome: string; telefone: string };
   // Atraso opcional (audio PTT "gravando"), repassado ao canal quando suportado.
   atrasoMs?: number;

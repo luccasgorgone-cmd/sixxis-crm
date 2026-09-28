@@ -14,7 +14,13 @@ import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono, filtroEquipe } from "./dono";
 import { estaAbertoAgora, normalizarHorarios } from "./horario";
-import { fetchFotoPerfil, enviarTexto, metadataGrupo } from "./evolution";
+import { fetchFotoPerfil, metadataGrupo } from "./evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "./canal/envio";
 import { garantirConversaUnificada } from "./conversa";
 import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
@@ -218,9 +224,13 @@ async function processarCampanha(
     let erro: string | null = null;
     let externalIdWa: string | undefined;
     if (campanha.canal === CanalEnvio.WHATSAPP) {
-      const r = await enviarTexto(d.destino, texto, instancia);
+      const r = await enviarPeloCanal(
+        contaEvolution(instancia),
+        destinoTelefone(d.destino),
+        { tipo: "TEXTO", texto },
+      );
       ok = r.ok;
-      externalIdWa = r.externalId;
+      externalIdWa = externalIdEnviado(r);
       erro = r.ok ? null : "falha no envio (WhatsApp)";
     } else if (campanha.canal === CanalEnvio.SMS) {
       const r = await enviarSMS(d.destino, texto);
@@ -1136,14 +1146,18 @@ async function responderForaHorarioSePreciso(
     const texto = (config.mensagemForaHorario ?? "").trim();
     if (!texto) return;
     const agora = new Date();
-    const r = await enviarTexto(telefone, texto, conversa.instancia);
+    const r = await enviarPeloCanal(
+      contaEvolution(conversa.instancia),
+      destinoTelefone(telefone),
+      { tipo: "TEXTO", texto },
+    );
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
 
     let msg;
     try {
       msg = await prisma.mensagem.create({
         data: {
-          externalId: r.externalId ?? `out-auto-${randomUUID()}`,
+          externalId: externalIdEnviado(r) ?? `out-auto-${randomUUID()}`,
           conversaId: conversa.id,
           direcao: DirecaoMsg.OUT,
           tipo: TipoMsg.TEXTO,
@@ -1562,7 +1576,11 @@ async function enviarMensagensLuna(
     if (!texto?.trim()) continue;
     if (i > 0) await esperar(intervaloMs); // intervalo natural entre bolhas
 
-    const r = await enviarTexto(telefone, texto, conversa.instancia);
+    const r = await enviarPeloCanal(
+      contaEvolution(conversa.instancia),
+      destinoTelefone(telefone),
+      { tipo: "TEXTO", texto },
+    );
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
     const agora = new Date();
 
@@ -1581,7 +1599,7 @@ async function enviarMensagensLuna(
     };
     try {
       msg = await prisma.mensagem.create({
-        data: { externalId: r.externalId ?? `out-luna-${randomUUID()}`, ...dados },
+        data: { externalId: externalIdEnviado(r) ?? `out-luna-${randomUUID()}`, ...dados },
       });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

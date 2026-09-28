@@ -35,6 +35,38 @@ export function resolverAdapterEnvio(
   return REGISTRO_ENVIO[provider] ?? null;
 }
 
+// Builders para os chamadores atuais (F2b): eles so tem a string da instancia
+// Evolution e o telefone do destino. Ate o roteador real por numero (F5, que le
+// InstanciaWhatsApp.provider e escolhe Evolution vs Cloud), toda saida continua
+// pela Evolution — comportamento IDENTICO ao envio direto de hoje.
+//
+// `finalidade` NAO e lida no caminho de saida da Evolution (o adaptador ignora);
+// so passa a importar quando o Cloud entrar, e ai a ContaCanal vira do resolver
+// de F5 com a finalidade correta. Default "VENDA" e placeholder inofensivo aqui.
+export function contaEvolution(
+  instancia: string | null | undefined,
+  finalidade: ContaCanal["finalidade"] = "VENDA",
+): ContaCanal {
+  // refExterna "" preserva o fallback atual: enviar* faz `instancia || env`, ou
+  // seja instancia ausente cai em process.env.EVOLUTION_INSTANCE como hoje.
+  const ref = instancia ?? "";
+  return { id: ref, provider: "EVOLUTION", finalidade, refExterna: ref };
+}
+
+// Destino 1:1 a partir do telefone ja normalizado (so digitos, como os
+// chamadores montam hoje antes de chamar a Evolution).
+export function destinoTelefone(numero: string): IdentidadeExterna {
+  return { tipo: "TELEFONE", valor: numero, telefone: numero };
+}
+
+// externalId retornado no sucesso; undefined caso contrario. Existe porque o
+// ResultadoEnvioCanonico e uma uniao discriminada (externalId so no ramo ok),
+// enquanto os chamadores fazem `externalId ?? fallback` sem checar ok — este
+// helper preserva exatamente esse comportamento (falha -> undefined -> fallback).
+export function externalIdEnviado(r: ResultadoEnvioCanonico): string | undefined {
+  return r.ok ? r.externalId : undefined;
+}
+
 // PURO: a conta escolhida suporta esta saida? Retorna a falha tipada quando nao,
 // senao null. Evita tentar (e falhar) no canal — ex.: um provedor sem midia.
 export function checarCapacidade(

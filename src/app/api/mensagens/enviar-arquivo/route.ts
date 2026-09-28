@@ -14,7 +14,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarAudio, enviarMidia } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { enviarParaR2ComRetry, extensaoDoMime } from "@/lib/r2";
 import {
   DirecaoMsg,
@@ -138,17 +143,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Envia pelo canal certo. Documento preserva o nome do arquivo (filename);
   // imagem/video levam a legenda como caption (estilo WhatsApp).
+  const conta = contaEvolution(instanciaEvolution);
+  const destino = destinoTelefone(numero);
   const resultado =
     midia === "audio"
-      ? await enviarAudio(numero, midiaParaEnviar, instanciaEvolution)
-      : await enviarMidia(numero, midiaParaEnviar, midia, instanciaEvolution, {
-          mimetype: mime,
+      ? await enviarPeloCanal(conta, destino, {
+          tipo: "AUDIO",
+          midiaRef: midiaParaEnviar,
+        })
+      : await enviarPeloCanal(conta, destino, {
+          tipo:
+            midia === "image" ? "IMAGEM" : midia === "video" ? "VIDEO" : "DOCUMENTO",
+          midiaRef: midiaParaEnviar,
+          mime,
           ...(ehDocumento ? { fileName: nomeArquivo } : {}),
-          ...(temCaption ? { caption: legenda } : {}),
+          ...(temCaption ? { texto: legenda } : {}),
         });
 
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   // Conteudo: placeholder por tipo de midia; documento guarda o NOME do arquivo

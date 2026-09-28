@@ -8,7 +8,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarTexto } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { previewCitada } from "@/lib/citada";
 import {
   DirecaoMsg,
@@ -156,11 +161,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Chama a Evolution. Se falhar, ainda gravamos a mensagem com status ERRO.
-  const resultado = await enviarTexto(numero, texto, instanciaEvolution, quoted);
+  const resultado = await enviarPeloCanal(
+    contaEvolution(instanciaEvolution),
+    destinoTelefone(numero),
+    {
+      tipo: "TEXTO",
+      texto,
+      ...(quoted
+        ? { citarExternalId: quoted.id, citarEhSaida: quoted.fromMe }
+        : {}),
+    },
+  );
   const status: StatusEnvio = resultado.ok
     ? StatusEnvio.ENVIADA
     : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   let mensagem;

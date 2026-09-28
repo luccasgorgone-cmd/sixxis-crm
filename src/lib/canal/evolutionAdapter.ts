@@ -88,7 +88,9 @@ async function enviar(
         ? {
             id: saida.citarExternalId,
             remoteJid: `${numero}@s.whatsapp.net`,
-            fromMe: false,
+            // fromMe reflete se a mensagem CITADA e nossa (OUT) — identico ao
+            // que os chamadores calculavam antes da fachada.
+            fromMe: saida.citarEhSaida ?? false,
           }
         : undefined;
       return mapearResultado(

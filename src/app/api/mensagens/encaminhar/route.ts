@@ -9,11 +9,11 @@ import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
 import {
-  enviarTexto,
-  enviarMidia,
-  enviarAudio,
-  enviarContato,
-} from "@/lib/evolution";
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { DirecaoMsg, TipoMsg, StatusEnvio, Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -78,29 +78,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     conversa.instanciaRef?.instanciaEvolution ?? conversa.instancia ?? null;
 
   // Reenvia o conteudo pelo canal certo.
+  const conta = contaEvolution(instancia);
+  const destino = destinoTelefone(numero);
   let resultado;
   if (origem.contatoNome && origem.contatoTelefone) {
-    resultado = await enviarContato(numero, instancia, {
-      nome: origem.contatoNome,
-      telefone: origem.contatoTelefone,
+    resultado = await enviarPeloCanal(conta, destino, {
+      tipo: "CONTATO",
+      contato: { nome: origem.contatoNome, telefone: origem.contatoTelefone },
     });
   } else if (origem.tipo === TipoMsg.TEXTO) {
-    resultado = await enviarTexto(numero, origem.conteudo ?? "", instancia);
+    resultado = await enviarPeloCanal(conta, destino, {
+      tipo: "TEXTO",
+      texto: origem.conteudo ?? "",
+    });
   } else if (
     (origem.tipo === TipoMsg.IMAGEM ||
       origem.tipo === TipoMsg.VIDEO ||
       origem.tipo === TipoMsg.DOCUMENTO) &&
     ehUrlRenderavel(origem.mediaUrl)
   ) {
-    const mediatype =
+    const tipo =
       origem.tipo === TipoMsg.IMAGEM
-        ? "image"
+        ? "IMAGEM"
         : origem.tipo === TipoMsg.VIDEO
-          ? "video"
-          : "document";
-    resultado = await enviarMidia(numero, origem.mediaUrl!, mediatype, instancia);
+          ? "VIDEO"
+          : "DOCUMENTO";
+    resultado = await enviarPeloCanal(conta, destino, {
+      tipo,
+      midiaRef: origem.mediaUrl!,
+    });
   } else if (origem.tipo === TipoMsg.AUDIO && ehUrlRenderavel(origem.mediaUrl)) {
-    resultado = await enviarAudio(numero, origem.mediaUrl!, instancia);
+    resultado = await enviarPeloCanal(conta, destino, {
+      tipo: "AUDIO",
+      midiaRef: origem.mediaUrl!,
+    });
   } else {
     return NextResponse.json(
       { erro: "esta mensagem nao pode ser encaminhada" },
@@ -109,7 +120,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   const dados = {

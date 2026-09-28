@@ -10,7 +10,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
-import { enviarAudio } from "@/lib/evolution";
+import {
+  enviarPeloCanal,
+  contaEvolution,
+  destinoTelefone,
+  externalIdEnviado,
+} from "@/lib/canal/envio";
 import { enviarParaR2ComRetry, extensaoDoMime } from "@/lib/r2";
 import {
   DirecaoMsg,
@@ -100,9 +105,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const mediaUrl = await enviarParaR2ComRetry(chave, buffer, mime);
 
   // Chama a Evolution com a URL publica (se houver) ou o base64 (ultimo recurso).
-  const resultado = await enviarAudio(numero, mediaUrl ?? base64, instanciaEvolution);
+  const resultado = await enviarPeloCanal(
+    contaEvolution(instanciaEvolution),
+    destinoTelefone(numero),
+    { tipo: "AUDIO", midiaRef: mediaUrl ?? base64 },
+  );
   const status: StatusEnvio = resultado.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
-  const externalId = resultado.externalId ?? `out-${randomUUID()}`;
+  const externalId = externalIdEnviado(resultado) ?? `out-${randomUUID()}`;
   const agora = new Date();
 
   let mensagem;
