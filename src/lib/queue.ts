@@ -25,6 +25,7 @@ import { registrarSolEvento } from "./solEvento";
 import { marcarRespostaRecaptacao } from "./recaptacao";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
+import type { AcaoIngest, IdentidadeExterna, DirecaoCanal } from "./canal/tipos";
 import {
   TipoMsg,
   DirecaoMsg,
@@ -1765,58 +1766,254 @@ async function enriquecerGrupo(
 }
 
 // Processa um unico evento. Retorna sem erro para eventos que nao interessam.
-async function processarEvento(
-  payload: EventoEvolution,
-  io: Server | null,
-): Promise<void> {
+// ---------------------------------------------------------------------------
+// F1 (arquitetura omnichannel): parser PURO do canal Evolution.
+//
+// Traduz o payload cru da Evolution para a decisao canonica (AcaoIngest),
+// reproduzindo EXATAMENTE a arvore de decisao e o parsing que antes viviam
+// inline no processarEvento — mesma ordem de checagens, mesmos helpers. NAO faz
+// I/O: nao toca banco, nao emite socket, nao loga (o nucleo faz o log a partir
+// do resultado). Por ser puro, e testavel com fixture (scripts/contratos/) sem
+// banco/rede/credencial — a base para plugar o CloudApiAdapter no mesmo nucleo.
+//
+// Contrato de equivalencia: para qualquer payload, a acao retornada leva o
+// nucleo ao MESMO efeito de antes. IGNORAR nunca descarta uma mensagem que o
+// fluxo antigo processaria; MENSAGEM so aparece quando o fluxo antigo tambem
+// chegaria a criar a mensagem (passou por todos os mesmos guardas).
+// ---------------------------------------------------------------------------
+export function parseEventoEvolution(payload: EventoEvolution): AcaoIngest {
   // A Evolution envia o nome do evento em formatos diferentes conforme a versao/
   // config: "MESSAGES_UPSERT" (maiusculo, underscore) ou "messages.upsert"
   // (minusculo, ponto). Normaliza antes de comparar para aceitar ambos.
   const evtRaw = String(payload?.event ?? "");
   const evt = evtRaw.toUpperCase().replace(/\./g, "_");
 
-  // Chamada (CALL): a secao de Chamadas foi removida (fatia 2.77 — a Evolution
-  // nao transmite audio/video). O evento e IGNORADO silenciosamente, sem
-  // persistir nada. Nao afeta o processamento de mensagens/grupos/reacoes.
-  if (evt === "CALL") return;
+  // Chamada (CALL): ignorada silenciosamente (a Evolution nao transmite audio/
+  // video). Nao afeta mensagens/grupos/reacoes.
+  if (evt === "CALL") return { acao: "IGNORAR", motivo: "call" };
 
   // Revogacao dedicada (cliente apagou): preserva, nao deleta.
   if (evt === "MESSAGES_DELETE") {
     const revId = payload?.data?.key?.id ?? idRevogado(payload);
-    if (revId) await marcarApagadaPeloCliente(revId, io);
-    return;
+    return revId
+      ? { acao: "REVOGACAO", externalId: revId }
+      : { acao: "IGNORAR", motivo: "delete-sem-id" };
   }
   // Update pode ser revogacao (stub), EDICAO de mensagem, OU atualizacao de
   // status de entrega/leitura.
   if (evt === "MESSAGES_UPDATE") {
     const revId = idRevogado(payload);
-    if (revId) {
-      await marcarApagadaPeloCliente(revId, io);
-      return;
-    }
+    if (revId) return { acao: "REVOGACAO", externalId: revId };
     const edicao = extrairEdicao(payload);
     if (edicao) {
-      await aplicarEdicaoRecebida(edicao.id, edicao.texto, io);
-      return;
+      return { acao: "EDICAO", externalId: edicao.id, texto: edicao.texto };
     }
-    await atualizarStatusMensagem(payload, io);
-    return;
+    return { acao: "STATUS" };
   }
   // So processamos recebimento/insercao de mensagens. Demais eventos: ignora.
-  if (evt !== "MESSAGES_UPSERT") return;
+  if (evt !== "MESSAGES_UPSERT") {
+    return { acao: "IGNORAR", motivo: "evento-nao-tratado" };
+  }
 
   // Revogacao que chega como upsert com protocolMessage REVOKE.
   const revInline = idRevogado(payload);
-  if (revInline) {
-    await marcarApagadaPeloCliente(revInline, io);
-    return;
-  }
+  if (revInline) return { acao: "REVOGACAO", externalId: revInline };
 
   // Edicao que chega como upsert (protocolMessage MESSAGE_EDIT): atualiza o
-  // conteudo da mensagem-alvo e retorna (nao cria uma mensagem nova).
+  // conteudo da mensagem-alvo (nao cria uma mensagem nova).
   const edInline = extrairEdicao(payload);
   if (edInline) {
-    await aplicarEdicaoRecebida(edInline.id, edInline.texto, io);
+    return { acao: "EDICAO", externalId: edInline.id, texto: edInline.texto };
+  }
+
+  const data = payload?.data;
+  const jid = data?.key?.remoteJid;
+  const externalId = data?.key?.id;
+  // Defensivo: sem campos essenciais, o nucleo loga e ignora (nao quebra).
+  if (!jid || !externalId) {
+    return { acao: "IGNORAR", motivo: "sem-jid-ou-externalid" };
+  }
+
+  const fromMe = data?.key?.fromMe === true;
+
+  // REACAO recebida (cliente reagiu). Ignora o eco das NOSSAS reacoes (fromMe):
+  // como no fluxo antigo, uma reacao fromMe NAO retorna aqui — cai no fluxo
+  // normal abaixo (vira MENSAGEM de tipo OUTRO, conteudo nulo).
+  type MsgReacao = {
+    reactionMessage?: { key?: { id?: string }; text?: string };
+  };
+  const reacaoWa =
+    (data?.message as MsgReacao | undefined)?.reactionMessage ??
+    (desembrulharMessage(data?.message) as MsgReacao | null)?.reactionMessage;
+  if (reacaoWa && !fromMe) {
+    const alvo = reacaoWa.key?.id;
+    // Fluxo antigo: registra so quando ha alvo, mas SEMPRE retorna (nao segue).
+    return alvo
+      ? { acao: "REACAO", alvoExternalId: alvo, emoji: reacaoWa.text ?? "" }
+      : { acao: "IGNORAR", motivo: "reacao-sem-alvo" };
+  }
+
+  // GRUPOS (@g.us): caminho PARALELO e ISOLADO (chat interno).
+  if (jid.endsWith("@g.us")) return { acao: "GRUPO" };
+
+  // Leads fantasma: @broadcast (listas/status) e @newsletter (canais).
+  if (jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) {
+    return { acao: "IGNORAR", motivo: "broadcast-newsletter" };
+  }
+
+  // @lid + saida = eco a contato nao-salvo (numero mascarado); descarta.
+  if (jid.endsWith("@lid") && fromMe) {
+    return { acao: "IGNORAR", motivo: "lid-fromme" };
+  }
+
+  const pushName = data?.pushName;
+  // pushName so nomeia o lead em mensagens de ENTRADA (em saida vem "Voce").
+  const pushNameCliente = fromMe ? undefined : (pushName ?? undefined);
+  // Fatia 3.21: para ENTRADA "@lid" resolve o numero REAL (senderPn/participantPn/
+  // remoteJidAlt) antes de extrair o telefone. Fora disso, jidEfetivo == jid.
+  const { jidEfetivo, resolvidoDe } = resolverJidReal(
+    jid,
+    data?.key as Record<string, unknown> | undefined,
+    fromMe,
+  );
+  const telefone = normalizarJid(jidEfetivo);
+  if (!telefone) return { acao: "IGNORAR", motivo: "jid-sem-digitos" };
+
+  // Desembrulha envelopes antes de mapear tipo/conteudo/midia. Fatia 2.95.
+  const msgDesemb = desembrulharMessage(data?.message);
+  const tipo = mapearTipo(tipoEfetivoMensagem(data));
+  const conteudo = extrairConteudo(msgDesemb);
+  const transcricao = extrairTranscricao(data, msgDesemb);
+  const contatoInfo = extrairContato(msgDesemb);
+  const stanzaCitada = extrairStanzaCitada(
+    msgDesemb,
+    data as Record<string, unknown> | undefined,
+  );
+  // Sticker NUNCA grava URL crua (.enc nao renderiza). Fatia 2.83/2.95.
+  const ehSticker = ehStickerMessage(data?.message);
+  const mediaUrlOriginal = ehSticker ? null : extrairMediaUrl(msgDesemb);
+  const direcao: DirecaoCanal = fromMe ? "OUT" : "IN";
+  // Origem por anuncio (Click-to-WhatsApp): extraida sempre (puro); o nucleo so
+  // APLICA em IN e quando o lead ainda nao tem origem (mesma condicao de antes).
+  const anuncio = extrairAnuncio(
+    msgDesemb,
+    data as Record<string, unknown> | undefined,
+  );
+  const ts = data?.messageTimestamp;
+  const ocorridoEm = ts ? new Date(Number(ts) * 1000) : undefined;
+  const tipoIdentidade: IdentidadeExterna["tipo"] =
+    jid.endsWith("@lid") && resolvidoDe === null ? "LID" : "TELEFONE";
+
+  return {
+    acao: "MENSAGEM",
+    evento: {
+      provider: "EVOLUTION",
+      externalId,
+      direcao,
+      ...(ocorridoEm ? { ocorridoEm } : {}),
+      contaRef: payload?.instance ?? "sixxis-wa1",
+      cliente: {
+        tipo: tipoIdentidade,
+        valor: telefone,
+        telefone,
+        ...(pushNameCliente ? { nomePerfil: pushNameCliente } : {}),
+        jidBruto: jid,
+        jidEfetivo,
+        resolvidoDe,
+      },
+      conteudo: {
+        tipoDominio: tipo,
+        texto: conteudo,
+        transcricao,
+        midiaRef: mediaUrlOriginal,
+        ehSticker,
+        contato: contatoInfo,
+      },
+      respondeA: stanzaCitada,
+      origemAnuncio: anuncio,
+      raw: payload,
+    },
+  };
+}
+
+async function processarEvento(
+  payload: EventoEvolution,
+  io: Server | null,
+): Promise<void> {
+  // F1: o parser puro decide a acao. As acoes que NAO sao MENSAGEM sao
+  // despachadas aqui, com o MESMO efeito (mesmos helpers, mesmos logs) de antes.
+  // MENSAGEM segue para a ingestao abaixo, que ainda extrai os campos inline —
+  // o consumo direto do EventoCanonico pelo nucleo vem na fatia seguinte (F1b).
+  const acaoIngest = parseEventoEvolution(payload);
+  if (acaoIngest.acao !== "MENSAGEM") {
+    const jidLog = payload?.data?.key?.remoteJid;
+    const fromMeLog = payload?.data?.key?.fromMe === true;
+    const externalIdLog = payload?.data?.key?.id;
+    switch (acaoIngest.acao) {
+      case "IGNORAR":
+        if (acaoIngest.motivo === "sem-jid-ou-externalid") {
+          console.warn(
+            `[ingest] evento sem jid/externalId ignorado (instance=${payload?.instance ?? "?"})`,
+          );
+        } else if (acaoIngest.motivo === "jid-sem-digitos") {
+          console.warn(`[ingest] jid sem digitos ignorado: ${jidLog}`);
+          if (!fromMeLog) {
+            logIngestDiag({
+              evento: "descarte-filtro",
+              motivo: "jid-sem-digitos",
+              instancia: payload?.instance ?? null,
+              sufixo: sufixoJid(jidLog ?? ""),
+              externalId: externalIdLog,
+            });
+          }
+        } else if (acaoIngest.motivo === "broadcast-newsletter") {
+          if (!fromMeLog) {
+            logIngestDiag({
+              evento: "descarte-filtro",
+              motivo: sufixoJid(jidLog ?? ""),
+              instancia: payload?.instance ?? null,
+              externalId: externalIdLog,
+              temPushName: !!payload?.data?.pushName,
+            });
+          }
+        }
+        return;
+      case "REVOGACAO":
+        await marcarApagadaPeloCliente(acaoIngest.externalId, io);
+        return;
+      case "EDICAO":
+        await aplicarEdicaoRecebida(
+          acaoIngest.externalId,
+          acaoIngest.texto,
+          io,
+        );
+        return;
+      case "STATUS":
+        await atualizarStatusMensagem(payload, io);
+        return;
+      case "REACAO":
+        try {
+          await registrarReacaoCliente(
+            acaoIngest.alvoExternalId,
+            acaoIngest.emoji,
+            io,
+          );
+        } catch (e) {
+          console.warn(
+            `[reacao] falha ao registrar reacao do cliente: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+        return;
+      case "GRUPO":
+        try {
+          await processarMensagemGrupo(payload, io);
+        } catch (e) {
+          console.warn(
+            `[grupo] falha ao processar ${jidLog}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+        return;
+    }
     return;
   }
 
