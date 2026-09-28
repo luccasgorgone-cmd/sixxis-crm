@@ -9,6 +9,7 @@
 // finalidade) depende da coluna `provider` em InstanciaWhatsApp (F3) e vive num
 // resolvedor separado; esta fachada recebe a conta ja resolvida para ficar pura
 // e testavel sem banco.
+import { adapterEnvioCloud } from "./cloudApiAdapter";
 import { adapterEnvioEvolution } from "./evolutionAdapter";
 import type {
   CanalAdapterEnvio,
@@ -20,9 +21,12 @@ import type {
   SaidaCanonica,
 } from "./tipos";
 
-// Registro de adaptadores de envio por provedor. Cloud API entra aqui no F4.
+// Registro de adaptadores de envio por provedor. CLOUD_API entra registrado no
+// F4, mas so envia com uma ContaCanal CLOUD_API + token no ambiente (retorna
+// CONFIG_AUSENTE sem tocar a rede ate o piloto). SANDBOX segue sem adaptador.
 const REGISTRO_ENVIO: Partial<Record<Provider, CanalAdapterEnvio>> = {
   EVOLUTION: adapterEnvioEvolution,
+  CLOUD_API: adapterEnvioCloud,
 };
 
 export function resolverAdapterEnvio(

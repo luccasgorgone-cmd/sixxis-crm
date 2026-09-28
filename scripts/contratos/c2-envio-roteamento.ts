@@ -49,8 +49,17 @@ async function main(): Promise<void> {
     assert.equal(a?.capacidades.contato, true);
   });
 
-  await caso("registro ainda NAO resolve CLOUD_API (entra no F4)", () => {
-    assert.equal(resolverAdapterEnvio("CLOUD_API"), null);
+  await caso("registro resolve CLOUD_API (F4) com janela de 24h", () => {
+    const a = resolverAdapterEnvio("CLOUD_API");
+    assert.ok(a);
+    assert.equal(a?.provider, "CLOUD_API");
+    assert.equal(a?.capacidades.exigeTemplateForaDaJanela, true);
+    assert.equal(a?.capacidades.midia, true);
+    assert.equal(a?.capacidades.contato, true);
+  });
+
+  await caso("registro NAO resolve SANDBOX (sem adaptador)", () => {
+    assert.equal(resolverAdapterEnvio("SANDBOX"), null);
   });
 
   await caso("checarCapacidade: canal sem midia recusa IMAGEM", () => {
@@ -79,12 +88,25 @@ async function main(): Promise<void> {
     }
   });
 
-  await caso("enviarPeloCanal: provider sem adaptador -> CONFIG_AUSENTE (sem rede)", async () => {
+  await caso("enviarPeloCanal: provider sem adaptador (SANDBOX) -> CONFIG_AUSENTE (sem rede)", async () => {
     const conta: ContaCanal = {
       id: "c1",
+      provider: "SANDBOX",
+      finalidade: "VENDA",
+      refExterna: "pnid-123",
+    };
+    const r = await enviarPeloCanal(conta, DESTINO, { tipo: "TEXTO", texto: "oi" });
+    assert.equal(r.ok, false);
+    if (r.ok === false) assert.equal(r.motivo, "CONFIG_AUSENTE");
+  });
+
+  await caso("enviarPeloCanal: CLOUD_API sem token no ambiente -> CONFIG_AUSENTE (sem rede)", async () => {
+    const conta: ContaCanal = {
+      id: "c2",
       provider: "CLOUD_API",
       finalidade: "VENDA",
       refExterna: "pnid-123",
+      credencialRef: "TOKEN_CLOUD_INEXISTENTE_NO_TESTE",
     };
     const r = await enviarPeloCanal(conta, DESTINO, { tipo: "TEXTO", texto: "oi" });
     assert.equal(r.ok, false);
