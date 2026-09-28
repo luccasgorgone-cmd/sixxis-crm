@@ -66,6 +66,79 @@ export interface EventoMensagem {
   raw: unknown; // payload cru do canal (persistido em Mensagem.raw como hoje)
 }
 
+// ===========================================================================
+// SAIDA (F2): contrato de ENVIO. O nucleo pede "manda isto nesta conversa" em
+// termos canonicos; a fachada (enviarPeloCanal) escolhe a conta/adaptador e o
+// adaptador do provedor traduz para a API do canal. Assim o mesmo ponto de envio
+// serve Evolution e Cloud API — a diferenca (ex.: template fora da janela de 24h
+// no Cloud) fica no adaptador/capacidades, nao no chamador.
+// ===========================================================================
+
+// Conta de envio (generaliza InstanciaWhatsApp). refExterna = instancia
+// Evolution OU phone_number_id do Cloud. credencialRef = NOME da env var do
+// segredo (nunca o valor).
+export interface ContaCanal {
+  id: string;
+  provider: Provider;
+  finalidade: "VENDA" | "POS_VENDA";
+  refExterna: string;
+  credencialRef?: string;
+}
+
+// O que enviar, em termos canonicos (independe do canal).
+export interface SaidaCanonica {
+  tipo: "TEXTO" | "IMAGEM" | "AUDIO" | "VIDEO" | "DOCUMENTO" | "CONTATO";
+  texto?: string;
+  // Midia: URL publica OU base64 (o adaptador do canal sabe consumir). mime/
+  // fileName quando o canal precisa (documento).
+  midiaRef?: string;
+  mime?: string;
+  fileName?: string;
+  // Reply: externalId da mensagem citada (o adaptador resolve o formato do quote).
+  citarExternalId?: string;
+  contato?: { nome: string; telefone: string };
+  // Atraso opcional (audio PTT "gravando"), repassado ao canal quando suportado.
+  atrasoMs?: number;
+}
+
+// O que cada canal consegue fazer. A fachada recusa (CAPACIDADE_AUSENTE) uma
+// saida que a conta escolhida nao suporta, em vez de tentar e falhar no canal.
+export interface CapacidadesCanal {
+  texto: true;
+  midia: boolean;
+  audioPTT: boolean;
+  reacao: boolean;
+  edicao: boolean;
+  revogar: boolean;
+  contato: boolean;
+  // Cloud API: true (fora da janela de 24h so template aprovado). Evolution: false.
+  exigeTemplateForaDaJanela: boolean;
+}
+
+export type MotivoFalhaEnvio =
+  | "JANELA_FECHADA"
+  | "TEMPLATE_OBRIGATORIO"
+  | "CAPACIDADE_AUSENTE"
+  | "CONTA_OFFLINE"
+  | "RECUSADO_PELO_CANAL"
+  | "CONFIG_AUSENTE"
+  | "ERRO_TRANSITORIO";
+
+export type ResultadoEnvioCanonico =
+  | { ok: true; externalId?: string; raw?: unknown }
+  | { ok: false; motivo: MotivoFalhaEnvio; detalhe?: string; raw?: unknown };
+
+// Adaptador de ENVIO de um provedor. `enviar` e a unica porta de saida do canal.
+export interface CanalAdapterEnvio {
+  provider: Provider;
+  capacidades: CapacidadesCanal;
+  enviar(
+    conta: ContaCanal,
+    destino: IdentidadeExterna,
+    saida: SaidaCanonica,
+  ): Promise<ResultadoEnvioCanonico>;
+}
+
 // Decisao do parser: o que o nucleo deve fazer com este payload. Cada variante
 // corresponde 1:1 a um ramo do processarEvento atual, na MESMA ordem. O `motivo`
 // do IGNORAR distingue os poucos casos que ainda emitem log/diagnostico no
