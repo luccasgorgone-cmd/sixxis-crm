@@ -72,11 +72,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // (confirmarAcao) — o comando é a autorização; fica com undo. Ações
   // irreversíveis NUNCA executam direto: continuam PROPOSTO (exigem confirmação).
   let acao:
-    | { id: string; ferramenta: string; preview: string; status: string; erro?: string }
+    | { id: string; ferramenta: string; preview: string; status: string; erro?: string; leadId?: string | null }
     | null = null;
   if (resultado.proposta) {
     const { ferramenta, args, preview } = resultado.proposta;
     const negocioId = lerId(args, "negocioId");
+    // leadId para deep-link da conversa — derivado do negócio quando houver.
+    let leadId: string | null = null;
+    if (negocioId) {
+      const n = await prisma.negocio
+        .findUnique({ where: { id: negocioId }, select: { leadId: true } })
+        .catch(() => null);
+      leadId = n?.leadId ?? null;
+    }
     const registro = await prisma.supervisorAcao.create({
       data: {
         adminId: admin.id,
@@ -86,8 +94,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         preview,
         status: "PROPOSTO",
         negocioId: negocioId ?? null,
+        leadId,
       },
-      select: { id: true, ferramenta: true, preview: true },
+      select: { id: true, ferramenta: true, preview: true, leadId: true },
     });
 
     let status = "PROPOSTO";

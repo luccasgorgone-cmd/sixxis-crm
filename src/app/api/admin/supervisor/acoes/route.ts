@@ -17,7 +17,7 @@ export async function GET(): Promise<NextResponse> {
 
   const itens = await prisma.supervisorAcao.findMany({
     where: { status: "PROPOSTO", adminId: ORIGEM_VARREDURA },
-    select: { id: true, ferramenta: true, preview: true, negocioId: true, criadoEm: true },
+    select: { id: true, ferramenta: true, preview: true, negocioId: true, leadId: true, criadoEm: true },
     orderBy: { criadoEm: "desc" },
     take: 50,
   });

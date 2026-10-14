@@ -22,7 +22,28 @@ export const ORIGEM_VARREDURA = "varredura";
 const CAP_POR_CICLO = 25; // teto de propostas novas por ciclo (evita enxurrada)
 const TAKE_POR_SINAL = 40; // teto de candidatos consultados por sinal
 
-type Candidato = { negocioId: string; motivo: string };
+type Candidato = { negocioId: string; motivo: string; sinal: SinalVarredura };
+
+// Sugestão de ação ESPECÍFICA por sinal. Todas materializam como criar_lembrete
+// (a única proposta sempre válida sem inferir etapa/vendedor alvo), mas o texto
+// orienta o gestor para a ação certa daquele tipo de problema.
+const SUGESTAO_POR_SINAL: Record<SinalVarredura, string> = {
+  semProximoPasso: "Agendar o próximo passo com o cliente.",
+  parado: "Revisar: avançar de etapa, reatribuir ou retomar o contato.",
+  semResposta: "Responder o cliente — há mensagens aguardando.",
+  primeiraResposta: "Responder agora — 1ª resposta atrasada.",
+  outro: "Agendar contato.",
+};
+
+// Urgência por sinal: quão à frente agendar o lembrete (minutos relativos,
+// recomputados na confirmação). Sinais urgentes (1ª resposta) vêm antes.
+const MINUTOS_POR_SINAL: Record<SinalVarredura, number> = {
+  primeiraResposta: 15,
+  semResposta: 30,
+  parado: 60,
+  semProximoPasso: 60,
+  outro: 60,
+};
 
 // ───────────────────────── detecções (read-only) ─────────────────────────
 
@@ -37,7 +58,7 @@ async function detSemProximoPasso(agora: Date): Promise<Candidato[]> {
     orderBy: { entrouEtapaEm: "asc" },
     take: TAKE_POR_SINAL,
   });
-  return negs.map((n) => ({ negocioId: n.id, motivo: "Sem próximo passo agendado" }));
+  return negs.map((n) => ({ negocioId: n.id, motivo: "Sem próximo passo agendado", sinal: "semProximoPasso" as const }));
 }
 
 // Sinal 3 — parado além do limiar DA ETAPA. Reusa ConfigAlertaSla (fonte única,
@@ -64,7 +85,7 @@ async function detParado(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]>
     const limiar = limiarParadoMs(n.finalidade, n.etapaId, cfg.limiares.paradoDiasPadrao, slaMin);
     if (estaParado(n.entrouEtapaEm, agora, limiar)) {
       const dias = Math.floor((agora.getTime() - n.entrouEtapaEm.getTime()) / 86_400_000);
-      out.push({ negocioId: n.id, motivo: `Parado há ${dias} dia(s) em "${n.etapa?.nome ?? "etapa"}"` });
+      out.push({ negocioId: n.id, motivo: `Parado há ${dias} dia(s) em "${n.etapa?.nome ?? "etapa"}"`, sinal: "parado" });
       if (out.length >= TAKE_POR_SINAL) break;
     }
   }
@@ -106,7 +127,7 @@ async function detSemResposta(agora: Date, cfg: ConfigEditavel): Promise<Candida
   const out: Candidato[] = [];
   for (const c of convs) {
     const negId = mapa.get(`${c.leadId}:${c.finalidade}`);
-    if (negId) out.push({ negocioId: negId, motivo: "Cliente aguardando resposta (mensagens não lidas)" });
+    if (negId) out.push({ negocioId: negId, motivo: "Cliente aguardando resposta (mensagens não lidas)", sinal: "semResposta" });
   }
   return out;
 }
@@ -132,7 +153,7 @@ async function detPrimeiraResposta(agora: Date, cfg: ConfigEditavel): Promise<Ca
   const out: Candidato[] = [];
   for (const n of novos) {
     if (comEspera.has(`${n.leadId}:${n.finalidade}`)) {
-      out.push({ negocioId: n.id, motivo: "Lead novo sem 1ª resposta no prazo" });
+      out.push({ negocioId: n.id, motivo: "Lead novo sem 1ª resposta no prazo", sinal: "primeiraResposta" });
       if (out.length >= TAKE_POR_SINAL) break;
     }
   }
@@ -182,9 +203,12 @@ export async function executarVarredura(agora: Date = new Date()): Promise<Resum
   }
 
   // Um achado por negócio (o primeiro motivo encontrado), na ordem de prioridade.
-  const porNegocio = new Map<string, string>();
-  for (const g of grupos) for (const c of g) if (!porNegocio.has(c.negocioId)) porNegocio.set(c.negocioId, c.motivo);
-  const achados = [...porNegocio.entries()].map(([negocioId, motivo]) => ({ negocioId, motivo }));
+  const porNegocio = new Map<string, { motivo: string; sinal: SinalVarredura }>();
+  for (const g of grupos)
+    for (const c of g)
+      if (!porNegocio.has(c.negocioId))
+        porNegocio.set(c.negocioId, { motivo: c.motivo, sinal: c.sinal });
+  const achados = [...porNegocio.entries()].map(([negocioId, info]) => ({ negocioId, ...info }));
 
   if (achados.length === 0) return { rodou: true, achados: 0, criadas: 0, pulados: 0 };
 
@@ -196,23 +220,32 @@ export async function executarVarredura(agora: Date = new Date()): Promise<Resum
   });
   const jaSet = new Set(jaAbertas.map((a) => a.negocioId));
 
+  // leadId por negócio — permite deep-link da proposta para a conversa no Inbox.
+  const negs = await prisma.negocio.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, leadId: true },
+  });
+  const leadPorNeg = new Map(negs.map((n) => [n.id, n.leadId]));
+
   let criadas = 0;
   let pulados = 0;
   for (const a of achados) {
     if (jaSet.has(a.negocioId)) { pulados++; continue; }
     if (criadas >= CAP_POR_CICLO) { pulados++; continue; }
     // dataHoraRelativaMin (não um instante fixo): o lembrete é recomputado para
-    // ~1h à frente NA HORA DA CONFIRMAÇÃO, então a proposta nunca "vence" se o
-    // gestor demorar a confirmar (evita o beco sem saída de validar no passado).
-    const args: Prisma.InputJsonValue = { negocioId: a.negocioId, dataHoraRelativaMin: 60, nota: a.motivo };
+    // X min à frente NA HORA DA CONFIRMAÇÃO (urgência por sinal), então a proposta
+    // nunca "vence" se o gestor demorar a confirmar (evita validar no passado).
+    const minutos = MINUTOS_POR_SINAL[a.sinal];
+    const args: Prisma.InputJsonValue = { negocioId: a.negocioId, dataHoraRelativaMin: minutos, nota: a.motivo };
     await prisma.supervisorAcao.create({
       data: {
         adminId: ORIGEM_VARREDURA,
         ferramenta: "criar_lembrete",
         argsJson: args,
-        preview: `${a.motivo}. Sugestão: agendar contato.`,
+        preview: `${a.motivo}. ${SUGESTAO_POR_SINAL[a.sinal]}`,
         status: "PROPOSTO",
         negocioId: a.negocioId,
+        leadId: leadPorNeg.get(a.negocioId) ?? null,
         motivo: "varredura automática",
       },
     });

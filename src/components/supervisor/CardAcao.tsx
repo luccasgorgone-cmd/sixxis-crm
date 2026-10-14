@@ -8,7 +8,7 @@
 // Tudo chama /api/admin/supervisor/acao/confirmar (decisao confirmar/descartar/
 // reverter), que revalida no servidor. O card é efêmero: some ao resolver.
 import { useState } from "react";
-import { Check, X, Loader2, Wand2, Undo2, CheckCircle2 } from "lucide-react";
+import { Check, X, Loader2, Wand2, Undo2, CheckCircle2, ExternalLink } from "lucide-react";
 
 export type StatusAcao = "PROPOSTO" | "EXECUTADO" | "FALHOU";
 
@@ -18,7 +18,22 @@ export type AcaoProposta = {
   preview: string;
   status?: StatusAcao; // ausente = PROPOSTO
   erro?: string;
+  leadId?: string | null; // deep-link para a conversa no Inbox
 };
+
+// Link para abrir a conversa do lead no Inbox (o Inbox resolve ?lead=<id>).
+function LinkConversa({ leadId }: { leadId?: string | null }) {
+  if (!leadId) return null;
+  return (
+    <a
+      href={`/inbox?lead=${encodeURIComponent(leadId)}`}
+      className="flex items-center gap-1 text-xs font-medium text-tiffany transition-colors hover:text-tiffany-escuro"
+    >
+      <ExternalLink className="h-3 w-3" />
+      Abrir conversa
+    </a>
+  );
+}
 
 export type ResolucaoAcao = {
   status: "EXECUTADO" | "DESCARTADO" | "REVERTIDO";
@@ -91,7 +106,7 @@ export function CardAcao({
         </div>
         <p className="text-sm text-escuro">{acao.preview}</p>
         {erro && <p className="mt-2 text-xs text-erro">{erro}</p>}
-        <div className="mt-3">
+        <div className="mt-3 flex items-center gap-3">
           <button
             onClick={() => aoDecidir("reverter")}
             disabled={processando !== null}
@@ -104,6 +119,9 @@ export function CardAcao({
             )}
             Desfazer
           </button>
+          <div className="ml-auto">
+            <LinkConversa leadId={acao.leadId} />
+          </div>
         </div>
       </div>
     );
@@ -139,6 +157,9 @@ export function CardAcao({
           <X className="h-3.5 w-3.5" />
           Descartar
         </button>
+        <div className="ml-auto">
+          <LinkConversa leadId={acao.leadId} />
+        </div>
       </div>
     </div>
   );
