@@ -19,12 +19,13 @@ import { modeloTemPreco } from "./custoIA";
 
 const FUSO = "America/Sao_Paulo";
 
-// Teto padrao ($10/mes) — decisao do Luccas de 14/08/2026 pra fase de sandbox.
-// Ajustavel via env sem precisar de deploy de codigo novo (AGENTE_IA_TETO_
-// MENSAL_USD), mas o valor gravado aqui e o combinado: se a env var nao
-// existir, usamos ESTE numero, nunca um default arbitrario diferente do que
-// foi decidido.
-export const TETO_MENSAL_USD_PADRAO = 10;
+// Teto padrao ($20/mes) — decisao do Luccas de 14/10/2026 ao avancar a Sol para
+// producao ("pode colocar uns 100 reais ao mes ou 20 dolares"). Antes era $10
+// (fase de sandbox, 14/08/2026). Ajustavel via env sem precisar de deploy de
+// codigo novo (AGENTE_IA_TETO_MENSAL_USD), mas o valor gravado aqui e o
+// combinado: se a env var nao existir, usamos ESTE numero, nunca um default
+// arbitrario diferente do que foi decidido.
+export const TETO_MENSAL_USD_PADRAO = 20;
 
 // Fracao do teto a partir da qual avisamos no log (proativo, nao bloqueia) —
 // mesmo espirito do alerta do openrouter-budget-check.sh, adaptado pra teto
