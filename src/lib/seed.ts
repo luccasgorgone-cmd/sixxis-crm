@@ -1542,8 +1542,17 @@ export async function backfillNegocios(): Promise<void> {
     });
     if (!etapa) return;
 
+    // So cria negocio para leads que NAO tem NENHUM negocio (os orfaos de
+    // verdade). O filtro antigo `none: { status: "ABERTO" }` incluia tambem os
+    // leads cujo unico negocio era PERDIDO/GANHO — e como isto roda em TODO boot
+    // (server.ts) e garantirNegocioParaLead REABRE o fechado (PERDIDO -> ABERTO,
+    // etapa "Novo"), cada deploy ressuscitava todos os perdidos para o Kanban
+    // sem o cliente ter mandado mensagem (bug 14/10, causa raiz confirmada: burst
+    // de ~900 reaberturas por deploy). Um negocio fechado SO pode voltar ao Novo
+    // quando o CLIENTE voltar a falar (ingestao, queue.ts, respeitarPrazoPerdido).
+    // Backfill nunca reabre fechado — so preenche quem nao tem negocio algum.
     const leads = await prisma.lead.findMany({
-      where: { negocios: { none: { status: "ABERTO" } } },
+      where: { negocios: { none: {} } },
       select: { id: true },
     });
     for (const l of leads) {
