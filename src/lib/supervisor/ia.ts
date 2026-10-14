@@ -28,11 +28,15 @@ import { garantirProvidersRegistrados } from "../llmProviders/registro";
 import { verificarOrcamentoMensal } from "../orcamentoIA";
 import { registrarSolEvento } from "../solEvento";
 import { montarPainel } from "./painel";
+import { carregarAprendizado, nomeSinal } from "./aprendizado";
 import {
+  APRENDIZADO_PADRAO,
   resolverLimiares,
   resolverVarredura,
+  type AprendizadoSnapshot,
   type Janela,
   type PainelSupervisor,
+  type SinalVarredura,
   type SupervisorLimiares,
   type VarreduraConfig,
 } from "./tipos";
@@ -138,9 +142,32 @@ function janelaPadrao(agora: Date): Janela {
 }
 
 // ───────────────────────── system prompt ─────────────────────────
+// Bloco de contexto com o que a IA já aprendeu desta operação. null quando ainda
+// não estudou (não polui o prompt). Determinístico — só repassa números reais.
+function blocoAprendizado(ap: AprendizadoSnapshot): string | null {
+  if (!ap.geradoEm || (ap.insights.length === 0 && ap.aceitacaoPorSinal.length === 0)) {
+    return null;
+  }
+  const data = new Date(ap.geradoEm).toLocaleString("pt-BR");
+  const linhas: string[] = [
+    `PADRÕES APRENDIDOS DESTA OPERAÇÃO (atualizado em ${data}, amostra ${ap.amostras.acoes} decisão(ões) do gestor). Use para priorizar o conselho; NÃO invente além disto:`,
+  ];
+  for (const i of ap.insights) linhas.push(`- ${i.texto} [${i.forca}]`);
+  const comTaxa = ap.aceitacaoPorSinal.filter((a) => a.taxa !== null && a.chave !== "outro");
+  if (comTaxa.length > 0) {
+    linhas.push(
+      `Aceitação do gestor por tipo de sugestão: ${comTaxa
+        .map((a) => `${nomeSinal(a.chave as SinalVarredura)} ${Math.round((a.taxa ?? 0) * 100)}%`)
+        .join("; ")}. Priorize os de maior aceitação; se um estiver muito baixo, você pode SUGERIR desligá-lo (nunca desligue sozinho).`,
+    );
+  }
+  return linhas.join("\n");
+}
+
 function montarSystem(
   painel: PainelSupervisor,
   cfg: ConfigSupervisor,
+  aprendizado: AprendizadoSnapshot,
 ): ProviderSystemBloco[] {
   const base = `Você é o Supervisor Comercial da Sixxis — um CONSULTOR INTERNO que ajuda o GESTOR a ler o funil de vendas/pós-venda e a decidir o próximo passo. Você fala com o gestor, NUNCA com o cliente.
 
@@ -187,7 +214,14 @@ Responda SEMPRE no envelope JSON estruturado:
     },
   )}`;
 
-  return [{ text: base, cache: true }, { text: configCtx }, { text: contexto }];
+  const blocos: ProviderSystemBloco[] = [
+    { text: base, cache: true },
+    { text: configCtx },
+    { text: contexto },
+  ];
+  const apr = blocoAprendizado(aprendizado);
+  if (apr) blocos.push({ text: apr });
+  return blocos;
 }
 
 // Envelope estruturado (mesma técnica da Luna: força o formato pela API, não só
@@ -377,7 +411,9 @@ export async function gerarRespostaSupervisor(
     return base({ motivo: `falha ao montar painel: ${motivo}` });
   }
 
-  const system = montarSystem(painel, config);
+  // Snapshot de aprendizado (best-effort; nunca bloqueia o chat se faltar).
+  const aprendizado = await carregarAprendizado().catch(() => null);
+  const system = montarSystem(painel, config, aprendizado ?? APRENDIZADO_PADRAO);
   const mensagens = montarMensagens(entrada.historico);
   if (mensagens.length === 0) {
     return base({ resposta: "Em que posso ajudar com o funil hoje?", motivo: "histórico vazio" });

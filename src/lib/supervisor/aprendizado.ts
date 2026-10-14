@@ -18,6 +18,7 @@ import {
   APRENDIZADO_PADRAO,
   CADENCIA_ESTUDO_PADRAO,
   HISTORICO_MAX,
+  nomeSinal,
   resolverAprendizado,
   type AceitacaoItem,
   type AprendizadoSnapshot,
@@ -27,6 +28,10 @@ import {
   type SinalVarredura,
   type SucessoSinal,
 } from "./tipos";
+
+// Reexport para quem já importava de aprendizado (ia.ts). A definição canônica
+// vive em tipos.ts (client-safe).
+export { nomeSinal };
 
 // Janela do ledger considerada no estudo (bounded; decisões muito antigas não
 // descrevem a operação de hoje).
@@ -46,17 +51,6 @@ export function classificarSinal(texto: string | null | undefined): SinalVarredu
   if (t.includes("1ª resposta") || t.includes("1a resposta") || t.includes("primeira resposta")) return "primeiraResposta";
   if (t.includes("aguardando resposta") || t.includes("sem resposta")) return "semResposta";
   return "outro";
-}
-
-// Rótulo humano de um sinal (para insights/UI).
-export function nomeSinal(s: SinalVarredura): string {
-  switch (s) {
-    case "semResposta": return "cliente sem resposta";
-    case "semProximoPasso": return "sem próximo passo";
-    case "parado": return "negócio parado";
-    case "primeiraResposta": return "1ª resposta estourada";
-    default: return "outras ações";
-  }
 }
 
 // EXECUTADO ÷ (EXECUTADO+DESCARTADO). null quando não há amostra.

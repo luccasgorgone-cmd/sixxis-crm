@@ -301,6 +301,18 @@ export type SinalVarredura =
   | "primeiraResposta"
   | "outro";
 
+// Rótulo humano de um sinal (para insights/UI). Puro e client-safe (fica aqui,
+// não em aprendizado.ts, que importa prisma/painel — server-only).
+export function nomeSinal(s: SinalVarredura): string {
+  switch (s) {
+    case "semResposta": return "cliente sem resposta";
+    case "semProximoPasso": return "sem próximo passo";
+    case "parado": return "negócio parado";
+    case "primeiraResposta": return "1ª resposta estourada";
+    default: return "outras ações";
+  }
+}
+
 // Força de um insight pelo tamanho da amostra (honestidade: amostra pequena é
 // marcada, não escondida).
 export type ForcaInsight = "forte" | "media" | "fraca";
