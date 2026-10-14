@@ -6,7 +6,7 @@
 // nascem no servidor — aqui só se renderiza.
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
 import { formatarBRL, formatarPct } from "@/lib/format";
-import { Download, Layers, Megaphone, Trophy } from "lucide-react";
+import { ChevronRight, Download, Layers, Megaphone, Trophy } from "lucide-react";
 import { GradeIndicadores, LinhaLista, Secao, formatarValor } from "./PainelPartes";
 
 // Exporta o painel para CSV (separador ';' + BOM, amigável ao Excel pt-BR). Sem
@@ -76,7 +76,48 @@ function baixarCsv(painel: PainelSupervisor) {
   URL.revokeObjectURL(url);
 }
 
-export function PainelRelatorios({ painel }: { painel: PainelSupervisor }) {
+// Barra de atingimento da meta do período: valor vendido ÷ meta configurada.
+// Usa valorEfetivo via metricas.valorVendido (já respeita a regra do valorAjustado).
+function BarraMeta({ painel }: { painel: PainelSupervisor }) {
+  const meta = painel.limiares.metaPeriodoReais;
+  if (meta == null || meta <= 0) return null;
+  const vendido = painel.metricas.valorVendido;
+  const pct = Math.max(0, (vendido / meta) * 100);
+  const bateu = vendido >= meta;
+  return (
+    <section className="rounded-xl border border-black/5 bg-white p-3.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-medio/50">
+          Meta do período
+        </h3>
+        <span
+          className={`text-xs font-semibold tabular-nums ${bateu ? "text-sucesso" : "text-escuro"}`}
+        >
+          {Math.round(pct)}%
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-black/5">
+        <span
+          className={`block h-full rounded-full ${bateu ? "bg-sucesso" : "bg-tiffany"}`}
+          style={{ width: `${Math.min(100, pct)}%` }}
+          aria-hidden
+        />
+      </div>
+      <p className="mt-1.5 text-[11px] tabular-nums text-medio/60">
+        {formatarBRL(vendido)} de {formatarBRL(meta)}
+        {!bateu && ` · faltam ${formatarBRL(meta - vendido)}`}
+      </p>
+    </section>
+  );
+}
+
+export function PainelRelatorios({
+  painel,
+  aoFocarAgente,
+}: {
+  painel: PainelSupervisor;
+  aoFocarAgente?: (id: string, nome: string) => void;
+}) {
   const maxFunil = Math.max(1, ...painel.funil.map((e) => e.emAberto));
   const origens = painel.origens.slice(0, 6);
   const ranking = [...painel.ranking].sort(
@@ -96,6 +137,8 @@ export function PainelRelatorios({ painel }: { painel: PainelSupervisor }) {
       </div>
 
       <GradeIndicadores indicadores={painel.indicadores} />
+
+      <BarraMeta painel={painel} />
 
       {painel.funil.length > 0 && (
         <Secao titulo="Funil — negócios em aberto" icone={Layers}>
@@ -164,27 +207,47 @@ export function PainelRelatorios({ painel }: { painel: PainelSupervisor }) {
       )}
 
       {ranking.length > 0 && (
-        <Secao titulo="Ranking de vendedores" icone={Trophy}>
+        <Secao
+          titulo="Ranking de vendedores"
+          icone={Trophy}
+          extra={aoFocarAgente ? "clique p/ ver um vendedor" : undefined}
+        >
           <div className="space-y-1.5">
-            {ranking.map((v, i) => (
-              <LinhaLista key={v.agenteId}>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <span className="w-4 shrink-0 text-xs tabular-nums text-medio/50">
-                    {i + 1}
+            {ranking.map((v, i) => {
+              const conteudo = (
+                <>
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <span className="w-4 shrink-0 text-xs tabular-nums text-medio/50">
+                      {i + 1}
+                    </span>
+                    <span className="truncate text-escuro">{v.nome}</span>
                   </span>
-                  <span className="truncate text-escuro">{v.nome}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-3 text-xs text-medio/70">
-                  <span className="tabular-nums">{v.ganhos} ganhos</span>
-                  <span className="w-10 text-right tabular-nums">
-                    {formatarPct(v.conversao)}
+                  <span className="flex shrink-0 items-center gap-3 text-xs text-medio/70">
+                    <span className="tabular-nums">{v.ganhos} ganhos</span>
+                    <span className="w-10 text-right tabular-nums">
+                      {formatarPct(v.conversao)}
+                    </span>
+                    <span className="hidden w-24 text-right tabular-nums font-medium text-escuro sm:inline">
+                      {formatarBRL(v.valorVendido)}
+                    </span>
+                    {aoFocarAgente && (
+                      <ChevronRight className="h-3.5 w-3.5 text-medio/40" />
+                    )}
                   </span>
-                  <span className="hidden w-24 text-right tabular-nums font-medium text-escuro sm:inline">
-                    {formatarBRL(v.valorVendido)}
-                  </span>
-                </span>
-              </LinhaLista>
-            ))}
+                </>
+              );
+              return aoFocarAgente ? (
+                <button
+                  key={v.agenteId}
+                  onClick={() => aoFocarAgente(v.agenteId, v.nome)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-black/5 bg-white px-3 py-2 text-left text-sm transition-colors hover:border-tiffany/40 hover:bg-tiffany/[0.03]"
+                >
+                  {conteudo}
+                </button>
+              ) : (
+                <LinhaLista key={v.agenteId}>{conteudo}</LinhaLista>
+              );
+            })}
           </div>
         </Secao>
       )}

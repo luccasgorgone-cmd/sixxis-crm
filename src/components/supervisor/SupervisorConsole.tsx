@@ -7,7 +7,7 @@
 // período/finalidade); o Chat conversa com a IA, que também lê o painel no
 // servidor. Nada é executado sem confirmação do gestor (human-in-the-loop).
 import { useState, useEffect, useCallback, useRef } from "react";
-import { BarChart3, Bell, MessageSquare, Gauge, SlidersHorizontal, BookOpen } from "lucide-react";
+import { BarChart3, Bell, MessageSquare, Gauge, SlidersHorizontal, BookOpen, User, X } from "lucide-react";
 import { Cabecalho } from "@/components/admin/VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
@@ -91,6 +91,9 @@ export function SupervisorConsole() {
   const [erro, setErro] = useState(false);
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [finalidade, setFinalidade] = useState<Finalidade>("");
+  // Drilldown: quando o gestor clica num vendedor do ranking, todo o painel passa
+  // a ser recalculado no escopo daquele agente (a rota já aceita agenteId).
+  const [agenteFoco, setAgenteFoco] = useState<{ id: string; nome: string } | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
@@ -99,6 +102,7 @@ export function SupervisorConsole() {
     try {
       const qs = new URLSearchParams({ periodo });
       if (finalidade) qs.set("finalidade", finalidade);
+      if (agenteFoco) qs.set("agenteId", agenteFoco.id);
       const r = await fetch(`/api/admin/supervisor/painel?${qs.toString()}`);
       if (!r.ok) {
         setErro(true);
@@ -110,7 +114,7 @@ export function SupervisorConsole() {
     } finally {
       setCarregando(false);
     }
-  }, [periodo, finalidade]);
+  }, [periodo, finalidade, agenteFoco]);
 
   useEffect(() => {
     void carregar();
@@ -193,6 +197,20 @@ export function SupervisorConsole() {
             aoMudar={setFinalidade}
             rotuloGrupo="Finalidade"
           />
+          {/* Chip de foco no vendedor (drilldown) — clique no X volta ao geral. */}
+          {agenteFoco && (
+            <div className="flex items-center gap-1.5 rounded-lg border border-tiffany/30 bg-tiffany/5 px-2.5 py-1 text-xs font-medium text-tiffany">
+              <User className="h-3.5 w-3.5" />
+              {agenteFoco.nome}
+              <button
+                onClick={() => setAgenteFoco(null)}
+                aria-label="Voltar ao geral"
+                className="ml-0.5 rounded hover:text-tiffany-escuro"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -228,7 +246,12 @@ export function SupervisorConsole() {
         ) : painel ? (
           <div className={carregando ? "opacity-60 transition-opacity" : ""}>
             {aba === "relatorios" ? (
-              <PainelRelatorios painel={painel} />
+              <PainelRelatorios
+                painel={painel}
+                aoFocarAgente={
+                  agenteFoco ? undefined : (id, nome) => setAgenteFoco({ id, nome })
+                }
+              />
             ) : (
               <PainelAlertas painel={painel} />
             )}
