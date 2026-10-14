@@ -9,6 +9,7 @@ import { AtividadeTipo } from "../../../generated/prisma/enums";
 import { buscarNegocio } from "./comum";
 import {
   lerId,
+  lerNumero,
   lerTexto,
   type Args,
   type FerramentaEscrita,
@@ -24,6 +25,19 @@ function parseData(args: Args): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Resolve QUANDO agendar. Prioriza `dataHoraRelativaMin` (minutos a partir de
+// AGORA) — usado pela varredura, porque é recomputado na confirmação e nunca
+// "vence" (um dataHora absoluto gravado na proposta viraria passado se o gestor
+// demorasse a confirmar, travando a ação). Senão usa `dataHora` (ISO absoluto),
+// como no uso pelo chat.
+function resolverQuando(args: Args): Date | null {
+  const rel = lerNumero(args, "dataHoraRelativaMin");
+  if (rel != null && rel > 0) {
+    return new Date(Date.now() + Math.round(rel) * 60_000);
+  }
+  return parseData(args);
+}
+
 function formatar(d: Date): string {
   return d.toLocaleString("pt-BR", {
     day: "2-digit",
@@ -37,8 +51,10 @@ function formatar(d: Date): string {
 async function validar(args: Args): Promise<Validacao> {
   const negocioId = lerId(args, "negocioId");
   if (!negocioId) return { ok: false, erro: "negocioId é obrigatório" };
-  const data = parseData(args);
-  if (!data) return { ok: false, erro: "dataHora inválida (use ISO 8601)" };
+  const data = resolverQuando(args);
+  if (!data) {
+    return { ok: false, erro: "informe dataHora (ISO 8601) ou dataHoraRelativaMin (minutos)" };
+  }
   if (data.getTime() <= Date.now()) {
     return { ok: false, erro: "dataHora precisa ser no futuro" };
   }
@@ -48,7 +64,7 @@ async function validar(args: Args): Promise<Validacao> {
 }
 
 async function preview(args: Args): Promise<string> {
-  const data = parseData(args);
+  const data = resolverQuando(args);
   const nota = lerTexto(args, "nota");
   const quando = data ? formatar(data) : "(data)";
   return `Agendar contato para ${quando}${nota ? ` — ${nota}` : ""}.`;
@@ -59,7 +75,7 @@ async function executar(
   admin: { id: string; nome: string },
 ): Promise<ResultadoExec> {
   const negocioId = lerId(args, "negocioId")!;
-  const data = parseData(args)!;
+  const data = resolverQuando(args)!;
   const nota = lerTexto(args, "nota");
   const negocio = await buscarNegocio(negocioId);
   if (!negocio) return { ok: false, erro: "negócio sumiu", antes: null, depois: null };
@@ -150,14 +166,18 @@ export const criarLembrete: FerramentaEscrita = {
       negocioId: { type: "string", description: "id do negócio" },
       dataHora: {
         type: "string",
-        description: "data/hora do contato em ISO 8601 (futuro)",
+        description: "data/hora do contato em ISO 8601 (futuro). Use isto OU dataHoraRelativaMin.",
+      },
+      dataHoraRelativaMin: {
+        type: "number",
+        description: "alternativa a dataHora: minutos a partir de agora (recomputado na confirmação)",
       },
       nota: {
         type: "string",
         description: "observação opcional do lembrete",
       },
     },
-    required: ["negocioId", "dataHora"],
+    required: ["negocioId"],
     additionalProperties: false,
   },
   preview,

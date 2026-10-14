@@ -8,12 +8,13 @@
 // DUAS CLASSES DE FERRAMENTA, tratadas de formas OPOSTAS de propósito:
 //   • LEITURA (acoes/consultas) — EXECUTÁVEIS no laço de tool-use. Só consultam
 //     (painel, listagens). A IA chama à vontade para aprofundar o diagnóstico.
-//   • ESCRITA (acoes/registro) — NUNCA executáveis pela IA. Elas NÃO são
-//     passadas como "tools" ao provider. O máximo que a IA faz é PROPOR uma
-//     (campo `proposta` do envelope). Nada é gravado aqui: a proposta vira um
-//     SupervisorAcao(PROPOSTO) que o admin confirma numa segunda etapa
-//     (human-in-the-loop, §6). Fail-closed por desenho: o modelo não tem como
-//     auto-executar uma escrita, só sugerir.
+//   • ESCRITA (acoes/registro) — NÃO são passadas como "tools" ao provider. O
+//     modelo só as PROPÕE (campo `proposta` do envelope); aqui nada é gravado.
+//     A proposta sai com `acaoSolicitada`: se o GESTOR comandou a ação e ela é
+//     REVERSÍVEL, a rota de chat executa direto (o comando é a autorização, com
+//     undo); senão vira SupervisorAcao(PROPOSTO) que o admin confirma depois
+//     (human-in-the-loop). Default fail-safe: acaoSolicitada ausente = propõe.
+//     Ver SPEC_SUPERVISOR_CONFIG_EXPLICATIVO_VARREDURA §3.
 import { prisma } from "../prisma";
 import {
   obterProvider,

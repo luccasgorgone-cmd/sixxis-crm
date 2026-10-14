@@ -167,22 +167,60 @@ export async function conversaoPorEtapa(
   return coreFunil(etapas, negocios, agora);
 }
 
-// CORE: negócios ABERTO parados além do limiar de dias, agrupados por etapa.
-// Só etapas com ao menos 1 parado entram; ordena por mais parados primeiro.
+// Chave do limiar de SLA por etapa (mesma convenção de slaAlertas.ts).
+export function chaveSla(
+  finalidade: string | null | undefined,
+  etapaId: string | null,
+): string {
+  return `${finalidade ?? ""}:${etapaId ?? ""}`;
+}
+
+// FONTE ÚNICA do limiar de "parado" (SPEC_SUPERVISOR_CONFIG §5, item 3): usa o
+// SLA por (finalidade, etapa) de ConfigAlertaSla quando existe; senão cai no
+// `paradoDiasPadrao` global. Painel e varredura chamam isto — não há duas
+// definições. Retorna o limiar em ms e se veio do SLA.
+export function limiarParadoMs(
+  finalidade: string | null | undefined,
+  etapaId: string | null,
+  globalDias: number,
+  slaMinPorChave?: Map<string, number>,
+): { ms: number; viaSla: boolean } {
+  const min = slaMinPorChave?.get(chaveSla(finalidade, etapaId));
+  if (min != null) return { ms: min * 60_000, viaSla: true };
+  return { ms: globalDias * MS_DIA, viaSla: false };
+}
+
+// Um negócio está "parado"? Caminho SLA usa `>=` (igual slaAlertas.ts); o
+// caminho global mantém `>` (comportamento histórico do painel).
+export function estaParado(
+  entrouEtapaEm: Date,
+  agora: Date,
+  limiar: { ms: number; viaSla: boolean },
+): boolean {
+  const decorrido = agora.getTime() - entrouEtapaEm.getTime();
+  return limiar.viaSla ? decorrido >= limiar.ms : decorrido > limiar.ms;
+}
+
+// CORE: negócios ABERTO parados além do limiar, agrupados por etapa. O limiar é
+// resolvido por `limiarParadoMs` (SLA por etapa + fallback global) — fonte única
+// com a varredura. Só etapas com ao menos 1 parado entram; mais parados primeiro.
 const SEM_ETAPA = "(sem etapa)";
 export function coreParados(
   etapas: MetaEtapa[],
-  negocios: { etapaId: string | null; entrouEtapaEm: Date }[],
+  negocios: { etapaId: string | null; entrouEtapaEm: Date; finalidade?: string | null }[],
   limiarDias: number,
   agora: Date,
+  slaMinPorChave?: Map<string, number>,
 ): ParadoPorEtapa[] {
   const nomePorId = new Map(etapas.map((e) => [e.id, e.nome]));
   const conta = new Map<string, number>();
+  const viaSlaNaChave = new Map<string, boolean>();
   for (const n of negocios) {
-    const dias = (agora.getTime() - n.entrouEtapaEm.getTime()) / MS_DIA;
-    if (dias <= limiarDias) continue;
+    const limiar = limiarParadoMs(n.finalidade, n.etapaId, limiarDias, slaMinPorChave);
+    if (!estaParado(n.entrouEtapaEm, agora, limiar)) continue;
     const chave = n.etapaId ?? "";
     conta.set(chave, (conta.get(chave) ?? 0) + 1);
+    if (limiar.viaSla) viaSlaNaChave.set(chave, true);
   }
   const saida: ParadoPorEtapa[] = [];
   for (const [chave, parados] of conta) {
@@ -190,7 +228,9 @@ export function coreParados(
       etapaId: chave || null,
       nome: chave ? nomePorId.get(chave) ?? SEM_ETAPA : SEM_ETAPA,
       parados,
-      limiarDias,
+      // limiarDias só é afirmável quando o grupo usou o limiar global (dias). Se
+      // usou SLA (minutos por etapa), fica null — a UI omite o "+N d parado".
+      limiarDias: viaSlaNaChave.get(chave) ? null : limiarDias,
     });
   }
   return saida.sort((a, b) => b.parados - a.parados);

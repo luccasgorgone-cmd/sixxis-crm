@@ -56,20 +56,23 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ erro: r.erro }, { status: 422 });
   }
 
-  const salvo = await salvarConfigEditavel(r.valor);
-
-  // Trilha de auditoria + undo (mesma tabela das ações da IA).
-  await prisma.supervisorAcao.create({
-    data: {
-      adminId: admin.id,
-      ferramenta: "definir_config",
-      argsJson: patch as Prisma.InputJsonValue,
-      preview: "Configuração alterada pelo gestor (formulário).",
-      status: "EXECUTADO",
-      executadoEm: new Date(),
-      antesJson: base as unknown as Prisma.InputJsonValue,
-      depoisJson: salvo as unknown as Prisma.InputJsonValue,
-    },
+  // Config + trilha de auditoria/undo gravadas ATOMICAMENTE (se a auditoria
+  // falhar, a config não muda sem rastro).
+  const salvo = await prisma.$transaction(async (tx) => {
+    const s = await salvarConfigEditavel(r.valor, tx);
+    await tx.supervisorAcao.create({
+      data: {
+        adminId: admin.id,
+        ferramenta: "definir_config",
+        argsJson: patch as Prisma.InputJsonValue,
+        preview: "Configuração alterada pelo gestor (formulário).",
+        status: "EXECUTADO",
+        executadoEm: new Date(),
+        antesJson: base as unknown as Prisma.InputJsonValue,
+        depoisJson: s as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return s;
   });
 
   return NextResponse.json({ ok: true, config: salvo });

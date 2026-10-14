@@ -10,6 +10,7 @@ import { analisarPerdidosWhere } from "../perdidos";
 import { whereVendaNoPeriodo, comEscopo } from "../vendasPeriodo";
 import type { Prisma } from "../../generated/prisma/client";
 import {
+  chaveSla,
   coberturaFunil,
   coreCobertura,
   coreFunil,
@@ -130,6 +131,7 @@ export async function montarPainel(
     select: {
       etapaId: true,
       entrouEtapaEm: true,
+      finalidade: true,
       valor: true,
       valorAjustado: true,
       temperatura: true,
@@ -185,8 +187,17 @@ export async function montarPainel(
       montarRanking(janela, finalidade, limiares),
     ]);
 
+  // Limiares de SLA por (finalidade, etapa) — MESMA fonte que a varredura usa
+  // para "parado" (ConfigAlertaSla). Onde não houver, cai no paradoDiasPadrao.
+  const slasAtivos = await prisma.configAlertaSla
+    .findMany({ where: { ativo: true }, select: { finalidade: true, etapaId: true, minutosParaAlerta: true } })
+    .catch(() => []);
+  const slaMin = new Map(
+    slasAtivos.map((s) => [chaveSla(s.finalidade, s.etapaId), s.minutosParaAlerta]),
+  );
+
   const funil = coreFunil(etapas, abertos, agora);
-  const parados = coreParados(etapas, abertos, limiares.paradoDiasPadrao, agora);
+  const parados = coreParados(etapas, abertos, limiares.paradoDiasPadrao, agora, slaMin);
 
   const metaRestante =
     limiares.metaPeriodoReais !== null

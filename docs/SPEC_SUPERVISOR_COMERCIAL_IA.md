@@ -16,8 +16,15 @@ Criar, numa **aba só para admins** do CRM, um **Supervisor Comercial** que:
 2. Tem um **chat** com visão ampla do sistema ("sabe de tudo") que, sobre esses
    números, **diagnostica o gargalo, escreve plano de ação** e responde perguntas.
 3. Pelo chat, **propõe e executa alterações** no estado interno do CRM —
-   **sempre com confirmação humana** (human-in-the-loop), reusando a mesma
-   validação de quando um admin faz na mão, com log e reversibilidade.
+   reusando a mesma validação de quando um admin faz na mão, com log e
+   reversibilidade.
+   > **ATUALIZAÇÃO (14/10/2026 — supersede o "sempre com confirmação humana"
+   > abaixo):** por decisão do Luccas, quando o GESTOR COMANDA a ação no chat e
+   > ela é REVERSÍVEL, o comando é a autorização e ela executa direto (com undo);
+   > a confirmação em duas etapas fica só para a IA sugerindo por conta própria e
+   > para ações irreversíveis. Detalhe em
+   > `SPEC_SUPERVISOR_CONFIG_EXPLICATIVO_VARREDURA.md` §3. A linha vermelha de
+   > **nunca falar com cliente** NÃO muda.
 
 O papel-alvo é o do doc: dono da execução comercial (demanda, funil, pessoas,
 governança, análise), com o diagnóstico da SIXXIS já apontado (1ª resposta de
@@ -222,8 +229,11 @@ métrica, mandar mensagem a cliente, executar escrita direto.
 
 ## 6. Harness de escrita — human-in-the-loop (o ponto sensível)
 
-**Princípio:** a IA **nunca** escreve direto. Ela **propõe** uma ação tipada; o
-servidor só executa após o admin **Confirmar** na UI. **Molde já existente a
+**Princípio (atualizado 14/10/2026):** a IA propõe uma ação tipada. Por padrão o
+servidor só executa após o admin **Confirmar** na UI — MAS, quando o gestor
+comanda a ação diretamente no chat e ela é reversível, executa na hora com undo
+(ver nota no item 3 e `SPEC_SUPERVISOR_CONFIG_EXPLICATIVO_VARREDURA.md` §3). O
+modelo nunca ganha ferramenta de envio a cliente. **Molde já existente a
 copiar:** `src/lib/aplicarSync.ts` (prévia não-escreve → aplicar recomputa no
 servidor → `$transaction` idempotente → log) — mesmo formato, outro conjunto de
 mutações (funil em vez de cadastro/NF).

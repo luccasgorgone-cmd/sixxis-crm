@@ -20,6 +20,12 @@ import {
   linhasConfig,
   REGISTRO_SISTEMA,
 } from "../../src/lib/supervisor/explicativo";
+import {
+  chaveSla,
+  limiarParadoMs,
+  estaParado,
+  coreParados,
+} from "../../src/lib/supervisor/indicadores";
 
 let ok = 0;
 let falhou = 0;
@@ -190,6 +196,50 @@ caso("REGISTRO_SISTEMA: não vazio e toda entrada completa", () => {
   for (const e of REGISTRO_SISTEMA) {
     assert.ok(e.chave && e.nome && e.oQueFaz && e.cadencia && e.le && e.editavel && e.fonte);
   }
+});
+
+// ───────────────────── 4) "Parado" — fonte única (painel == varredura) ──────
+
+const DIA = 86_400_000;
+
+caso("limiarParadoMs: SLA por etapa vence o global; fallback global sem SLA", () => {
+  const sla = new Map<string, number>([[chaveSla("VENDA", "e1"), 120]]); // 2h
+  const comSla = limiarParadoMs("VENDA", "e1", 7, sla);
+  assert.deepEqual(comSla, { ms: 120 * 60_000, viaSla: true });
+  const semSla = limiarParadoMs("VENDA", "e2", 7, sla);
+  assert.deepEqual(semSla, { ms: 7 * DIA, viaSla: false });
+});
+
+caso("estaParado: SLA usa >= (na borda conta); global usa > (na borda não conta)", () => {
+  const agora = new Date("2026-10-14T12:00:00Z");
+  const t = (ms: number) => new Date(agora.getTime() - ms);
+  // SLA: exatamente no limiar => parado
+  assert.equal(estaParado(t(120 * 60_000), agora, { ms: 120 * 60_000, viaSla: true }), true);
+  // global: exatamente no limiar => NÃO parado (> estrito, comportamento antigo)
+  assert.equal(estaParado(t(7 * DIA), agora, { ms: 7 * DIA, viaSla: false }), false);
+  assert.equal(estaParado(t(7 * DIA + 1), agora, { ms: 7 * DIA, viaSla: false }), true);
+});
+
+caso("coreParados: mistura SLA+global; limiarDias null quando veio do SLA", () => {
+  const agora = new Date("2026-10-14T12:00:00Z");
+  const t = (ms: number) => new Date(agora.getTime() - ms);
+  const etapas = [
+    { id: "e1", nome: "Novo", ordem: 1 },
+    { id: "e2", nome: "Proposta", ordem: 2 },
+  ];
+  const negocios = [
+    { etapaId: "e1", entrouEtapaEm: t(3 * 60 * 60_000), finalidade: "VENDA" }, // 3h, SLA 2h => parado
+    { etapaId: "e2", entrouEtapaEm: t(10 * DIA), finalidade: "VENDA" }, // sem SLA, 10d > 7 => parado
+    { etapaId: "e2", entrouEtapaEm: t(2 * DIA), finalidade: "VENDA" }, // sem SLA, 2d <= 7 => não
+  ];
+  const sla = new Map<string, number>([[chaveSla("VENDA", "e1"), 120]]);
+  const r = coreParados(etapas, negocios, 7, agora, sla);
+  const e1 = r.find((x) => x.etapaId === "e1")!;
+  const e2 = r.find((x) => x.etapaId === "e2")!;
+  assert.equal(e1.parados, 1);
+  assert.equal(e1.limiarDias, null); // veio do SLA
+  assert.equal(e2.parados, 1);
+  assert.equal(e2.limiarDias, 7); // veio do global
 });
 
 console.log(`\nC6 supervisor config/varredura: ${ok} ok, ${falhou} falha(s)`);

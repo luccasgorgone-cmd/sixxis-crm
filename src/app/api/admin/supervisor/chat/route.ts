@@ -1,8 +1,13 @@
 // Admin: CHAT do Supervisor Comercial (Camada 2, IA). Recebe o histórico do chat
-// e devolve a resposta do consultor interno. A IA NUNCA executa escrita: quando
-// ela sugere uma ação no CRM, esta rota PERSISTE a sugestão como
-// SupervisorAcao(PROPOSTO) e devolve o id — a execução só acontece depois, no
-// /acao/confirmar, com clique do admin (human-in-the-loop, §6).
+// e devolve a resposta do consultor interno. DOIS modos (ver SPEC_SUPERVISOR_
+// CONFIG_EXPLICATIVO_VARREDURA §3, que supersede o "só propõe" do spec original):
+//   • A IA SUGERE por conta própria (acaoSolicitada=false) → materializa como
+//     SupervisorAcao(PROPOSTO); a execução só vem depois, no /acao/confirmar, com
+//     clique do admin (human-in-the-loop).
+//   • O GESTOR COMANDA no chat (acaoSolicitada=true) E a ferramenta é REVERSÍVEL
+//     → o comando é a autorização: esta rota executa direto (confirmarAcao) e
+//     devolve status EXECUTADO, com undo. Ação IRREVERSÍVEL nunca executa direto.
+// Default é fail-safe: sem acaoSolicitada=true, cai no modo propõe.
 //
 // Toda chamada paga passa pelo teto mensal dentro de gerarRespostaSupervisor
 // (HARD STOP antes da rede). O gasto é gravado em SolEvento (mesmo teto da Sol).

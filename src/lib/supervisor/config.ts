@@ -25,25 +25,30 @@ export async function carregarConfigEditavel(): Promise<ConfigEditavel> {
   };
 }
 
+// Cliente Prisma OU client de transação (para gravar config + auditoria juntos).
+type DbCliente = typeof prisma | Prisma.TransactionClient;
+
 // Persiste a config editável na linha única. Preserva provider/modelo (só
 // atualiza os dois JSONs). Cria a linha se ainda não existir. `atualizadoEm` é
-// @updatedAt — o Prisma cuida. Retorna o valor gravado (resolvido de volta).
+// @updatedAt — o Prisma cuida. Aceita um client de transação para operar junto
+// com a trilha de auditoria. Retorna o valor gravado (resolvido de volta).
 export async function salvarConfigEditavel(
   valor: ConfigEditavel,
+  db: DbCliente = prisma,
 ): Promise<ConfigEditavel> {
   const limiaresJson = valor.limiares as unknown as Prisma.InputJsonValue;
   const varreduraJson = valor.varredura as unknown as Prisma.InputJsonValue;
-  const existente = await prisma.supervisorConfig.findFirst({
+  const existente = await db.supervisorConfig.findFirst({
     select: { id: true },
     orderBy: { atualizadoEm: "desc" },
   });
   if (existente) {
-    await prisma.supervisorConfig.update({
+    await db.supervisorConfig.update({
       where: { id: existente.id },
       data: { limiaresJson, varreduraJson },
     });
   } else {
-    await prisma.supervisorConfig.create({
+    await db.supervisorConfig.create({
       data: { limiaresJson, varreduraJson },
     });
   }

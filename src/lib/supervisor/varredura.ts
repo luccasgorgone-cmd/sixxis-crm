@@ -10,6 +10,7 @@
 import { prisma } from "../prisma";
 import { carregarConfigEditavel } from "./config";
 import type { ConfigEditavel } from "./tipos";
+import { chaveSla, limiarParadoMs, estaParado } from "./indicadores";
 import { StatusNeg } from "../../generated/prisma/enums";
 import type { Prisma } from "../../generated/prisma/client";
 
@@ -42,12 +43,13 @@ async function detSemProximoPasso(agora: Date): Promise<Candidato[]> {
 // por finalidade+etapa, em minutos); onde não houver config, cai no limiar
 // global `paradoDiasPadrao` da config do Supervisor.
 async function detParado(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]> {
+  // MESMO limiar do painel: SLA por (finalidade,etapa) + fallback global, via o
+  // helper único de indicadores.ts (sem segunda definição de "parado").
   const slas = await prisma.configAlertaSla.findMany({
     where: { ativo: true },
     select: { finalidade: true, etapaId: true, minutosParaAlerta: true },
   });
-  const mapa = new Map(slas.map((s) => [`${s.finalidade}:${s.etapaId}`, s.minutosParaAlerta]));
-  const limiarGlobalMs = cfg.limiares.paradoDiasPadrao * 86_400_000;
+  const slaMin = new Map(slas.map((s) => [chaveSla(s.finalidade, s.etapaId), s.minutosParaAlerta]));
 
   const negs = await prisma.negocio.findMany({
     where: { status: StatusNeg.ABERTO, etapaId: { not: null } },
@@ -58,12 +60,9 @@ async function detParado(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]>
   const out: Candidato[] = [];
   for (const n of negs) {
     if (!n.entrouEtapaEm) continue;
-    const decorridoMs = agora.getTime() - n.entrouEtapaEm.getTime();
-    const minSla = mapa.get(`${n.finalidade}:${n.etapaId}`);
-    const estourou =
-      minSla != null ? decorridoMs >= minSla * 60_000 : decorridoMs >= limiarGlobalMs;
-    if (estourou) {
-      const dias = Math.floor(decorridoMs / 86_400_000);
+    const limiar = limiarParadoMs(n.finalidade, n.etapaId, cfg.limiares.paradoDiasPadrao, slaMin);
+    if (estaParado(n.entrouEtapaEm, agora, limiar)) {
+      const dias = Math.floor((agora.getTime() - n.entrouEtapaEm.getTime()) / 86_400_000);
       out.push({ negocioId: n.id, motivo: `Parado há ${dias} dia(s) em "${n.etapa?.nome ?? "etapa"}"` });
       if (out.length >= TAKE_POR_SINAL) break;
     }
@@ -187,11 +186,13 @@ export async function executarVarredura(agora: Date = new Date()): Promise<Resum
 
   let criadas = 0;
   let pulados = 0;
-  const dataHora = new Date(agora.getTime() + 3_600_000).toISOString(); // sugere contato em 1h
   for (const a of achados) {
     if (jaSet.has(a.negocioId)) { pulados++; continue; }
     if (criadas >= CAP_POR_CICLO) { pulados++; continue; }
-    const args: Prisma.InputJsonValue = { negocioId: a.negocioId, dataHora, nota: a.motivo };
+    // dataHoraRelativaMin (não um instante fixo): o lembrete é recomputado para
+    // ~1h à frente NA HORA DA CONFIRMAÇÃO, então a proposta nunca "vence" se o
+    // gestor demorar a confirmar (evita o beco sem saída de validar no passado).
+    const args: Prisma.InputJsonValue = { negocioId: a.negocioId, dataHoraRelativaMin: 60, nota: a.motivo };
     await prisma.supervisorAcao.create({
       data: {
         adminId: ORIGEM_VARREDURA,
