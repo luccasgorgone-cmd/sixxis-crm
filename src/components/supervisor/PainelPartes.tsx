@@ -8,6 +8,7 @@ import type {
   UnidadeIndicador,
 } from "@/lib/supervisor/tipos";
 import { formatarBRL, formatarDuracao, formatarPct } from "@/lib/format";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 // Cor do ponto de semáforo. neutro = "sem leitura" (cinza), nunca verde.
 export const COR_SEMAFORO: Record<Semaforo, string> = {
@@ -43,6 +44,37 @@ function formatarMeta(ind: Indicador): string | null {
   return `meta ${formatarValor(ind.meta, ind.unidade)}`;
 }
 
+// Variação período-a-período: diferença ABSOLUTA na mesma unidade (evita a
+// confusão de "% de %"). Cor por melhora/piora conforme maiorMelhor; seta pela
+// direção bruta do valor.
+function VariacaoIndicador({ ind }: { ind: Indicador }) {
+  if (ind.valorAnterior == null || ind.valor == null) return null;
+  const delta = ind.valor - ind.valorAnterior;
+  if (delta === 0) {
+    return (
+      <span
+        className="text-[11px] font-medium text-medio/40"
+        title="Igual ao período anterior"
+      >
+        0
+      </span>
+    );
+  }
+  const melhorou = ind.maiorMelhor ? delta > 0 : delta < 0;
+  const Seta = delta > 0 ? ArrowUp : ArrowDown;
+  return (
+    <span
+      className={`flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${
+        melhorou ? "text-sucesso" : "text-erro"
+      }`}
+      title={`${formatarValor(ind.valorAnterior, ind.unidade)} no período anterior`}
+    >
+      <Seta className="h-3 w-3" />
+      {formatarValor(Math.abs(delta), ind.unidade)}
+    </span>
+  );
+}
+
 export function CartaoIndicador({ ind }: { ind: Indicador }) {
   return (
     <div className="rounded-xl border border-black/5 bg-white p-3.5 transition-colors hover:border-black/10">
@@ -55,9 +87,12 @@ export function CartaoIndicador({ ind }: { ind: Indicador }) {
           aria-hidden
         />
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-escuro">
-        {formatarValor(ind.valor, ind.unidade)}
-      </p>
+      <div className="mt-2 flex items-baseline justify-between gap-2">
+        <p className="text-2xl font-semibold tabular-nums tracking-tight text-escuro">
+          {formatarValor(ind.valor, ind.unidade)}
+        </p>
+        <VariacaoIndicador ind={ind} />
+      </div>
       <p className="mt-0.5 text-[11px] leading-tight text-medio/50">
         {ind.detalhe ?? formatarMeta(ind) ?? " "}
       </p>

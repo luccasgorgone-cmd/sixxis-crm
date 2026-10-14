@@ -6,8 +6,9 @@
 // histórico enviado à API contém só as trocas gestor/assistente (notas de sistema
 // são locais, para o gestor ver o que aconteceu — nunca vão ao modelo).
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Loader2, Sparkles, Info } from "lucide-react";
+import { Send, Loader2, Sparkles, Info, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { Markdown } from "@/components/ui/Markdown";
 import { CardAcao, type AcaoProposta, type ResolucaoAcao } from "./CardAcao";
 
 type Autor = "gestor" | "assistente" | "sistema";
@@ -26,12 +27,36 @@ const SUGESTOES = [
   "Onde estamos perdendo mais no funil?",
 ];
 
+// Sugestões compactas que seguem disponíveis durante a conversa (não só no
+// estado vazio) — ajudam o gestor a continuar sem pensar no fraseado.
+const SUGESTOES_CONTINUAS = [
+  "Resuma o funil agora",
+  "Quem está sem próximo passo?",
+  "Onde perdemos mais?",
+  "O que priorizar hoje?",
+];
+
+// Histórico do chat persiste na sessão do navegador — não some ao trocar de aba.
+const CHAVE_CHAT = "supervisor.chat.v1";
+
+function carregarHistorico(): Mensagem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const bruto = window.sessionStorage.getItem(CHAVE_CHAT);
+    if (!bruto) return [];
+    const dados = JSON.parse(bruto) as Mensagem[];
+    return Array.isArray(dados) ? dados.slice(-60) : [];
+  } catch {
+    return [];
+  }
+}
+
 let contador = 0;
 const novoId = () => `m${Date.now()}-${contador++}`;
 
 export function ChatSupervisor() {
   const toast = useToast();
-  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
+  const [mensagens, setMensagens] = useState<Mensagem[]>(carregarHistorico);
   const [entrada, setEntrada] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [acaoPendente, setAcaoPendente] = useState<AcaoProposta | null>(null);
@@ -40,6 +65,31 @@ export function ChatSupervisor() {
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens, acaoPendente]);
+
+  // Persiste o histórico (cap defensivo) a cada mudança.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        CHAVE_CHAT,
+        JSON.stringify(mensagens.slice(-60)),
+      );
+    } catch {
+      // storage cheio/indisponível: segue sem persistir
+    }
+  }, [mensagens]);
+
+  const limparConversa = useCallback(() => {
+    setMensagens([]);
+    setAcaoPendente(null);
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.removeItem(CHAVE_CHAT);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   const enviar = useCallback(
     async (texto: string) => {
@@ -172,13 +222,13 @@ export function ChatSupervisor() {
                 }`}
               >
                 <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
                     m.autor === "gestor"
-                      ? "bg-tiffany text-white"
+                      ? "whitespace-pre-wrap bg-tiffany text-white"
                       : "border border-black/5 bg-white text-escuro"
                   }`}
                 >
-                  {m.texto}
+                  {m.autor === "gestor" ? m.texto : <Markdown texto={m.texto} />}
                 </div>
               </div>
             ),
@@ -201,6 +251,30 @@ export function ChatSupervisor() {
 
       {/* Composer */}
       <div className="border-t border-black/5 p-3">
+        {/* Sugestões contínuas + limpar — só quando há conversa e o campo está
+            vazio, para não poluir enquanto o gestor digita. */}
+        {!vazio && !entrada.trim() && (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {SUGESTOES_CONTINUAS.map((s) => (
+              <button
+                key={s}
+                onClick={() => void enviar(s)}
+                disabled={enviando}
+                className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] text-medio transition-colors hover:border-tiffany hover:text-tiffany disabled:opacity-40"
+              >
+                {s}
+              </button>
+            ))}
+            <button
+              onClick={limparConversa}
+              disabled={enviando}
+              className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-medio/60 transition-colors hover:text-erro disabled:opacity-40"
+              aria-label="Limpar conversa"
+            >
+              <Trash2 className="h-3 w-3" /> Limpar
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             value={entrada}

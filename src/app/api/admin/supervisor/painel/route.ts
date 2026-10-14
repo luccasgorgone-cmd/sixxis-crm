@@ -7,9 +7,10 @@
 //                                 [&finalidade=VENDA|POS_VENDA][&agenteId=]
 import { NextResponse, type NextRequest } from "next/server";
 import { obterAdmin } from "@/lib/autorizacao";
-import { resolverPeriodo } from "@/lib/metricas";
+import { resolverPeriodo, calcularMetricas } from "@/lib/metricas";
 import { montarPainel } from "@/lib/supervisor/painel";
-import { resolverLimiares } from "@/lib/supervisor/tipos";
+import { pctDentroDoPrazo1aResposta } from "@/lib/supervisor/indicadores";
+import { resolverLimiares, IND, type EscopoSupervisor } from "@/lib/supervisor/tipos";
 import { prisma } from "@/lib/prisma";
 import { Finalidade } from "@/generated/prisma/enums";
 
@@ -48,5 +49,38 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     { agenteId },
     new Date(),
   );
+
+  // Variação período-a-período: calcula a janela IMEDIATAMENTE anterior (mesma
+  // duração) e anexa valorAnterior aos indicadores de PERÍODO. É barato — só as
+  // duas funções de período (métricas + 1ª resposta), sem refazer o painel todo
+  // (nada de ranking/origens/snapshot de abertos).
+  try {
+    const dur = fim.getTime() - inicio.getTime();
+    if (dur > 0) {
+      const janelaAnt = { inicio: new Date(inicio.getTime() - dur), fim: inicio };
+      const escopoSup: EscopoSupervisor = {
+        finalidade: finalidade ?? undefined,
+        agenteId,
+      };
+      const [mAnt, pctAnt] = await Promise.all([
+        calcularMetricas(janelaAnt, escopoSup),
+        pctDentroDoPrazo1aResposta(janelaAnt, limiares.prazo1aRespostaSeg, escopoSup),
+      ]);
+      const anteriores: Record<string, number | null> = {
+        [IND.PCT_PRAZO]: pctAnt.pct,
+        [IND.CONVERSAO]: mAnt.conversao,
+        [IND.TEMPO_1A_RESP]: mAnt.tempoPrimeiraRespostaSeg || null,
+        [IND.TICKET]: mAnt.ticketMedio || null,
+      };
+      painel.indicadores = painel.indicadores.map((ind) =>
+        ind.chave in anteriores
+          ? { ...ind, valorAnterior: anteriores[ind.chave] }
+          : ind,
+      );
+    }
+  } catch {
+    // Se a comparação falhar, segue sem deltas — o painel principal é o que importa.
+  }
+
   return NextResponse.json(painel);
 }

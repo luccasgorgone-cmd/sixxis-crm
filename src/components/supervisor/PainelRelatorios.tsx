@@ -6,8 +6,75 @@
 // nascem no servidor — aqui só se renderiza.
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
 import { formatarBRL, formatarPct } from "@/lib/format";
-import { Layers, Megaphone, Trophy } from "lucide-react";
-import { GradeIndicadores, LinhaLista, Secao } from "./PainelPartes";
+import { Download, Layers, Megaphone, Trophy } from "lucide-react";
+import { GradeIndicadores, LinhaLista, Secao, formatarValor } from "./PainelPartes";
+
+// Exporta o painel para CSV (separador ';' + BOM, amigável ao Excel pt-BR). Sem
+// dependência: serializa o que a tela já mostra, em seções.
+function csvEscapar(v: string | number | null | undefined): string {
+  const s = v == null ? "" : String(v);
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function gerarCsv(painel: PainelSupervisor): string {
+  const linhas: (string | number | null)[][] = [];
+  linhas.push(["Indicador", "Valor", "Período anterior", "Meta"]);
+  for (const ind of painel.indicadores) {
+    linhas.push([
+      ind.titulo,
+      formatarValor(ind.valor, ind.unidade),
+      ind.valorAnterior != null ? formatarValor(ind.valorAnterior, ind.unidade) : "",
+      ind.meta != null ? formatarValor(ind.meta, ind.unidade) : "",
+    ]);
+  }
+  linhas.push([]);
+  linhas.push(["Funil — etapa", "Negócios em aberto", "Valor em aberto", "Ciclo médio (dias)"]);
+  for (const e of painel.funil) {
+    linhas.push([
+      e.nome,
+      e.emAberto,
+      formatarBRL(e.valorEmAberto),
+      e.cicloMedioDias != null ? Math.round(e.cicloMedioDias) : "",
+    ]);
+  }
+  linhas.push([]);
+  linhas.push(["Origem", "Ganhos", "Perdas", "Conversão", "Valor ganho"]);
+  for (const o of painel.origens) {
+    linhas.push([
+      o.origem,
+      o.ganhos,
+      o.perdas,
+      o.conversao != null ? formatarPct(o.conversao) : "",
+      formatarBRL(o.valorGanho),
+    ]);
+  }
+  linhas.push([]);
+  linhas.push(["Vendedor", "Ganhos", "Perdidos", "Conversão", "Valor vendido", "Sem próximo passo"]);
+  for (const v of painel.ranking) {
+    linhas.push([
+      v.nome,
+      v.ganhos,
+      v.perdidos,
+      formatarPct(v.conversao),
+      formatarBRL(v.valorVendido),
+      v.semProximoPasso,
+    ]);
+  }
+  return linhas.map((l) => l.map(csvEscapar).join(";")).join("\n");
+}
+
+function baixarCsv(painel: PainelSupervisor) {
+  const csv = "﻿" + gerarCsv(painel);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `supervisor-relatorio-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function PainelRelatorios({ painel }: { painel: PainelSupervisor }) {
   const maxFunil = Math.max(1, ...painel.funil.map((e) => e.emAberto));
@@ -18,6 +85,16 @@ export function PainelRelatorios({ painel }: { painel: PainelSupervisor }) {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <button
+          onClick={() => baixarCsv(painel)}
+          className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-medio transition-colors hover:border-tiffany hover:text-tiffany"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Exportar CSV
+        </button>
+      </div>
+
       <GradeIndicadores indicadores={painel.indicadores} />
 
       {painel.funil.length > 0 && (

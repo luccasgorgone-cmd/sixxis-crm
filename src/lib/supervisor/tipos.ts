@@ -33,6 +33,11 @@ export type Indicador = {
   // true: maior é melhor (conversão, cobertura). false: menor é melhor (tempo).
   maiorMelhor: boolean;
   detalhe?: string;
+  // Valor do MESMO indicador na janela imediatamente anterior (mesma duração),
+  // para variação período-a-período. Só é preenchido para indicadores de PERÍODO
+  // (1ª resposta, conversão, tempo, ticket) — cobertura e "sem próximo passo" são
+  // estado atual e não comparam com janela passada. undefined = não calculado.
+  valorAnterior?: number | null;
 };
 
 // --- Resultados das métricas novas (§4). Cada um tem um CORE PURO (testável por
