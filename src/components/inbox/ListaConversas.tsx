@@ -12,8 +12,15 @@ import {
   PinOff,
   MoreVertical,
   CircleDot,
+  Layers,
 } from "lucide-react";
-import type { ConversaItem, Filtro, Finalidade } from "./tipos";
+import type {
+  ConversaItem,
+  Filtro,
+  Finalidade,
+  EtapaOpcao,
+  FiltroEtapa,
+} from "./tipos";
 import { horarioLista } from "@/lib/format";
 import { BadgeFinalidade, corFinalidade } from "@/components/BadgeFinalidade";
 import { AvatarCliente } from "@/components/AvatarCliente";
@@ -46,6 +53,9 @@ export function ListaConversas({
   mostrarFinalidade,
   periodo,
   contadorPeriodo,
+  etapasOpcoes,
+  etapaFiltro,
+  onEtapa,
   onBusca,
   onFiltro,
   onFinalidade,
@@ -65,6 +75,10 @@ export function ListaConversas({
   mostrarFinalidade: boolean;
   periodo: PeriodoEntrada;
   contadorPeriodo?: number;
+  // Filtro por etapa do funil (so exibicao/filtro; nunca mexe no Kanban).
+  etapasOpcoes: EtapaOpcao[];
+  etapaFiltro: FiltroEtapa;
+  onEtapa: (v: FiltroEtapa) => void;
   onBusca: (v: string) => void;
   onFiltro: (f: Filtro) => void;
   onFinalidade: (f: Finalidade | "") => void;
@@ -128,6 +142,25 @@ export function ListaConversas({
             contador={contadorPeriodo}
           />
         </div>
+        {/* Filtro por etapa do funil: em que etapa o cliente esta. So filtra a
+            lista do Inbox — nao altera o Kanban. */}
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-black/10 bg-fundo px-3">
+          <Layers className="h-4 w-4 shrink-0 text-medio/50" />
+          <select
+            value={etapaFiltro}
+            onChange={(e) => onEtapa(e.target.value)}
+            aria-label="Filtrar por etapa"
+            className="w-full bg-transparent py-2 text-sm text-escuro outline-none"
+          >
+            <option value="">Todas as etapas</option>
+            {etapasOpcoes.map((et) => (
+              <option key={et.id} value={et.id}>
+                {et.nome}
+              </option>
+            ))}
+            <option value="SEM">Sem etapa</option>
+          </select>
+        </div>
       </div>
 
       {/* Lista */}
@@ -137,7 +170,7 @@ export function ListaConversas({
         ) : erro ? (
           <EstadoErro mensagem={erro} onRetry={onTentar} compacto />
         ) : conversas.length === 0 ? (
-          busca.trim() || filtro !== "todas" ? (
+          busca.trim() || filtro !== "todas" || etapaFiltro ? (
             <EstadoVazio
               icone={SearchX}
               titulo="Nenhum resultado"
@@ -249,9 +282,22 @@ function ItemConversa({
             {horarioLista(conversa.ultimaMensagemEm)}
           </span>
         </div>
-        {(conversa.finalidade || conversa.instanciaNome) && (
+        {(conversa.finalidade || conversa.instanciaNome || conversa.etapa) && (
           <div className="mb-0.5 flex items-center gap-1.5">
             <BadgeFinalidade finalidade={conversa.finalidade} />
+            {/* Etapa atual do cliente no funil (so leitura; nao e o Kanban). */}
+            {conversa.etapa && (
+              <span
+                className="flex min-w-0 items-center gap-1 text-[10px] text-medio/60"
+                title={`Etapa: ${conversa.etapa.nome}`}
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: conversa.etapa.cor ?? "#9ca3af" }}
+                />
+                <span className="truncate">{conversa.etapa.nome}</span>
+              </span>
+            )}
             {conversa.instanciaNome && (
               <span className="truncate text-[10px] text-medio/40">
                 {conversa.instanciaNome}

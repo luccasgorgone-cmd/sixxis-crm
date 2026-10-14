@@ -7,7 +7,7 @@ import { MessageSquare } from "lucide-react";
 import { getSocket } from "@/lib/socketClient";
 import { previewMensagem } from "@/lib/preview";
 import { normalizarTexto } from "@/lib/format";
-import { compararPin } from "@/lib/ordenacao";
+import { compararConversasInbox } from "@/lib/ordenacao";
 import { ListaConversas } from "./ListaConversas";
 import { Thread } from "./Thread";
 import type { ViaOtimista } from "./Compositor";
@@ -32,6 +32,8 @@ import type {
   EventoMidia,
   Filtro,
   Finalidade,
+  EtapaOpcao,
+  FiltroEtapa,
 } from "./tipos";
 
 export function Inbox({
@@ -63,6 +65,37 @@ export function Inbox({
   }, [busca]);
   // Finalidade: "" = todas (so faz sentido para ADMIN, que ve as duas).
   const [finalidade, setFinalidade] = useState<Finalidade | "">("");
+  // Filtro por etapa do funil ("" = todas; "SEM" = sem etapa; senao id da etapa).
+  const [etapa, setEtapa] = useState<FiltroEtapa>("");
+  const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
+
+  // Carrega as etapas uma vez (fonte do seletor de etapa). So leitura.
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/etapas")
+      .then((r) => (r.ok ? r.json() : { etapas: [] }))
+      .then((d) => {
+        if (!cancelado) setEtapas((d.etapas ?? []) as EtapaOpcao[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  // Opcoes do seletor conforme a finalidade ativa (AMBAS vale pros dois funis).
+  const etapasOpcoes = useMemo(
+    () =>
+      etapas.filter(
+        (e) => !finalidade || e.finalidade === finalidade || e.finalidade === "AMBAS",
+      ),
+    [etapas, finalidade],
+  );
+
+  // Trocar de finalidade pode esvaziar o conjunto de etapas -> reseta o filtro.
+  useEffect(() => {
+    setEtapa("");
+  }, [finalidade]);
 
   // Ref para o socket ler a conversa aberta sem recriar o listener.
   const selecionadaRef = useRef<string | null>(null);
@@ -273,6 +306,8 @@ export function Inbox({
           ...atual,
           ultimaMensagemPreview: previewMensagem(evt.tipo, evt.conteudo),
           ultimaMensagemEm: evt.ultimaMensagemEm,
+          // Camada de ordenacao: IN (cliente) sobe, OUT (nos) afunda.
+          ultimaDirecao: evt.direcao,
           naoLidas,
         };
         const resto = prev.filter((_, i) => i !== idx);
@@ -371,6 +406,8 @@ export function Inbox({
         ...atual,
         ultimaMensagemPreview: previewMensagem(msg.tipo, msg.conteudo),
         ultimaMensagemEm: msg.hora,
+        // Envio nosso (OUT): a conversa afunda para baixo das que esperam resposta.
+        ultimaDirecao: "OUT",
       };
       const resto = prev.filter((_, i) => i !== idx);
       return [atualizado, ...resto];
@@ -446,15 +483,17 @@ export function Inbox({
       // Fatia Y: "nao lidas" tambem inclui a marcacao MANUAL (marcadaNaoLida).
       if (filtro === "naoLidas" && c.naoLidas <= 0 && !c.marcadaNaoLida)
         return false;
+      // Filtro por etapa do funil: "SEM" = sem etapa; id = etapa exata.
+      if (etapa === "SEM" && c.etapa) return false;
+      if (etapa && etapa !== "SEM" && c.etapa?.id !== etapa) return false;
       return true;
     };
-    // Fatia Y: fixadas primeiro, depois recencia (mesma regra do servidor —
-    // reafirmada no cliente porque updates ao vivo reordenam a lista).
+    // Ordenacao do Inbox (fonte unica em src/lib/ordenacao): fixadas primeiro;
+    // "aguardando resposta nossa" acima de "aguardando o cliente"; dentro da
+    // primeira camada quem espera ha mais tempo primeiro. Reafirmada no cliente
+    // porque os updates ao vivo reordenam a lista.
     const ordenar = (arr: ConversaItem[]) =>
-      [...arr].sort((a, b) => {
-        const p = compararPin(a.fixadaEm, b.fixadaEm);
-        return p !== 0 ? p : compararPin(a.ultimaMensagemEm, b.ultimaMensagemEm);
-      });
+      [...arr].sort(compararConversasInbox);
     const locais = conversas.filter((c) => {
       if (!passaFiltro(c)) return false;
       if (q) {
@@ -478,7 +517,7 @@ export function Inbox({
       }
     }
     return ordenar(Array.from(mapa.values()));
-  }, [conversas, buscaAplicada, filtro, agenteIdAtual, resConteudo]);
+  }, [conversas, buscaAplicada, filtro, etapa, agenteIdAtual, resConteudo]);
 
   const conversaAberta = useMemo(
     () => conversas.find((c) => c.id === selecionada) ?? null,
@@ -498,6 +537,9 @@ export function Inbox({
         mostrarFinalidade={ehAdmin}
         periodo={periodo}
         contadorPeriodo={conversas.length}
+        etapasOpcoes={etapasOpcoes}
+        etapaFiltro={etapa}
+        onEtapa={setEtapa}
         onBusca={setBusca}
         onFiltro={setFiltro}
         onFinalidade={setFinalidade}

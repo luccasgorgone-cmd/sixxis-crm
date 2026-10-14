@@ -21,6 +21,16 @@ export type AtendidoPor = "HUMANO" | "IA";
 
 export type Finalidade = "VENDA" | "POS_VENDA";
 
+// Etapa (funil) atual do cliente, resolvida a partir do negocio ABERTO da
+// finalidade da conversa. Usada SO para exibir/filtrar no Inbox — nunca escreve
+// etapa nem mexe no Kanban. null = "Sem etapa" (sem negocio aberto).
+export type EtapaResumo = {
+  id: string;
+  nome: string;
+  cor: string | null;
+  ordem: number;
+};
+
 export type ConversaItem = {
   id: string;
   // Presente na lista real do Inbox (/api/conversas); ausente nos usos embutidos
@@ -41,6 +51,13 @@ export type ConversaItem = {
   marcadaNaoLida?: boolean;
   atendidoPor: AtendidoPor;
   agenteId: string | null;
+  // Direcao da ULTIMA mensagem (IN = cliente falou por ultimo; OUT = nos). Dirige
+  // a camada de ordenacao do Inbox (ver compararConversasInbox). Ausente em usos
+  // embutidos (Thread no Kanban/supervisao), que nao usam esse comparador.
+  ultimaDirecao?: Direcao | null;
+  // Etapa atual do cliente no funil (negocio ABERTO da finalidade). null = "Sem
+  // etapa". So exibicao/filtro no Inbox — nao vem nos usos embutidos.
+  etapa?: EtapaResumo | null;
   finalidade?: Finalidade;
   instanciaId?: string | null;
   instanciaNome?: string | null;
@@ -143,3 +160,15 @@ export type EventoMidia = {
 };
 
 export type Filtro = "minhas" | "naoLidas" | "todas";
+
+// Opcao do filtro por etapa no Inbox (vem de /api/etapas). finalidade AMBAS
+// aparece nos dois funis. "" = todas as etapas; "SEM" = conversas sem etapa.
+export type FinalidadeEtapa = "VENDA" | "POS_VENDA" | "AMBAS";
+export type EtapaOpcao = {
+  id: string;
+  nome: string;
+  cor: string | null;
+  ordem: number;
+  finalidade: FinalidadeEtapa;
+};
+export type FiltroEtapa = string; // "" | "SEM" | <etapaId>

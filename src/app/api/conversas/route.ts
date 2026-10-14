@@ -64,6 +64,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
               finalidade: true,
               status: true,
               criadoEm: true,
+              // Etapa (funil) para exibir/filtrar no Inbox. So LEITURA — nunca
+              // escreve etapa nem reordena o Kanban.
+              etapa: {
+                select: { id: true, nome: true, cor: true, ordem: true },
+              },
             },
           },
         },
@@ -72,7 +77,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       mensagens: {
         orderBy: { hora: "desc" },
         take: 1,
-        select: { conteudo: true, tipo: true, apagada: true, apagadaPor: true },
+        select: {
+          conteudo: true,
+          tipo: true,
+          apagada: true,
+          apagadaPor: true,
+          // Direcao da ultima mensagem: dirige a camada de ordenacao do Inbox
+          // (cliente por ultimo = sobe; nos por ultimo = afunda).
+          direcao: true,
+        },
       },
     },
     take: 200,
@@ -97,6 +110,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return [...daFinalidade].sort(
       (a, b) => b.criadoEm.getTime() - a.criadoEm.getTime(),
     )[0].id;
+  }
+
+  // Etapa atual do cliente = etapa do negocio ABERTO da finalidade da conversa.
+  // Sem negocio aberto (fechado GANHO/PERDIDO ou inexistente) => null = "Sem
+  // etapa". So LEITURA p/ exibir/filtrar no Inbox; nao mexe no Kanban.
+  function etapaDaConversa(
+    negocios: {
+      finalidade: Finalidade;
+      status: string;
+      etapa: { id: string; nome: string; cor: string | null; ordem: number } | null;
+    }[],
+    finalidade: Finalidade,
+  ): { id: string; nome: string; cor: string | null; ordem: number } | null {
+    const aberto = negocios.find(
+      (n) => n.finalidade === finalidade && n.status === "ABERTO",
+    );
+    return aberto?.etapa ?? null;
   }
 
   // Trecho que bateu na busca: 1 consulta extra (nao N+1) so para as conversas
@@ -125,6 +155,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     leadId: c.leadId,
     ...(texto ? { trechoBusca: trechos.get(c.id) ?? null } : {}),
     negocioId: negocioDaConversa(c.lead.negocios, c.finalidade),
+    etapa: etapaDaConversa(c.lead.negocios, c.finalidade),
     leadNome: nomeEfetivo(c.lead),
     leadFoto: c.lead.fotoUrl,
     leadTelefone: c.lead.telefone,
@@ -136,6 +167,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         : previewMensagem(c.mensagens[0].tipo, c.mensagens[0].conteudo)
       : null,
     ultimaMensagemEm: c.ultimaMensagemEm,
+    // Direcao da ultima mensagem p/ a camada de ordenacao do Inbox.
+    ultimaDirecao: c.mensagens[0]?.direcao ?? null,
     naoLidas: c.naoLidas,
     // Fatia Y: pin + marcacao manual de nao-lida.
     fixadaEm: c.fixadaEm,
