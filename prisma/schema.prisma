@@ -1779,3 +1779,56 @@ model SandboxConfig {
   modelo            String?
   atualizadoEm      DateTime @updatedAt
 }
+
+// ============================================================================
+// SUPERVISOR COMERCIAL IA (SPEC_SUPERVISOR_COMERCIAL_IA.md, V1 — aba admin-only)
+// Subsistema INDEPENDENTE do atendimento (Sol/Luna) e do Oracle. ADITIVO: duas
+// tabelas novas + um enum, ZERO alteracao em tabela existente, ZERO FK (mesmo
+// padrao de SolEvento — tabela de auditoria: adminId/negocioId/leadId sao ids
+// soltos, nao referencias, pra um log de acao nunca ser apagado em cascata com o
+// negocio que ele audita). Custo da IA reusa SolEvento (acao "supervisor_*").
+// ============================================================================
+
+// Ciclo de vida de uma acao proposta pela IA do supervisor. Toda escrita e
+// human-in-the-loop: nasce PROPOSTO, so vira EXECUTADO depois do admin Confirmar
+// na UI; REVERTIDO guarda o desfazer pelo snapshot "antes"; FALHOU registra erro.
+enum StatusSupervisorAcao {
+  PROPOSTO
+  EXECUTADO
+  DESCARTADO
+  REVERTIDO
+  FALHOU
+}
+
+// Config singleton do supervisor: provider/modelo da IA (independente de Luna e
+// Oracle) + limiares/metas do semaforo em JSON (prazo1aRespostaSeg, pesos de
+// cobertura por temperatura, metas por indicador). Semeado com defaults do doc.
+model SupervisorConfig {
+  id           String   @id @default(cuid())
+  provider     String?
+  modelo       String?
+  limiaresJson Json?
+  atualizadoEm DateTime @updatedAt
+}
+
+// Auditoria + undo de cada acao de escrita Nivel 1. Nunca executa sozinha:
+// PROPOSTO (preview calculado, nada escrito) -> admin Confirmar -> EXECUTADO
+// (antes/depois gravados pra reverter). Sem FK (ver bloco acima).
+model SupervisorAcao {
+  id          String               @id @default(cuid())
+  adminId     String
+  ferramenta  String
+  argsJson    Json
+  preview     String               @db.Text
+  status      StatusSupervisorAcao @default(PROPOSTO)
+  antesJson   Json?
+  depoisJson  Json?
+  negocioId   String?
+  leadId      String?
+  motivo      String?              @db.Text
+  criadoEm    DateTime             @default(now())
+  executadoEm DateTime?
+
+  @@index([status])
+  @@index([criadoEm])
+}

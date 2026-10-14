@@ -67,7 +67,7 @@ const SECOES: Secao[] = [
 ];
 
 // Rotas de topo (nao sao configuracao): nelas a sub-nav nao aparece.
-const SEM_SUBNAV = ["/admin/dashboard", "/admin/metas"];
+const SEM_SUBNAV = ["/admin/dashboard", "/admin/metas", "/admin/supervisor"];
 
 export function AdminNav({ marca }: { marca?: Marca }) {
   const pathname = usePathname();

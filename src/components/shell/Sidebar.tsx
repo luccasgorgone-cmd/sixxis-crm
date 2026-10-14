@@ -20,6 +20,7 @@ import {
   MapPin,
   TrendingUp,
   Shield,
+  Gauge,
   Wrench,
   UserCog,
   ReceiptText,
@@ -113,7 +114,10 @@ export function Sidebar({
     { rotulo: "Campanhas", href: "/campanhas", icone: Megaphone },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
-      ? [{ rotulo: "Admin", href: "/admin", icone: Shield }]
+      ? [
+          { rotulo: "Supervisor", href: "/admin/supervisor", icone: Gauge },
+          { rotulo: "Admin", href: "/admin", icone: Shield },
+        ]
       : []),
   ];
 
