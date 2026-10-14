@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Loader2, Sparkles, Info } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { CardAcao, type AcaoProposta } from "./CardAcao";
+import { CardAcao, type AcaoProposta, type ResolucaoAcao } from "./CardAcao";
 
 type Autor = "gestor" | "assistente" | "sistema";
 type Mensagem = { id: string; autor: Autor; texto: string };
@@ -79,6 +79,10 @@ export function ChatSupervisor() {
           ]);
           return;
         }
+        const notaFalha =
+          corpo.acao && corpo.acao.status === "FALHOU"
+            ? `Não consegui aplicar a ação${corpo.acao.erro ? `: ${corpo.acao.erro}` : "."}`
+            : null;
         setMensagens((prev) => [
           ...prev,
           { id: novoId(), autor: "assistente", texto: corpo.resposta },
@@ -91,8 +95,13 @@ export function ChatSupervisor() {
                 },
               ]
             : []),
+          ...(notaFalha
+            ? [{ id: novoId(), autor: "sistema" as const, texto: notaFalha }]
+            : []),
         ]);
-        if (corpo.acao) setAcaoPendente(corpo.acao);
+        // Mostra o card só quando há algo a decidir (PROPOSTO) ou desfazer
+        // (EXECUTADO por comando). FALHOU já virou nota de sistema acima.
+        if (corpo.acao && corpo.acao.status !== "FALHOU") setAcaoPendente(corpo.acao);
       } catch {
         toast.erro("Falha de conexão com o consultor.");
       } finally {
@@ -102,16 +111,15 @@ export function ChatSupervisor() {
     [mensagens, enviando, toast],
   );
 
-  function aoResolver(resultado: {
-    status: "EXECUTADO" | "DESCARTADO";
-    mensagem: string;
-  }) {
+  function aoResolver(resultado: ResolucaoAcao) {
     setAcaoPendente(null);
     setMensagens((prev) => [
       ...prev,
       { id: novoId(), autor: "sistema", texto: resultado.mensagem },
     ]);
-    if (resultado.status === "EXECUTADO") toast.sucesso(resultado.mensagem);
+    if (resultado.status === "EXECUTADO" || resultado.status === "REVERTIDO") {
+      toast.sucesso(resultado.mensagem);
+    }
   }
 
   const vazio = mensagens.length === 0;
@@ -130,8 +138,8 @@ export function ChatSupervisor() {
                 Pergunte ao consultor comercial
               </p>
               <p className="mt-0.5 text-xs text-medio/60">
-                Ele lê os indicadores e sugere o próximo passo. Nada é
-                executado sem a sua confirmação.
+                Ele lê os indicadores e sugere o próximo passo. Quando você
+                mandar agir, ele faz na hora — e dá pra desfazer.
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">

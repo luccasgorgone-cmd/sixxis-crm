@@ -15,6 +15,7 @@ import { criarLembrete } from "./criar_lembrete";
 import { criarNota } from "./criar_nota";
 import { reatribuirVendedor } from "./reatribuir_vendedor";
 import { arquivarNegocio } from "./arquivar_negocio";
+import { definirConfig } from "./definir_config";
 
 // Ordem estável (vira a ordem das tools apresentadas ao provider).
 export const FERRAMENTAS_ESCRITA: FerramentaEscrita[] = [
@@ -25,6 +26,7 @@ export const FERRAMENTAS_ESCRITA: FerramentaEscrita[] = [
   criarNota,
   reatribuirVendedor,
   arquivarNegocio,
+  definirConfig,
 ];
 
 // Prefixos/nomes que denunciam uma ferramenta de comunicação externa. Linha

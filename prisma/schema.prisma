@@ -1804,11 +1804,15 @@ enum StatusSupervisorAcao {
 // Oracle) + limiares/metas do semaforo em JSON (prazo1aRespostaSeg, pesos de
 // cobertura por temperatura, metas por indicador). Semeado com defaults do doc.
 model SupervisorConfig {
-  id           String   @id @default(cuid())
-  provider     String?
-  modelo       String?
-  limiaresJson Json?
-  atualizadoEm DateTime @updatedAt
+  id            String   @id @default(cuid())
+  provider      String?
+  modelo        String?
+  limiaresJson  Json?
+  // Config da varredura periódica do Supervisor (ativa/cadência/itens vigiados).
+  // Aditivo: ausência/parcial é resolvida por resolverVarredura (default seguro:
+  // varredura DESLIGADA até o gestor ligar). Ver src/lib/supervisor/tipos.ts.
+  varreduraJson Json?
+  atualizadoEm  DateTime @updatedAt
 }
 
 // Auditoria + undo de cada acao de escrita Nivel 1. Nunca executa sozinha:

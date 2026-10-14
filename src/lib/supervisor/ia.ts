@@ -29,9 +29,11 @@ import { registrarSolEvento } from "../solEvento";
 import { montarPainel } from "./painel";
 import {
   resolverLimiares,
+  resolverVarredura,
   type Janela,
   type PainelSupervisor,
   type SupervisorLimiares,
+  type VarreduraConfig,
 } from "./tipos";
 import {
   executarLeitura,
@@ -57,6 +59,9 @@ export type SupervisorResultado = {
   resposta: string;
   // Proposta de ação pendente de confirmação, ou null.
   proposta: SupervisorProposta | null;
+  // true quando a IA indicou que o GESTOR comandou esta ação (o chat pode
+  // executá-la direto, se reversível). Só relevante quando proposta != null.
+  acaoSolicitada: boolean;
   // Quando a IA tentou propor algo que não passou na validação do servidor:
   // a proposta é DESCARTADA (fail-closed) e o motivo fica aqui para log/UI.
   propostaRejeitada?: string;
@@ -94,15 +99,20 @@ type ConfigSupervisor = {
   provider: string;
   modelo: string;
   limiares: SupervisorLimiares;
+  varredura: VarreduraConfig;
 };
 
 // Lê a (única) linha de SupervisorConfig. Ausente/incompleta → defaults seguros.
 async function carregarConfig(): Promise<ConfigSupervisor> {
-  let row: { provider: string | null; modelo: string | null; limiaresJson: unknown } | null =
-    null;
+  let row: {
+    provider: string | null;
+    modelo: string | null;
+    limiaresJson: unknown;
+    varreduraJson: unknown;
+  } | null = null;
   try {
     row = await prisma.supervisorConfig.findFirst({
-      select: { provider: true, modelo: true, limiaresJson: true },
+      select: { provider: true, modelo: true, limiaresJson: true, varreduraJson: true },
       orderBy: { atualizadoEm: "desc" },
     });
   } catch (e) {
@@ -116,6 +126,7 @@ async function carregarConfig(): Promise<ConfigSupervisor> {
     provider: row?.provider?.trim() || PROVIDER_PADRAO,
     modelo: row?.modelo?.trim() || MODELO_PADRAO,
     limiares: resolverLimiares(row?.limiaresJson),
+    varredura: resolverVarredura(row?.varreduraJson),
   };
 }
 
@@ -126,24 +137,38 @@ function janelaPadrao(agora: Date): Janela {
 }
 
 // ───────────────────────── system prompt ─────────────────────────
-function montarSystem(painel: PainelSupervisor): ProviderSystemBloco[] {
+function montarSystem(
+  painel: PainelSupervisor,
+  cfg: ConfigSupervisor,
+): ProviderSystemBloco[] {
   const base = `Você é o Supervisor Comercial da Sixxis — um CONSULTOR INTERNO que ajuda o GESTOR a ler o funil de vendas/pós-venda e a decidir o próximo passo. Você fala com o gestor, NUNCA com o cliente.
 
 REGRAS DURAS:
 1. Você NÃO envia mensagem, e-mail, WhatsApp ou qualquer coisa a clientes. Você não tem essa capacidade e nunca deve prometê-la.
-2. Todo número que você citar tem que vir do painel abaixo ou de uma ferramenta de consulta. NUNCA invente métrica, valor ou nome. Se não sabe, diga que não sabe e sugira qual consulta faria.
-3. Para agir no CRM (mover etapa, registrar ganho/perda, criar lembrete/nota, reatribuir vendedor, arquivar), você só PROPÕE uma ação — quem executa é o gestor, confirmando depois. Proponha no máximo UMA ação por resposta, e só quando tiver o id real do negócio (use as ferramentas de consulta para obtê-lo).
+2. Todo número que você citar tem que vir do painel/config abaixo ou de uma ferramenta de consulta. NUNCA invente métrica, valor ou nome. Se não sabe, diga que não sabe e sugira qual consulta faria.
+3. Você pode AGIR no CRM: mover etapa, registrar ganho/perda, criar lembrete/nota, reatribuir vendedor, arquivar negócio, e ALTERAR A CONFIGURAÇÃO (definir_config). REGRA DE OURO do agir:
+   • Só aja quando o GESTOR te MANDAR fazer aquilo. Nesse caso marque "acaoSolicitada": true — o comando dele é a autorização e a ação (sendo reversível) é aplicada na hora, com opção de desfazer.
+   • Se a ideia for SUA (ele não pediu, só perguntou/analisou), marque "acaoSolicitada": false — vira uma SUGESTÃO que ele confirma depois. Na dúvida, false.
+   Proponha no máximo UMA ação por resposta. Para ações sobre um negócio, use o id real (obtenha pelas consultas).
 4. Seja direto e objetivo. O gestor quer diagnóstico e recomendação, não texto longo.
+
+PARA ALTERAR CONFIGURAÇÃO use ferramenta "definir_config" com argsJson contendo só os campos que mudam, no formato {"limiares":{...},"varredura":{...}}. Campos de limiares: prazo1aRespostaSeg (segundos), metaPeriodoReais (reais, 0/null = sem meta), paradoDiasPadrao (dias), pesosCobertura {QUENTE,MORNO,FRIO} (0..1), metas (por indicador). Campos de varredura: ativa (bool), cadenciaMin (5..1440), semRespostaHoras (1..168), vigia {semResposta,semProximoPasso,parado,primeiraResposta} (bool). Ex.: gestor pede "prazo de 1ª resposta para 30 min" → ferramenta "definir_config", argsJson "{\\"limiares\\":{\\"prazo1aRespostaSeg\\":1800}}", acaoSolicitada true.
 
 FERRAMENTAS DE CONSULTA (use para aprofundar além do painel): consultar_painel (recorta por vendedor/período), listar_negocios (ids reais, parados, sem próximo passo), listar_vendedores (ids para reatribuir), listar_etapas (ids para mover).
 
-AÇÕES QUE PODE PROPOR (nunca executa, só sugere): ${nomesFerramentas().join(", ")}.
+AÇÕES DISPONÍVEIS: ${nomesFerramentas().join(", ")}.
 
 Responda SEMPRE no envelope JSON estruturado:
 - "resposta": seu texto para o gestor (markdown curto).
-- "temProposta": true só quando estiver sugerindo uma ação concreta no CRM.
-- "ferramenta": o nome da ação proposta (uma das listadas acima) ou "" se nenhuma.
+- "temProposta": true quando houver uma ação concreta (proposta OU comandada).
+- "acaoSolicitada": true se o GESTOR pediu explicitamente ESTA ação agora; false se é sugestão sua. Só vale quando temProposta=true.
+- "ferramenta": o nome da ação (uma das disponíveis) ou "" se nenhuma.
 - "argsJson": os argumentos da ação como JSON (ex.: {"negocioId":"...","etapaId":"..."}) ou "{}" se nenhuma.`;
+
+  // Config atual como contexto factual (para a IA RESPONDER "como está configurado").
+  const configCtx = `CONFIGURAÇÃO ATUAL (use como verdade factual ao explicar a config):\n${JSON.stringify(
+    { limiares: cfg.limiares, varredura: cfg.varredura },
+  )}`;
 
   // Painel serializado como contexto factual (a IA lê, nunca recalcula).
   const contexto = `PAINEL ATUAL (janela ${painel.janela.inicio} → ${painel.janela.fim}, use como verdade factual):\n${JSON.stringify(
@@ -161,7 +186,7 @@ Responda SEMPRE no envelope JSON estruturado:
     },
   )}`;
 
-  return [{ text: base, cache: true }, { text: contexto }];
+  return [{ text: base, cache: true }, { text: configCtx }, { text: contexto }];
 }
 
 // Envelope estruturado (mesma técnica da Luna: força o formato pela API, não só
@@ -178,10 +203,11 @@ const ENVELOPE_SUPERVISOR: ProviderFormatoResposta = {
     properties: {
       resposta: { type: "string" },
       temProposta: { type: "boolean" },
+      acaoSolicitada: { type: "boolean" },
       ferramenta: { type: "string", enum: ["", ...nomesFerramentas()] },
       argsJson: { type: "string" },
     },
-    required: ["resposta", "temProposta", "ferramenta", "argsJson"],
+    required: ["resposta", "temProposta", "acaoSolicitada", "ferramenta", "argsJson"],
     additionalProperties: false,
   },
 };
@@ -189,6 +215,9 @@ const ENVELOPE_SUPERVISOR: ProviderFormatoResposta = {
 type EnvelopeBruto = {
   resposta: string;
   temProposta: boolean;
+  // true só quando o GESTOR comandou a ação (autoriza execução direta reversível).
+  // Default seguro = false (proposta/card). Um glitch nunca executa sozinho.
+  acaoSolicitada: boolean;
   ferramenta: string;
   argsJson: string;
 };
@@ -210,6 +239,7 @@ function parsearEnvelope(texto: string): EnvelopeBruto | null {
       return {
         resposta: o.resposta,
         temProposta: o.temProposta === true,
+        acaoSolicitada: o.acaoSolicitada === true,
         ferramenta: typeof o.ferramenta === "string" ? o.ferramenta : "",
         argsJson: typeof o.argsJson === "string" ? o.argsJson : "{}",
       };
@@ -300,6 +330,7 @@ export async function gerarRespostaSupervisor(
   const base = (extra: Partial<SupervisorResultado> = {}): SupervisorResultado => ({
     resposta: RESPOSTA_INDISPONIVEL,
     proposta: null,
+    acaoSolicitada: false,
     modelo: config.modelo,
     tokensEntrada: uso.tokensEntrada,
     tokensSaida: uso.tokensSaida,
@@ -345,7 +376,7 @@ export async function gerarRespostaSupervisor(
     return base({ motivo: `falha ao montar painel: ${motivo}` });
   }
 
-  const system = montarSystem(painel);
+  const system = montarSystem(painel, config);
   const mensagens = montarMensagens(entrada.historico);
   if (mensagens.length === 0) {
     return base({ resposta: "Em que posso ajudar com o funil hoje?", motivo: "histórico vazio" });
@@ -419,6 +450,7 @@ export async function gerarRespostaSupervisor(
           base({
             resposta: env.resposta.trim() || RESPOSTA_INDISPONIVEL,
             proposta,
+            acaoSolicitada: proposta ? env.acaoSolicitada : false,
             ...(rejeicao ? { propostaRejeitada: rejeicao } : {}),
             motivo: undefined,
           }),
@@ -443,6 +475,7 @@ export async function gerarRespostaSupervisor(
               base({
                 resposta: envRetry.resposta.trim() || RESPOSTA_INDISPONIVEL,
                 proposta,
+                acaoSolicitada: proposta ? envRetry.acaoSolicitada : false,
                 ...(rejeicao ? { propostaRejeitada: rejeicao } : {}),
                 motivo: undefined,
               }),

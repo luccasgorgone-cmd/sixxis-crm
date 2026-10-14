@@ -7,15 +7,16 @@
 // período/finalidade); o Chat conversa com a IA, que também lê o painel no
 // servidor. Nada é executado sem confirmação do gestor (human-in-the-loop).
 import { useState, useEffect, useCallback, useRef } from "react";
-import { BarChart3, Bell, MessageSquare, Gauge } from "lucide-react";
+import { BarChart3, Bell, MessageSquare, Gauge, SlidersHorizontal } from "lucide-react";
 import { Cabecalho } from "@/components/admin/VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
 import { PainelRelatorios } from "./PainelRelatorios";
 import { PainelAlertas } from "./PainelAlertas";
 import { ChatSupervisor } from "./ChatSupervisor";
+import { PainelConfiguracoes } from "./PainelConfiguracoes";
 
-type Aba = "relatorios" | "alertas" | "chat";
+type Aba = "relatorios" | "alertas" | "chat" | "config";
 type Periodo = "hoje" | "semana" | "15d" | "mes";
 type Finalidade = "" | "VENDA" | "POS_VENDA";
 
@@ -36,6 +37,7 @@ const ABAS: { chave: Aba; rotulo: string; icone: typeof BarChart3 }[] = [
   { chave: "relatorios", rotulo: "Relatórios", icone: BarChart3 },
   { chave: "alertas", rotulo: "Alertas", icone: Bell },
   { chave: "chat", rotulo: "Chat", icone: MessageSquare },
+  { chave: "config", rotulo: "Configurações", icone: SlidersHorizontal },
 ];
 
 // Há algo pedindo atenção? (dirige o ponto no rótulo da aba Alertas.)
@@ -127,7 +129,7 @@ export function SupervisorConsole() {
   }
 
   const atencao = temAtencao(painel);
-  const mostraFiltros = aba !== "chat";
+  const mostraFiltros = aba === "relatorios" || aba === "alertas";
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 sm:p-6">
@@ -206,6 +208,8 @@ export function SupervisorConsole() {
               <ChatSupervisor />
             </div>
           </div>
+        ) : aba === "config" ? (
+          <PainelConfiguracoes />
         ) : erro ? (
           <EstadoErro
             mensagem="Não foi possível carregar os indicadores."

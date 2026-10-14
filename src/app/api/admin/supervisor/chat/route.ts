@@ -16,7 +16,9 @@ import {
   gerarRespostaSupervisor,
   type SupervisorMensagem,
 } from "@/lib/supervisor/ia";
-import { lerId } from "@/lib/supervisor/acoes/tipos";
+import { ehReversivel, lerId } from "@/lib/supervisor/acoes/tipos";
+import { acharFerramenta } from "@/lib/supervisor/acoes/registro";
+import { confirmarAcao } from "@/lib/supervisor/executarAcao";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -60,8 +62,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     admin: { id: admin.id, nome: admin.nome ?? "Admin" },
   });
 
-  // Se a IA sugeriu uma ação, materializa como PROPOSTO (pendente de confirmação).
-  let acao: { id: string; ferramenta: string; preview: string } | null = null;
+  // Se a IA sugeriu uma ação, materializa como PROPOSTO. Se o GESTOR COMANDOU
+  // (acaoSolicitada) e a ação é REVERSÍVEL, executa direto pelo caminho único
+  // (confirmarAcao) — o comando é a autorização; fica com undo. Ações
+  // irreversíveis NUNCA executam direto: continuam PROPOSTO (exigem confirmação).
+  let acao:
+    | { id: string; ferramenta: string; preview: string; status: string; erro?: string }
+    | null = null;
   if (resultado.proposta) {
     const { ferramenta, args, preview } = resultado.proposta;
     const negocioId = lerId(args, "negocioId");
@@ -77,7 +84,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
       select: { id: true, ferramenta: true, preview: true },
     });
-    acao = registro;
+
+    let status = "PROPOSTO";
+    let erro: string | undefined;
+    const ferr = acharFerramenta(registro.ferramenta);
+    if (resultado.acaoSolicitada && ferr && ehReversivel(ferr)) {
+      const r = await confirmarAcao(registro.id, { id: admin.id, nome: admin.nome ?? "Admin" });
+      if (r.ok) status = "EXECUTADO";
+      else if (r.codigo === "revalidou_falhou") {
+        status = "PROPOSTO"; // estado mudou; cai no card de confirmação manual
+        erro = r.erro;
+      } else {
+        status = "FALHOU";
+        erro = r.erro;
+      }
+    }
+    acao = { ...registro, status, ...(erro ? { erro } : {}) };
   }
 
   return NextResponse.json({

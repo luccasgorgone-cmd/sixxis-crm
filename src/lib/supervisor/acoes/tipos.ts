@@ -50,6 +50,10 @@ export type FerramentaEscrita = {
   titulo: string;
   // Descrição para o LLM (entra no inputSchema.description da tool).
   descricao: string;
+  // Reversível (desfazer via `reverter`)? Ausente = true. Só ações IRREVERSÍVEIS
+  // marcam `false` — e, nesse caso, nunca executam direto por comando no chat;
+  // sempre exigem confirmação (catraca "ação destrutiva"). Ver executarAcao.ts.
+  reversivel?: boolean;
   // JSON Schema (mesmo formato de ProviderFerramenta.inputSchema).
   inputSchema: Record<string, unknown>;
   // Texto curto mostrado no card ANTES de confirmar. NÃO escreve nada (pode ler
@@ -89,4 +93,9 @@ export function lerNumero(args: Args, chave: string): number | null {
     if (Number.isFinite(n)) return n;
   }
   return null;
+}
+
+// Reversível por padrão; só é irreversível quando a ferramenta marca explícito.
+export function ehReversivel(f: { reversivel?: boolean }): boolean {
+  return f.reversivel !== false;
 }
