@@ -43,10 +43,19 @@ export type Indicador = {
 // --- Resultados das métricas novas (§4). Cada um tem um CORE PURO (testável por
 // fixture, sem banco) em indicadores.ts + um wrapper async que busca no banco. ---
 
+// Uma faixa do histograma de tempo de 1ª resposta.
+export type FaixaResposta = {
+  rotulo: string; // "< 5 min", "1–4 h", …
+  qtd: number; // nº de conversas nesta faixa
+};
+
 export type PctPrazoResultado = {
   total: number; // conversas com 1ª resposta medível no período
   dentro: number; // com (1º OUT − 1º IN) <= limiar
   pct: number | null; // dentro/total, null se total=0
+  // Distribuição por faixa de tempo (histograma) — preenchida pelo wrapper que
+  // tem os tempos individuais; mostra ONDE a resposta cai, não só a média.
+  distribuicao?: FaixaResposta[];
 };
 
 export type EtapaFunil = {

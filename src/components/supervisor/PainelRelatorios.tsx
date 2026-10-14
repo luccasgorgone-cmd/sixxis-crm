@@ -6,7 +6,7 @@
 // nascem no servidor — aqui só se renderiza.
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
 import { formatarBRL, formatarPct } from "@/lib/format";
-import { ChevronRight, Download, Layers, Megaphone, Trophy } from "lucide-react";
+import { ChevronRight, Download, Layers, Megaphone, Timer, Trophy } from "lucide-react";
 import { GradeIndicadores, LinhaLista, Secao, formatarValor } from "./PainelPartes";
 
 // Exporta o painel para CSV (separador ';' + BOM, amigável ao Excel pt-BR). Sem
@@ -76,6 +76,43 @@ function baixarCsv(painel: PainelSupervisor) {
   URL.revokeObjectURL(url);
 }
 
+// Histograma do tempo de 1ª resposta: onde as respostas caem, não só a média.
+function DistribuicaoResposta({ painel }: { painel: PainelSupervisor }) {
+  const faixas = painel.pctDentroDoPrazo.distribuicao;
+  if (!faixas || faixas.length === 0) return null;
+  const total = faixas.reduce((s, f) => s + f.qtd, 0);
+  if (total === 0) return null;
+  const max = Math.max(1, ...faixas.map((f) => f.qtd));
+  return (
+    <Secao titulo="Tempo de 1ª resposta — distribuição" icone={Timer} extra={`${total} conversas`}>
+      <div className="space-y-1.5">
+        {faixas.map((f) => {
+          const pct = (f.qtd / total) * 100;
+          return (
+            <div
+              key={f.rotulo}
+              className="relative overflow-hidden rounded-lg border border-black/5 bg-white"
+            >
+              <span
+                className="absolute inset-y-0 left-0 bg-tiffany/[0.07]"
+                style={{ width: `${(f.qtd / max) * 100}%` }}
+                aria-hidden
+              />
+              <div className="relative flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <span className="text-escuro">{f.rotulo}</span>
+                <span className="flex shrink-0 items-center gap-3 text-xs text-medio/70">
+                  <span className="tabular-nums font-medium text-escuro">{f.qtd}</span>
+                  <span className="w-10 text-right tabular-nums">{Math.round(pct)}%</span>
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Secao>
+  );
+}
+
 // Barra de atingimento da meta do período: valor vendido ÷ meta configurada.
 // Usa valorEfetivo via metricas.valorVendido (já respeita a regra do valorAjustado).
 function BarraMeta({ painel }: { painel: PainelSupervisor }) {
@@ -139,6 +176,8 @@ export function PainelRelatorios({
       <GradeIndicadores indicadores={painel.indicadores} />
 
       <BarraMeta painel={painel} />
+
+      <DistribuicaoResposta painel={painel} />
 
       {painel.funil.length > 0 && (
         <Secao titulo="Funil — negócios em aberto" icone={Layers}>

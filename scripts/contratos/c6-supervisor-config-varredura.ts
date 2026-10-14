@@ -25,6 +25,7 @@ import {
   limiarParadoMs,
   estaParado,
   coreParados,
+  distribuir1aResposta,
 } from "../../src/lib/supervisor/indicadores";
 
 let ok = 0;
@@ -240,6 +241,25 @@ caso("coreParados: mistura SLA+global; limiarDias null quando veio do SLA", () =
   assert.equal(e1.limiarDias, null); // veio do SLA
   assert.equal(e2.parados, 1);
   assert.equal(e2.limiarDias, 7); // veio do global
+});
+
+caso("distribuir1aResposta: classifica cada tempo na faixa certa (corte superior inclusivo)", () => {
+  // 1 em <5min(300), 1 em 5–15(900), 1 em 15–60(3600), 1 em 1–4h(14400), 1 em 4–24h(86400), 1 em >24h
+  const tempos = [300, 600, 3600, 10000, 50000, 200000];
+  const r = distribuir1aResposta(tempos);
+  assert.equal(r.length, 6);
+  assert.deepEqual(
+    r.map((f) => f.qtd),
+    [1, 1, 1, 1, 1, 1],
+  );
+  assert.equal(r[0].rotulo, "< 5 min");
+  assert.equal(r[5].rotulo, "> 24 h");
+});
+
+caso("distribuir1aResposta: lista vazia => todas as faixas em 0, soma 0", () => {
+  const r = distribuir1aResposta([]);
+  assert.equal(r.reduce((s, f) => s + f.qtd, 0), 0);
+  assert.equal(r.length, 6);
 });
 
 console.log(`\nC6 supervisor config/varredura: ${ok} ok, ${falhou} falha(s)`);

@@ -9,6 +9,7 @@ import type {
   CoberturaResultado,
   EscopoSupervisor,
   EtapaFunil,
+  FaixaResposta,
   Janela,
   OrigemResultado,
   ParadoPorEtapa,
@@ -61,6 +62,26 @@ export function corePctPrazo(
   return { total, dentro, pct: total > 0 ? dentro / total : null };
 }
 
+// Faixas do histograma de 1ª resposta (corte superior inclusivo, em segundos).
+const FAIXAS_1A_RESPOSTA: { rotulo: string; max: number }[] = [
+  { rotulo: "< 5 min", max: 300 },
+  { rotulo: "5–15 min", max: 900 },
+  { rotulo: "15–60 min", max: 3600 },
+  { rotulo: "1–4 h", max: 14400 },
+  { rotulo: "4–24 h", max: 86400 },
+  { rotulo: "> 24 h", max: Infinity },
+];
+
+// CORE: distribui os tempos (s) pelas faixas. Determinístico, testável por fixture.
+export function distribuir1aResposta(temposSeg: number[]): FaixaResposta[] {
+  const qtds = FAIXAS_1A_RESPOSTA.map(() => 0);
+  for (const t of temposSeg) {
+    const i = FAIXAS_1A_RESPOSTA.findIndex((f) => t <= f.max);
+    if (i >= 0) qtds[i]++;
+  }
+  return FAIXAS_1A_RESPOSTA.map((f, i) => ({ rotulo: f.rotulo, qtd: qtds[i] }));
+}
+
 export async function pctDentroDoPrazo1aResposta(
   j: Janela,
   limiarSeg: number,
@@ -82,7 +103,7 @@ export async function pctDentroDoPrazo1aResposta(
   const tempos = linhas
     .map((l) => l.seg)
     .filter((s): s is number => typeof s === "number");
-  return corePctPrazo(tempos, limiarSeg);
+  return { ...corePctPrazo(tempos, limiarSeg), distribuicao: distribuir1aResposta(tempos) };
 }
 
 // ───────────────────────── 2) Funil por etapa ─────────────────────────
