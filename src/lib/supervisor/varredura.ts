@@ -9,7 +9,8 @@
 // proposta aberta da varredura.
 import { prisma } from "../prisma";
 import { carregarConfigEditavel } from "./config";
-import type { ConfigEditavel } from "./tipos";
+import { carregarAprendizado, prioridadeSinais } from "./aprendizado";
+import { APRENDIZADO_PADRAO, type ConfigEditavel, type SinalVarredura } from "./tipos";
 import { chaveSla, limiarParadoMs, estaParado } from "./indicadores";
 import { StatusNeg } from "../../generated/prisma/enums";
 import type { Prisma } from "../../generated/prisma/client";
@@ -159,17 +160,28 @@ export async function executarVarredura(agora: Date = new Date()): Promise<Resum
   if (!cfg.varredura.ativa) return { rodou: false, motivo: "desligada", achados: 0, criadas: 0, pulados: 0 };
 
   const v = cfg.varredura.vigia;
+  // A3 — prioriza os sinais que o gestor mais aceita (aprendizado). Detectores
+  // mapeados por sinal; rodamos na ordem de prioridade, então o "primeiro motivo
+  // por negócio" (dedup abaixo) já favorece o tipo mais valorizado dentro do teto.
+  const ap = await carregarAprendizado().catch(() => APRENDIZADO_PADRAO);
+  const detectores: Record<SinalVarredura, (() => Promise<Candidato[]>) | null> = {
+    semProximoPasso: v.semProximoPasso ? () => detSemProximoPasso(agora) : null,
+    parado: v.parado ? () => detParado(agora, cfg) : null,
+    semResposta: v.semResposta ? () => detSemResposta(agora, cfg) : null,
+    primeiraResposta: v.primeiraResposta ? () => detPrimeiraResposta(agora, cfg) : null,
+    outro: null,
+  };
   const grupos: Candidato[][] = [];
   try {
-    if (v.semProximoPasso) grupos.push(await detSemProximoPasso(agora));
-    if (v.parado) grupos.push(await detParado(agora, cfg));
-    if (v.semResposta) grupos.push(await detSemResposta(agora, cfg));
-    if (v.primeiraResposta) grupos.push(await detPrimeiraResposta(agora, cfg));
+    for (const sinal of prioridadeSinais(ap)) {
+      const det = detectores[sinal];
+      if (det) grupos.push(await det());
+    }
   } catch (e) {
     return { rodou: true, motivo: `falha na detecção: ${e instanceof Error ? e.message : String(e)}`, achados: 0, criadas: 0, pulados: 0 };
   }
 
-  // Um achado por negócio (o primeiro motivo encontrado), na ordem dos sinais.
+  // Um achado por negócio (o primeiro motivo encontrado), na ordem de prioridade.
   const porNegocio = new Map<string, string>();
   for (const g of grupos) for (const c of g) if (!porNegocio.has(c.negocioId)) porNegocio.set(c.negocioId, c.motivo);
   const achados = [...porNegocio.entries()].map(([negocioId, motivo]) => ({ negocioId, motivo }));

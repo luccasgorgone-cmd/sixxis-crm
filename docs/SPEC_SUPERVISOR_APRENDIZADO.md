@@ -1,7 +1,8 @@
 # SPEC — Aprendizado do Supervisor Comercial IA
 
-**Status:** proposto (Luccas pré-autorizou "pode seguir com suas recomendações e
-implementar tudo"; doc em disco por Artigo 14).
+**Status:** IMPLEMENTADO (A1+A2+A3) na branch de trabalho — Luccas autorizou
+direto "pode seguir sim, siga com suas recomendações". Gates verdes por fase;
+nada em produção (deploy = catraca). Doc em disco por Artigo 14.
 **Data:** 2026-10-14.
 **Classificação:** Architectural (loop de feedback + store de aprendizado + job
 agendado + injeção no contexto da IA).

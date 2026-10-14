@@ -68,6 +68,28 @@ export function forcaPorAmostra(n: number): ForcaInsight {
 
 const pct = (x: number): string => `${Math.round(x * 100)}%`;
 
+// Ordem default dos sinais da varredura (sem aprendizado) — mesma de antes.
+const ORDEM_SINAIS_PADRAO: SinalVarredura[] = [
+  "semProximoPasso",
+  "parado",
+  "semResposta",
+  "primeiraResposta",
+];
+
+// Ordena os 4 sinais da varredura por ACEITAÇÃO aprendida (maior primeiro), para
+// a varredura abrir primeiro as propostas do tipo que o gestor mais valoriza
+// dentro do teto por ciclo. Sinal sem amostra = neutro (0.5): fica ACIMA de um
+// sinal muito descartado (<0.5) e abaixo de um bem aceito. Sem aprendizado algum,
+// todos neutros → preserva a ordem default (sort estável). Pura.
+export function prioridadeSinais(ap: AprendizadoSnapshot): SinalVarredura[] {
+  const taxa = new Map(ap.aceitacaoPorSinal.map((a) => [a.chave, a.taxa] as const));
+  const chave = (s: SinalVarredura): number => {
+    const t = taxa.get(s);
+    return typeof t === "number" ? t : 0.5;
+  };
+  return [...ORDEM_SINAIS_PADRAO].sort((a, b) => chave(b) - chave(a));
+}
+
 // Entradas puras para montar os insights (números já computados).
 export type EntradaInsights = {
   aceitacaoPorSinal: AceitacaoItem[];

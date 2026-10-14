@@ -17,10 +17,12 @@ import {
   montarInsights,
   extrairProducao,
   nomeSinal,
+  prioridadeSinais,
   type EntradaInsights,
 } from "../../src/lib/supervisor/aprendizado";
 import {
   resolverAprendizado,
+  APRENDIZADO_PADRAO,
   AMOSTRA,
   CADENCIA_ESTUDO_PADRAO,
   LIMITES_APRENDIZADO,
@@ -241,6 +243,39 @@ caso("extrairProducao + montarInsights: pipeline completo gera insights coerente
   assert.ok(r.some((i) => /respostas?/i.test(i.texto)));
   assert.ok(r.some((i) => i.texto.includes("Instagram")));
   assert.ok(r.some((i) => i.texto.includes("Preço")));
+});
+
+// ───────────────────────── 7) prioridadeSinais (A3) ─────────────────────────
+
+caso("prioridadeSinais: sem aprendizado => ordem default preservada", () => {
+  assert.deepEqual(prioridadeSinais(APRENDIZADO_PADRAO), [
+    "semProximoPasso",
+    "parado",
+    "semResposta",
+    "primeiraResposta",
+  ]);
+});
+
+caso("prioridadeSinais: maior aceitação primeiro; muito descartado por último", () => {
+  const ap = resolverAprendizado({
+    geradoEm: "2026-10-14T00:00:00.000Z",
+    aceitacaoPorSinal: [
+      { chave: "semResposta", executadas: 9, descartadas: 1, taxa: 0.9 }, // alto
+      { chave: "semProximoPasso", executadas: 1, descartadas: 9, taxa: 0.1 }, // baixo
+      // "parado" e "primeiraResposta" sem dado → neutro 0.5 (entre os dois)
+    ],
+  });
+  const ordem = prioridadeSinais(ap);
+  assert.equal(ordem[0], "semResposta"); // 0.9
+  assert.equal(ordem[3], "semProximoPasso"); // 0.1 (abaixo dos neutros 0.5)
+  // os dois neutros ficam no meio, preservando a ordem relativa default
+  assert.deepEqual(ordem.slice(1, 3), ["parado", "primeiraResposta"]);
+});
+
+caso("prioridadeSinais: sempre devolve os 4 sinais, sem duplicar", () => {
+  const ordem = prioridadeSinais(APRENDIZADO_PADRAO);
+  assert.equal(ordem.length, 4);
+  assert.equal(new Set(ordem).size, 4);
 });
 
 console.log(`\nC7 supervisor aprendizado: ${ok} ok, ${falhou} falha(s)`);
