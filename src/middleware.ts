@@ -25,6 +25,11 @@ const ROTAS_PUBLICAS = [
 ];
 
 export default auth((req) => {
+  // Modo sandbox LOCAL (SANDBOX_ONLY=1): libera tudo sem login — so eu testo a
+  // Sol localmente, contra o banco descartavel. Guarda DURA: em producao essa
+  // env NUNCA existe, entao a protecao de todas as rotas fica 100% intacta.
+  if (process.env.SANDBOX_ONLY === "1") return NextResponse.next();
+
   const { pathname } = req.nextUrl;
 
   const ehPublica = ROTAS_PUBLICAS.some(

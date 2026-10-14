@@ -12,10 +12,84 @@ export type SessaoAgente = {
   acessoPosVenda: boolean;
 };
 
+// Modo sandbox LOCAL (SANDBOX_ONLY=1): sem login, retorna o admin semeado como
+// sessao. Guarda DURA — so vale quando SANDBOX_ONLY esta ligado (server.ts so
+// liga isso na instancia local de teste, contra o banco descartavel). Em
+// producao essa env NUNCA existe, entao o fluxo de auth real fica 100% intacto.
+async function obterAdminSandboxLocal(): Promise<SessaoAgente | null> {
+  const admin = await prisma.agente.findFirst({
+    where: { papel: Papel.ADMIN, ativo: true },
+    orderBy: { criadoEm: "asc" },
+    select: {
+      id: true,
+      papel: true,
+      nome: true,
+      acessoVenda: true,
+      acessoPosVenda: true,
+    },
+  });
+  if (!admin) return null;
+  return {
+    id: admin.id,
+    papel: admin.papel,
+    nome: admin.nome,
+    acessoVenda: admin.acessoVenda,
+    acessoPosVenda: admin.acessoPosVenda,
+  };
+}
+
+// Sessao minima que os layouts server-side precisam (area autenticada + admin).
+// Espelha o `auth()` real, MAS no modo sandbox LOCAL (SANDBOX_ONLY=1) devolve o
+// admin semeado como sessao sintetica — assim a instancia de teste local NAO
+// pede login (so eu testo a Sol ali, contra o banco descartavel). Em producao a
+// env SANDBOX_ONLY nunca existe, entao e identico ao `auth()`.
+export type SessaoLayout = {
+  user: {
+    id: string;
+    name: string | null;
+    papel: Papel;
+    acessoVenda: boolean;
+    acessoPosVenda: boolean;
+  };
+};
+
+export async function obterSessaoLayout(): Promise<SessaoLayout | null> {
+  const session = await auth();
+  if (session?.user?.id) {
+    return {
+      user: {
+        id: session.user.id,
+        name: session.user.name ?? null,
+        papel: session.user.papel,
+        acessoVenda: session.user.acessoVenda ?? false,
+        acessoPosVenda: session.user.acessoPosVenda ?? false,
+      },
+    };
+  }
+  if (process.env.SANDBOX_ONLY === "1") {
+    const admin = await obterAdminSandboxLocal();
+    if (admin) {
+      return {
+        user: {
+          id: admin.id,
+          name: admin.nome,
+          papel: admin.papel,
+          acessoVenda: admin.acessoVenda,
+          acessoPosVenda: admin.acessoPosVenda,
+        },
+      };
+    }
+  }
+  return null;
+}
+
 // Retorna o agente da sessao ou null (deslogado).
 export async function obterAgente(): Promise<SessaoAgente | null> {
   const session = await auth();
-  if (!session?.user?.id) return null;
+  if (!session?.user?.id) {
+    if (process.env.SANDBOX_ONLY === "1") return obterAdminSandboxLocal();
+    return null;
+  }
   return {
     id: session.user.id,
     papel: session.user.papel,

@@ -1,7 +1,7 @@
 // Layout da area autenticada: sidebar + topbar + conteudo. Busca a sessao no
 // servidor (o middleware ja protege, isto e a segunda barreira).
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { obterSessaoLayout } from "@/lib/autorizacao";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -13,7 +13,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await obterSessaoLayout();
   if (!session) redirect("/login");
   const marca = await obterMarca();
 

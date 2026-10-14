@@ -1,6 +1,6 @@
 // Layout do painel administrativo. Restrito a ADMIN (alem do middleware).
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { obterSessaoLayout } from "@/lib/autorizacao";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { obterMarca } from "@/lib/marca";
 
@@ -11,7 +11,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await obterSessaoLayout();
   if (!session || session.user.papel !== "ADMIN") redirect("/inbox");
   const marca = await obterMarca();
   return (
