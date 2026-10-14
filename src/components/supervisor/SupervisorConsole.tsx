@@ -1,17 +1,21 @@
 "use client";
 
-// Console do Supervisor Comercial IA (SPEC §7) — admin-only. Junta o painel
-// determinístico (esquerda) e o chat com o consultor interno (direita). O painel
-// recarrega quando o gestor troca período/finalidade; o chat usa a janela padrão
-// e pode recortar sozinho via ferramentas de consulta.
-import { useState, useEffect, useCallback } from "react";
-import { Gauge } from "lucide-react";
+// Console do Supervisor Comercial IA (SPEC §7) — admin-only. Organizado em três
+// abas no topo: Relatórios (visão analítica), Alertas (o que precisa de ação) e
+// Chat (o consultor interno). Relatórios e Alertas leem a MESMA forma
+// PainelSupervisor (um único fetch, recarregado quando o gestor troca
+// período/finalidade); o Chat conversa com a IA, que também lê o painel no
+// servidor. Nada é executado sem confirmação do gestor (human-in-the-loop).
+import { useState, useEffect, useCallback, useRef } from "react";
+import { BarChart3, Bell, MessageSquare, Gauge } from "lucide-react";
 import { Cabecalho } from "@/components/admin/VendedoresAdmin";
 import { EstadoErro } from "@/components/ui/Estado";
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
-import { PainelIndicadores } from "./PainelIndicadores";
+import { PainelRelatorios } from "./PainelRelatorios";
+import { PainelAlertas } from "./PainelAlertas";
 import { ChatSupervisor } from "./ChatSupervisor";
 
+type Aba = "relatorios" | "alertas" | "chat";
 type Periodo = "hoje" | "semana" | "15d" | "mes";
 type Finalidade = "" | "VENDA" | "POS_VENDA";
 
@@ -28,12 +32,62 @@ const FINALIDADES: { chave: Finalidade; rotulo: string }[] = [
   { chave: "POS_VENDA", rotulo: "Pós-venda" },
 ];
 
+const ABAS: { chave: Aba; rotulo: string; icone: typeof BarChart3 }[] = [
+  { chave: "relatorios", rotulo: "Relatórios", icone: BarChart3 },
+  { chave: "alertas", rotulo: "Alertas", icone: Bell },
+  { chave: "chat", rotulo: "Chat", icone: MessageSquare },
+];
+
+// Há algo pedindo atenção? (dirige o ponto no rótulo da aba Alertas.)
+function temAtencao(p: PainelSupervisor | null): boolean {
+  if (!p) return false;
+  const parados = p.parados.some((x) => x.parados > 0);
+  return p.semProximoPasso.semProximo > 0 || parados || p.perdas.total > 0;
+}
+
+function Segmentado<T extends string>({
+  opcoes,
+  valor,
+  aoMudar,
+  rotuloGrupo,
+}: {
+  opcoes: { chave: T; rotulo: string }[];
+  valor: T;
+  aoMudar: (v: T) => void;
+  rotuloGrupo: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={rotuloGrupo}
+      className="flex items-center gap-0.5 rounded-lg border border-black/5 bg-white p-0.5"
+    >
+      {opcoes.map((o) => (
+        <button
+          key={o.chave || "_"}
+          onClick={() => aoMudar(o.chave)}
+          aria-pressed={valor === o.chave}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            valor === o.chave
+              ? "bg-tiffany/10 text-tiffany"
+              : "text-medio hover:text-escuro"
+          }`}
+        >
+          {o.rotulo}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SupervisorConsole() {
+  const [aba, setAba] = useState<Aba>("relatorios");
   const [painel, setPainel] = useState<PainelSupervisor | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [finalidade, setFinalidade] = useState<Finalidade>("");
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -58,79 +112,120 @@ export function SupervisorConsole() {
     void carregar();
   }, [carregar]);
 
+  // Navegação por seta entre abas (acessibilidade de tablist).
+  function aoTeclarNasAbas(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const i = ABAS.findIndex((a) => a.chave === aba);
+    const prox =
+      e.key === "ArrowRight"
+        ? (i + 1) % ABAS.length
+        : (i - 1 + ABAS.length) % ABAS.length;
+    setAba(ABAS[prox].chave);
+    const botoes = tabsRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    botoes?.[prox]?.focus();
+  }
+
+  const atencao = temAtencao(painel);
+  const mostraFiltros = aba !== "chat";
+
   return (
-    <div className="p-5">
+    <div className="flex h-full min-h-0 flex-col p-4 sm:p-6">
       <Cabecalho
         titulo="Supervisor Comercial"
         subtitulo="Consultor interno de IA — lê os indicadores e sugere o próximo passo. Nada é executado sem a sua confirmação."
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_minmax(360px,440px)]">
-        {/* Painel determinístico */}
-        <div>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-lg border border-black/5 bg-white p-0.5">
-              {PERIODOS.map((p) => (
-                <button
-                  key={p.chave}
-                  onClick={() => setPeriodo(p.chave)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    periodo === p.chave
-                      ? "bg-tiffany/10 text-tiffany"
-                      : "text-medio hover:text-escuro"
-                  }`}
-                >
-                  {p.rotulo}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 rounded-lg border border-black/5 bg-white p-0.5">
-              {FINALIDADES.map((f) => (
-                <button
-                  key={f.chave || "tudo"}
-                  onClick={() => setFinalidade(f.chave)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    finalidade === f.chave
-                      ? "bg-tiffany/10 text-tiffany"
-                      : "text-medio hover:text-escuro"
-                  }`}
-                >
-                  {f.rotulo}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Abas */}
+      <div
+        ref={tabsRef}
+        role="tablist"
+        aria-label="Seções do Supervisor"
+        onKeyDown={aoTeclarNasAbas}
+        className="mt-1 flex items-center gap-1 border-b border-black/5"
+      >
+        {ABAS.map((a) => {
+          const ativa = aba === a.chave;
+          const Icone = a.icone;
+          const pontoAlerta = a.chave === "alertas" && atencao;
+          return (
+            <button
+              key={a.chave}
+              role="tab"
+              aria-selected={ativa}
+              tabIndex={ativa ? 0 : -1}
+              onClick={() => setAba(a.chave)}
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                ativa
+                  ? "border-tiffany text-escuro"
+                  : "border-transparent text-medio hover:text-escuro"
+              }`}
+            >
+              <Icone className="h-4 w-4" />
+              {a.rotulo}
+              {pontoAlerta && (
+                <span
+                  className="ml-0.5 h-1.5 w-1.5 rounded-full bg-amber-500"
+                  aria-label="há pontos de atenção"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-          {erro ? (
-            <EstadoErro
-              mensagem="Não foi possível carregar os indicadores."
-              onRetry={() => void carregar()}
-            />
-          ) : carregando && !painel ? (
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="skeleton h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : painel ? (
-            <div className={carregando ? "opacity-60 transition-opacity" : ""}>
-              <PainelIndicadores painel={painel} />
-            </div>
-          ) : null}
+      {/* Filtros (período / finalidade) — só nas abas de dados. */}
+      {mostraFiltros && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Segmentado
+            opcoes={PERIODOS}
+            valor={periodo}
+            aoMudar={setPeriodo}
+            rotuloGrupo="Período"
+          />
+          <Segmentado
+            opcoes={FINALIDADES}
+            valor={finalidade}
+            aoMudar={setFinalidade}
+            rotuloGrupo="Finalidade"
+          />
         </div>
+      )}
 
-        {/* Chat com o consultor */}
-        <div className="lg:sticky lg:top-5 lg:h-[calc(100vh-8rem)]">
-          <div className="flex h-[32rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-black/5 bg-white lg:h-full">
+      {/* Conteúdo da aba ativa */}
+      <div className="mt-4 min-h-0 flex-1">
+        {aba === "chat" ? (
+          <div className="flex h-[calc(100vh-14rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl border border-black/5 bg-white">
             <div className="flex items-center gap-2 border-b border-black/5 px-4 py-3">
               <Gauge className="h-4 w-4 text-tiffany" />
-              <span className="text-sm font-semibold text-escuro">Consultor</span>
+              <span className="text-sm font-semibold text-escuro">
+                Consultor comercial
+              </span>
             </div>
             <div className="min-h-0 flex-1">
               <ChatSupervisor />
             </div>
           </div>
-        </div>
+        ) : erro ? (
+          <EstadoErro
+            mensagem="Não foi possível carregar os indicadores."
+            onRetry={() => void carregar()}
+          />
+        ) : carregando && !painel ? (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : painel ? (
+          <div className={carregando ? "opacity-60 transition-opacity" : ""}>
+            {aba === "relatorios" ? (
+              <PainelRelatorios painel={painel} />
+            ) : (
+              <PainelAlertas painel={painel} />
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -172,7 +172,10 @@ export async function montarPainel(
             baseEscopo,
             {
               status: StatusNeg.PERDIDO,
-              fechadoEm: { gte: janela.inicio, lte: janela.fim },
+              // `lt` no fim (não `lte`) para casar exatamente com a fronteira de
+              // wherePerdidos em metricas.ts — assim origens/perdas reconciliam
+              // com metricas.perdidos também na borda do período.
+              fechadoEm: { gte: janela.inicio, lt: janela.fim },
             },
             { NOT: whereVendaNoPeriodo(janela) },
           ],
