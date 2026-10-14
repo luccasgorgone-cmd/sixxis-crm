@@ -54,6 +54,55 @@ depósito, sem revisão de atendimento).
 - Números **nunca** saem do LLM. O LLM recebe números já calculados e/ou usa
   ferramentas de leitura tipadas; ele narra, não aritmetiza.
 
+## 2.1 Reuso do que já existe (descoberta no código — NÃO é greenfield)
+
+O recon do código achou duas fundações que mudam o custo da entrega. A spec
+**reusa**, não reconstrói.
+
+**(a) Oracle — chat de gestão/BI já pronto** (`src/lib/oracle.ts`, `gerarRespostaOracle`;
+UI `src/app/(app)/oracle/page.tsx`; API `src/app/api/oracle/chat/route.ts`):
+- **19 ferramentas, já quase toda a camada de métricas determinística** que a §4
+  pedia: `consultar_vendas`, `consultar_funil`, `consultar_desempenho_vendedores`,
+  `consultar_metas`, `consultar_tempo_resposta`, `comparar_periodos`,
+  `consultar_motivos_perda`, `consultar_atendimentos`, `analisar_padroes_atendimento`,
+  + `diagnosticar_sistema` (admin-only, 9 checagens de integridade) — todas batem
+  nas libs `metricas.ts`/`vendasPeriodo.ts`/etc. **O "diagnóstico" do doc do
+  supervisor já tem base pronta aqui.** Registry `FERRAMENTAS` em `oracle.ts:1631`,
+  dispatch `executarFerramenta` em `:1528`.
+- **Barreira de mensagem a cliente já é um fato**: nenhuma das 19 ferramentas
+  envia WhatsApp/SMS/e-mail. A única "de mensagem" (`criar_rascunho_campanha`,
+  `:571`) cria `Campanha` em `RASCUNHO` e **nunca dispara** (`:630` "Você NUNCA
+  dispara"; disparo é ação humana em `/campanhas`). Preservar.
+
+**Três lacunas reais do Oracle (o que de fato falta):**
+1. **Não é admin-only** — `obterAgente()` (qualquer papel) com escopo por-ferramenta
+   (`oracle.ts:237` `escopoOracle`, `agenteId: self` pra não-admin). O Supervisor é
+   **superfície admin-only separada** (não relaxar o Oracle).
+2. **Bypassa `llmProvider.ts` e `orcamentoIA`** — fala direto com a Anthropic via
+   `fetch` (`oracle.ts:2013`), modelo `claude-sonnet-4-6` (`ORACLE_MODEL`), **sem
+   teto de gasto e sem logar custo** (não grava `SolEvento`). Pra rodar em
+   Ollama/modelo barato sob o teto de $10, **isto precisa ser corrigido** (ver D4).
+3. **Sem máquina preview→confirma pro LLM** e **sem auditoria/undo** das ações —
+   as 2 escritas do Oracle (`criar_rascunho_campanha`, `salvar_guia_atendimento_sol`)
+   executam na hora da tool-call, sem passo de confirmação.
+
+**(b) Harness propõe→confirma→aplica já existe** (`src/lib/aplicarSync.ts` +
+`src/app/api/interno/crm/{previa,aplicar}/route.ts`): `previa` classifica
+campo-a-campo e **não escreve**; `aplicar` **recomputa no servidor** e só aplica os
+campos marcados pelo humano (`aplicar/route.ts:41`), em `$transaction`
+(`aplicarSync.ts:59`), idempotente, logado via `registrarAtividade` (`:182`). **É
+exatamente o padrão da §6** — porém hoje só cobre dado de cadastro/endereço/NF/
+rastreio (sync da Loja, auth `x-internal-key`, **não ligado ao LLM**) e
+**exclui explicitamente etapa/ganho/perda/valor** (`aplicarSync.ts:4`). Serve de
+**molde** pro harness do supervisor; não é reaproveitável direto.
+
+**Conclusão de reuso:** a Camada 1 (métricas) é **majoritariamente montagem**
+sobre as ferramentas do Oracle; o diagnóstico idem; o padrão de confirmação já
+tem molde em `aplicarSync.ts`. O que é **construção real**: (i) superfície
+admin-only + painel; (ii) ferramentas de **escrita Nível 1** (inexistentes); (iii)
+a máquina preview→confirma ligada ao LLM + auditoria/undo; (iv) rota do LLM por
+`llmProvider`+`orcamentoIA` (teto + log) — ver D4.
+
 ## 3. Arquitetura — 3 camadas
 
 ```
@@ -87,6 +136,10 @@ depósito, sem revisão de atendimento).
 ```
 
 ## 4. Camada 1 — Motor de métricas (determinístico)
+
+> Boa parte já está exposta como **ferramentas do Oracle** (§2.1) sobre estas
+> mesmas libs. O painel e o contexto da IA consomem as libs direto (números
+> auditáveis); a IA do chat pode chamar as ferramentas do Oracle como leitura.
 
 **Reuso direto (não reimplementar):**
 - `src/lib/metricas.ts` `calcularMetricas(periodo, {agenteId?, finalidade?})`:
@@ -126,12 +179,18 @@ cobertura 3-4×) e ficam em `SupervisorConfig` editável (ver §8 e Decisão D2)
 
 ## 5. Camada 2 — IA (provider-agnóstico, Ollama ou nuvem)
 
+> Depende de **D4**. O texto abaixo assume o caminho recomendado D4(a): loop do
+> supervisor roteado por `llmProvider`+`orcamentoIA`, **reusando as ferramentas de
+> leitura do Oracle** (`oracle.ts` `FERRAMENTAS`/`executarFerramenta`) como
+> biblioteca, sem tocar no chat Oracle existente.
+
 **Provider:** reusa toda a abstração existente (`llmProvider.ts`,
 `llmProviders/registro.ts`, `openaiCompativel.ts`). Adiciona um provider
 `ollama` apontando pra endpoint OpenAI-compatível
 (`http://<host>:11434/v1/chat/completions`, via `OLLAMA_BASE_URL`). **Nada no
-`luna.ts` muda** — o supervisor tem seu próprio resolvedor de config
-(`SupervisorConfig.provider/modelo`), independente do atendimento.
+`luna.ts` nem no `oracle.ts` muda** — o supervisor tem seu próprio resolvedor de
+config (`SupervisorConfig.provider/modelo`), independente do atendimento e do
+Oracle. (Corrigir o gap de orçamento do Oracle em si = D4(b), fora da V1.)
 
 **Orçamento:** toda chamada paga passa por `verificarOrcamentoMensal(modelo)`
 ANTES (mesma trava hard-stop da Luna). Eventos gravados em `SolEvento` com
@@ -164,7 +223,10 @@ métrica, mandar mensagem a cliente, executar escrita direto.
 ## 6. Harness de escrita — human-in-the-loop (o ponto sensível)
 
 **Princípio:** a IA **nunca** escreve direto. Ela **propõe** uma ação tipada; o
-servidor só executa após o admin **Confirmar** na UI.
+servidor só executa após o admin **Confirmar** na UI. **Molde já existente a
+copiar:** `src/lib/aplicarSync.ts` (prévia não-escreve → aplicar recomputa no
+servidor → `$transaction` idempotente → log) — mesmo formato, outro conjunto de
+mutações (funil em vez de cadastro/NF).
 
 **Contrato de ferramenta de escrita** (`src/lib/supervisor/acoes/tipos.ts`):
 ```
@@ -271,9 +333,13 @@ Nenhuma dessas é destrutiva irreversível; nenhuma fala com cliente.
 ## 12. Impacto — arquivo por arquivo
 
 **Novos:**
-- `src/lib/supervisor/indicadores.ts`, `painel.ts`, `tipos.ts`
-- `src/lib/supervisor/acoes/{tipos.ts,registro.ts, mover_etapa.ts, ...}`
-- `src/lib/supervisor/ia.ts` (contexto + loop + guard-rails; reusa llmProvider)
+- `src/lib/supervisor/indicadores.ts`, `painel.ts`, `tipos.ts` (indicadores novos
+  da §4 que o Oracle ainda não expõe: `pctDentroDoPrazo`, `semProximoPasso`,
+  `coberturaFunil`, `conversaoPorEtapa`, `ganhosPerdasPorOrigem`)
+- `src/lib/supervisor/acoes/{tipos.ts,registro.ts, mover_etapa.ts, ...}` (molde:
+  `aplicarSync.ts`)
+- `src/lib/supervisor/ia.ts` (contexto + loop + guard-rails; reusa `llmProvider`+
+  `orcamentoIA` e importa as ferramentas de leitura do Oracle — D4(a))
 - `src/app/api/admin/supervisor/painel/route.ts`
 - `src/app/api/admin/supervisor/chat/route.ts`
 - `src/app/api/admin/supervisor/acao/confirmar/route.ts`
@@ -288,8 +354,9 @@ Nenhuma dessas é destrutiva irreversível; nenhuma fala com cliente.
 - `src/components/admin/AdminNav.tsx` (+entrada top-level `SEM_SUBNAV`)
 - `prisma/schema.prisma` (+`SupervisorConfig`, +`SupervisorAcao`, +enum status)
 
-**Intocado:** Kanban, Inbox, `luna.ts`, `ConfigAgenteIA`, Evolution/Cloud/envio,
-qualquer caminho de mensagem a cliente.
+**Intocado:** Kanban, Inbox, `luna.ts`, **`oracle.ts` e o chat Oracle existente**
+(D4(a)), `ConfigAgenteIA`, Evolution/Cloud/envio, qualquer caminho de mensagem a
+cliente. (As ferramentas de leitura do Oracle são **importadas**, não alteradas.)
 
 ## 13. Decisões abertas (travam o início do código)
 
@@ -306,6 +373,22 @@ qualquer caminho de mensagem a cliente.
   tela depois? *Recomendo sim.*
 - **D3 — Reatribuir vendedor no Nível 1:** mantém (é reversível e útil) ou tira
   da V1 por ser mudança de responsabilidade? *Recomendo manter, com log.*
+- **D4 — Motor de IA: estender o Oracle ou motor próprio?** O Oracle já tem as 19
+  ferramentas de leitura, mas fala direto com a Anthropic (sem teto/sem log). Três
+  caminhos:
+  - **(a) Supervisor reusa o ENGINE do Oracle como biblioteca de ferramentas de
+    leitura, mas com loop próprio roteado por `llmProvider`+`orcamentoIA`**
+    (teto + `SolEvento`), e adiciona as ferramentas de escrita admin-only. Oracle
+    fica intocado (segue servindo o chat geral de todo papel). *Recomendo esta —
+    entrega o supervisor sem desestabilizar o Oracle; a duplicação é só do loop,
+    as ferramentas de leitura são compartilhadas.*
+  - **(b) Migrar o Oracle inteiro pra `llmProvider`+`orcamentoIA`** e construir o
+    supervisor em cima — mais limpo a longo prazo (um motor só, orçado), porém
+    mexe num recurso em produção que hoje funciona (risco/custo maior, vira
+    trabalho à parte).
+  - **(c) Motor 100% novo** ignorando o Oracle — mais caro, reimplementa 19
+    ferramentas. *Não recomendo.*
+  Qual caminho?
 
 ## 14. Fora de escopo (reafirmando)
 
