@@ -13,6 +13,7 @@ import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import { iniciarArquivamento } from "./src/lib/arquivamento";
 import { iniciarVarreduraSupervisor } from "./src/lib/supervisor/varredura";
+import { iniciarAprendizadoSupervisor } from "./src/lib/supervisor/aprendizado";
 import {
   seedAdmin,
   seedFunil,
@@ -118,6 +119,11 @@ async function main(): Promise<void> {
     // quando ATIVA na config e na cadencia configurada). Abre propostas, nunca
     // executa sozinha. Nasce DESLIGADA ate o gestor ligar na aba Configuracoes.
     iniciarVarreduraSupervisor();
+    // Supervisor: aprendizado (loop de feedback deterministico). Ticker 60s que
+    // recomputa o snapshot a cada cadenciaHoras (default 12h) — zero token,
+    // deriva de SupervisorAcao + negocios fechados. Roda mesmo com a varredura
+    // desligada; nunca auto-edita config (so sugere via insight).
+    iniciarAprendizadoSupervisor();
   }
 
   httpServer.listen(port, () => {

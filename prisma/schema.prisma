@@ -1812,6 +1812,11 @@ model SupervisorConfig {
   // Aditivo: ausência/parcial é resolvida por resolverVarredura (default seguro:
   // varredura DESLIGADA até o gestor ligar). Ver src/lib/supervisor/tipos.ts.
   varreduraJson Json?
+  // Snapshot de APRENDIZADO (loop de feedback determinístico): aceitação/sucesso
+  // por sinal + insights recomputados periodicamente. Aditivo e opcional —
+  // resolverAprendizado aplica defaults (nunca estudou = snapshot vazio). Zero
+  // token, derivado de SupervisorAcao + negócios fechados. Ver aprendizado.ts.
+  aprendizadoJson Json?
   atualizadoEm  DateTime @updatedAt
 }
 

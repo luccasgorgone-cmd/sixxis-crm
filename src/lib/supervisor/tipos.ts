@@ -288,6 +288,139 @@ export function resolverVarredura(bruto: unknown): VarreduraConfig {
   };
 }
 
+// --- Aprendizado (SupervisorConfig.aprendizadoJson). Snapshot determinístico do
+// loop de feedback: a IA acumula o que o gestor aceitou/descartou e o que deu
+// certo, destila em insights e realimenta as decisões. Zero token, sem re-treino.
+// Ver SPEC_SUPERVISOR_APRENDIZADO.md e aprendizado.ts (computação). ---
+
+// Os 4 sinais da varredura + "outro" (ações de chat/form sem sinal de varredura).
+export type SinalVarredura =
+  | "semResposta"
+  | "semProximoPasso"
+  | "parado"
+  | "primeiraResposta"
+  | "outro";
+
+// Força de um insight pelo tamanho da amostra (honestidade: amostra pequena é
+// marcada, não escondida).
+export type ForcaInsight = "forte" | "media" | "fraca";
+
+export type Insight = {
+  texto: string;
+  forca: ForcaInsight;
+};
+
+// Aceitação de um tipo (sinal ou ferramenta): EXECUTADO ÷ (EXECUTADO+DESCARTADO).
+export type AceitacaoItem = {
+  chave: string; // sinal ou nome da ferramenta
+  executadas: number;
+  descartadas: number;
+  taxa: number | null; // null quando não há amostra (exec+desc = 0)
+};
+
+// Sucesso de um sinal: das ações EXECUTADAS num negócio, quantas viraram GANHO.
+export type SucessoSinal = {
+  sinal: SinalVarredura;
+  executadas: number; // com negócio já fechado (GANHO ou PERDIDO)
+  ganhos: number;
+  taxa: number | null; // ganhos ÷ fechadas, null quando sem amostra
+};
+
+export type ResumoHistorico = {
+  geradoEm: string; // ISO
+  aceitacaoGeral: number | null;
+  amostra: number;
+};
+
+export type AprendizadoSnapshot = {
+  geradoEm: string | null; // ISO; null = nunca estudou
+  cadenciaHoras: number; // de quanto em quanto tempo recomputa (default 12)
+  amostras: { acoes: number; fechados: number };
+  aceitacaoPorSinal: AceitacaoItem[];
+  aceitacaoPorFerramenta: AceitacaoItem[];
+  sucessoPorSinal: SucessoSinal[];
+  insights: Insight[];
+  historico: ResumoHistorico[]; // últimos N resumos (mais recente primeiro)
+};
+
+// Faixas de amostra para a força do insight (e corte mínimo para emitir).
+export const AMOSTRA = { forte: 20, media: 8, min: 3 } as const;
+// Faixa aceita para a cadência de estudo (horas).
+export const LIMITES_APRENDIZADO = { cadenciaHoras: { min: 1, max: 168 } } as const;
+export const CADENCIA_ESTUDO_PADRAO = 12;
+export const HISTORICO_MAX = 10;
+
+export const APRENDIZADO_PADRAO: AprendizadoSnapshot = {
+  geradoEm: null,
+  cadenciaHoras: CADENCIA_ESTUDO_PADRAO,
+  amostras: { acoes: 0, fechados: 0 },
+  aceitacaoPorSinal: [],
+  aceitacaoPorFerramenta: [],
+  sucessoPorSinal: [],
+  insights: [],
+  historico: [],
+};
+
+// Resolve o snapshot a partir do JSON persistido (parcial/legado), aplicando
+// defaults campo a campo e CLAMPando a cadência. Tolerante na LEITURA. Pura.
+export function resolverAprendizado(bruto: unknown): AprendizadoSnapshot {
+  const b = (bruto && typeof bruto === "object" ? bruto : {}) as Record<
+    string,
+    unknown
+  >;
+  const arr = <T>(x: unknown, map: (o: Record<string, unknown>) => T | null): T[] => {
+    if (!Array.isArray(x)) return [];
+    const out: T[] = [];
+    for (const it of x) {
+      if (it && typeof it === "object") {
+        const v = map(it as Record<string, unknown>);
+        if (v !== null) out.push(v);
+      }
+    }
+    return out;
+  };
+  const num = (x: unknown, def = 0): number =>
+    typeof x === "number" && Number.isFinite(x) ? x : def;
+  const taxaOuNull = (x: unknown): number | null =>
+    typeof x === "number" && Number.isFinite(x) ? x : null;
+
+  const am = (b.amostras && typeof b.amostras === "object" ? b.amostras : {}) as Record<string, unknown>;
+  const cad = num(b.cadenciaHoras, CADENCIA_ESTUDO_PADRAO);
+  return {
+    geradoEm: typeof b.geradoEm === "string" ? b.geradoEm : null,
+    cadenciaHoras: Math.min(
+      LIMITES_APRENDIZADO.cadenciaHoras.max,
+      Math.max(LIMITES_APRENDIZADO.cadenciaHoras.min, cad),
+    ),
+    amostras: { acoes: num(am.acoes), fechados: num(am.fechados) },
+    aceitacaoPorSinal: arr<AceitacaoItem>(b.aceitacaoPorSinal, (o) =>
+      typeof o.chave === "string"
+        ? { chave: o.chave, executadas: num(o.executadas), descartadas: num(o.descartadas), taxa: taxaOuNull(o.taxa) }
+        : null,
+    ),
+    aceitacaoPorFerramenta: arr<AceitacaoItem>(b.aceitacaoPorFerramenta, (o) =>
+      typeof o.chave === "string"
+        ? { chave: o.chave, executadas: num(o.executadas), descartadas: num(o.descartadas), taxa: taxaOuNull(o.taxa) }
+        : null,
+    ),
+    sucessoPorSinal: arr<SucessoSinal>(b.sucessoPorSinal, (o) =>
+      typeof o.sinal === "string"
+        ? { sinal: o.sinal as SinalVarredura, executadas: num(o.executadas), ganhos: num(o.ganhos), taxa: taxaOuNull(o.taxa) }
+        : null,
+    ),
+    insights: arr<Insight>(b.insights, (o) =>
+      typeof o.texto === "string"
+        ? { texto: o.texto, forca: (o.forca === "forte" || o.forca === "media" || o.forca === "fraca" ? o.forca : "fraca") }
+        : null,
+    ),
+    historico: arr<ResumoHistorico>(b.historico, (o) =>
+      typeof o.geradoEm === "string"
+        ? { geradoEm: o.geradoEm, aceitacaoGeral: taxaOuNull(o.aceitacaoGeral), amostra: num(o.amostra) }
+        : null,
+    ).slice(0, HISTORICO_MAX),
+  };
+}
+
 // --- Edição de config (form + IA): PONTO ÚNICO de validação. Recebe o estado
 // atual já resolvido + um patch parcial; devolve o novo estado ou um erro legível
 // (nunca aplica valor inválido). Pura (testada em contrato c6). ---
