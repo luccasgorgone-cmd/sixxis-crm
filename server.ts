@@ -12,6 +12,7 @@ import { iniciarAlertas } from "./src/lib/alertas";
 import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import { iniciarArquivamento } from "./src/lib/arquivamento";
+import { iniciarVarreduraSupervisor } from "./src/lib/supervisor/varredura";
 import {
   seedAdmin,
   seedFunil,
@@ -113,6 +114,10 @@ async function main(): Promise<void> {
     // Bloco 3: esvaziar o Kanban por prazo (perdidos/ganhos parados). Nasce em
     // MODO LOG — so conta quantos arquivaria — ate o dono ligar no admin.
     iniciarArquivamento();
+    // Supervisor: varredura periodica dos atendimentos (ticker 60s; so roda
+    // quando ATIVA na config e na cadencia configurada). Abre propostas, nunca
+    // executa sozinha. Nasce DESLIGADA ate o gestor ligar na aba Configuracoes.
+    iniciarVarreduraSupervisor();
   }
 
   httpServer.listen(port, () => {

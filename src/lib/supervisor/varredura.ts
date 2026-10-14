@@ -1,0 +1,241 @@
+// Varredura periódica do Supervisor (SPEC §5). DETERMINÍSTICA: examina os
+// atendimentos por REGRA (sem LLM, custo de token zero), e para cada achado
+// registra uma SupervisorAcao(PROPOSTO) — a ação fica pronta para o gestor
+// confirmar com 1 clique. NUNCA executa nada sozinha; NUNCA fala com cliente.
+//
+// Papéis distintos: o slaAlertas (lib/slaAlertas.ts) avisa o VENDEDOR dono; esta
+// varredura é a camada de GESTÃO (junta o que precisa de ação e deixa a proposta
+// para o admin). Dedup: não recria proposta para um negócio que já tem uma
+// proposta aberta da varredura.
+import { prisma } from "../prisma";
+import { carregarConfigEditavel } from "./config";
+import type { ConfigEditavel } from "./tipos";
+import { StatusNeg } from "../../generated/prisma/enums";
+import type { Prisma } from "../../generated/prisma/client";
+
+// adminId sentinela das propostas automáticas (schema não tem FK em adminId).
+// Permite distinguir e listar só o que a varredura abriu.
+export const ORIGEM_VARREDURA = "varredura";
+
+const CAP_POR_CICLO = 25; // teto de propostas novas por ciclo (evita enxurrada)
+const TAKE_POR_SINAL = 40; // teto de candidatos consultados por sinal
+
+type Candidato = { negocioId: string; motivo: string };
+
+// ───────────────────────── detecções (read-only) ─────────────────────────
+
+// Sinal 2 — sem próximo passo: ABERTO sem Lembrete PENDENTE futuro.
+async function detSemProximoPasso(agora: Date): Promise<Candidato[]> {
+  const negs = await prisma.negocio.findMany({
+    where: {
+      status: StatusNeg.ABERTO,
+      NOT: { lembretes: { some: { status: "PENDENTE", dataHora: { gte: agora } } } },
+    },
+    select: { id: true },
+    orderBy: { entrouEtapaEm: "asc" },
+    take: TAKE_POR_SINAL,
+  });
+  return negs.map((n) => ({ negocioId: n.id, motivo: "Sem próximo passo agendado" }));
+}
+
+// Sinal 3 — parado além do limiar DA ETAPA. Reusa ConfigAlertaSla (fonte única,
+// por finalidade+etapa, em minutos); onde não houver config, cai no limiar
+// global `paradoDiasPadrao` da config do Supervisor.
+async function detParado(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]> {
+  const slas = await prisma.configAlertaSla.findMany({
+    where: { ativo: true },
+    select: { finalidade: true, etapaId: true, minutosParaAlerta: true },
+  });
+  const mapa = new Map(slas.map((s) => [`${s.finalidade}:${s.etapaId}`, s.minutosParaAlerta]));
+  const limiarGlobalMs = cfg.limiares.paradoDiasPadrao * 86_400_000;
+
+  const negs = await prisma.negocio.findMany({
+    where: { status: StatusNeg.ABERTO, etapaId: { not: null } },
+    select: { id: true, finalidade: true, etapaId: true, entrouEtapaEm: true, etapa: { select: { nome: true } } },
+    orderBy: { entrouEtapaEm: "asc" },
+    take: 200, // avalia um lote; corta para TAKE_POR_SINAL após o filtro
+  });
+  const out: Candidato[] = [];
+  for (const n of negs) {
+    if (!n.entrouEtapaEm) continue;
+    const decorridoMs = agora.getTime() - n.entrouEtapaEm.getTime();
+    const minSla = mapa.get(`${n.finalidade}:${n.etapaId}`);
+    const estourou =
+      minSla != null ? decorridoMs >= minSla * 60_000 : decorridoMs >= limiarGlobalMs;
+    if (estourou) {
+      const dias = Math.floor(decorridoMs / 86_400_000);
+      out.push({ negocioId: n.id, motivo: `Parado há ${dias} dia(s) em "${n.etapa?.nome ?? "etapa"}"` });
+      if (out.length >= TAKE_POR_SINAL) break;
+    }
+  }
+  return out;
+}
+
+// Negócio ABERTO de um conjunto de leads+finalidade (para anexar a ação a um
+// negócio real a partir de uma conversa). Retorna o 1º aberto por lead+final.
+async function negociosAbertosPorConversa(
+  chaves: { leadId: string; finalidade: string }[],
+): Promise<Map<string, string>> {
+  if (chaves.length === 0) return new Map();
+  const leadIds = [...new Set(chaves.map((c) => c.leadId))];
+  const negs = await prisma.negocio.findMany({
+    where: { status: StatusNeg.ABERTO, leadId: { in: leadIds } },
+    select: { id: true, leadId: true, finalidade: true },
+  });
+  const mapa = new Map<string, string>();
+  for (const n of negs) {
+    const k = `${n.leadId}:${n.finalidade}`;
+    if (!mapa.has(k)) mapa.set(k, n.id);
+  }
+  return mapa;
+}
+
+// Sinal 1 — cliente sem resposta (HEURÍSTICA barata, sem varrer mensagem a
+// mensagem): conversa não arquivada com mensagens não lidas (naoLidas>0) e
+// parada há mais de `semRespostaHoras`. Anexa a proposta ao negócio aberto do
+// lead/finalidade da conversa.
+async function detSemResposta(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]> {
+  const corte = new Date(agora.getTime() - cfg.varredura.semRespostaHoras * 3_600_000);
+  const convs = await prisma.conversa.findMany({
+    where: { arquivada: false, naoLidas: { gt: 0 }, ultimaMensagemEm: { lte: corte } },
+    select: { leadId: true, finalidade: true, ultimaMensagemEm: true },
+    orderBy: { ultimaMensagemEm: "asc" },
+    take: TAKE_POR_SINAL,
+  });
+  const mapa = await negociosAbertosPorConversa(convs.map((c) => ({ leadId: c.leadId, finalidade: c.finalidade })));
+  const out: Candidato[] = [];
+  for (const c of convs) {
+    const negId = mapa.get(`${c.leadId}:${c.finalidade}`);
+    if (negId) out.push({ negocioId: negId, motivo: "Cliente aguardando resposta (mensagens não lidas)" });
+  }
+  return out;
+}
+
+// Sinal 4 — 1ª resposta estourada: lead NOVO (negócio criado há pouco) cuja
+// conversa segue com não lidas além do prazo de 1ª resposta. Heurística no mesmo
+// espírito do sinal 1, restrita a negócios recém-criados.
+async function detPrimeiraResposta(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]> {
+  const corteResp = new Date(agora.getTime() - cfg.limiares.prazo1aRespostaSeg * 1000);
+  const corteNovo = new Date(agora.getTime() - 7 * 86_400_000); // "novo" = últimos 7 dias
+  const novos = await prisma.negocio.findMany({
+    where: { status: StatusNeg.ABERTO, criadoEm: { gte: corteNovo } },
+    select: { id: true, leadId: true, finalidade: true },
+    take: 200,
+  });
+  if (novos.length === 0) return [];
+  const leadIds = [...new Set(novos.map((n) => n.leadId))];
+  const convs = await prisma.conversa.findMany({
+    where: { leadId: { in: leadIds }, arquivada: false, naoLidas: { gt: 0 }, ultimaMensagemEm: { lte: corteResp } },
+    select: { leadId: true, finalidade: true },
+  });
+  const comEspera = new Set(convs.map((c) => `${c.leadId}:${c.finalidade}`));
+  const out: Candidato[] = [];
+  for (const n of novos) {
+    if (comEspera.has(`${n.leadId}:${n.finalidade}`)) {
+      out.push({ negocioId: n.id, motivo: "Lead novo sem 1ª resposta no prazo" });
+      if (out.length >= TAKE_POR_SINAL) break;
+    }
+  }
+  return out;
+}
+
+// ───────────────────────── ciclo ─────────────────────────
+
+export type ResumoVarredura = {
+  rodou: boolean;
+  motivo?: string;
+  achados: number;
+  criadas: number;
+  pulados: number;
+};
+
+// Executa UM ciclo. Determinístico e idempotente por dedup. Nunca lança.
+export async function executarVarredura(agora: Date = new Date()): Promise<ResumoVarredura> {
+  let cfg: ConfigEditavel;
+  try {
+    cfg = await carregarConfigEditavel();
+  } catch (e) {
+    return { rodou: false, motivo: `falha ao ler config: ${e instanceof Error ? e.message : String(e)}`, achados: 0, criadas: 0, pulados: 0 };
+  }
+  if (!cfg.varredura.ativa) return { rodou: false, motivo: "desligada", achados: 0, criadas: 0, pulados: 0 };
+
+  const v = cfg.varredura.vigia;
+  const grupos: Candidato[][] = [];
+  try {
+    if (v.semProximoPasso) grupos.push(await detSemProximoPasso(agora));
+    if (v.parado) grupos.push(await detParado(agora, cfg));
+    if (v.semResposta) grupos.push(await detSemResposta(agora, cfg));
+    if (v.primeiraResposta) grupos.push(await detPrimeiraResposta(agora, cfg));
+  } catch (e) {
+    return { rodou: true, motivo: `falha na detecção: ${e instanceof Error ? e.message : String(e)}`, achados: 0, criadas: 0, pulados: 0 };
+  }
+
+  // Um achado por negócio (o primeiro motivo encontrado), na ordem dos sinais.
+  const porNegocio = new Map<string, string>();
+  for (const g of grupos) for (const c of g) if (!porNegocio.has(c.negocioId)) porNegocio.set(c.negocioId, c.motivo);
+  const achados = [...porNegocio.entries()].map(([negocioId, motivo]) => ({ negocioId, motivo }));
+
+  if (achados.length === 0) return { rodou: true, achados: 0, criadas: 0, pulados: 0 };
+
+  // Dedup: pula negócios que já têm proposta aberta da varredura.
+  const ids = achados.map((a) => a.negocioId);
+  const jaAbertas = await prisma.supervisorAcao.findMany({
+    where: { status: "PROPOSTO", adminId: ORIGEM_VARREDURA, negocioId: { in: ids } },
+    select: { negocioId: true },
+  });
+  const jaSet = new Set(jaAbertas.map((a) => a.negocioId));
+
+  let criadas = 0;
+  let pulados = 0;
+  const dataHora = new Date(agora.getTime() + 3_600_000).toISOString(); // sugere contato em 1h
+  for (const a of achados) {
+    if (jaSet.has(a.negocioId)) { pulados++; continue; }
+    if (criadas >= CAP_POR_CICLO) { pulados++; continue; }
+    const args: Prisma.InputJsonValue = { negocioId: a.negocioId, dataHora, nota: a.motivo };
+    await prisma.supervisorAcao.create({
+      data: {
+        adminId: ORIGEM_VARREDURA,
+        ferramenta: "criar_lembrete",
+        argsJson: args,
+        preview: `${a.motivo}. Sugestão: agendar contato.`,
+        status: "PROPOSTO",
+        negocioId: a.negocioId,
+        motivo: "varredura automática",
+      },
+    });
+    criadas++;
+  }
+  return { rodou: true, achados: achados.length, criadas, pulados };
+}
+
+// ───────────────────────── agendamento ─────────────────────────
+let ultimaExecucaoMs = 0;
+let rodando = false;
+
+// Gate por cadência: lê a config a cada tick e só roda quando ATIVA e já passou
+// cadenciaMin desde a última execução — assim mudar a cadência na aba
+// Configurações passa a valer sem reiniciar o servidor.
+async function talvezRodar(): Promise<void> {
+  if (rodando) return;
+  rodando = true;
+  try {
+    const cfg = await carregarConfigEditavel().catch(() => null);
+    if (!cfg || !cfg.varredura.ativa) return;
+    const agora = Date.now();
+    if (agora - ultimaExecucaoMs < cfg.varredura.cadenciaMin * 60_000) return;
+    ultimaExecucaoMs = agora;
+    const r = await executarVarredura(new Date(agora));
+    if (r.criadas > 0) {
+      console.log(`[varredura] ${r.criadas} proposta(s) nova(s), ${r.pulados} pulada(s), ${r.achados} achado(s)`);
+    }
+  } catch (e) {
+    console.error(`[varredura] falha: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    rodando = false;
+  }
+}
+
+// Agenda o ticker (a cada 60s checa se está na hora). Chamado no boot.
+export function iniciarVarreduraSupervisor(): void {
+  setInterval(() => void talvezRodar(), 60_000);
+}

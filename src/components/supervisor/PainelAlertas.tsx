@@ -4,11 +4,13 @@
 // PainelSupervisor (Camada 1). Negócios sem próximo passo, negócios parados além
 // do limiar por etapa e as perdas do período. Sem fetch próprio — recebe o painel
 // que a console já carregou. Quando não há nada pendente, mostra estado vazio.
+import { useState, useEffect, useCallback } from "react";
 import type { PainelSupervisor } from "@/lib/supervisor/tipos";
 import { formatarBRL, formatarPct } from "@/lib/format";
-import { CalendarClock, CheckCircle2, Hourglass, TrendingDown } from "lucide-react";
+import { CalendarClock, CheckCircle2, Hourglass, TrendingDown, Wand2 } from "lucide-react";
 import { EstadoVazio } from "@/components/ui/Estado";
 import { LinhaLista, Secao } from "./PainelPartes";
+import { CardAcao, type AcaoProposta } from "./CardAcao";
 
 // Chip compacto de resumo: rótulo + valor + ponto de severidade. Não é um
 // hero-metric card — é uma leitura rápida do volume de cada tipo de alerta.
@@ -48,8 +50,30 @@ export function PainelAlertas({ painel }: { painel: PainelSupervisor }) {
   const totalParados = parados.reduce((s, p) => s + p.parados, 0);
   const perdasTop = painel.perdas.porMotivo.slice(0, 5);
 
+  // Propostas abertas pela varredura periódica (ações prontas para confirmar).
+  const [propostas, setPropostas] = useState<AcaoProposta[]>([]);
+  const carregarPropostas = useCallback(async () => {
+    try {
+      const r = await fetch("/api/admin/supervisor/acoes");
+      if (!r.ok) return;
+      const d = (await r.json()) as { itens?: AcaoProposta[] };
+      setPropostas(d.itens ?? []);
+    } catch {
+      // silencioso: a aba de alertas ainda mostra o resto
+    }
+  }, []);
+  useEffect(() => {
+    void carregarPropostas();
+  }, [carregarPropostas]);
+
+  const removerProposta = (id: string) =>
+    setPropostas((prev) => prev.filter((p) => p.id !== id));
+
   const semNada =
-    sem.semProximo === 0 && totalParados === 0 && painel.perdas.total === 0;
+    sem.semProximo === 0 &&
+    totalParados === 0 &&
+    painel.perdas.total === 0 &&
+    propostas.length === 0;
 
   if (semNada) {
     return (
@@ -63,6 +87,21 @@ export function PainelAlertas({ painel }: { painel: PainelSupervisor }) {
 
   return (
     <div className="space-y-6">
+      {/* Sugestões abertas pela varredura periódica (confirmar/descartar). */}
+      {propostas.length > 0 && (
+        <Secao
+          titulo="Sugestões da varredura"
+          icone={Wand2}
+          extra={`${propostas.length} pendente${propostas.length === 1 ? "" : "s"}`}
+        >
+          <div className="space-y-2">
+            {propostas.map((p) => (
+              <CardAcao key={p.id} acao={p} onResolvido={() => removerProposta(p.id)} />
+            ))}
+          </div>
+        </Secao>
+      )}
+
       {/* Resumo rápido */}
       <div className="grid grid-cols-3 gap-2.5">
         <ChipResumo
