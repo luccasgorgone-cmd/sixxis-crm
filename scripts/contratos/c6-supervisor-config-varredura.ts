@@ -15,6 +15,11 @@ import {
   LIMITES_VARREDURA,
   type ConfigEditavel,
 } from "../../src/lib/supervisor/tipos";
+import {
+  resumoVarreduraSupervisor,
+  linhasConfig,
+  REGISTRO_SISTEMA,
+} from "../../src/lib/supervisor/explicativo";
 
 let ok = 0;
 let falhou = 0;
@@ -144,6 +149,47 @@ caso("aplicarPatchConfig: patch vazio => ok, config inalterada", () => {
   const r = aplicarPatchConfig(base, {});
   assert.ok(r.ok);
   if (r.ok) assert.deepEqual(r.valor, base);
+});
+
+// ───────────────────────── 3) Explicativo (documentação viva) ──────────────
+
+caso("resumoVarreduraSupervisor: desligada => cadência 'desligada'", () => {
+  const base = baseConfig(); // nasce desligada
+  const r = resumoVarreduraSupervisor(base);
+  assert.equal(r.cadencia, "desligada");
+  assert.ok(/desligada/i.test(r.oQueFaz));
+});
+
+caso("resumoVarreduraSupervisor: ligada reflete cadência e só itens marcados", () => {
+  const base = baseConfig();
+  const p = aplicarPatchConfig(base, {
+    varredura: { ativa: true, cadenciaMin: 20, vigia: { parado: false, primeiraResposta: false } },
+  });
+  assert.ok(p.ok);
+  if (p.ok) {
+    const r = resumoVarreduraSupervisor(p.valor);
+    assert.equal(r.cadencia, "a cada 20 min");
+    assert.ok(r.oQueFaz.includes("cliente sem resposta"));
+    assert.ok(!r.oQueFaz.includes("parado além do limiar"));
+  }
+});
+
+caso("linhasConfig: deriva min do prazo e 'sem meta' quando null", () => {
+  const base = baseConfig(); // prazo 3600s => 60 min, meta null
+  const grupos = linhasConfig(base);
+  const prazos = grupos.find((g) => g.grupo === "Prazos & limiares");
+  assert.ok(prazos);
+  const prazo = prazos!.itens.find((i) => i.rotulo === "Prazo de 1ª resposta");
+  assert.equal(prazo!.valor, "60 min");
+  const meta = prazos!.itens.find((i) => i.rotulo === "Meta do período");
+  assert.equal(meta!.valor, "sem meta");
+});
+
+caso("REGISTRO_SISTEMA: não vazio e toda entrada completa", () => {
+  assert.ok(REGISTRO_SISTEMA.length >= 5);
+  for (const e of REGISTRO_SISTEMA) {
+    assert.ok(e.chave && e.nome && e.oQueFaz && e.cadencia && e.le && e.editavel && e.fonte);
+  }
 });
 
 console.log(`\nC6 supervisor config/varredura: ${ok} ok, ${falhou} falha(s)`);
