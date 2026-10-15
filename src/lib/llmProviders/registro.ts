@@ -60,4 +60,20 @@ export function garantirProvidersRegistrados(): void {
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     }),
   );
+
+  // Ollama local (Tier local do Jarvis) pelo endpoint OpenAI-compativel. O
+  // Ollama NAO exige chave e ignora o header Authorization; OLLAMA_API_KEY
+  // existe so pra satisfazer temChaveConfigurada (qualquer valor, ex.:
+  // "ollama"). OLLAMA_BASE_URL aponta pro /v1/chat/completions do host Ollama
+  // (em prod, o IP da tailnet via Tailscale; em dev/sandbox local, o 127.0.0.1
+  // do urlPadrao basta). Registrar NAO ativa nada: so age se as duas envs
+  // existirem E a config (SupervisorConfig/luna) apontar provider="local".
+  registrarProvider(
+    criarProviderOpenAICompativel({
+      nome: "local",
+      envChave: "OLLAMA_API_KEY",
+      envUrl: "OLLAMA_BASE_URL",
+      urlPadrao: "http://127.0.0.1:11434/v1/chat/completions",
+    }),
+  );
 }

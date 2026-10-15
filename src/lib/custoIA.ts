@@ -21,6 +21,10 @@ const PRECO_POR_MILHAO: Record<string, { entrada: number; saida: number }> = {
   "claude-opus-4-8": { entrada: 5.0, saida: 25.0 },
   "gemini-2.5-flash-lite": { entrada: 0.1, saida: 0.4 },
   "gemini-3.1-flash-lite": { entrada: 0.25, saida: 1.5 },
+  // Modelos LOCAIS (Ollama, nossa GPU) — custo ZERO. Precisam estar aqui senao
+  // o HARD STOP de orcamento (orcamentoIA) RECUSA o modelo: modelo sem preco =
+  // recusado pra nao furar o teto em silencio. Preco 0 = admitido e soma $0.
+  "qwen2.5:7b-instruct": { entrada: 0, saida: 0 },
 };
 
 export function modeloTemPreco(modelo: string | null | undefined): boolean {
