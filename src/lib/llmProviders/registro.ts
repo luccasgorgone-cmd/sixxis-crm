@@ -74,6 +74,10 @@ export function garantirProvidersRegistrados(): void {
       envChave: "OLLAMA_API_KEY",
       envUrl: "OLLAMA_BASE_URL",
       urlPadrao: "http://127.0.0.1:11434/v1/chat/completions",
+      // SOMENTE a chamada do Ollama sai pela tailnet (proxy userspace do
+      // Tailscale). Em prod na Railway: OLLAMA_HTTP_PROXY=http://127.0.0.1:1055.
+      // Vazio (dev/sandbox local, que fala com 127.0.0.1 direto) = sem proxy.
+      envProxy: "OLLAMA_HTTP_PROXY",
     }),
   );
 }

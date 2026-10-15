@@ -13,6 +13,7 @@
 //     envUrl: "OPENAI_BASE_URL",       // default: api.openai.com/v1
 //     envChave: "OPENAI_API_KEY",
 //   })
+import { ProxyAgent, type Dispatcher } from "undici";
 import type {
   ChatProvider,
   ProviderBloco,
@@ -117,6 +118,11 @@ export type ConfigProviderOpenAICompativel = {
   // Env var com a chave de API. Obrigatoria — sem ela, temChaveConfigurada()
   // e false e chamar() nunca executa.
   envChave: string;
+  // Env var com a URL de um proxy HTTP de SAIDA. Quando setada, SOMENTE as
+  // chamadas deste provider passam pelo proxy (ex.: Ollama alcancado pela
+  // tailnet via o proxy userspace do Tailscale em localhost:1055). O resto do
+  // app (DB, Anthropic, Evolution) continua com fetch direto. Ausente = direto.
+  envProxy?: string;
 };
 
 export function criarProviderOpenAICompativel(
@@ -126,6 +132,16 @@ export function criarProviderOpenAICompativel(
     (cfg.envUrl ? process.env[cfg.envUrl] : undefined) ||
     cfg.urlPadrao ||
     URL_PADRAO_OPENAI;
+
+  // Dispatcher de proxy (undici) construido sob demanda e cacheado. So existe
+  // quando cfg.envProxy aponta uma env preenchida; senao fetch vai direto.
+  let dispatcherProxy: Dispatcher | undefined;
+  const obterDispatcher = (): Dispatcher | undefined => {
+    const purl = cfg.envProxy ? process.env[cfg.envProxy] : undefined;
+    if (!purl) return undefined;
+    if (!dispatcherProxy) dispatcherProxy = new ProxyAgent(purl);
+    return dispatcherProxy;
+  };
 
   return {
     nome: cfg.nome,
@@ -146,6 +162,7 @@ export function criarProviderOpenAICompativel(
       opcoes.signal?.addEventListener("abort", onExternalAbort);
 
       try {
+        const disp = obterDispatcher();
         const resp = await fetch(urlBase(), {
           method: "POST",
           headers: {
@@ -177,7 +194,10 @@ export function criarProviderOpenAICompativel(
               : {}),
           }),
           signal: controller.signal,
-        });
+          // Proxy de saida SOMENTE deste provider (ex.: Ollama via Tailscale
+          // userspace). undici le `dispatcher`; os demais providers nao passam.
+          ...(disp ? { dispatcher: disp } : {}),
+        } as RequestInit);
 
         if (!resp.ok) {
           const corpo = (await resp.text().catch(() => "")).slice(0, 500);
