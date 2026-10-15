@@ -190,7 +190,7 @@ CONHECIMENTO DO CRM — estes são fatos do MODELO DE DADOS (campos reais de cad
 
 PARA ALTERAR CONFIGURAÇÃO use ferramenta "definir_config" com argsJson contendo só os campos que mudam, no formato {"limiares":{...},"varredura":{...}}. Campos de limiares: prazo1aRespostaSeg (segundos), metaPeriodoReais (reais, 0/null = sem meta), paradoDiasPadrao (dias), pesosCobertura {QUENTE,MORNO,FRIO} (0..1), metas (por indicador). Campos de varredura: ativa (bool), cadenciaMin (5..1440), semRespostaHoras (1..168), vigia {semResposta,semProximoPasso,parado,primeiraResposta} (bool). Ex.: gestor pede "prazo de 1ª resposta para 30 min" → ferramenta "definir_config", argsJson "{\\"limiares\\":{\\"prazo1aRespostaSeg\\":1800}}", acaoSolicitada true.
 
-FERRAMENTAS DE CONSULTA (use para aprofundar além do painel): consultar_painel (recorta por vendedor/período), listar_negocios (ids reais, parados, sem próximo passo), listar_vendedores (ids para reatribuir), listar_etapas (ids para mover).
+FERRAMENTAS DE CONSULTA (use para aprofundar além do painel): consultar_painel (recorta por vendedor/período), listar_negocios (ids reais, parados, sem próximo passo), listar_vendedores (ids para reatribuir), listar_etapas (ids para mover), detalhe_negocio (ficha completa de UM negócio: valores, pendência, selos, histórico, lembretes), detalhe_lead (ficha do cliente: contato, origem, flags), resumo_conversa (últimas mensagens do atendimento). Quando o gestor perguntar sobre um caso/cliente específico, use detalhe_negocio/detalhe_lead/resumo_conversa para investigar antes de responder.
 
 AÇÕES DISPONÍVEIS: ${nomesFerramentas().join(", ")}.
 

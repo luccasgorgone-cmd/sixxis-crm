@@ -230,11 +230,197 @@ const listarEtapas: FerramentaLeitura = {
   },
 };
 
+// ───────────────────────── detalhe_negocio ─────────────────────────
+const detalheNegocio: FerramentaLeitura = {
+  nome: "detalhe_negocio",
+  descricao:
+    "Abre a ficha COMPLETA de UM negócio pelo id: valores (valor, valorAjustado, valorProdutos, valorEfetivo), status/etapa/temperatura/finalidade, pendência, selos de histórico (jaFoiPerdido/jaFoiGanho, vezes, último motivo de perda e datas), dias parado/aberto, vendedor, cliente, os últimos eventos do histórico (com valorGanho quando houve ganho) e os lembretes futuros pendentes. Use para investigar um caso específico a fundo antes de recomendar ou agir.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      negocioId: { type: "string", description: "id do negócio (obtenha em listar_negocios)" },
+    },
+    required: ["negocioId"],
+    additionalProperties: false,
+  },
+  async executar(args, ctx) {
+    const negocioId = lerId(args, "negocioId");
+    if (!negocioId) return JSON.stringify({ ok: false, erro: "negocioId é obrigatório" });
+    const n = await prisma.negocio.findUnique({
+      where: { id: negocioId },
+      select: {
+        id: true, status: true, finalidade: true, temperatura: true,
+        valor: true, valorAjustado: true, valorProdutos: true,
+        pendente: true, motivoPendencia: true,
+        jaFoiPerdido: true, jaFoiGanho: true, vezesPerdido: true, vezesGanho: true,
+        motivoPerda: true, ultimoMotivoPerda: true, ultimaPerdaEm: true, ultimoGanhoEm: true,
+        entrouEtapaEm: true, criadoEm: true, fechadoEm: true, arquivado: true,
+        lead: { select: { nome: true, nomeManual: true, pushName: true } },
+        agente: { select: { id: true, nome: true } },
+        etapa: { select: { nome: true, tipo: true } },
+        historicos: {
+          select: { tipo: true, descricao: true, valorGanho: true, criadoEm: true },
+          orderBy: { criadoEm: "desc" },
+          take: 8,
+        },
+        lembretes: {
+          where: { status: "PENDENTE", dataHora: { gte: ctx.agora } },
+          select: { dataHora: true, nota: true },
+          orderBy: { dataHora: "asc" },
+          take: 5,
+        },
+      },
+    });
+    if (!n) return JSON.stringify({ ok: false, erro: `negócio ${negocioId} não encontrado` });
+    return JSON.stringify({
+      negocioId: n.id,
+      status: n.status,
+      finalidade: n.finalidade,
+      temperatura: n.temperatura,
+      etapa: n.etapa?.nome ?? null,
+      etapaTipo: n.etapa?.tipo ?? null,
+      valor: n.valor,
+      valorAjustado: n.valorAjustado,
+      valorProdutos: n.valorProdutos,
+      valorEfetivo: valorEfetivo(n.valor, n.valorAjustado),
+      pendente: n.pendente,
+      motivoPendencia: n.motivoPendencia,
+      cliente: n.lead?.nomeManual ?? n.lead?.pushName ?? n.lead?.nome ?? "(sem nome)",
+      vendedor: n.agente ? { id: n.agente.id, nome: n.agente.nome } : null,
+      jaFoiPerdido: n.jaFoiPerdido,
+      jaFoiGanho: n.jaFoiGanho,
+      vezesPerdido: n.vezesPerdido,
+      vezesGanho: n.vezesGanho,
+      motivoPerda: n.motivoPerda,
+      ultimoMotivoPerda: n.ultimoMotivoPerda,
+      ultimaPerdaEm: n.ultimaPerdaEm,
+      ultimoGanhoEm: n.ultimoGanhoEm,
+      diasParado: diasDesde(n.entrouEtapaEm, ctx.agora),
+      diasAberto: diasDesde(n.criadoEm, ctx.agora),
+      fechadoEm: n.fechadoEm,
+      arquivado: n.arquivado,
+      historico: n.historicos.map((h) => ({
+        tipo: h.tipo, quando: h.criadoEm, valorGanho: h.valorGanho, descricao: h.descricao,
+      })),
+      lembretesFuturos: n.lembretes.map((l) => ({ quando: l.dataHora, nota: l.nota })),
+    });
+  },
+};
+
+// ───────────────────────── detalhe_lead ─────────────────────────
+const detalheLead: FerramentaLeitura = {
+  nome: "detalhe_lead",
+  descricao:
+    "Abre a ficha do CLIENTE (lead) por leadId ou pelo negocioId: nome efetivo, contato (telefone, e-mail), empresa, segmento, origem/anúncio e flags (bloqueado, aceitaContato). Use para entender quem é o cliente antes de recomendar abordagem. Uso interno/admin.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      leadId: { type: "string" },
+      negocioId: { type: "string", description: "alternativa: resolve o lead pelo negócio" },
+    },
+    additionalProperties: false,
+  },
+  async executar(args) {
+    let leadId = lerId(args, "leadId");
+    const negocioId = lerId(args, "negocioId");
+    if (!leadId && negocioId) {
+      const n = await prisma.negocio.findUnique({ where: { id: negocioId }, select: { leadId: true } });
+      leadId = n?.leadId ?? null;
+    }
+    if (!leadId) return JSON.stringify({ ok: false, erro: "informe leadId ou negocioId" });
+    const l = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: {
+        id: true, nome: true, nomeManual: true, pushName: true, telefone: true,
+        email: true, empresa: true, segmento: true, origem: true, origemDetalhe: true,
+        anuncioTitulo: true, aceitaContato: true, bloqueado: true, donoId: true,
+      },
+    });
+    if (!l) return JSON.stringify({ ok: false, erro: `lead ${leadId} não encontrado` });
+    return JSON.stringify({
+      leadId: l.id,
+      cliente: l.nomeManual ?? l.pushName ?? l.nome ?? l.telefone,
+      telefone: l.telefone,
+      email: l.email,
+      empresa: l.empresa,
+      segmento: l.segmento,
+      origem: l.origem,
+      origemDetalhe: l.origemDetalhe,
+      anuncio: l.anuncioTitulo,
+      aceitaContato: l.aceitaContato,
+      bloqueado: l.bloqueado,
+      donoVendaId: l.donoId,
+    });
+  },
+};
+
+// ───────────────────────── resumo_conversa ─────────────────────────
+const resumoConversa: FerramentaLeitura = {
+  nome: "resumo_conversa",
+  descricao:
+    "Resumo das últimas mensagens do atendimento de um cliente (por negocioId, ou leadId + finalidade): direção (cliente/empresa), tipo, se foi via IA, horário e um trecho do conteúdo. Use para entender o que está acontecendo na conversa antes de recomendar. Conteúdo interno/admin; o modelo roda local.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      negocioId: { type: "string" },
+      leadId: { type: "string" },
+      finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"] },
+      limite: { type: "number", description: `máx de mensagens (default 15, teto ${LIMITE_MAX})` },
+    },
+    additionalProperties: false,
+  },
+  async executar(args, ctx) {
+    let leadId = lerId(args, "leadId");
+    let finalidade = finalidadeDe(args, ctx);
+    const negocioId = lerId(args, "negocioId");
+    if (negocioId) {
+      const n = await prisma.negocio.findUnique({
+        where: { id: negocioId },
+        select: { leadId: true, finalidade: true },
+      });
+      if (n) {
+        leadId = leadId ?? n.leadId;
+        finalidade = finalidade ?? n.finalidade;
+      }
+    }
+    if (!leadId) return JSON.stringify({ ok: false, erro: "informe negocioId ou leadId" });
+    const conversa = await prisma.conversa.findFirst({
+      where: { leadId, ...(finalidade ? { finalidade } : {}) },
+      orderBy: [{ arquivada: "asc" }, { ultimaMensagemEm: "desc" }],
+      select: { id: true, finalidade: true, arquivada: true },
+    });
+    if (!conversa) return JSON.stringify({ ok: false, erro: "sem conversa para esse cliente/finalidade" });
+    const lim = Math.max(1, Math.min(LIMITE_MAX, Math.trunc(lerNumero(args, "limite") ?? 15)));
+    const msgs = await prisma.mensagem.findMany({
+      where: { conversaId: conversa.id },
+      select: { direcao: true, tipo: true, viaIA: true, hora: true, conteudo: true, transcricao: true },
+      orderBy: { hora: "desc" },
+      take: lim,
+    });
+    const itens = msgs.reverse().map((m) => ({
+      de: m.direcao === "IN" ? "cliente" : "empresa",
+      tipo: m.tipo,
+      viaIA: m.viaIA,
+      quando: m.hora,
+      texto: (m.conteudo ?? m.transcricao ?? "").slice(0, 280),
+    }));
+    return JSON.stringify({
+      finalidade: conversa.finalidade,
+      arquivada: conversa.arquivada,
+      total: itens.length,
+      mensagens: itens,
+    });
+  },
+};
+
 export const FERRAMENTAS_LEITURA: FerramentaLeitura[] = [
   consultarPainel,
   listarNegocios,
   listarVendedores,
   listarEtapas,
+  detalheNegocio,
+  detalheLead,
+  resumoConversa,
 ];
 
 const POR_NOME = new Map<string, FerramentaLeitura>(
