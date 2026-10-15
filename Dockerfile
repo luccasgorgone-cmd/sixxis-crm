@@ -18,9 +18,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Dependencias primeiro (camada cacheavel). --foreground-scripts garante que os
-# postinstall (ex.: prisma, esbuild) rodem de verdade no build nao-interativo.
-COPY package.json package-lock.json ./
+# Dependencias primeiro (camada cacheavel). O postinstall roda `prisma generate`,
+# que precisa do schema + prisma.config.ts — por isso eles sao copiados ANTES do
+# npm ci. --foreground-scripts garante que os postinstall (prisma, esbuild) rodem
+# de verdade no build nao-interativo.
+COPY package.json package-lock.json prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci --foreground-scripts
 
 # Codigo + build do Next e do client Prisma.
