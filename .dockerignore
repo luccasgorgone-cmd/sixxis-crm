@@ -1,0 +1,9 @@
+node_modules
+.git
+.next
+backups
+.env
+.env.*
+*.log
+.impeccable
+npm-debug.log*
