@@ -337,6 +337,10 @@ const detalheLead: FerramentaLeitura = {
       },
     });
     if (!l) return JSON.stringify({ ok: false, erro: `lead ${leadId} não encontrado` });
+    const etiquetas = await prisma.leadEtiqueta.findMany({
+      where: { leadId: l.id },
+      select: { etiqueta: { select: { id: true, nome: true } } },
+    });
     return JSON.stringify({
       leadId: l.id,
       cliente: l.nomeManual ?? l.pushName ?? l.nome ?? l.telefone,
@@ -350,7 +354,31 @@ const detalheLead: FerramentaLeitura = {
       aceitaContato: l.aceitaContato,
       bloqueado: l.bloqueado,
       donoVendaId: l.donoId,
+      etiquetas: etiquetas.map((e) => ({ id: e.etiqueta.id, nome: e.etiqueta.nome })),
     });
+  },
+};
+
+// ───────────────────────── listar_etiquetas ─────────────────────────
+const listarEtiquetas: FerramentaLeitura = {
+  nome: "listar_etiquetas",
+  descricao:
+    "Lista as etiquetas disponíveis (id, nome, cor, finalidade) para obter o etiquetaId real antes de propor adicionar/remover uma etiqueta de um cliente.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      finalidade: { type: "string", enum: ["VENDA", "POS_VENDA"] },
+    },
+    additionalProperties: false,
+  },
+  async executar(args, ctx) {
+    const finalidade = finalidadeDe(args, ctx);
+    const etiquetas = await prisma.etiqueta.findMany({
+      where: finalidade ? { OR: [{ finalidade }, { finalidade: null }] } : {},
+      select: { id: true, nome: true, cor: true, finalidade: true },
+      orderBy: { nome: "asc" },
+    });
+    return JSON.stringify({ total: etiquetas.length, etiquetas });
   },
 };
 
@@ -421,6 +449,7 @@ export const FERRAMENTAS_LEITURA: FerramentaLeitura[] = [
   detalheNegocio,
   detalheLead,
   resumoConversa,
+  listarEtiquetas,
 ];
 
 const POR_NOME = new Map<string, FerramentaLeitura>(

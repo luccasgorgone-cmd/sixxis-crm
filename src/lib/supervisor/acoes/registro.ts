@@ -16,6 +16,10 @@ import { criarNota } from "./criar_nota";
 import { reatribuirVendedor } from "./reatribuir_vendedor";
 import { arquivarNegocio } from "./arquivar_negocio";
 import { definirConfig } from "./definir_config";
+import { definirTemperatura } from "./definir_temperatura";
+import { definirPendencia } from "./definir_pendencia";
+import { ajustarValor } from "./ajustar_valor";
+import { gerenciarEtiqueta } from "./gerenciar_etiqueta";
 
 // Ordem estável (vira a ordem das tools apresentadas ao provider).
 export const FERRAMENTAS_ESCRITA: FerramentaEscrita[] = [
@@ -27,6 +31,10 @@ export const FERRAMENTAS_ESCRITA: FerramentaEscrita[] = [
   reatribuirVendedor,
   arquivarNegocio,
   definirConfig,
+  definirTemperatura,
+  definirPendencia,
+  ajustarValor,
+  gerenciarEtiqueta,
 ];
 
 // Prefixos/nomes que denunciam uma ferramenta de comunicação externa. Linha

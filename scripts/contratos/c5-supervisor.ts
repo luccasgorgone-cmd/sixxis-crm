@@ -179,12 +179,16 @@ caso("nenhum nome registrado casa com um padrão proibido", () => {
 
 // ───────────────────── 4) Integridade do registro ──────────────────────────
 
-caso("as 8 ferramentas de escrita Nível 1 estão registradas", () => {
+caso("as 12 ferramentas de escrita Nível 1 estão registradas", () => {
   assert.deepEqual(nomesFerramentas().sort(), [
+    "ajustar_valor",
     "arquivar_negocio",
     "criar_lembrete",
     "criar_nota",
     "definir_config",
+    "definir_pendencia",
+    "definir_temperatura",
+    "gerenciar_etiqueta",
     "mover_etapa",
     "reatribuir_vendedor",
     "registrar_ganho",

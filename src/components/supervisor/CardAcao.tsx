@@ -50,6 +50,10 @@ const ROTULO_ACAO: Record<string, string> = {
   criar_nota: "Criar nota",
   arquivar_negocio: "Arquivar negócio",
   definir_config: "Alterar configuração",
+  definir_temperatura: "Definir temperatura",
+  definir_pendencia: "Pendência",
+  ajustar_valor: "Ajustar valor",
+  gerenciar_etiqueta: "Etiqueta",
 };
 
 async function decidir(acaoId: string, decisao: "confirmar" | "descartar" | "reverter") {
