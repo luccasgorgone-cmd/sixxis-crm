@@ -150,7 +150,7 @@ export function SupervisorConsole() {
         role="tablist"
         aria-label="Seções do Supervisor"
         onKeyDown={aoTeclarNasAbas}
-        className="mt-1 flex items-center gap-1 border-b border-black/5"
+        className="mt-1 flex items-center gap-0.5 overflow-x-auto border-b border-black/5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {ABAS.map((a) => {
           const ativa = aba === a.chave;
@@ -163,13 +163,17 @@ export function SupervisorConsole() {
               aria-selected={ativa}
               tabIndex={ativa ? 0 : -1}
               onClick={() => setAba(a.chave)}
-              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`group -mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                 ativa
                   ? "border-tiffany text-escuro"
-                  : "border-transparent text-medio hover:text-escuro"
+                  : "border-transparent text-medio hover:bg-black/[0.02] hover:text-escuro"
               }`}
             >
-              <Icone className="h-4 w-4" />
+              <Icone
+                className={`h-4 w-4 transition-colors ${
+                  ativa ? "text-tiffany" : "text-medio/60 group-hover:text-medio"
+                }`}
+              />
               {a.rotulo}
               {pontoAlerta && (
                 <span
