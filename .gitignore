@@ -28,5 +28,9 @@ backups/
 # CSVs de conversoes offline gerados (dados de producao) — nunca versionar
 exports/
 
+# Ferramenta operacional de extracao de atribuicao (gera CSV com PII; handoff
+# manual ao Marketing, apagada apos uso) — nunca versionar
+scripts/extracao-atribuicao-meta.ts
+
 # Estado local da ferramenta Impeccable (cache/hook por maquina)
 .impeccable/
