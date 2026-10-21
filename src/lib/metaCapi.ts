@@ -8,6 +8,12 @@ import { prisma } from "./prisma";
 
 const GRAPH_VERSION = "v19.0";
 
+// Pagina do Facebook vinculada ao WhatsApp Business. OBRIGATORIO em eventos
+// action_source=business_messaging: a Graph API rejeita (error subcode 2804116)
+// sem user_data.page_id OU user_data.whatsapp_business_account_id. Default =
+// Pagina "Sixxis do Brasil" (unica do business); override por env META_PAGE_ID.
+const META_PAGE_ID = process.env.META_PAGE_ID || "113494068344928";
+
 type ConfigMeta = {
   pixelId: string;
   token: string;
@@ -74,6 +80,9 @@ export async function dispararPurchase(opts: {
   if (em) userData.em = em;
   if (fn) userData.fn = fn;
   if (opts.ctwaClid) userData.ctwa_clid = opts.ctwaClid;
+  // Obrigatorio para action_source=business_messaging (vide META_PAGE_ID acima).
+  // Nao e hasheado (identificador da Pagina, nao PII). Enviado sempre.
+  userData.page_id = META_PAGE_ID;
 
   const evento: Record<string, unknown> = {
     event_name: "Purchase",
