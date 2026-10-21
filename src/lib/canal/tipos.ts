@@ -63,6 +63,10 @@ export interface EventoMensagem {
   conteudo: ConteudoCanonico;
   respondeA?: string | null; // externalId (stanzaId) da mensagem citada, se houver
   origemAnuncio?: OrigemAnuncio | null;
+  // gclid do Google Ads extraido do marcador [#g:...] do texto (so na 1a mensagem
+  // IN, via Site/wa.me). Separado de origemAnuncio: nao depende de referral de
+  // anuncio — e um lane proprio (Google offline conversions).
+  gclid?: string | null;
   raw: unknown; // payload cru do canal (persistido em Mensagem.raw como hoje)
 }
 

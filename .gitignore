@@ -25,5 +25,8 @@ Thumbs.db
 # Backups operacionais (dados/PII de producao) — nunca versionar
 backups/
 
+# CSVs de conversoes offline gerados (dados de producao) — nunca versionar
+exports/
+
 # Estado local da ferramenta Impeccable (cache/hook por maquina)
 .impeccable/

@@ -258,6 +258,10 @@ model Lead {
   // Opt-out de comunicacoes em massa: false = nao incluir em campanhas.
   aceitaContato Boolean        @default(true)
   ctwaClid      String?
+  // gclid do Google Ads capturado do marcador [#g:...] da 1a mensagem do WhatsApp
+  // (o Site pre-preenche o corpo do wa.me). Espelha o ctwaClid: gravado so na 1a
+  // mensagem IN, nunca sobrescrito. Lido no export de conversoes offline.
+  googleClickId String?
   // Origem por ANUNCIO (Click-to-WhatsApp): dados do referral do contextInfo da
   // Evolution, gravados na 1a mensagem (nunca sobrescritos com vazio depois).
   anuncioId      String?

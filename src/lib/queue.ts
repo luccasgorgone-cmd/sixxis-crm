@@ -32,6 +32,7 @@ import { marcarRespostaRecaptacao } from "./recaptacao";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import type { AcaoIngest, IdentidadeExterna, DirecaoCanal } from "./canal/tipos";
+import { extrairGclid } from "./canal/gclid";
 import {
   TipoMsg,
   DirecaoMsg,
@@ -1917,6 +1918,14 @@ export function parseEventoEvolution(payload: EventoEvolution): AcaoIngest {
     msgDesemb,
     data as Record<string, unknown> | undefined,
   );
+  // gclid do Google Ads: so quando o marcador [#g:...] esta no texto. Sem
+  // marcador, o texto fica INTACTO (preserva null/espacos — equivalencia F1); so
+  // quando ha marcador o texto e limpo e o gclid extraido. Aplicado so em IN pelo
+  // nucleo (mesma condicao do ctwaClid).
+  const temMarcadorGclid = conteudo != null && conteudo.includes("[#g:");
+  const resGclid = temMarcadorGclid ? extrairGclid(conteudo) : null;
+  const textoFinal = resGclid ? resGclid.textoLimpo : conteudo;
+  const gclid = resGclid ? resGclid.gclid : null;
   const ts = data?.messageTimestamp;
   const ocorridoEm = ts ? new Date(Number(ts) * 1000) : undefined;
   const tipoIdentidade: IdentidadeExterna["tipo"] =
@@ -1941,7 +1950,7 @@ export function parseEventoEvolution(payload: EventoEvolution): AcaoIngest {
       },
       conteudo: {
         tipoDominio: tipo,
-        texto: conteudo,
+        texto: textoFinal,
         transcricao,
         midiaRef: mediaUrlOriginal,
         ehSticker,
@@ -1949,6 +1958,7 @@ export function parseEventoEvolution(payload: EventoEvolution): AcaoIngest {
       },
       respondeA: stanzaCitada,
       origemAnuncio: anuncio,
+      gclid,
       raw: payload,
     },
   };
@@ -2184,6 +2194,27 @@ async function processarEvento(
         },
       });
     }
+  }
+
+  // Origem por GOOGLE ADS (gclid): o Site embute [#g:<gclid>] na 1a mensagem do
+  // wa.me; o parser ja extraiu e limpou o texto. Grava so em IN, na 1a vez, nunca
+  // sobrescreve (espelha o ctwaClid). Lane independente do anuncio Meta acima — um
+  // lead pode ter os dois. Sem valor cru na descricao (sem PII sensivel).
+  if (direcao === DirecaoMsg.IN && !lead.googleClickId && ev.gclid) {
+    lead = await prisma.lead.update({
+      where: { id: lead.id },
+      data: {
+        googleClickId: ev.gclid,
+        ...(lead.origem ? {} : { origem: "google-ads" }),
+      },
+    });
+    await prisma.atividade.create({
+      data: {
+        leadId: lead.id,
+        tipo: AtividadeTipo.CRIACAO,
+        descricao: "Origem: Google Ads (clique rastreado)",
+      },
+    });
   }
 
   // Resolve a instancia (numero) pelo campo `instance` do payload. Define a
