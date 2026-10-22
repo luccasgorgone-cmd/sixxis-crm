@@ -7,6 +7,16 @@
 // (contrato c9); (2) coletarCaptacao — a query Prisma (Task 2) que monta as
 // linhas e chama o agregador.
 
+import { prisma } from "../prisma";
+import {
+  AtividadeTipo,
+  StatusNeg,
+  TipoHistorico,
+} from "../../generated/prisma/enums";
+import type { Finalidade } from "../../generated/prisma/enums";
+import type { Prisma } from "../../generated/prisma/client";
+import { valorEfetivo } from "./indicadores";
+
 const ROTULO_SEM_VENDEDOR = "(sem vendedor)";
 
 export type StatusCaptacao = "ABERTO" | "GANHO" | "PERDIDO";
@@ -142,4 +152,142 @@ export function agregarCaptacao(
     serie,
     linhas,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Query (Task 2): monta as LinhaCaptacao da janela e chama o agregador puro.
+// COORTE: captados = Lead.origem="manual" com criadoEm na janela; conversão/R$
+// seguem os negócios do lead PRA FRENTE (qualquer evento GANHO no histórico),
+// sem filtrar data de fechamento. "Cadastrado por" = Atividade(CRIACAO) com
+// agenteId (as ingestões anúncio/google-ads criam CRIACAO sem agenteId).
+// ---------------------------------------------------------------------------
+
+export type ArgsCaptacao = {
+  janela: { inicio: Date; fim: Date };
+  finalidade: Finalidade | null;
+  agenteId?: string | null;
+};
+
+async function montarLinhas(
+  janela: { inicio: Date; fim: Date },
+  finalidade: Finalidade | null,
+  agenteId: string | null,
+): Promise<LinhaCaptacao[]> {
+  const where: Prisma.LeadWhereInput = {
+    origem: "manual",
+    criadoEm: { gte: janela.inicio, lt: janela.fim },
+    ...(finalidade === "VENDA" ? { donoId: agenteId ?? { not: null } } : {}),
+    ...(finalidade === "POS_VENDA"
+      ? { donoPosVendaId: agenteId ?? { not: null } }
+      : {}),
+    ...(!finalidade && agenteId
+      ? { OR: [{ donoId: agenteId }, { donoPosVendaId: agenteId }] }
+      : {}),
+  };
+
+  const leads = await prisma.lead.findMany({
+    where,
+    select: {
+      id: true,
+      nome: true,
+      nomeManual: true,
+      pushName: true,
+      telefone: true,
+      criadoEm: true,
+      dono: { select: { id: true, nome: true } },
+      donoPosVenda: { select: { id: true, nome: true } },
+      atividades: {
+        where: { tipo: AtividadeTipo.CRIACAO, agenteId: { not: null } },
+        orderBy: { criadoEm: "asc" },
+        take: 1,
+        select: { agente: { select: { id: true, nome: true } } },
+      },
+      negocios: {
+        where: finalidade ? { finalidade } : undefined,
+        select: {
+          status: true,
+          valor: true,
+          valorAjustado: true,
+          etapa: { select: { nome: true } },
+          historicos: {
+            where: { tipo: TipoHistorico.GANHO },
+            select: { valorGanho: true },
+          },
+        },
+      },
+    },
+  });
+
+  return leads.map((l) => {
+    const porFin =
+      finalidade === "POS_VENDA"
+        ? l.donoPosVenda
+        : finalidade === "VENDA"
+          ? l.dono
+          : (l.dono ?? l.donoPosVenda);
+    const cad = l.atividades[0]?.agente ?? null;
+
+    const ganhoHist = l.negocios.flatMap((n) => n.historicos);
+    const converteu = ganhoHist.length > 0;
+    let valorGanho: number | null = null;
+    if (converteu) {
+      let soma = ganhoHist.reduce((s, h) => s + Number(h.valorGanho ?? 0), 0);
+      if (soma === 0) {
+        // Eventos GANHO antigos sem valorGanho estruturado: cai no valorEfetivo.
+        soma = l.negocios
+          .filter((n) => n.historicos.length > 0)
+          .reduce((s, n) => s + valorEfetivo(n.valor, n.valorAjustado), 0);
+      }
+      valorGanho = soma;
+    }
+
+    const principal = l.negocios[0] ?? null;
+    const status: StatusCaptacao = converteu
+      ? "GANHO"
+      : principal?.status === StatusNeg.PERDIDO
+        ? "PERDIDO"
+        : "ABERTO";
+
+    return {
+      leadId: l.id,
+      nome: l.nomeManual ?? l.pushName ?? l.nome ?? null,
+      telefone: l.telefone,
+      donoId: porFin?.id ?? null,
+      donoNome: porFin?.nome ?? null,
+      cadastradoPorId: cad?.id ?? null,
+      cadastradoPorNome: cad?.nome ?? null,
+      criadoEm: l.criadoEm,
+      etapaAtual: principal?.etapa?.nome ?? null,
+      status,
+      valorGanho,
+    };
+  });
+}
+
+export async function coletarCaptacao(
+  args: ArgsCaptacao,
+): Promise<ResultadoCaptacao> {
+  const { janela, finalidade } = args;
+  const agenteId = args.agenteId ?? null;
+
+  const linhas = await montarLinhas(janela, finalidade, agenteId);
+
+  // Janela anterior de mesma duração — só os 3 totais, para o delta ▲/▼.
+  const dur = janela.fim.getTime() - janela.inicio.getTime();
+  const janelaAnterior = {
+    inicio: new Date(janela.inicio.getTime() - dur),
+    fim: janela.inicio,
+  };
+  const linhasAnt = await montarLinhas(janelaAnterior, finalidade, agenteId);
+  const agAnt = agregarCaptacao(linhasAnt, {
+    total: 0,
+    conversao: 0,
+    valorGerado: 0,
+  });
+
+  return agregarCaptacao(linhas, {
+    total: agAnt.total,
+    conversao: agAnt.conversao,
+    valorGerado: agAnt.valorGerado,
+  });
 }
