@@ -207,6 +207,10 @@ model Agente {
   avatarUrl     String?
   metaMensal    Decimal? @db.Decimal(12, 2)
   ativo         Boolean  @default(true)
+  // Presenca AO VIVO (online/offline), SEPARADA de 'ativo' (conta habilitada).
+  // Controlada pelo toggle no header + auto-offline por inatividade. O
+  // roteamento (fase futura) passa a exigir ativo && online.
+  online        Boolean  @default(false)
   acessoVenda   Boolean  @default(true)
   acessoPosVenda Boolean @default(false)
   ultimoLogin   DateTime?
@@ -226,7 +230,22 @@ model Agente {
   chamadas              Chamada[]
   oracleConversas       OracleConversa[]
   oracleComandos        OracleComando[]
+  presencas             PresencaPeriodo[]
   criadoEm              DateTime           @default(now())
+}
+
+// Periodos de PRESENCA online do vendedor (base da metrica por tempo-online e do
+// roteamento so-pra-online). Abre um periodo quando fica online e fecha (fimEm)
+// ao sair/auto-offline. Ver docs/DESIGN_PRESENCA_ONLINE_ROTEAMENTO.md.
+model PresencaPeriodo {
+  id        String    @id @default(cuid())
+  agenteId  String
+  agente    Agente    @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  inicioEm  DateTime  @default(now())
+  fimEm     DateTime?
+  criadoEm  DateTime  @default(now())
+
+  @@index([agenteId, inicioEm])
 }
 
 model Lead {
