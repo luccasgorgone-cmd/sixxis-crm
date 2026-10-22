@@ -4,6 +4,8 @@ import { prisma } from "./prisma";
 import { Prisma } from "../generated/prisma/client";
 import { StatusNeg, Finalidade, TipoGanho } from "../generated/prisma/enums";
 import { whereVendaNoPeriodo, comEscopo } from "./vendasPeriodo";
+import { mediaPrimeiraRespostaOnline } from "./presenca/primeiraResposta";
+import { type PeriodoOnline } from "./presenca/tempoOnline";
 
 export type Periodo = { inicio: Date; fim: Date };
 
@@ -168,6 +170,7 @@ export async function calcularMetricas(
     clientesRaw,
     primeiraRespRaw,
     resolucaoRaw,
+    presencaDesdeRaw,
   ] = await Promise.all([
     prisma.negocio.count({
       where: negocioWhere(p, e, [StatusNeg.ABERTO]),
@@ -227,25 +230,32 @@ export async function calcularMetricas(
       WHERE m.hora >= ${p.inicio} AND m.hora < ${p.fim}
       ${condConversa(e)}
     `),
-    // Tempo medio de 1a resposta (1o OUT apos 1o IN), por conversa, no periodo.
-    prisma.$queryRaw<{ media: number | null }[]>(Prisma.sql`
-      SELECT AVG(EXTRACT(EPOCH FROM (fo - fi)))::float AS media FROM (
-        SELECT c.id,
+    // 1a resposta (1o OUT apos 1o IN) POR CONVERSA no periodo, com o dono. O
+    // tempo EXIBIDO usa o tempo ONLINE do dono (fallback wall-clock) — calculo
+    // em JS com segundosOnlineEntre. Antes era um AVG(EXTRACT(EPOCH ...)) cru.
+    prisma.$queryRaw<{ agenteId: string | null; fi: Date; fo: Date }[]>(Prisma.sql`
+      SELECT t."agenteId", t.fi, t.fo FROM (
+        SELECT c.id, c."agenteId" AS "agenteId",
           MIN(m.hora) FILTER (WHERE m.direcao = 'IN') AS fi,
           MIN(m.hora) FILTER (WHERE m.direcao = 'OUT') AS fo
         FROM "Conversa" c
         JOIN "Mensagem" m ON m."conversaId" = c.id
         WHERE m.hora >= ${p.inicio} AND m.hora < ${p.fim}
         ${condConversa(e)}
-        GROUP BY c.id
+        GROUP BY c.id, c."agenteId"
       ) t
-      WHERE fi IS NOT NULL AND fo IS NOT NULL AND fo > fi
+      WHERE t.fi IS NOT NULL AND t.fo IS NOT NULL AND t.fo > t.fi
     `),
     // Tempo medio de resolucao (fechadoEm - criadoEm) dos finalizados no periodo.
     prisma.negocio.findMany({
       where: negocioWhere(p, e, [StatusNeg.GANHO, StatusNeg.PERDIDO], true),
       select: { criadoEm: true, fechadoEm: true },
     }),
+    // Cutover global do rastreamento de presenca: antes disso nao ha dado, entao
+    // a 1a resposta cai no fallback wall-clock (passado nunca regride).
+    prisma.$queryRaw<{ min: Date | null }[]>(Prisma.sql`
+      SELECT MIN("inicioEm") AS min FROM "PresencaPeriodo"
+    `),
   ]);
 
   // Ganhos de POS-VENDA do escopo, quebrados por tipoGanho. Mesma janela e mesmo
@@ -274,7 +284,45 @@ export async function calcularMetricas(
   const conversao = finalizados > 0 ? ganhos / finalizados : 0;
   const ticketMedio = ganhos > 0 ? valorVendido / ganhos : 0;
   const clientesAtendidos = Number(clientesRaw[0]?.total ?? 0);
-  const tempoPrimeiraRespostaSeg = Math.round(primeiraRespRaw[0]?.media ?? 0);
+  // Tempo de 1a resposta = tempo ONLINE do dono (fallback wall-clock). Busca os
+  // periodos de presenca dos donos envolvidos que cruzam a janela das respostas.
+  const presencaAtivaDesde = presencaDesdeRaw[0]?.min ?? null;
+  const periodosPorAgente = new Map<string, PeriodoOnline[]>();
+  if (presencaAtivaDesde && primeiraRespRaw.length > 0) {
+    const agenteIds = [
+      ...new Set(
+        primeiraRespRaw
+          .map((r) => r.agenteId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    if (agenteIds.length > 0) {
+      let minFi = primeiraRespRaw[0].fi;
+      let maxFo = primeiraRespRaw[0].fo;
+      for (const r of primeiraRespRaw) {
+        if (r.fi < minFi) minFi = r.fi;
+        if (r.fo > maxFo) maxFo = r.fo;
+      }
+      const periodos = await prisma.presencaPeriodo.findMany({
+        where: {
+          agenteId: { in: agenteIds },
+          inicioEm: { lt: maxFo },
+          OR: [{ fimEm: null }, { fimEm: { gt: minFi } }],
+        },
+        select: { agenteId: true, inicioEm: true, fimEm: true },
+      });
+      for (const pp of periodos) {
+        const lista = periodosPorAgente.get(pp.agenteId) ?? [];
+        lista.push({ inicio: pp.inicioEm, fim: pp.fimEm });
+        periodosPorAgente.set(pp.agenteId, lista);
+      }
+    }
+  }
+  const tempoPrimeiraRespostaSeg = mediaPrimeiraRespostaOnline(
+    primeiraRespRaw,
+    periodosPorAgente,
+    presencaAtivaDesde,
+  );
 
   let somaResol = 0;
   let nResol = 0;
