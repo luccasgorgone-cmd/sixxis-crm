@@ -8,6 +8,7 @@ import { SinoNotificacoes } from "./SinoNotificacoes";
 import { SinoAlertasSla } from "./SinoAlertasSla";
 import { DisponibilidadeUsuario } from "./DisponibilidadeUsuario";
 import { TemaToggle } from "./TemaToggle";
+import { TogglePresenca } from "@/components/presenca/TogglePresenca";
 
 const ROTULO_PAPEL: Record<string, string> = {
   ADMIN: "Administrador",
@@ -50,6 +51,9 @@ export function Topbar({
       <h1 className="text-sm font-semibold text-escuro">{titulo}</h1>
 
       <div className="flex items-center gap-3">
+        {/* Presenca AO VIVO (online/offline) — estado novo, separado de 'ativo'.
+            So para quem recebe leads (nao-admin). Auto-offline por inatividade. */}
+        {papel !== "ADMIN" && <TogglePresenca />}
         {/* Disponibilidade: so para quem recebe leads (nao-admin). Reusa Agente.ativo. */}
         {papel !== "ADMIN" && <DisponibilidadeUsuario />}
         <TemaToggle />
