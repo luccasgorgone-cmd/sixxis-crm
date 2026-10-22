@@ -1,7 +1,7 @@
 // Contrato dourado C11 — tempo de 1a resposta por PRESENCA (tempo online do dono).
 //   npx tsx scripts/contratos/c11-primeira-resposta-online.ts
 //
-// Prova, sem banco/rede, a regra de mediaPrimeiraRespostaOnline:
+// Prova, sem banco/rede, a regra de segundos1aRespostaPorConversa + mediaSegundos:
 //  - fallback wall-clock quando dono=null, sem rastreamento, ou janela antes do
 //    cutover global de presenca (passado nunca regride);
 //  - tempo ONLINE do dono (intersecao via segundosOnlineEntre) quando rastreado;
