@@ -5,6 +5,7 @@ import { prisma } from "../prisma";
 import { Prisma } from "../../generated/prisma/client";
 import { StatusNeg, Temperatura } from "../../generated/prisma/enums";
 import type { Finalidade } from "../../generated/prisma/enums";
+import { coletarSegundos1aResposta } from "../presenca/primeiraRespostaDb";
 import type {
   CoberturaResultado,
   EscopoSupervisor,
@@ -30,16 +31,6 @@ export function valorEfetivo(
   }
   if (valor !== null && valor !== undefined) return Number(valor);
   return 0;
-}
-
-// Fragmento SQL de escopo para a tabela Conversa (espelha metricas.condConversa).
-function condConversaSql(e: EscopoSupervisor): Prisma.Sql {
-  const partes: Prisma.Sql[] = [];
-  if (e.agenteId) partes.push(Prisma.sql`AND c."agenteId" = ${e.agenteId}`);
-  if (e.finalidade) {
-    partes.push(Prisma.sql`AND c."finalidade" = ${e.finalidade}::"Finalidade"`);
-  }
-  return partes.length ? Prisma.join(partes, " ") : Prisma.empty;
 }
 
 // WHERE de escopo (Negocio) sem status/janela — compõe por AND.
@@ -87,22 +78,11 @@ export async function pctDentroDoPrazo1aResposta(
   limiarSeg: number,
   e: EscopoSupervisor = {},
 ): Promise<PctPrazoResultado> {
-  const linhas = await prisma.$queryRaw<{ seg: number | null }[]>(Prisma.sql`
-    SELECT EXTRACT(EPOCH FROM (fo - fi))::float AS seg FROM (
-      SELECT c.id,
-        MIN(m.hora) FILTER (WHERE m.direcao = 'IN') AS fi,
-        MIN(m.hora) FILTER (WHERE m.direcao = 'OUT') AS fo
-      FROM "Conversa" c
-      JOIN "Mensagem" m ON m."conversaId" = c.id
-      WHERE m.hora >= ${j.inicio} AND m.hora < ${j.fim}
-      ${condConversaSql(e)}
-      GROUP BY c.id
-    ) t
-    WHERE fi IS NOT NULL AND fo IS NOT NULL AND fo > fi
-  `);
-  const tempos = linhas
-    .map((l) => l.seg)
-    .filter((s): s is number => typeof s === "number");
+  // Mesma FONTE ÚNICA da media (metricas.ts): segundos de 1a resposta por conversa
+  // medidos pelo tempo ONLINE do dono (fallback wall-clock). O "prazo" agora e
+  // tempo-disponivel, nao relogio de parede — coerente com a media exibida e com
+  // o design (presenca substitui o horario comercial fixo).
+  const tempos = await coletarSegundos1aResposta(j.inicio, j.fim, e);
   return { ...corePctPrazo(tempos, limiarSeg), distribuicao: distribuir1aResposta(tempos) };
 }
 
