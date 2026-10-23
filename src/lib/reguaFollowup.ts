@@ -53,8 +53,14 @@ export async function aplicarRetornoFollowup(
     const cfg = await prisma.configuracaoCRM.findFirst({ select: { followupAtivo: true } });
     if (cfg?.followupAtivo !== true) return;
 
+    // Só etapas DA MESMA finalidade do negócio (ou AMBAS) — um negócio nunca
+    // volta para uma etapa de outra finalidade mesmo que os nomes colidam.
     const etapas = await prisma.etapa.findMany({
-      where: { ativo: true, tipo: TipoEtapa.ABERTA },
+      where: {
+        ativo: true,
+        tipo: TipoEtapa.ABERTA,
+        finalidade: { in: [finalidade as never, "AMBAS" as never] },
+      },
       select: { id: true, nome: true, ordem: true, diasUteisMax: true },
       orderBy: { ordem: "asc" },
     });
@@ -157,7 +163,7 @@ export async function processarReguaFollowup(): Promise<void> {
       if (prox) {
         await moverParaProximaEtapa(n, prox, etapa.nome);
       } else {
-        await moverParaPerdido(n, etapa.nome);
+        await moverParaPerdido(n, etapa.nome, n.finalidade);
       }
     }
   } catch (erro) {
@@ -202,10 +208,17 @@ async function moverParaProximaEtapa(
 async function moverParaPerdido(
   n: { id: string; leadId: string; agenteId: string | null; status: string },
   etapaAtualNome: string,
+  finalidade: Finalidade,
 ): Promise<void> {
   const agora = new Date();
+  // Etapa de Perdido DA MESMA finalidade do negócio (ou AMBAS) — nunca manda um
+  // VENDA para a coluna de Perdido do POS_VENDA e vice-versa.
   const etapaPerdido = await prisma.etapa.findFirst({
-    where: { tipo: TipoEtapa.PERDIDO, ativo: true },
+    where: {
+      tipo: TipoEtapa.PERDIDO,
+      ativo: true,
+      finalidade: { in: [finalidade as never, "AMBAS" as never] },
+    },
     orderBy: { ordem: "asc" },
     select: { id: true },
   });
