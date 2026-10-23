@@ -12,6 +12,7 @@ import { iniciarAlertas } from "./src/lib/alertas";
 import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import { iniciarArquivamento } from "./src/lib/arquivamento";
+import { iniciarReguaFollowup } from "./src/lib/reguaFollowup";
 import { iniciarVarreduraSupervisor } from "./src/lib/supervisor/varredura";
 import { iniciarAprendizadoSupervisor } from "./src/lib/supervisor/aprendizado";
 import {
@@ -115,6 +116,10 @@ async function main(): Promise<void> {
     // Bloco 3: esvaziar o Kanban por prazo (perdidos/ganhos parados). Nasce em
     // MODO LOG — so conta quantos arquivaria — ate o dono ligar no admin.
     iniciarArquivamento();
+    // Regua de follow-up (Manual secao 5): move negocios ABERTO por prazo (dias
+    // uteis) e cria a proxima acao pro vendedor. Nasce em DRY-RUN (so loga) ate o
+    // dono ligar followupAtivo na config. NUNCA envia mensagem ao cliente.
+    iniciarReguaFollowup();
     // Supervisor: varredura periodica dos atendimentos (ticker 60s; so roda
     // quando ATIVA na config e na cadencia configurada). Abre propostas, nunca
     // executa sozinha. Nasce DESLIGADA ate o gestor ligar na aba Configuracoes.

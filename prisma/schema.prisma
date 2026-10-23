@@ -583,6 +583,11 @@ model Etapa {
   tipo       TipoEtapa       @default(ABERTA)
   finalidade FinalidadeEtapa @default(VENDA)
   ativo      Boolean         @default(true)
+  // Regua de follow-up (Manual secao 5): dias UTEIS maximos nesta etapa antes do
+  // auto-avanco para a proxima etapa (por ordem) ou Perdido. null = etapa sem
+  // auto-avanco por prazo (ex.: Negociando, Vendido). So tem efeito com
+  // ConfiguracaoCRM.followupAtivo=true.
+  diasUteisMax Int?
   negocios   Negocio[]
   configsAlertaSla ConfigAlertaSla[]
 }
@@ -704,6 +709,10 @@ model Negocio {
   // tipo do motivoPerda. NAO conta contra a conversao do vendedor nem entra em
   // follow-up/reaquisicao. Default false (negocios antigos = perda normal).
   desqualificado Boolean          @default(false)
+  // Regra de retorno (Manual secao 6): quantas vezes o lead voltou do follow-up
+  // para Em atendimento/Negociando por interacao qualificada. Limite 1 sem
+  // aprovacao do gestor. Default 0.
+  vezesRetorno        Int           @default(0)
   // MEMORIA DE FECHAMENTO (Bloco 1/5 da fatia "Organizacao do Kanban"). Um lead
   // + finalidade tem no MAXIMO um negocio, que e REUSADO quando o cliente volta:
   // ao reabrir, motivoPerda/motivoPerdaObs sao limpos (o negocio esta aberto de
@@ -1295,6 +1304,11 @@ model ConfiguracaoCRM {
   // DESLIGADO: deploy NAO muda o relogio atual (tempo corrido) ate o admin ligar.
   // Antigos (sem o campo) = false.
   slaEmDiasUteis     Boolean @default(false)
+  // Liga a REGUA DE FOLLOW-UP automatica (Manual secao 5): mover negocios ABERTO
+  // por prazo (Etapa.diasUteisMax) e criar a proxima acao (lembrete) pro vendedor.
+  // Comeca DESLIGADO: com false o job so registra em log o que FARIA (dry-run),
+  // sem mover nada. NUNCA envia mensagem ao cliente. Antigos = false.
+  followupAtivo      Boolean @default(false)
   mensagemForaHorario String?
   // Interruptor do aviso automatico de FORA DE HORARIO. Comeca DESLIGADO: nenhum
   // aviso e enviado ate o dono ligar explicitamente. Registros antigos (sem o

@@ -128,6 +128,40 @@ export function minutosUteisEntre(
   return total;
 }
 
+// Quantos DIAS ÚTEIS se passaram entre `de` e `ate`: conta as datas úteis (dia
+// aberto, fora de feriado) que começaram DEPOIS da data local de `de`, até a data
+// de `ate` inclusive. Base dos gatilhos da régua de follow-up (ex.: entrou na
+// etapa no D1, "início do D2" = 1 dia útil decorrido). Sem horários -> dias
+// corridos de calendário.
+export function diasUteisDecorridos(
+  de: Date,
+  ate: Date,
+  horarios: DiaHorario[] | null | undefined,
+  feriados: Iterable<string> = [],
+  fuso = "America/Sao_Paulo",
+): number {
+  if (ate.getTime() <= de.getTime()) return 0;
+  const feriadoSet = feriados instanceof Set ? feriados : new Set(feriados);
+  const pDe = partesLocais(de, fuso);
+  const pAte = partesLocais(ate, fuso);
+  if (pDe.dateKey === pAte.dateKey) return 0;
+
+  let conta = 0;
+  // Começa no dia seguinte à data de `de`.
+  let cursor = new Date(de.getTime() + 24 * 60 * 60 * 1000);
+  for (let guard = 0; guard < 800; guard++) {
+    const p = partesLocais(cursor, fuso);
+    const ehUtil = !horarios
+      ? true
+      : (horarios.find((h) => h.dia === p.diaSemana)?.aberto ?? false);
+    if (ehUtil && !feriadoSet.has(p.dateKey)) conta += 1;
+    if (p.dateKey === pAte.dateKey) break;
+    if (p.dateKey > pAte.dateKey) break;
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return conta;
+}
+
 export function estaAbertoAgora(
   horarios: DiaHorario[] | null | undefined,
   fuso = "America/Sao_Paulo",

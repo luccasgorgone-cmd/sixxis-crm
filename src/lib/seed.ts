@@ -684,6 +684,25 @@ export async function seedEtapasIntermediarias(): Promise<void> {
         ? `[seed] etapas FollowUp: ${criadas} criadas, ${renomeadas} renomeadas, ${mudancas.length} ordens ajustadas`
         : "[seed] etapas FollowUp ok (ordem ja no alvo)",
     );
+
+    // 3) Prazos da REGUA (Manual secao 5), em dias uteis, por nome na VENDA. So
+    // seta onde ainda esta NULL — nao sobrescreve ajuste do admin. Nao tem efeito
+    // ate ConfiguracaoCRM.followupAtivo=true (nasce false).
+    const PRAZOS_REGUA_VENDA: Record<string, number> = {
+      "Em atendimento": 1,
+      "FollowUp - 1": 2,
+      "FollowUp - 2": 3,
+      "FollowUp - 3": 1,
+    };
+    let prazosSet = 0;
+    for (const [nome, dias] of Object.entries(PRAZOS_REGUA_VENDA)) {
+      const r = await prisma.etapa.updateMany({
+        where: { nome, finalidade: FinalidadeEtapa.VENDA, diasUteisMax: null },
+        data: { diasUteisMax: dias },
+      });
+      prazosSet += r.count;
+    }
+    if (prazosSet > 0) console.log(`[seed] regua: ${prazosSet} prazo(s) de etapa semeados`);
   } catch (erro) {
     console.error(
       `[seed] falha nas etapas FollowUp: ${erro instanceof Error ? erro.message : String(erro)}`,

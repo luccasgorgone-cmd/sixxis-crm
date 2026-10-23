@@ -10,6 +10,7 @@ import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { normalizarJid, telefoneParaLog } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
+import { aplicarRetornoFollowup } from "./reguaFollowup";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono, filtroEquipe } from "./dono";
@@ -2402,6 +2403,10 @@ async function processarEvento(
       // Idempotente: nao mexe em negocio ja atribuido. (Roda independentemente
       // do horario — o lead e atribuido mesmo fora do expediente.)
       await rotearLeadNovo(lead.id, finalidade);
+      // Regra de retorno (Manual secao 6): se o negocio esta numa etapa de
+      // follow-up e a mensagem e interacao QUALIFICADA, volta para Em
+      // atendimento/Negociando (limite 1). No-op com followupAtivo=false.
+      await aplicarRetornoFollowup(lead.id, finalidade, conteudo);
     }
 
     // Atendimento automatico em mensagens de ENTRADA. Primeiro a LUNA (gated por

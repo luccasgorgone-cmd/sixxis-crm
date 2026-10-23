@@ -2,7 +2,11 @@
 // úteis, excluindo feriados). Base dos SLAs do Manual de Atendimento.
 //   npx tsx scripts/contratos/c12-tempo-util.ts
 import assert from "node:assert";
-import { minutosUteisEntre, type DiaHorario } from "../../src/lib/horario";
+import {
+  minutosUteisEntre,
+  diasUteisDecorridos,
+  type DiaHorario,
+} from "../../src/lib/horario";
 
 let ok = 0;
 let falhou = 0;
@@ -108,6 +112,24 @@ caso("sem horários configurados -> fallback tempo corrido (minutos)", () => {
     minutosUteisEntre(sp("2026-10-21T10:00:00"), sp("2026-10-21T13:00:00"), null, []),
     180,
   );
+});
+
+// ───── dias úteis decorridos (régua de follow-up) ─────
+caso("dias úteis: mesmo dia -> 0", () => {
+  assert.equal(diasUteisDecorridos(sp("2026-10-21T09:00:00"), sp("2026-10-21T17:00:00"), H, []), 0);
+});
+caso("dias úteis: Qua->Qui = 1 (início do D2)", () => {
+  assert.equal(diasUteisDecorridos(sp("2026-10-21T15:00:00"), sp("2026-10-22T09:00:00"), H, []), 1);
+});
+caso("dias úteis: Sex->Seg = 1 (pula fim de semana)", () => {
+  assert.equal(diasUteisDecorridos(sp("2026-10-23T15:00:00"), sp("2026-10-26T09:00:00"), H, []), 1);
+});
+caso("dias úteis: Seg->Qui = 3", () => {
+  assert.equal(diasUteisDecorridos(sp("2026-10-19T10:00:00"), sp("2026-10-22T10:00:00"), H, []), 3);
+});
+caso("dias úteis: pula feriado no meio", () => {
+  // Seg->Qua, com Ter feriado: conta só Qua = 1 (Ter não)
+  assert.equal(diasUteisDecorridos(sp("2026-10-19T10:00:00"), sp("2026-10-21T10:00:00"), H, ["2026-10-20"]), 1);
 });
 
 console.log(`\nc12-tempo-util: ${ok} ok, ${falhou} falhou`);
