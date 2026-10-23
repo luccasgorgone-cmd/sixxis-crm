@@ -7,6 +7,7 @@
 import { prisma } from "./prisma";
 import { ehTelefoneValidoBR } from "./ddd";
 import { Finalidade, FinalidadeEtapa } from "@/generated/prisma/enums";
+import { motivoEntraReaquisicao } from "./motivosPerda";
 
 // Teto de leitura por varredura. O funil tem ~1.3k candidatos; o teto so existe
 // para uma base que cresceu 10x nao virar uma consulta gigante sem querer.
@@ -31,6 +32,74 @@ export type Publico = {
   // Bateu o teto de varredura (ha mais candidatos do que o lido).
   truncado: boolean;
 };
+
+// Reaquisição mensal (Manual secao 8): PÚBLICO = leads PERDIDOS do periodo (mes
+// anterior) cujo MOTIVO entra na reaquisicao (motivoEntraReaquisicao). Mesma
+// forma de saida (Candidato) e mesmos descartes do publico de ABERTO, para o
+// motor de envio tratar os dois identicamente. READ-ONLY.
+export async function selecionarPublicoPerdidos(
+  inicio: Date,
+  fim: Date,
+): Promise<Publico> {
+  const linhas = await prisma.$queryRaw<
+    {
+      leadId: string;
+      telefone: string;
+      nome: string | null;
+      pushName: string | null;
+      nomeManual: string | null;
+      conversaId: string;
+      instancia: string | null;
+      motivoPerda: string | null;
+    }[]
+  >`
+    SELECT DISTINCT ON (l.id)
+           l.id AS "leadId", l.telefone AS "telefone", l.nome AS "nome",
+           l."pushName" AS "pushName", l."nomeManual" AS "nomeManual",
+           c.id AS "conversaId", c.instancia AS "instancia",
+           n."motivoPerda" AS "motivoPerda"
+    FROM "Negocio" n
+    JOIN "Lead" l     ON l.id = n."leadId"
+    JOIN "Conversa" c ON c."leadId" = l.id
+                     AND c.finalidade = 'VENDA'::"Finalidade"
+                     AND c.arquivada = false
+    WHERE n.finalidade = 'VENDA'::"Finalidade"
+      AND n.status = 'PERDIDO'::"StatusNeg"
+      AND n."desqualificado" = false
+      AND n."fechadoEm" >= ${inicio} AND n."fechadoEm" < ${fim}
+      AND l.arquivado = false
+      AND l.bloqueado = false
+      AND l."aceitaContato" = true
+      AND NOT EXISTS (
+        SELECT 1 FROM "RecaptacaoEnvio" r
+        WHERE r."leadId" = l.id
+          AND r.status IN ('ENVIADO', 'RESPONDIDO', 'OPTOUT')
+      )
+    ORDER BY l.id, n."fechadoEm" DESC
+    LIMIT ${TETO_VARREDURA + 1}
+  `;
+
+  const truncado = linhas.length > TETO_VARREDURA;
+  const lidas = truncado ? linhas.slice(0, TETO_VARREDURA) : linhas;
+  const elegiveis: Candidato[] = [];
+  const descartes: Record<Descarte, number> = { telefone_nao_br: 0, sem_instancia: 0 };
+
+  for (const l of lidas) {
+    // Só motivos que ENTRAM na reaquisição (manual secao 7): exclui "comprou no
+    // site", "pediu para não ser contatado" e os desqualificados.
+    if (!motivoEntraReaquisicao(l.motivoPerda)) continue;
+    if (!ehTelefoneValidoBR(l.telefone)) { descartes.telefone_nao_br++; continue; }
+    if (!l.instancia?.trim()) { descartes.sem_instancia++; continue; }
+    elegiveis.push({
+      leadId: l.leadId,
+      telefone: l.telefone,
+      primeiroNome: primeiroNomeReal(l),
+      conversaId: l.conversaId,
+      instancia: l.instancia.trim(),
+    });
+  }
+  return { elegiveis, descartes, truncado };
+}
 
 // Etapa de ENTRADA de venda ("Novo"): a ativa de menor ordem no funil de VENDA.
 // Resolvida assim, e nao por nome fixo, para acompanhar o funil se ele for

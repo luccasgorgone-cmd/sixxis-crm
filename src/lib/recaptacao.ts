@@ -29,11 +29,12 @@ import {
 } from "./canal/envio";
 import { nomeEfetivo } from "./cliente";
 import { normalizarTexto } from "./format";
-import { estaAbertoAgora, normalizarHorarios } from "./horario";
+import { estaAbertoAgora, normalizarHorarios, diasUteisDecorridos } from "./horario";
 import { registrarSolEvento, ACAO_RECAPTACAO } from "./solEvento";
 import {
   etapaEntradaVenda,
   selecionarPublico,
+  selecionarPublicoPerdidos,
   renderizarMensagem,
   primeiroNomeReal,
 } from "./recaptacaoPublico";
@@ -41,9 +42,11 @@ import { Prisma } from "@/generated/prisma/client";
 import {
   StatusCampanhaRecap,
   StatusRecapEnvio,
+  RecapModo,
   DirecaoMsg,
   TipoMsg,
   StatusEnvio,
+  Finalidade,
 } from "@/generated/prisma/enums";
 
 // Cadencia do tick. O tick e barato quando nao ha campanha ARMADA (uma consulta).
@@ -149,15 +152,25 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
 
     const lote = Math.min(restantes, LOTE_MAX);
 
-    const etapa = await etapaEntradaVenda();
-    if (!etapa) {
-      await pausar(campanha.id, "funil de VENDA sem etapa de entrada ativa");
-      return;
-    }
-
     // Materializa os proximos candidatos. skipDuplicates + o unique do banco
     // fazem isto ser idempotente: rodar duas vezes nao cria linha repetida.
-    const publico = await selecionarPublico(etapa.id);
+    // Modo PERDIDOS_MES (Manual secao 8) usa o publico de Perdidos elegiveis do
+    // periodo; o modo padrao usa ABERTO na etapa de entrada.
+    let publico;
+    if (campanha.modo === RecapModo.PERDIDOS_MES) {
+      if (!campanha.periodoInicio || !campanha.periodoFim) {
+        await pausar(campanha.id, "campanha de Perdidos sem periodo definido");
+        return;
+      }
+      publico = await selecionarPublicoPerdidos(campanha.periodoInicio, campanha.periodoFim);
+    } else {
+      const etapa = await etapaEntradaVenda();
+      if (!etapa) {
+        await pausar(campanha.id, "funil de VENDA sem etapa de entrada ativa");
+        return;
+      }
+      publico = await selecionarPublico(etapa.id);
+    }
     if (publico.elegiveis.length > 0) {
       await prisma.recaptacaoEnvio.createMany({
         data: publico.elegiveis.slice(0, lote).map((c) => ({
@@ -532,6 +545,9 @@ export async function marcarRespostaRecaptacao(
         where: { id: envio.id },
         data: { status: StatusRecapEnvio.RESPONDIDO, respondidoEm: agora },
       });
+      // Reativado (Manual secao 8): o lead que respondeu a reaquisicao ganha a
+      // etiqueta "Reativado" para medir a taxa de reativacao. Idempotente.
+      await marcarReativado(leadId);
       getIO()?.emit("recaptacao:atualizada", { campanhaId: envio.campanhaId });
     }
     return { respondido: true, optOut: false };
@@ -546,9 +562,87 @@ export async function marcarRespostaRecaptacao(
   }
 }
 
+// Aplica a etiqueta "Reativado" ao lead (cria a etiqueta na 1a vez). Idempotente.
+async function marcarReativado(leadId: string): Promise<void> {
+  try {
+    const existente = await prisma.etiqueta.findFirst({
+      where: { nome: "Reativado" },
+      select: { id: true },
+    });
+    const etiqueta =
+      existente ??
+      (await prisma.etiqueta.create({
+        data: { nome: "Reativado", cor: "#3cbfb3", finalidade: Finalidade.VENDA },
+        select: { id: true },
+      }));
+    await prisma.leadEtiqueta.upsert({
+      where: { leadId_etiquetaId: { leadId, etiquetaId: etiqueta.id } },
+      update: {},
+      create: { leadId, etiquetaId: etiqueta.id },
+    });
+  } catch (e) {
+    console.warn(`[recaptacao] falha ao etiquetar Reativado: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+// Prepara a reaquisicao mensal (Manual secao 8): no 6o dia util do mes, cria uma
+// campanha RASCUNHO modo PERDIDOS_MES com os Perdidos elegiveis do mes anterior.
+// Nasce RASCUNHO: o envio so comeca quando o gestor ARMA (nenhuma msg automatica).
+// Idempotente: so cria se ainda nao existe campanha para o periodo do mes passado.
+export async function prepararReaquisicaoMensal(): Promise<void> {
+  try {
+    const cfg = await prisma.configuracaoCRM.findFirst({
+      select: { horarios: true, feriados: true, fuso: true },
+    });
+    const fuso = cfg?.fuso ?? "America/Sao_Paulo";
+    const horarios = normalizarHorarios(cfg?.horarios);
+    const feriados: string[] = Array.isArray(cfg?.feriados)
+      ? (cfg!.feriados as unknown[]).filter((f): f is string => typeof f === "string")
+      : [];
+    const agora = new Date();
+    const [ano, mes] = new Intl.DateTimeFormat("en-CA", {
+      timeZone: fuso, year: "numeric", month: "2-digit",
+    }).format(agora).split("-").map(Number);
+    const primeiroDoMes = new Date(`${ano}-${String(mes).padStart(2, "0")}-01T00:00:00-03:00`);
+    // Ordinal do dia util do mes (quantos dias uteis do 1o ate hoje).
+    const ultimoDiaMesAnterior = new Date(primeiroDoMes.getTime() - 86_400_000);
+    const ordinal = diasUteisDecorridos(ultimoDiaMesAnterior, agora, horarios, feriados, fuso);
+    if (ordinal !== 6) return; // só age no 6º dia útil
+
+    // Janela do mes anterior.
+    const anoAnt = mes === 1 ? ano - 1 : ano;
+    const mesAnt = mes === 1 ? 12 : mes - 1;
+    const inicio = new Date(`${anoAnt}-${String(mesAnt).padStart(2, "0")}-01T00:00:00-03:00`);
+    const fim = primeiroDoMes;
+
+    const existe = await prisma.campanhaRecaptacao.findFirst({
+      where: { modo: RecapModo.PERDIDOS_MES, periodoInicio: inicio },
+      select: { id: true },
+    });
+    if (existe) return;
+
+    await prisma.campanhaRecaptacao.create({
+      data: {
+        nome: `Reaquisição ${String(mesAnt).padStart(2, "0")}/${anoAnt}`,
+        mensagemTemplate:
+          "Oi {{primeiroNome}}! Passando para retomar seu atendimento na SIXXIS — temos uma condição especial deste mês. Posso te mostrar?",
+        status: StatusCampanhaRecap.RASCUNHO,
+        modo: RecapModo.PERDIDOS_MES,
+        periodoInicio: inicio,
+        periodoFim: fim,
+      },
+    });
+    console.log(`[reaquisicao] RASCUNHO criado para ${mesAnt}/${anoAnt} (aguardando ARMAR pelo gestor)`);
+  } catch (e) {
+    console.error(`[reaquisicao] falha ao preparar: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 // Agenda o motor. Chamado no boot — mas so age quando ha campanha ARMADA, entao
 // subir o servidor nao envia nada por si so.
 export function iniciarRecaptacao(io?: Server): void {
+  void prepararReaquisicaoMensal();
+  setInterval(() => void prepararReaquisicaoMensal(), 60 * 60 * 1000); // de hora em hora: so age no 6o dia util
   setInterval(() => void processarRecaptacao(io ?? null), TICK_MS);
   console.log(
     "[recaptacao] motor agendado (so envia com campanha ARMADA, dentro do horario e da cota diaria)",

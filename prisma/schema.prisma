@@ -1218,11 +1218,22 @@ enum StatusRecapEnvio {
 
 // Uma onda de recaptacao. O envio real exige status ARMADA — nenhum deploy,
 // seed ou migracao arma nada: o estado inicial e RASCUNHO.
+enum RecapModo {
+  ABERTO_ENTRADA // publico = leads ABERTO na etapa de entrada sem resposta humana
+  PERDIDOS_MES   // publico = Perdidos eligiveis do periodo (Manual secao 8)
+}
+
 model CampanhaRecaptacao {
   id               String              @id @default(cuid())
   nome             String
   mensagemTemplate String              @db.Text
   status           StatusCampanhaRecap @default(RASCUNHO)
+  // Modo do publico (Manual secao 8 = PERDIDOS_MES). Default preserva o
+  // comportamento atual (ABERTO_ENTRADA).
+  modo             RecapModo           @default(ABERTO_ENTRADA)
+  // Janela de Perdidos (so no modo PERDIDOS_MES): mes anterior.
+  periodoInicio    DateTime?           @db.Date
+  periodoFim       DateTime?           @db.Date
   // Teto de envios por dia. Comeca BAIXO de proposito: a fatia existe para
   // DESCOBRIR o limite seguro do numero, subindo aos poucos, nao para adivinhar.
   limiteDiario     Int                 @default(20)
