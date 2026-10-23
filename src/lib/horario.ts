@@ -39,6 +39,95 @@ export function normalizarHorarios(valor: unknown): DiaHorario[] | null {
   return dias;
 }
 
+function hmParaMin(hm: string): number {
+  const [h, m] = hm.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+// Partes locais (no fuso) de um instante: chave de data YYYY-MM-DD, dia da semana
+// (0=Dom) e minuto do dia (0-1439).
+function partesLocais(
+  d: Date,
+  fuso: string,
+): { dateKey: string; diaSemana: number; minutoDia: number } {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: fuso,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      weekday: "short",
+    }).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    const ano = get("year");
+    const mes = get("month");
+    const dia = get("day");
+    const hora = Number(get("hour")) % 24;
+    const min = Number(get("minute"));
+    const diaSemana = NOME_DIA[get("weekday")] ?? d.getDay();
+    return {
+      dateKey: `${ano}-${mes}-${dia}`,
+      diaSemana,
+      minutoDia: hora * 60 + min,
+    };
+  } catch {
+    const diaSemana = d.getDay();
+    const minutoDia = d.getHours() * 60 + d.getMinutes();
+    const dateKey = d.toISOString().slice(0, 10);
+    return { dateKey, diaSemana, minutoDia };
+  }
+}
+
+// Minutos ÚTEIS entre `de` e `ate`: soma só os minutos dentro do horário
+// comercial (faixas por dia da semana), em dias úteis (dia aberto) e fora de
+// feriados. Determinística, pura. Base dos SLAs do Manual de Atendimento
+// (ex.: "o relógio começa na abertura do próximo dia útil" sai de graça: tempo
+// fora do expediente contribui 0). Sem horários configurados -> tempo corrido
+// (minutos de parede), para nunca regredir onde não há config.
+export function minutosUteisEntre(
+  de: Date,
+  ate: Date,
+  horarios: DiaHorario[] | null | undefined,
+  feriados: Iterable<string> = [],
+  fuso = "America/Sao_Paulo",
+): number {
+  const ini = de.getTime();
+  const fim = ate.getTime();
+  if (fim <= ini) return 0;
+  if (!horarios || horarios.length === 0) {
+    return Math.round((fim - ini) / 60_000);
+  }
+
+  const feriadoSet = feriados instanceof Set ? feriados : new Set(feriados);
+  const pDe = partesLocais(de, fuso);
+  const pAte = partesLocais(ate, fuso);
+
+  let total = 0;
+  let cursor = de;
+  for (let guard = 0; guard < 800; guard++) {
+    const p = partesLocais(cursor, fuso);
+    const startMin = p.dateKey === pDe.dateKey ? pDe.minutoDia : 0;
+    const endMin = p.dateKey === pAte.dateKey ? pAte.minutoDia : 1440;
+    if (!feriadoSet.has(p.dateKey)) {
+      const dia = horarios.find((h) => h.dia === p.diaSemana);
+      if (dia && dia.aberto) {
+        for (const f of dia.faixas) {
+          const ov =
+            Math.min(endMin, hmParaMin(f.fim)) -
+            Math.max(startMin, hmParaMin(f.inicio));
+          if (ov > 0) total += ov;
+        }
+      }
+    }
+    if (p.dateKey === pAte.dateKey) break;
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return total;
+}
+
 export function estaAbertoAgora(
   horarios: DiaHorario[] | null | undefined,
   fuso = "America/Sao_Paulo",

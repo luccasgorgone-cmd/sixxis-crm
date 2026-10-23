@@ -7,11 +7,25 @@ import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { criarNotificacao } from "./notificacao";
 import { StatusNeg } from "../generated/prisma/enums";
+import { minutosUteisEntre, normalizarHorarios } from "./horario";
 
 // Avalia todos os negocios abertos e cria/fecha alertas de SLA conforme a config.
 export async function processarSlaAlertas(): Promise<void> {
   const agora = new Date();
   try {
+    // Config global de tempo: quando slaEmDiasUteis=true, o relógio da etapa conta
+    // só horário comercial / dias úteis / fora de feriados (Manual de Atendimento).
+    // Default (false) preserva o comportamento atual (minutos corridos).
+    const cfgCrm = await prisma.configuracaoCRM.findFirst({
+      select: { fuso: true, horarios: true, feriados: true, slaEmDiasUteis: true },
+    });
+    const emDiasUteis = cfgCrm?.slaEmDiasUteis === true;
+    const horariosNorm = emDiasUteis ? normalizarHorarios(cfgCrm?.horarios) : null;
+    const feriados: string[] = Array.isArray(cfgCrm?.feriados)
+      ? (cfgCrm!.feriados as unknown[]).filter((f): f is string => typeof f === "string")
+      : [];
+    const fuso = cfgCrm?.fuso || "America/Sao_Paulo";
+
     const configs = await prisma.configAlertaSla.findMany({
       where: { ativo: true },
       select: {
@@ -75,8 +89,9 @@ export async function processarSlaAlertas(): Promise<void> {
         });
       }
 
-      const decorridoMin =
-        (agora.getTime() - n.entrouEtapaEm.getTime()) / 60_000;
+      const decorridoMin = emDiasUteis
+        ? minutosUteisEntre(n.entrouEtapaEm, agora, horariosNorm, feriados, fuso)
+        : (agora.getTime() - n.entrouEtapaEm.getTime()) / 60_000;
       const jaTemAlertaDestaEtapa = aberto && aberto.configId === config.id;
 
       if (decorridoMin >= config.minutosParaAlerta && !jaTemAlertaDestaEtapa) {

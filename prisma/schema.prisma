@@ -1283,6 +1283,13 @@ model ConfiguracaoCRM {
   nomeEmpresa        String?
   fuso               String   @default("America/Sao_Paulo")
   horarios           Json?
+  // Feriados (lista de "YYYY-MM-DD") excluidos da contagem de tempo UTIL dos SLAs
+  // (Manual de Atendimento). null/vazio = nenhum.
+  feriados           Json?
+  // Liga o calculo de SLA/vencido em DIAS UTEIS + horario comercial. Comeca
+  // DESLIGADO: deploy NAO muda o relogio atual (tempo corrido) ate o admin ligar.
+  // Antigos (sem o campo) = false.
+  slaEmDiasUteis     Boolean @default(false)
   mensagemForaHorario String?
   // Interruptor do aviso automatico de FORA DE HORARIO. Comeca DESLIGADO: nenhum
   // aviso e enviado ate o dono ligar explicitamente. Registros antigos (sem o
