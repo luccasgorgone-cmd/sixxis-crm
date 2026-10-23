@@ -52,8 +52,11 @@ export function Topbar({
 
       <div className="flex items-center gap-3">
         {/* Presenca AO VIVO (online/offline) — estado novo, separado de 'ativo'.
-            So para quem recebe leads (nao-admin). Auto-offline por inatividade. */}
-        {papel !== "ADMIN" && <TogglePresenca />}
+            Visivel para TODOS os usuarios autenticados (inclusive admin), para que
+            qualquer um marque sua presenca e possa testar. Auto-offline por
+            inatividade. (O roteamento por presenca, quando existir, filtra por
+            papel de qualquer forma — admin online nao recebe lead.) */}
+        <TogglePresenca />
         {/* Disponibilidade: so para quem recebe leads (nao-admin). Reusa Agente.ativo. */}
         {papel !== "ADMIN" && <DisponibilidadeUsuario />}
         <TemaToggle />
