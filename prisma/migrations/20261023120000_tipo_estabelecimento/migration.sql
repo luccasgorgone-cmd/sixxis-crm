@@ -1,0 +1,8 @@
+-- Tipo de estabelecimento do cliente (Lead): classificacao de selecao unica,
+-- marcada na conversa. ADITIVO: CREATE TYPE + ADD COLUMN nullable. Sem DROP/TEMP.
+
+-- CreateEnum
+CREATE TYPE "TipoEstabelecimento" AS ENUM ('RESTAURANTE', 'BAR', 'ACADEMIA', 'ACADEMIA_LUTA', 'LOJA_CARRO', 'OFICINA_MECANICA', 'LOJA_ROUPA', 'MALHARIA', 'SERRALHERIA', 'AREA_LAZER', 'SALAO_FESTAS', 'MATERIAL_ELETRICO', 'SUPERMERCADO', 'MERCEARIA', 'ACOUGUE', 'VAREJO_BAIRRO', 'PADARIA', 'LANCHONETE', 'HORTIFRUTI', 'DISTRIBUIDORA_BEBIDAS', 'PET_SHOP', 'FARMACIA', 'SALAO_BELEZA', 'MOVEIS_DECORACAO', 'HOTEL_POUSADA', 'POSTO_CONVENIENCIA', 'OUTRO');
+
+-- AlterTable
+ALTER TABLE "Lead" ADD COLUMN     "tipoEstabelecimento" "TipoEstabelecimento";

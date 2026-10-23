@@ -2,7 +2,7 @@
 // Nome efetivo = nomeManual (override do atendente) || pushName (WhatsApp) ||
 // nome (legado/ingestao) || telefone formatado. Usar em TODA a UI.
 import { formatarTelefone, normalizarTexto } from "./format";
-import type { Segmento } from "@/generated/prisma/enums";
+import type { Segmento, TipoEstabelecimento } from "@/generated/prisma/enums";
 
 export type LeadNomeavel = {
   nome?: string | null;
@@ -65,6 +65,7 @@ export const selectClientePainel = {
   cpf: true,
   cnpj: true,
   segmento: true,
+  tipoEstabelecimento: true,
   dataNascimento: true,
   anotacoes: true,
   aceitaContato: true,
@@ -85,6 +86,7 @@ export type LeadPainelRow = LeadNomeavel & {
   cpf: string | null;
   cnpj: string | null;
   segmento: Segmento | null;
+  tipoEstabelecimento: TipoEstabelecimento | null;
   dataNascimento: Date | null;
   anotacoes: string | null;
   aceitaContato: boolean;
@@ -112,6 +114,7 @@ export function serializarClientePainel(l: LeadPainelRow) {
     cpf: l.cpf,
     cnpj: l.cnpj,
     segmento: l.segmento ?? null,
+    tipoEstabelecimento: l.tipoEstabelecimento ?? null,
     dataNascimento: l.dataNascimento ? l.dataNascimento.toISOString() : null,
     anotacoes: l.anotacoes,
     aceitaContato: l.aceitaContato,

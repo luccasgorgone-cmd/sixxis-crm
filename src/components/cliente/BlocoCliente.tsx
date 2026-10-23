@@ -33,6 +33,11 @@ import {
   mascararCnpj,
 } from "@/lib/format";
 import { temNomeReal } from "@/lib/cliente";
+import {
+  TIPOS_ESTABELECIMENTO,
+  rotuloTipoEstabelecimento,
+} from "@/lib/tipoEstabelecimento";
+import type { TipoEstabelecimento } from "@/generated/prisma/enums";
 import { Enderecos } from "@/components/cliente/Enderecos";
 
 export type ClientePainel = {
@@ -48,6 +53,7 @@ export type ClientePainel = {
   cpf: string | null;
   cnpj?: string | null;
   segmento?: "VAREJO" | "ATACADO" | null;
+  tipoEstabelecimento?: TipoEstabelecimento | null;
   dataNascimento?: string | null;
   anotacoes: string | null;
   aceitaContato?: boolean;
@@ -225,6 +231,17 @@ export function BlocoCliente({
               <BadgeSegmento segmento={cliente.segmento} />
             ) : (
               <span className="text-medio/40">Segmento nao definido</span>
+            )}
+          </div>
+          {/* Tipo de estabelecimento (classificacao do cliente); vazio honesto. */}
+          <div className="flex items-center gap-2 text-sm">
+            <Building2 className="h-3.5 w-3.5 shrink-0 text-medio/40" />
+            {cliente.tipoEstabelecimento ? (
+              <span className="text-escuro">
+                {rotuloTipoEstabelecimento(cliente.tipoEstabelecimento)}
+              </span>
+            ) : (
+              <span className="text-medio/40">Tipo nao definido</span>
             )}
           </div>
           {cliente.anotacoes && (
@@ -431,6 +448,9 @@ function Formulario({
     dataNascParaInput(cliente.dataNascimento),
   );
   const [segmento, setSegmento] = useState<string>(cliente.segmento ?? "");
+  const [tipoEstabelecimento, setTipoEstabelecimento] = useState<string>(
+    cliente.tipoEstabelecimento ?? "",
+  );
   const [anotacoes, setAnotacoes] = useState(cliente.anotacoes ?? "");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -449,6 +469,7 @@ function Formulario({
           cpf,
           cnpj,
           segmento: segmento || null,
+          tipoEstabelecimento: tipoEstabelecimento || null,
           dataNascimento,
           anotacoes,
         }),
@@ -514,6 +535,23 @@ function Formulario({
           <option value="">Nao definido</option>
           <option value="VAREJO">Varejo</option>
           <option value="ATACADO">Atacado</option>
+        </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-medio/70">
+          Tipo de estabelecimento
+        </label>
+        <select
+          value={tipoEstabelecimento}
+          onChange={(e) => setTipoEstabelecimento(e.target.value)}
+          className="campo w-full"
+        >
+          <option value="">Nao definido</option>
+          {TIPOS_ESTABELECIMENTO.map((t) => (
+            <option key={t.valor} value={t.valor}>
+              {t.rotulo}
+            </option>
+          ))}
         </select>
       </div>
       <div>

@@ -106,6 +106,38 @@ enum Segmento {
   ATACADO
 }
 
+// Tipo de estabelecimento do cliente (rotulos PT em src/lib/tipoEstabelecimento.ts).
+// Selecao UNICA, marcada na conversa (BlocoCliente). Lista fixa; OUTRO como escape.
+enum TipoEstabelecimento {
+  RESTAURANTE
+  BAR
+  ACADEMIA
+  ACADEMIA_LUTA
+  LOJA_CARRO
+  OFICINA_MECANICA
+  LOJA_ROUPA
+  MALHARIA
+  SERRALHERIA
+  AREA_LAZER
+  SALAO_FESTAS
+  MATERIAL_ELETRICO
+  SUPERMERCADO
+  MERCEARIA
+  ACOUGUE
+  VAREJO_BAIRRO
+  PADARIA
+  LANCHONETE
+  HORTIFRUTI
+  DISTRIBUIDORA_BEBIDAS
+  PET_SHOP
+  FARMACIA
+  SALAO_BELEZA
+  MOVEIS_DECORACAO
+  HOTEL_POUSADA
+  POSTO_CONVENIENCIA
+  OUTRO
+}
+
 // Finalidade de uma etapa do funil. AMBAS aparece nos dois funis.
 enum FinalidadeEtapa {
   VENDA
@@ -270,6 +302,9 @@ model Lead {
   // Segmento comercial do cliente (regra do time de VENDA): varejo ou atacado.
   // null = nao definido. Fica no Lead (nao varia por negocio).
   segmento      Segmento?
+  // Tipo de estabelecimento do cliente (selecao unica, marcada na conversa).
+  // null = nao definido. Fica no Lead (nao varia por negocio), igual ao segmento.
+  tipoEstabelecimento TipoEstabelecimento?
   // Data de nascimento (apenas a data; hora ignorada). Base para aniversarios.
   dataNascimento DateTime?
   anotacoes     String?        @db.Text

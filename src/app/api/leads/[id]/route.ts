@@ -21,6 +21,7 @@ import {
 import { parseDataNascimento } from "@/lib/format";
 import { getIO } from "@/lib/socket";
 import { AtividadeTipo, Segmento } from "@/generated/prisma/enums";
+import { ehTipoEstabelecimentoValido } from "@/lib/tipoEstabelecimento";
 import { Prisma } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
@@ -90,6 +91,7 @@ export async function PATCH(
       cpf: true,
       cnpj: true,
       segmento: true,
+      tipoEstabelecimento: true,
       dataNascimento: true,
       anotacoes: true,
       aceitaContato: true,
@@ -127,6 +129,7 @@ export async function PATCH(
     CAMPOS.some(({ chave }) => body[chave] !== undefined) ||
     body.dataNascimento !== undefined ||
     body.segmento !== undefined ||
+    body.tipoEstabelecimento !== undefined ||
     typeof body.aceitaContato === "boolean";
   const tentaAcomp =
     body.notaFiscal !== undefined || body.empresaFaturadaId !== undefined;
@@ -175,6 +178,17 @@ export async function PATCH(
     if (novo !== (lead.segmento ?? null)) {
       data.segmento = novo;
       mudancas.push("segmento");
+    }
+  }
+
+  // Tipo de estabelecimento (enum TipoEstabelecimento ou null). Igual ao segmento.
+  if (body.tipoEstabelecimento !== undefined) {
+    const novo = ehTipoEstabelecimentoValido(body.tipoEstabelecimento)
+      ? body.tipoEstabelecimento
+      : null;
+    if (novo !== (lead.tipoEstabelecimento ?? null)) {
+      data.tipoEstabelecimento = novo;
+      mudancas.push("tipo de estabelecimento");
     }
   }
 
