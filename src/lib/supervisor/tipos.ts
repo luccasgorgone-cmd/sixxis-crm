@@ -157,6 +157,10 @@ export const IND = {
   SEM_PROXIMO: "sem_proximo_passo",
   TEMPO_1A_RESP: "tempo_1a_resposta_seg",
   TICKET: "ticket_medio",
+  // Manual (KPIs de disciplina): mediana da 1ª resposta e % em ate 15 min.
+  MEDIANA_1A_RESP: "mediana_1a_resposta_seg",
+  PCT_15MIN: "pct_1a_resposta_ate_15min",
+  MOTIVO_PREENCHIDO: "pct_motivo_perda_preenchido",
 } as const;
 
 // Defaults do doc (D2: semeados, admin ajusta na tela depois).
@@ -176,6 +180,13 @@ export const LIMIARES_PADRAO: SupervisorLimiares = {
     [IND.SEM_PROXIMO]: { verde: 0.2, amarelo: 0.4 },
     // Tempo médio de 1ª resposta (seg): menorMelhor. <=5min verde, <=30min amarelo.
     [IND.TEMPO_1A_RESP]: { verde: 5 * 60, amarelo: 30 * 60 },
+    // Mediana da 1ª resposta (seg): menorMelhor. Manual pede <=15min. <=15min
+    // verde, <=30min amarelo.
+    [IND.MEDIANA_1A_RESP]: { verde: 15 * 60, amarelo: 30 * 60 },
+    // % 1º contato <=15min: Manual meta >=70% verde, >=50% amarelo.
+    [IND.PCT_15MIN]: { verde: 0.7, amarelo: 0.5 },
+    // % de perdas com motivo preenchido: Manual meta 100%. >=100% verde, >=90% amarelo.
+    [IND.MOTIVO_PREENCHIDO]: { verde: 1, amarelo: 0.9 },
   },
 };
 

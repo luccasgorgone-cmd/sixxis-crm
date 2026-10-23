@@ -46,3 +46,20 @@ export function mediaSegundos(temposSeg: number[]): number {
   const soma = temposSeg.reduce((a, b) => a + b, 0);
   return Math.round(soma / temposSeg.length);
 }
+
+// MEDIANA (não média) dos tempos (segundos). O Manual (KPIs) pede explicitamente a
+// mediana da 1ª resposta — robusta a outliers. 0 se vazio.
+export function medianaSegundos(temposSeg: number[]): number {
+  if (temposSeg.length === 0) return 0;
+  const ord = [...temposSeg].sort((a, b) => a - b);
+  const meio = Math.floor(ord.length / 2);
+  return ord.length % 2
+    ? Math.round(ord[meio])
+    : Math.round((ord[meio - 1] + ord[meio]) / 2);
+}
+
+// Fração dos tempos (segundos) dentro de um limiar. Base do "% 1º contato ≤ X".
+export function pctDentro(temposSeg: number[], limiarSeg: number): number {
+  if (temposSeg.length === 0) return 0;
+  return temposSeg.filter((t) => t <= limiarSeg).length / temposSeg.length;
+}

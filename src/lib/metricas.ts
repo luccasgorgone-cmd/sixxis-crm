@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { Prisma } from "../generated/prisma/client";
 import { StatusNeg, Finalidade, TipoGanho } from "../generated/prisma/enums";
 import { whereVendaNoPeriodo, comEscopo } from "./vendasPeriodo";
-import { mediaSegundos } from "./presenca/primeiraResposta";
+import { mediaSegundos, medianaSegundos, pctDentro } from "./presenca/primeiraResposta";
 import { coletarSegundos1aResposta } from "./presenca/primeiraRespostaDb";
 
 export type Periodo = { inicio: Date; fim: Date };
@@ -84,7 +84,11 @@ export type Metricas = {
   msgEnviadas: number;
   msgRecebidas: number;
   tempoPrimeiraRespostaSeg: number; // media
+  medianaPrimeiraRespostaSeg: number; // Manual: mediana (nao media)
+  pctPrimeiraRespostaAte15min: number; // 0..1 (Manual: 1o contato <= 15 min)
   tempoResolucaoSeg: number; // media
+  cicloGanhoDias: number; // Manual: ciclo medio Novo->Ganho (dias uteis corridos)
+  pctMotivoPreenchido: number; // 0..1 (perdidos nao-desq com motivo / perdidos)
   // Detalhamento do GANHO de POS-VENDA por tipo (Negocio.tipoGanho). A soma dos
   // quatro = ganhos de pos-venda do escopo; "SemTipo" sao os ganhos anteriores a
   // essa escolha existir (tipoGanho null), que continuam contando no total. Em
@@ -172,6 +176,7 @@ export async function calcularMetricas(
     clientesRaw,
     seg1aResposta,
     resolucaoRaw,
+    perdidosComMotivo,
   ] = await Promise.all([
     prisma.negocio.count({
       where: negocioWhere(p, e, [StatusNeg.ABERTO]),
@@ -238,7 +243,11 @@ export async function calcularMetricas(
     // Tempo medio de resolucao (fechadoEm - criadoEm) dos finalizados no periodo.
     prisma.negocio.findMany({
       where: negocioWhere(p, e, [StatusNeg.GANHO, StatusNeg.PERDIDO], true),
-      select: { criadoEm: true, fechadoEm: true },
+      select: { criadoEm: true, fechadoEm: true, status: true },
+    }),
+    // Perdidos (nao-desqualificados) COM motivo preenchido — Manual: meta 100%.
+    prisma.negocio.count({
+      where: { AND: [wherePerdidos(p, e), { motivoPerda: { not: null } }] },
     }),
   ]);
 
@@ -271,16 +280,26 @@ export async function calcularMetricas(
   // Tempo de 1a resposta = media dos segundos ONLINE do dono por conversa
   // (fallback wall-clock), vindos da fonte unica coletarSegundos1aResposta.
   const tempoPrimeiraRespostaSeg = mediaSegundos(seg1aResposta);
+  const medianaPrimeiraRespostaSeg = medianaSegundos(seg1aResposta);
+  const pctPrimeiraRespostaAte15min = pctDentro(seg1aResposta, 15 * 60);
 
   let somaResol = 0;
   let nResol = 0;
+  let somaGanhoDias = 0;
+  let nGanho = 0;
   for (const n of resolucaoRaw) {
-    if (n.fechadoEm) {
-      somaResol += (n.fechadoEm.getTime() - n.criadoEm.getTime()) / 1000;
-      nResol += 1;
+    if (!n.fechadoEm) continue;
+    const dias = (n.fechadoEm.getTime() - n.criadoEm.getTime()) / 86_400_000;
+    somaResol += (n.fechadoEm.getTime() - n.criadoEm.getTime()) / 1000;
+    nResol += 1;
+    if (n.status === StatusNeg.GANHO) {
+      somaGanhoDias += dias;
+      nGanho += 1;
     }
   }
   const tempoResolucaoSeg = nResol > 0 ? Math.round(somaResol / nResol) : 0;
+  const cicloGanhoDias = nGanho > 0 ? Math.round((somaGanhoDias / nGanho) * 10) / 10 : 0;
+  const pctMotivoPreenchido = perdidos > 0 ? perdidosComMotivo / perdidos : 1;
 
   return {
     clientesAtendidos,
@@ -295,6 +314,10 @@ export async function calcularMetricas(
     msgEnviadas,
     msgRecebidas,
     tempoPrimeiraRespostaSeg,
+    medianaPrimeiraRespostaSeg,
+    pctPrimeiraRespostaAte15min,
+    cicloGanhoDias,
+    pctMotivoPreenchido,
     tempoResolucaoSeg,
     posVendaGanhoDuvida: contaTipo(TipoGanho.DUVIDA),
     posVendaGanhoPagamento: contaTipo(TipoGanho.PAGAMENTO),
