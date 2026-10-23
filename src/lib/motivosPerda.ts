@@ -1,23 +1,50 @@
-// Lista FIXA de motivos de perda de um negocio. O Negocio.motivoPerda passa a
-// guardar o CODE; motivoPerdaObs guarda uma observacao livre (obrigatoria em OUTRO).
-// Compartilhado entre UI (seletor, rotulos) e API (analise de perdidos).
+// Lista FECHADA de motivos de encerramento (Manual de Atendimento, seção 7).
+// Negocio.motivoPerda guarda o CODE; motivoPerdaObs guarda observação livre.
+// Cada motivo tem TIPO (PERDIDO ou DESQUALIFICADO) e se ENTRA NA REAQUISIÇÃO.
+// Compartilhado entre UI (seletor agrupado), API (validação dura) e métricas.
+// "Outro" não existe por desenho do manual: se nada se aplica, o vendedor avisa
+// o gestor para incluir um novo código aqui.
 
-export type MotivoPerda = { code: string; label: string };
+export type TipoMotivo = "PERDIDO" | "DESQUALIFICADO";
+export type MotivoPerda = {
+  code: string;
+  label: string;
+  tipo: TipoMotivo;
+  // Entra na reaquisição mensal de perdidos (seção 8)? Só PERDIDO pode entrar.
+  entraReaquisicao: boolean;
+  obsObrigatoria?: boolean;
+};
 
 export const MOTIVOS_PERDA: MotivoPerda[] = [
-  { code: "NAO_RESPONDE", label: "Cliente não responde" },
-  { code: "SEM_INTERESSE", label: "Sem interesse" },
-  { code: "ACHOU_CARO", label: "Achou caro / fora do orçamento" },
-  { code: "CONCORRENTE", label: "Comprou com concorrente" },
-  { code: "CONFUSO", label: "Confuso / não entendeu" },
-  { code: "FORA_AREA", label: "Fora da área de entrega" },
-  { code: "INDISPONIVEL", label: "Produto indisponível" },
-  { code: "SO_PESQUISANDO", label: "Só pesquisando preço" },
-  { code: "DESISTIU", label: "Desistiu da compra" },
-  { code: "PAGAMENTO", label: "Problema no pagamento" },
-  { code: "CONTATO_ERRADO", label: "Contato errado / duplicado" },
-  { code: "OUTRO", label: "Outro" },
+  // ───── PERDIDO ─────
+  { code: "NAO_RESPONDE", label: "Sem resposta (fim da régua)", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "ACHOU_CARO", label: "Preço acima do esperado", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "FRETE_PRAZO", label: "Frete caro ou prazo de entrega longo", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "CONCORRENTE", label: "Comprou de concorrente", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "COMPROU_SITE", label: "Comprou no marketplace/site da SIXXIS", tipo: "PERDIDO", entraReaquisicao: false },
+  { code: "ADIOU", label: "Adiou a compra / sem orçamento agora", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "PRODUTO_NAO_ATENDE", label: "Produto não atende (tamanho, área, voltagem, modelo)", tipo: "PERDIDO", entraReaquisicao: true },
+  { code: "NAO_CONTATAR", label: "Pediu para não ser contatado", tipo: "PERDIDO", entraReaquisicao: false },
+  // ───── DESQUALIFICADO (não entra em follow-up nem reaquisição) ─────
+  { code: "CONTATO_ERRADO", label: "Número errado / contato inválido", tipo: "DESQUALIFICADO", entraReaquisicao: false },
+  { code: "SPAM", label: "Spam", tipo: "DESQUALIFICADO", entraReaquisicao: false },
+  { code: "FORNECEDOR", label: "Fornecedor / não é cliente", tipo: "DESQUALIFICADO", entraReaquisicao: false },
+  { code: "VAGA_EMPREGO", label: "Busca emprego", tipo: "DESQUALIFICADO", entraReaquisicao: false },
+  { code: "FORA_AREA", label: "Fora da área de atendimento", tipo: "DESQUALIFICADO", entraReaquisicao: false },
+  { code: "PRODUTO_NAO_VENDE", label: "Produto que a SIXXIS não vende", tipo: "DESQUALIFICADO", entraReaquisicao: false },
 ];
+
+// Rótulos de códigos LEGADOS (removidos da lista nova) só para exibir histórico
+// antigo sem perder informação. NÃO são oferecidos no seletor nem validados.
+const ROTULOS_LEGADO: Record<string, string> = {
+  SEM_INTERESSE: "Sem interesse (legado)",
+  CONFUSO: "Confuso / não entendeu (legado)",
+  INDISPONIVEL: "Produto indisponível (legado)",
+  SO_PESQUISANDO: "Só pesquisando preço (legado)",
+  DESISTIU: "Desistiu da compra (legado)",
+  PAGAMENTO: "Problema no pagamento (legado)",
+  OUTRO: "Outro (legado)",
+};
 
 // MARCADOR dos duplicados NEUTRALIZADOS por /api/admin/corrigir-duplicados: um
 // negocio que era copia de outro e virou perdido so para sair da carteira (o
@@ -25,8 +52,8 @@ export const MOTIVOS_PERDA: MotivoPerda[] = [
 // entra na analise de perdas — ver lib/perdidos.
 //
 // O QUE IDENTIFICA e o PAR code + observacao exata, nunca o code sozinho:
-// "Contato errado / duplicado" tambem e escolhido A MAO por atendente numa
-// perda legitima, e essa tem de continuar contando normalmente.
+// "Numero errado / contato invalido" tambem e escolhido A MAO por atendente numa
+// desqualificacao legitima, e essa tem de continuar contando normalmente.
 export const MOTIVO_DUPLICADO = "CONTATO_ERRADO";
 export const OBS_DUPLICADO_AUTO = "Duplicado corrigido automaticamente";
 
@@ -66,9 +93,17 @@ export function ehCodigoMotivo(code: string): boolean {
   return POR_CODE.has(code);
 }
 
-// Rotulo de um motivo. Se o valor guardado nao for um CODE conhecido (legado:
-// texto livre antigo), devolve o proprio valor para nao perder a informacao.
+export function motivoEhDesqualificacao(code: string | null | undefined): boolean {
+  return code ? POR_CODE.get(code)?.tipo === "DESQUALIFICADO" : false;
+}
+
+export function motivoEntraReaquisicao(code: string | null | undefined): boolean {
+  return code ? POR_CODE.get(code)?.entraReaquisicao === true : false;
+}
+
+// Rotulo de um motivo. Code conhecido -> label do manual; code legado -> label
+// marcado "(legado)"; texto livre antigo desconhecido -> o proprio valor.
 export function rotuloMotivo(codeOuTexto: string | null | undefined): string {
   if (!codeOuTexto) return "Sem motivo";
-  return POR_CODE.get(codeOuTexto)?.label ?? codeOuTexto;
+  return POR_CODE.get(codeOuTexto)?.label ?? ROTULOS_LEGADO[codeOuTexto] ?? codeOuTexto;
 }

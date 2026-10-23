@@ -699,6 +699,11 @@ model Negocio {
   // motivoPerda guarda o CODE (ver lib/motivosPerda); obs e a observacao livre.
   motivoPerda   String?
   motivoPerdaObs String?           @db.Text
+  // DESQUALIFICADO (Manual secao 7): perda que NAO e cliente possivel (spam, numero
+  // errado, fornecedor, vaga, fora da area, produto que nao vendemos). Derivado do
+  // tipo do motivoPerda. NAO conta contra a conversao do vendedor nem entra em
+  // follow-up/reaquisicao. Default false (negocios antigos = perda normal).
+  desqualificado Boolean          @default(false)
   // MEMORIA DE FECHAMENTO (Bloco 1/5 da fatia "Organizacao do Kanban"). Um lead
   // + finalidade tem no MAXIMO um negocio, que e REUSADO quando o cliente volta:
   // ao reabrir, motivoPerda/motivoPerdaObs sao limpos (o negocio esta aberto de

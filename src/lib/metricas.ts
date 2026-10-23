@@ -138,6 +138,8 @@ function wherePerdidos(p: Periodo, e: Escopo): Prisma.NegocioWhereInput {
       apenasEscopo(e),
       { status: StatusNeg.PERDIDO, fechadoEm: { gte: p.inicio, lt: p.fim } },
       { NOT: whereVendaNoPeriodo({ inicio: p.inicio, fim: p.fim }) },
+      // Manual secao 7: DESQUALIFICADO nao conta contra a conversao do vendedor.
+      { desqualificado: false },
     ],
   };
 }

@@ -2,7 +2,12 @@
 // PATCH /api/negocios/[id]: grava motivo/obs, a MEMÓRIA da perda (jaFoiPerdido +
 // ultimo*) que sobrevive a reaberturas, e conta a transição em vezesPerdido.
 import { TipoEtapa } from "../../../generated/prisma/enums";
-import { ehCodigoMotivo, rotuloMotivo } from "../../motivosPerda";
+import {
+  ehCodigoMotivo,
+  rotuloMotivo,
+  motivoEhDesqualificacao,
+  MOTIVOS_PERDA,
+} from "../../motivosPerda";
 import { resolverAlertasNegocio } from "../../slaAlertas";
 import { prisma } from "../../prisma";
 import {
@@ -59,9 +64,7 @@ async function validar(args: Args): Promise<Validacao> {
   if (!ehCodigoMotivo(motivo)) {
     return { ok: false, erro: `motivo "${motivo}" não é um código válido` };
   }
-  if (motivo === "OUTRO" && !obs) {
-    return { ok: false, erro: "observação é obrigatória para o motivo Outro" };
-  }
+  void obs;
   return { ok: true };
 }
 
@@ -96,6 +99,7 @@ async function executar(
         entrouEtapaEm: agora,
         motivoPerda: motivo,
         motivoPerdaObs: obs,
+        desqualificado: motivoEhDesqualificacao(motivo),
         status: StatusNeg.PERDIDO,
         fechadoEm: agora,
         jaFoiPerdido: true,
@@ -145,6 +149,7 @@ async function reverter(
           : new Date(),
         motivoPerda: (antes.motivoPerda as string | null) ?? null,
         motivoPerdaObs: (antes.motivoPerdaObs as string | null) ?? null,
+        desqualificado: Boolean(antes.desqualificado),
         status: antes.status as (typeof StatusNeg)[keyof typeof StatusNeg],
         fechadoEm: antes.fechadoEm ? new Date(antes.fechadoEm as string) : null,
         jaFoiPerdido: Boolean(antes.jaFoiPerdido),
@@ -176,32 +181,21 @@ export const registrarPerda: FerramentaEscrita = {
   nome: "registrar_perda",
   titulo: "Registrar perda",
   descricao:
-    "Fecha o negócio como PERDIDO com um motivo (código). Observação obrigatória quando o motivo é OUTRO.",
+    "Fecha o negócio como PERDIDO com um motivo (código da lista fechada do Manual, seção 7). Motivos de tipo DESQUALIFICADO não contam contra a conversão.",
   inputSchema: {
     type: "object",
     properties: {
       negocioId: { type: "string", description: "id do negócio a fechar" },
       motivo: {
         type: "string",
-        enum: [
-          "NAO_RESPONDE",
-          "SEM_INTERESSE",
-          "ACHOU_CARO",
-          "CONCORRENTE",
-          "CONFUSO",
-          "FORA_AREA",
-          "INDISPONIVEL",
-          "SO_PESQUISANDO",
-          "DESISTIU",
-          "PAGAMENTO",
-          "CONTATO_ERRADO",
-          "OUTRO",
-        ],
-        description: "código do motivo da perda",
+        // Fonte única: a lista fechada do Manual (lib/motivosPerda). Evita
+        // duplicar os códigos aqui e ficar fora de sincronia.
+        enum: MOTIVOS_PERDA.map((m) => m.code),
+        description: "código do motivo da perda (lista do Manual, seção 7)",
       },
       observacao: {
         type: "string",
-        description: "observação livre; obrigatória quando motivo = OUTRO",
+        description: "observação livre (opcional)",
       },
     },
     required: ["negocioId", "motivo"],

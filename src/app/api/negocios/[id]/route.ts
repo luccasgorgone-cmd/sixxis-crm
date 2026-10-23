@@ -17,7 +17,11 @@ import {
   Finalidade,
 } from "@/generated/prisma/enums";
 import { espelharDonoNasConversas, temAcesso } from "@/lib/dono";
-import { rotuloMotivo } from "@/lib/motivosPerda";
+import {
+  rotuloMotivo,
+  ehCodigoMotivo,
+  motivoEhDesqualificacao,
+} from "@/lib/motivosPerda";
 import { lerTipoGanho, rotuloTipoGanho } from "@/lib/tipoGanho";
 import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
@@ -581,16 +585,20 @@ export async function PATCH(
           { status: 422 },
         );
       }
-      const obs = body.motivoPerdaObs?.trim() || null;
-      // Quando o motivo e OUTRO, a observacao livre e obrigatoria.
-      if (motivo === "OUTRO" && !obs) {
+      // Lista FECHADA (Manual secao 7): so valida quando o motivo veio no corpo
+      // (nova escolha). Fallback a um motivo ja gravado (legado) nao e revalidado.
+      if (body.motivoPerda?.trim() && !ehCodigoMotivo(motivo)) {
         return NextResponse.json(
-          { erro: "observacao e obrigatoria para o motivo Outro" },
+          { erro: "motivo de perda invalido (use um da lista padrao)" },
           { status: 422 },
         );
       }
+      const obs = body.motivoPerdaObs?.trim() || null;
       data.motivoPerda = motivo;
       data.motivoPerdaObs = obs;
+      // Desqualificado (spam/numero errado/fornecedor/vaga/fora area/nao vendemos)
+      // e derivado do TIPO do motivo — nao conta contra conversao nem reaquisicao.
+      data.desqualificado = motivoEhDesqualificacao(motivo);
       data.status = StatusNeg.PERDIDO;
       data.fechadoEm = agora;
       // Bloco 5: grava a MEMORIA da perda no mesmo instante em que ela acontece.
@@ -681,7 +689,15 @@ export async function PATCH(
 
   // ---- Motivo de perda avulso ----
   if (body.motivoPerda !== undefined && data.motivoPerda === undefined) {
+    // Mesma lista FECHADA do caminho de perda por etapa.
+    if (body.motivoPerda && !ehCodigoMotivo(body.motivoPerda)) {
+      return NextResponse.json(
+        { erro: "motivo de perda invalido (use um da lista padrao)" },
+        { status: 422 },
+      );
+    }
     data.motivoPerda = body.motivoPerda;
+    data.desqualificado = motivoEhDesqualificacao(body.motivoPerda);
   }
   if (body.motivoPerdaObs !== undefined && data.motivoPerdaObs === undefined) {
     data.motivoPerdaObs = body.motivoPerdaObs?.trim() || null;

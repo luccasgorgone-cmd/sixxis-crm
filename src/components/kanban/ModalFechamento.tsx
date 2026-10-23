@@ -478,10 +478,7 @@ export function ModalFechamento({
       setErro("Selecione o motivo da perda.");
       return;
     }
-    if (motivo === "OUTRO" && !obs.trim()) {
-      setErro("Descreva o motivo no campo de observacao.");
-      return;
-    }
+    // Sem regra de observacao obrigatoria: o manual (secao 7) nao tem "Outro".
     setSalvando(true);
     try {
       await onConfirmar({ motivoPerda: motivo, motivoPerdaObs: obs.trim() || undefined });
@@ -928,17 +925,23 @@ export function ModalFechamento({
                 className="campo w-full"
               >
                 <option value="">Selecione um motivo...</option>
-                {MOTIVOS_PERDA.map((m) => (
-                  <option key={m.code} value={m.code}>
-                    {m.label}
-                  </option>
-                ))}
+                <optgroup label="Perdido">
+                  {MOTIVOS_PERDA.filter((m) => m.tipo === "PERDIDO").map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Desqualificado (não é cliente possível)">
+                  {MOTIVOS_PERDA.filter((m) => m.tipo === "DESQUALIFICADO").map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <label className="mb-1 mt-3 block text-sm font-medium text-escuro">
-                Observacao{" "}
-                <span className="text-medio/50">
-                  {motivo === "OUTRO" ? "(obrigatoria)" : "(opcional)"}
-                </span>
+                Observacao <span className="text-medio/50">(opcional)</span>
               </label>
               <textarea
                 value={obs}
