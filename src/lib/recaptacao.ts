@@ -30,6 +30,7 @@ import {
 import { nomeEfetivo } from "./cliente";
 import { normalizarTexto } from "./format";
 import { estaAbertoAgora, normalizarHorarios, diasUteisDecorridos } from "./horario";
+import { aplicarEtiquetaPorNome } from "./etiquetaAuto";
 import { registrarSolEvento, ACAO_RECAPTACAO } from "./solEvento";
 import {
   etapaEntradaVenda,
@@ -547,7 +548,7 @@ export async function marcarRespostaRecaptacao(
       });
       // Reativado (Manual secao 8): o lead que respondeu a reaquisicao ganha a
       // etiqueta "Reativado" para medir a taxa de reativacao. Idempotente.
-      await marcarReativado(leadId);
+      await aplicarEtiquetaPorNome(leadId, "Reativado", { finalidade: Finalidade.VENDA });
       getIO()?.emit("recaptacao:atualizada", { campanhaId: envio.campanhaId });
     }
     return { respondido: true, optOut: false };
@@ -559,29 +560,6 @@ export async function marcarRespostaRecaptacao(
       `[recaptacao] falha ao marcar resposta: ${e instanceof Error ? e.message : String(e)}`,
     );
     return { respondido: false, optOut: false };
-  }
-}
-
-// Aplica a etiqueta "Reativado" ao lead (cria a etiqueta na 1a vez). Idempotente.
-async function marcarReativado(leadId: string): Promise<void> {
-  try {
-    const existente = await prisma.etiqueta.findFirst({
-      where: { nome: "Reativado" },
-      select: { id: true },
-    });
-    const etiqueta =
-      existente ??
-      (await prisma.etiqueta.create({
-        data: { nome: "Reativado", cor: "#3cbfb3", finalidade: Finalidade.VENDA },
-        select: { id: true },
-      }));
-    await prisma.leadEtiqueta.upsert({
-      where: { leadId_etiquetaId: { leadId, etiquetaId: etiqueta.id } },
-      update: {},
-      create: { leadId, etiquetaId: etiqueta.id },
-    });
-  } catch (e) {
-    console.warn(`[recaptacao] falha ao etiquetar Reativado: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

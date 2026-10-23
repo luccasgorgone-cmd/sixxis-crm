@@ -11,6 +11,7 @@ import { getIO } from "./socket";
 import { normalizarJid, telefoneParaLog } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
 import { aplicarRetornoFollowup } from "./reguaFollowup";
+import { aplicarEtiquetaPorNome } from "./etiquetaAuto";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
 import { campoDono, filtroEquipe } from "./dono";
@@ -1543,6 +1544,11 @@ async function tratarHandoffLuna(
       status: StatusLembrete.PENDENTE,
     },
   });
+
+  // Manual secao 5: lead transferido pelo agente recebe a etiqueta "Transferido
+  // do agente" para o vendedor saber o contexto (e para medir a conversao das
+  // transferencias). Idempotente; nao bloqueia o handoff em caso de falha.
+  await aplicarEtiquetaPorNome(lead.id, "Transferido do agente", { finalidade });
 
   await criarNotificacao({
     agenteId,

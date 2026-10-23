@@ -559,6 +559,17 @@ export async function seedFunil(): Promise<void> {
     } else {
       console.log("[seed] etiquetas pos-venda ok");
     }
+
+    // B2B (Manual secao 3): etiqueta de revenda/loja/assistencia/academia ou
+    // compra >5 un. Semeada idempotente (o vendedor aplica a mao; nao ha
+    // auto-deteccao). Os prazos B2B especificos (Negociando 10d vs 5d) sao um
+    // follow-on separado (exigem SLA por-segmento).
+    if (!existentes.has("b2b")) {
+      await prisma.etiqueta.create({
+        data: { nome: "B2B", cor: "#0ea5e9", finalidade: Finalidade.VENDA },
+      });
+      console.log("[seed] etiqueta B2B criada");
+    }
   } catch (erro) {
     console.error(
       `[seed] falha ao semear funil: ${erro instanceof Error ? erro.message : String(erro)}`,
