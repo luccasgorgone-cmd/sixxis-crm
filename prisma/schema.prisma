@@ -263,6 +263,7 @@ model Agente {
   oracleConversas       OracleConversa[]
   oracleComandos        OracleComando[]
   presencas             PresencaPeriodo[]
+  prospeccoes           ProspeccaoContato[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -350,6 +351,7 @@ model Lead {
   notas          Nota[]
   atividades     Atividade[]
   lembretes      Lembrete[]
+  prospeccao     ProspeccaoContato?
   campanhaDestinos CampanhaDestino[]
   // SOL-4: ondas de recaptacao que ja alcancaram este lead.
   recaptacoes    RecaptacaoEnvio[]
@@ -1223,6 +1225,43 @@ enum RecapModo {
   PERDIDOS_MES   // publico = Perdidos eligiveis do periodo (Manual secao 8)
 }
 
+// Fase da cadencia de prospeccao ativa (Manual Fase 2). As 4 primeiras sao por
+// tempo (cadencia.ts); QUALIFICADO = promovido ao funil normal; ENCERRADO = sem
+// resposta (>=5 tentativas/2 canais) ou nao qualificado.
+enum FaseProspeccao {
+  ABORDAGEM
+  QUALIFICACAO
+  PROPOSTA
+  FECHAMENTO
+  NUTRICAO
+  QUALIFICADO
+  ENCERRADO
+}
+
+// Estado de cadencia de um contato de PROSPECCAO ATIVA. 1:1 com um Lead de
+// origem="manual". Side-table: nao toca o Lead/Negocio existentes.
+model ProspeccaoContato {
+  id                String         @id @default(cuid())
+  leadId            String         @unique
+  lead              Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agenteId          String?
+  agente            Agente?        @relation(fields: [agenteId], references: [id])
+  fase              FaseProspeccao @default(ABORDAGEM)
+  tentativas        Int            @default(0)
+  // Canais distintos ja usados (ex.: ["whatsapp","ligacao"]). >=2 p/ "sem resposta".
+  canais            Json?
+  primeiroContatoEm DateTime?
+  proximaAcaoEm     DateTime?
+  nutricaoAte       DateTime?
+  encerradoMotivo   String?
+  criadoEm          DateTime       @default(now())
+  atualizadoEm      DateTime       @updatedAt
+
+  @@index([fase])
+  @@index([agenteId])
+  @@index([nutricaoAte])
+}
+
 model CampanhaRecaptacao {
   id               String              @id @default(cuid())
   nome             String
@@ -1320,6 +1359,10 @@ model ConfiguracaoCRM {
   // Comeca DESLIGADO: com false o job so registra em log o que FARIA (dry-run),
   // sem mover nada. NUNCA envia mensagem ao cliente. Antigos = false.
   followupAtivo      Boolean @default(false)
+  // Liga o motor da PROSPECCAO ATIVA (Manual Fase 2): avanca a cadencia de 4
+  // semanas e cria a proxima acao pro vendedor. Comeca DESLIGADO (dry-run: so
+  // loga). NUNCA envia mensagem ao cliente. Antigos = false.
+  prospeccaoAtiva    Boolean @default(false)
   mensagemForaHorario String?
   // Interruptor do aviso automatico de FORA DE HORARIO. Comeca DESLIGADO: nenhum
   // aviso e enviado ate o dono ligar explicitamente. Registros antigos (sem o
