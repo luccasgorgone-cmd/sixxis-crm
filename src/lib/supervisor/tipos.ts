@@ -161,6 +161,7 @@ export const IND = {
   MEDIANA_1A_RESP: "mediana_1a_resposta_seg",
   PCT_15MIN: "pct_1a_resposta_ate_15min",
   MOTIVO_PREENCHIDO: "pct_motivo_perda_preenchido",
+  CICLO_GANHO: "ciclo_ganho_dias",
 } as const;
 
 // Defaults do doc (D2: semeados, admin ajusta na tela depois).
@@ -187,6 +188,8 @@ export const LIMIARES_PADRAO: SupervisorLimiares = {
     [IND.PCT_15MIN]: { verde: 0.7, amarelo: 0.5 },
     // % de perdas com motivo preenchido: Manual meta 100%. >=100% verde, >=90% amarelo.
     [IND.MOTIVO_PREENCHIDO]: { verde: 1, amarelo: 0.9 },
+    // Ciclo de venda Novo->Ganho (dias): menorMelhor. <=7d verde, <=15d amarelo.
+    [IND.CICLO_GANHO]: { verde: 7, amarelo: 15 },
   },
 };
 

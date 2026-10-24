@@ -45,6 +45,15 @@ export async function processarSlaAlertas(): Promise<void> {
       configs.map((c) => [`${c.finalidade}:${c.etapaId}`, c]),
     );
 
+    // B2B (Manual secao 3/4): lead com etiqueta "B2B" tem o DOBRO do prazo em
+    // Negociando (10 dias uteis vs 5). Resolve o id da etiqueta uma vez; se nao
+    // existir, o fator B2B simplesmente nao se aplica.
+    const etiquetaB2B = await prisma.etiqueta.findFirst({
+      where: { nome: "B2B" },
+      select: { id: true },
+    });
+    const b2bId = etiquetaB2B?.id ?? "";
+
     const negocios = await prisma.negocio.findMany({
       where: { status: StatusNeg.ABERTO, etapaId: { not: null } },
       select: {
@@ -54,7 +63,10 @@ export async function processarSlaAlertas(): Promise<void> {
         etapaId: true,
         entrouEtapaEm: true,
         lead: {
-          select: { nome: true, pushName: true, nomeManual: true, telefone: true },
+          select: {
+            nome: true, pushName: true, nomeManual: true, telefone: true,
+            etiquetas: { where: { etiquetaId: b2bId }, select: { etiquetaId: true } },
+          },
         },
         etapa: { select: { nome: true } },
         alertasSla: {
@@ -94,7 +106,13 @@ export async function processarSlaAlertas(): Promise<void> {
         : (agora.getTime() - n.entrouEtapaEm.getTime()) / 60_000;
       const jaTemAlertaDestaEtapa = aberto && aberto.configId === config.id;
 
-      if (decorridoMin >= config.minutosParaAlerta && !jaTemAlertaDestaEtapa) {
+      // B2B dobra o prazo na etapa de Negociando (Manual: B2B 10d vs B2C 5d).
+      const ehB2B = n.lead.etiquetas.length > 0;
+      const emNegociacao = /negoci/i.test(n.etapa?.nome ?? "");
+      const limiarMin =
+        ehB2B && emNegociacao ? config.minutosParaAlerta * 2 : config.minutosParaAlerta;
+
+      if (decorridoMin >= limiarMin && !jaTemAlertaDestaEtapa) {
         await prisma.alertaNegocio.create({
           data: { negocioId: n.id, configId: config.id },
         });

@@ -289,6 +289,14 @@ export async function montarPainel(
       `${metricas.perdidos} perdas no período`,
     ),
     card(
+      IND.CICLO_GANHO,
+      "Ciclo de venda (Novo→Ganho)",
+      metricas.cicloGanhoDias || null,
+      "dias",
+      false,
+      limiares,
+    ),
+    card(
       IND.TICKET,
       "Ticket médio",
       metricas.ticketMedio || null,
