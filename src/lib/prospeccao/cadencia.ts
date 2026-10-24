@@ -3,7 +3,10 @@
 // desde o 1º contato; "sem resposta" exige o mínimo de tentativas/canais.
 // Ver docs/superpowers/plans/2026-10-23-f5-prospeccao-fase2.md.
 
-export type FaseProspeccao =
+// União das fases DE TEMPO (as 4 ativas + NUTRICAO). Nome distinto do enum Prisma
+// FaseProspeccao (que tem também QUALIFICADO/ENCERRADO, estados manuais) para não
+// confundir os dois significados.
+export type FaseCadencia =
   | "ABORDAGEM"
   | "QUALIFICACAO"
   | "PROPOSTA"
@@ -21,7 +24,7 @@ export function semanaCadencia(primeiroContatoEm: Date, agora: Date): number {
 
 // Fase ESPERADA pela cadência (por tempo). Semana 1=Abordagem, 2=Qualificação,
 // 3=Proposta, 4=Fechamento, >=5=Nutrição (fim da cadência sem avanço).
-export function faseEsperada(primeiroContatoEm: Date, agora: Date): FaseProspeccao {
+export function faseEsperada(primeiroContatoEm: Date, agora: Date): FaseCadencia {
   const s = semanaCadencia(primeiroContatoEm, agora);
   if (s <= 1) return "ABORDAGEM";
   if (s === 2) return "QUALIFICACAO";

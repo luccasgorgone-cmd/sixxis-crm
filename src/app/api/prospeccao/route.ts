@@ -56,6 +56,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (body.acao === "criar") {
     if (!body.leadId) return NextResponse.json({ erro: "leadId obrigatorio" }, { status: 400 });
+    // Valida que o lead existe ANTES de criar (evita 500 por violacao de FK).
+    const leadExiste = await prisma.lead.findUnique({ where: { id: body.leadId }, select: { id: true } });
+    if (!leadExiste) return NextResponse.json({ erro: "lead nao encontrado" }, { status: 404 });
     const existe = await prisma.prospeccaoContato.findUnique({ where: { leadId: body.leadId }, select: { id: true } });
     if (existe) return NextResponse.json({ erro: "lead ja esta em prospeccao", id: existe.id }, { status: 409 });
     const canal = body.canal?.trim() || "whatsapp";

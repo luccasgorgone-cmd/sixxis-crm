@@ -9,4 +9,12 @@ npx tsc --noEmit
 echo "[pre-commit] next build..."
 npm run build
 
+# Contratos dourados (determinísticos, sem banco/rede): travam regressão da
+# lógica pura (tempo, 1ª resposta, motivos, cadência, parsers, supervisor...).
+echo "[pre-commit] contratos dourados..."
+for c in scripts/contratos/c*.ts; do
+  echo "  - $(basename "$c")"
+  npx tsx "$c" > /dev/null
+done
+
 echo "[pre-commit] gates verdes."
