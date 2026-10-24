@@ -13,6 +13,7 @@ import { iniciarSlaAlertas } from "./src/lib/slaAlertas";
 import { iniciarRecaptacao } from "./src/lib/recaptacao";
 import { iniciarArquivamento } from "./src/lib/arquivamento";
 import { iniciarReguaFollowup } from "./src/lib/reguaFollowup";
+import { iniciarProspeccao } from "./src/lib/prospeccao/prospeccao";
 import { iniciarVarreduraSupervisor } from "./src/lib/supervisor/varredura";
 import { iniciarAprendizadoSupervisor } from "./src/lib/supervisor/aprendizado";
 import {
@@ -120,6 +121,10 @@ async function main(): Promise<void> {
     // uteis) e cria a proxima acao pro vendedor. Nasce em DRY-RUN (so loga) ate o
     // dono ligar followupAtivo na config. NUNCA envia mensagem ao cliente.
     iniciarReguaFollowup();
+    // Prospeccao ativa (Manual Fase 2): avanca a cadencia de 4 semanas e cria a
+    // proxima acao pro vendedor. Nasce em DRY-RUN (so loga) ate o gestor ligar
+    // prospeccaoAtiva. NUNCA envia mensagem ao cliente.
+    iniciarProspeccao();
     // Supervisor: varredura periodica dos atendimentos (ticker 60s; so roda
     // quando ATIVA na config e na cadencia configurada). Abre propostas, nunca
     // executa sozinha. Nasce DESLIGADA ate o gestor ligar na aba Configuracoes.
