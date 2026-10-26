@@ -238,8 +238,15 @@ model Agente {
   telefone      String?
   avatarUrl     String?
   metaMensal    Decimal? @db.Decimal(12, 2)
+  // CONTA habilitada: controla o LOGIN (auth.ts) e o cadastro. So o admin liga/
+  // desliga (desativar = bloquear acesso, ex.: vendedor que saiu). NUNCA mexido
+  // pelo proprio vendedor — ausencia de almoco e `disponivel`, nao `ativo`.
   ativo         Boolean  @default(true)
-  // Presenca AO VIVO (online/offline), SEPARADA de 'ativo' (conta habilitada).
+  // DISPONIBILIDADE para receber leads (Ausente/Disponivel). O proprio vendedor
+  // alterna (almoco etc.). Ausente = nao entra no rodizio, MAS continua logando.
+  // Separado de `ativo` para o vendedor nunca se trancar fora do login.
+  disponivel    Boolean  @default(true)
+  // Presenca AO VIVO (online/offline), SEPARADA de 'ativo'/'disponivel'.
   // Controlada pelo toggle no header + auto-offline por inatividade. O
   // roteamento (fase futura) passa a exigir ativo && online.
   online        Boolean  @default(false)

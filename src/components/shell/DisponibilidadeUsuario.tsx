@@ -1,13 +1,13 @@
 "use client";
 
-// Controle de disponibilidade do PROPRIO usuario no topo. Reflete/altera o MESMO
-// Agente.ativo do painel do admin (sem duplicar). Ausente = nao recebe novos
-// leads; os leads continuam entrando e vao para os colegas disponiveis.
+// Controle de DISPONIBILIDADE do proprio usuario no topo (Ausente/Disponivel).
+// Altera Agente.disponivel — SEPARADO de `ativo` (conta/login do admin): ficar
+// Ausente tira do rodizio de novos leads mas NAO desloga nem trava o login.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 export function DisponibilidadeUsuario() {
-  const [ativo, setAtivo] = useState<boolean | null>(null);
+  const [disponivel, setDisponivel] = useState<boolean | null>(null);
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -16,7 +16,7 @@ export function DisponibilidadeUsuario() {
     fetch("/api/me/disponibilidade")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d.ativo === "boolean") setAtivo(d.ativo);
+        if (d && typeof d.disponivel === "boolean") setDisponivel(d.disponivel);
       })
       .catch(() => undefined);
   }, []);
@@ -39,11 +39,11 @@ export function DisponibilidadeUsuario() {
       const r = await fetch("/api/me/disponibilidade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ativo: v }),
+        body: JSON.stringify({ disponivel: v }),
       });
       if (r.ok) {
         const d = await r.json();
-        if (typeof d.ativo === "boolean") setAtivo(d.ativo);
+        if (typeof d.disponivel === "boolean") setDisponivel(d.disponivel);
       }
     } catch {
       // silencioso: o estado nao muda
@@ -52,25 +52,25 @@ export function DisponibilidadeUsuario() {
     }
   }, []);
 
-  if (ativo === null) return null;
+  if (disponivel === null) return null;
 
   return (
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => setAberto((v) => !v)}
-        title={ativo ? "Disponivel para receber leads" : "Ausente — nao recebe leads"}
+        title={disponivel ? "Disponivel para receber leads" : "Ausente — nao recebe leads"}
         className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-          ativo
+          disponivel
             ? "border-green-500/25 bg-green-500/10 text-green-700 dark:text-green-300"
             : "border-black/10 bg-black/5 text-medio/70"
         }`}
       >
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
-            ativo ? "bg-green-500" : "bg-medio/40"
+            disponivel ? "bg-green-500" : "bg-medio/40"
           }`}
         />
-        <span className="hidden sm:inline">{ativo ? "Disponivel" : "Ausente"}</span>
+        <span className="hidden sm:inline">{disponivel ? "Disponivel" : "Ausente"}</span>
       </button>
 
       {aberto && (
@@ -81,32 +81,33 @@ export function DisponibilidadeUsuario() {
                 Disponivel para receber leads
               </p>
               <p className="text-xs text-medio/60">
-                {ativo ? "Voce esta recebendo novos leads." : "Voce esta ausente."}
+                {disponivel ? "Voce esta recebendo novos leads." : "Voce esta ausente."}
               </p>
             </div>
             <button
-              onClick={() => void mudar(!ativo)}
+              onClick={() => void mudar(!disponivel)}
               disabled={salvando}
               role="switch"
-              aria-checked={ativo}
+              aria-checked={disponivel}
               aria-label="Disponivel para receber leads"
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
-                ativo ? "bg-tiffany" : "bg-black/15"
+                disponivel ? "bg-tiffany" : "bg-black/15"
               }`}
             >
               <span
                 className={`absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow transition-transform ${
-                  ativo ? "translate-x-5" : "translate-x-0"
+                  disponivel ? "translate-x-5" : "translate-x-0"
                 }`}
               >
                 {salvando && <Loader2 className="h-3 w-3 animate-spin text-medio" />}
               </span>
             </button>
           </div>
-          {!ativo && (
+          {!disponivel && (
             <div className="border-t border-black/5 bg-fundo px-3 py-2.5 text-xs leading-relaxed text-medio/70">
               Voce nao recebera novos leads enquanto estiver ausente. Os leads
-              continuam entrando e vao para os colegas disponiveis.
+              continuam entrando e vao para os colegas disponiveis. Seu login
+              continua normal.
             </div>
           )}
         </div>

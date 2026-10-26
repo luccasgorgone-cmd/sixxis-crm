@@ -29,6 +29,8 @@ export function papelDaFinalidade(finalidade: Finalidade): Papel {
 export function filtroEquipe(finalidade: Finalidade): Prisma.AgenteWhereInput {
   return {
     ativo: true,
+    // Ausente (disponivel=false) sai do rodizio de novos leads, mas segue logando.
+    disponivel: true,
     papel: { not: Papel.ADMIN },
     ...(finalidade === Finalidade.VENDA
       ? { acessoVenda: true }
