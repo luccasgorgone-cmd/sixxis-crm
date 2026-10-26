@@ -99,8 +99,8 @@ export function TogglePresenca() {
         onClick={() => void definir(!online)}
         title={
           online
-            ? "Online — recebendo leads. Clique para ficar offline."
-            : "Offline — não recebe leads. Clique para ficar online."
+            ? "Presença: Online. Clique para ficar offline. (Disponibilidade de leads é o controle 'Disponível/Ausente'.)"
+            : "Presença: Offline. Clique para ficar online. (Disponibilidade de leads é o controle 'Disponível/Ausente'.)"
         }
         aria-pressed={online}
         className="flex items-center gap-1.5 rounded-lg border border-black/5 px-2 py-1 text-xs font-medium transition-colors hover:bg-black/[0.03]"

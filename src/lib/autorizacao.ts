@@ -90,6 +90,13 @@ export async function obterAgente(): Promise<SessaoAgente | null> {
     if (process.env.SANDBOX_ONLY === "1") return obterAdminSandboxLocal();
     return null;
   }
+  // Reconfere `ativo` no banco a CADA request (a sessao e JWT de 30 dias): se o
+  // admin desativa a conta, o acesso e cortado na hora, nao so no proximo login.
+  const atual = await prisma.agente.findUnique({
+    where: { id: session.user.id },
+    select: { ativo: true },
+  });
+  if (!atual?.ativo) return null;
   return {
     id: session.user.id,
     papel: session.user.papel,

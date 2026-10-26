@@ -2125,10 +2125,22 @@ async function processarEvento(
   // nao duplica, nao altera e nao reemite o evento de tempo real.
   const jaExiste = await prisma.mensagem.findUnique({
     where: { externalId },
-    select: { id: true },
+    select: { id: true, conversa: { select: { leadId: true, finalidade: true } } },
   });
   if (jaExiste) {
     console.log(`[ingest] ${telefoneParaLog(telefone)} duplicada ignorada ${externalId}`);
+    // RECUPERACAO: se o 1o processamento gravou a mensagem mas caiu ANTES de
+    // criar/rotear o negocio (crash/retry/deadlock no ponteiro), o reprocesso
+    // cairia aqui e o lead ficaria sem card/dono. Re-roda garantir+rotear (ambos
+    // idempotentes: no-op se ja houver negocio atribuido) so para mensagem IN.
+    if (direcao === DirecaoMsg.IN && jaExiste.conversa) {
+      try {
+        await garantirNegocioParaLead(jaExiste.conversa.leadId, jaExiste.conversa.finalidade, true, true);
+        await rotearLeadNovo(jaExiste.conversa.leadId, jaExiste.conversa.finalidade);
+      } catch (e) {
+        console.warn(`[ingest] recuperacao de roteamento falhou: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
     return;
   }
 

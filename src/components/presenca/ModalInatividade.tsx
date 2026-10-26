@@ -28,8 +28,9 @@ export function ModalInatividade({
         </h2>
         <p className="mt-1.5 text-sm text-medio">
           Sem atividade há um tempo. Em{" "}
-          <strong className="text-escuro">{segundos}s</strong> você fica{" "}
-          <strong>offline</strong> automaticamente e para de receber novos leads.
+          <strong className="text-escuro">{segundos}s</strong> sua{" "}
+          <strong>presença</strong> fica offline automaticamente (registro de
+          presença; não muda sua disponibilidade de leads).
         </p>
         <div className="mt-4 flex gap-2">
           <button

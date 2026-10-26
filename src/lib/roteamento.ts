@@ -32,7 +32,14 @@ export async function rotearLeadNovo(
     if (!negocio || negocio.agenteId) return null;
 
     const config = await tx.configRoteamento.findFirst();
-    const donoAtual = lead[campoOwner];
+    const donoAtualBruto = lead[campoOwner];
+    // So respeita o dono (sticky) se a conta dele ainda estiver ATIVA — senao um
+    // cliente recorrente de um vendedor desativado cairia numa conta morta e o
+    // lead apodreceria. Conta inativa -> cai no round-robin entre os ativos.
+    const donoAtivo = donoAtualBruto
+      ? (await tx.agente.findUnique({ where: { id: donoAtualBruto }, select: { ativo: true } }))?.ativo === true
+      : false;
+    const donoAtual = donoAtivo ? donoAtualBruto : null;
 
     let alvoId: string | null = null;
     let tipo: AtividadeTipo = AtividadeTipo.ATRIBUICAO;

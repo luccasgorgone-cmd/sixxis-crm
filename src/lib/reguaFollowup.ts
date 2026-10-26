@@ -222,6 +222,12 @@ async function moverParaPerdido(
     orderBy: { ordem: "asc" },
     select: { id: true },
   });
+  // Sem etapa de Perdido no funil: NAO marca PERDIDO (deixaria o card com status
+  // PERDIDO numa coluna ABERTA, inconsistente). Deixa onde esta e avisa no log.
+  if (!etapaPerdido) {
+    console.warn(`[regua] ${finalidade} sem etapa de Perdido ativa — negocio ${n.id} nao fechado (fim da regua)`);
+    return;
+  }
   const transicao = n.status !== StatusNeg.PERDIDO;
   await prisma.$transaction(async (tx) => {
     await tx.negocio.update({

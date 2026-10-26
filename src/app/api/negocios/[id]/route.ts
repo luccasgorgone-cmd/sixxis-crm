@@ -549,10 +549,13 @@ export async function PATCH(
         // segue usando o total pre-desconto), so registra o cobrado para exibicao.
         {
           const aj = body.valorAjustado;
+          // aj > 0 (nao >= 0): um ajuste de 0 com total > 0 zerava a venda em
+          // silencio (bug historico nº1). "Nao cobrou nada" e tratado por outro
+          // caminho (valor/valorProdutos = 0), deixando valorAjustado null.
           data.valorAjustado =
             typeof aj === "number" &&
             Number.isFinite(aj) &&
-            aj >= 0 &&
+            aj > 0 &&
             Math.abs(aj - (totalPedido ?? 0)) > 0.005
               ? aj
               : null;
@@ -636,6 +639,16 @@ export async function PATCH(
 
   // ---- Valor (sem mudanca de etapa) ----
   if (body.valor !== undefined && data.valor === undefined) {
+    // Valida o tipo antes de passar ao Prisma (evita 500 por tipo invalido).
+    if (
+      body.valor !== null &&
+      (typeof body.valor !== "number" || !Number.isFinite(body.valor) || body.valor < 0)
+    ) {
+      return NextResponse.json(
+        { erro: "valor deve ser um numero >= 0 ou null" },
+        { status: 422 },
+      );
+    }
     data.valor = body.valor;
     historicos.push({
       tipo: TipoHistorico.VALOR,
