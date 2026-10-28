@@ -162,10 +162,20 @@ const ORDEM_ALVO_VENDA = [
 ];
 const ORDEM_ALVO_POS_VENDA = [
   "Aberto",
+  "Análise",
   "Em atendimento",
   "Aguardando cliente",
   "Resolvido",
   "Encerrado sem solucao",
+];
+
+// Etapa(s) ABERTAS novas do funil de POS-VENDA, criadas idempotente por nome.
+// seedFinalidadeEInstancias so cria o funil de pos-venda quando ele esta VAZIO;
+// em producao ele ja existe, entao uma coluna nova ("Análise", triagem entre
+// "Aberto" e "Em atendimento") entra por seedEtapasIntermediarias. A posicao
+// final vem de ORDEM_ALVO_POS_VENDA; nenhum card e tocado.
+const ETAPAS_POSVENDA_NOVAS: { nome: string; cor: string }[] = [
+  { nome: "Análise", cor: "#8b5cf6" },
 ];
 
 // As 3 etapas ABERTAS de follow-up do funil de VENDA, em tons de tiffany (sem
@@ -640,11 +650,37 @@ export async function seedEtapasIntermediarias(): Promise<void> {
       criadas++;
     }
 
+    // 1.5) Garante as etapas novas do funil de POS-VENDA (casa por nome DENTRO
+    // da POS_VENDA). Em producao o funil de pos-venda ja existe, entao
+    // seedFinalidadeEInstancias nao recria nada; este passo e o que introduz a
+    // coluna nova ("Análise") sem tocar em nenhum card. Lugar provisorio no fim;
+    // a ordem definitiva vem do passo 2 via ORDEM_ALVO_POS_VENDA.
+    const porNomePos = new Map(
+      antes
+        .filter((e) => e.finalidade === FinalidadeEtapa.POS_VENDA)
+        .map((e) => [e.nome.trim().toLowerCase(), e] as const),
+    );
+    let criadasPos = 0;
+    for (const nova of ETAPAS_POSVENDA_NOVAS) {
+      if (porNomePos.has(nova.nome.toLowerCase())) continue;
+      await prisma.etapa.create({
+        data: {
+          nome: nova.nome,
+          cor: nova.cor,
+          tipo: TipoEtapa.ABERTA,
+          finalidade: FinalidadeEtapa.POS_VENDA,
+          ativo: true,
+          ordem: ordemLivre++,
+        },
+      });
+      criadasPos++;
+    }
+
     // 2) Renumera para a ordem alvo (venda -> pos-venda -> o que sobrar).
     // Renomes ja estao refletidos em `antes` (mesmo objeto), entao so releio o
     // banco quando alguma etapa foi de fato criada.
     const linhas =
-      criadas > 0
+      criadas > 0 || criadasPos > 0
         ? await prisma.etapa.findMany({
             orderBy: [{ ordem: "asc" }, { nome: "asc" }],
             select: { id: true, nome: true, ordem: true, finalidade: true },
@@ -691,8 +727,8 @@ export async function seedEtapasIntermediarias(): Promise<void> {
       );
     }
     console.log(
-      criadas > 0 || renomeadas > 0 || mudancas.length > 0
-        ? `[seed] etapas FollowUp: ${criadas} criadas, ${renomeadas} renomeadas, ${mudancas.length} ordens ajustadas`
+      criadas > 0 || criadasPos > 0 || renomeadas > 0 || mudancas.length > 0
+        ? `[seed] etapas FollowUp: ${criadas} criadas, ${criadasPos} pos-venda criadas, ${renomeadas} renomeadas, ${mudancas.length} ordens ajustadas`
         : "[seed] etapas FollowUp ok (ordem ja no alvo)",
     );
 
@@ -793,6 +829,7 @@ export async function seedRoteamentoEPresets(): Promise<void> {
 // Funil padrao de POS-VENDA (criado uma vez junto da migracao de finalidade).
 const ETAPAS_POSVENDA: { nome: string; cor: string; tipo: TipoEtapa }[] = [
   { nome: "Aberto", cor: "#64748b", tipo: TipoEtapa.ABERTA },
+  { nome: "Análise", cor: "#8b5cf6", tipo: TipoEtapa.ABERTA },
   { nome: "Em atendimento", cor: "#3cbfb3", tipo: TipoEtapa.ABERTA },
   { nome: "Aguardando cliente", cor: "#f59e0b", tipo: TipoEtapa.ABERTA },
   { nome: "Resolvido", cor: "#16a34a", tipo: TipoEtapa.GANHO },
