@@ -91,6 +91,17 @@ const PROVIDER_PADRAO = "gemini";
 const MODELO_PADRAO = "gemini-3.1-flash-lite";
 const JANELA_PADRAO_DIAS = 30;
 
+// Fallback de RESILIÊNCIA (pendência #6): quando o provider primário é o box
+// LOCAL (Qwen via tailnet) e ele está OFFLINE (falha de conexão), caímos UMA
+// vez para o Haiku da nuvem em vez de devolver "indisponível". NÃO é downgrade
+// de segurança: as travas (envelope fail-closed, tools só de leitura, escrita
+// human-in-the-loop, linha vermelha anti-envio ao cliente) são
+// provider-agnósticas; a ÚNICA trava sensível ao modelo é o TETO DE GASTO, que
+// re-checamos para o modelo de fallback ANTES de chamar. Só dispara quando o
+// primário é "local" (free) e nunca encadeia além de 1 salto.
+const PROVIDER_FALLBACK = "anthropic";
+const MODELO_FALLBACK = "claude-haiku-4-5";
+
 // Sentinela: SolEvento exige conversaId/leadId NOT NULL, mas o supervisor não
 // está preso a uma conversa. Usamos "supervisor" nos dois para o gasto entrar
 // no mesmo teto mensal sem fingir vínculo com um lead real.
@@ -369,12 +380,16 @@ export async function gerarRespostaSupervisor(
   const agora = entrada.agora ?? new Date();
   const uso = { tokensEntrada: 0, tokensSaida: 0 };
   const config = await carregarConfig();
+  // Modelo efetivo da requisição — pode trocar para o de fallback (resiliência).
+  // O evento de gasto (registrarSolEvento) e o resultado SEMPRE usam este, para
+  // o teto contar o modelo REALMENTE chamado (nunca subcontar o Haiku como Qwen).
+  let modeloAtivo = config.modelo;
 
   const base = (extra: Partial<SupervisorResultado> = {}): SupervisorResultado => ({
     resposta: RESPOSTA_INDISPONIVEL,
     proposta: null,
     acaoSolicitada: false,
-    modelo: config.modelo,
+    modelo: modeloAtivo,
     tokensEntrada: uso.tokensEntrada,
     tokensSaida: uso.tokensSaida,
     ...extra,
@@ -389,6 +404,30 @@ export async function gerarRespostaSupervisor(
   if (!provider.temChaveConfigurada()) {
     return base({ motivo: `chave do provider "${config.provider}" ausente` });
   }
+
+  // Provider/modelo ATIVOS (podem trocar para o fallback de resiliência).
+  let providerAtivo = provider;
+  let nomeProviderAtivo = config.provider;
+
+  // Box local offline → troca para o Haiku, UMA vez. Retorna true se trocou (o
+  // chamador deve repetir a chamada). Mantém TODAS as travas: só cai quando o
+  // primário é o "local", exige a chave do Haiku, e re-roda o TETO para o modelo
+  // de fallback (se o teto recusar, NÃO cai — segue o caminho normal de erro).
+  const tentarFallbackResiliencia = async (resp: { erro: string }): Promise<boolean> => {
+    if (nomeProviderAtivo === PROVIDER_FALLBACK) return false; // já no fallback / defensivo
+    if (nomeProviderAtivo !== "local") return false; // só o box local dispara resiliência
+    const fb = obterProvider(PROVIDER_FALLBACK);
+    if (!fb || !fb.temChaveConfigurada()) return false; // sem Haiku viável → mantém o erro original
+    const orc = await verificarOrcamentoMensal(MODELO_FALLBACK, agora); // TETO ainda manda
+    if (!orc.ok) return false;
+    console.warn(
+      `[supervisor] provider local offline (${resp.erro}); fallback de resiliência -> ${PROVIDER_FALLBACK}/${MODELO_FALLBACK}`,
+    );
+    providerAtivo = fb;
+    nomeProviderAtivo = PROVIDER_FALLBACK;
+    modeloAtivo = MODELO_FALLBACK;
+    return true;
+  };
 
   // TETO DE GASTO: HARD STOP antes de qualquer chamada paga. Nunca lança;
   // recusa por segurança (inclui modelo sem preço cadastrado).
@@ -444,7 +483,7 @@ export async function gerarRespostaSupervisor(
       SENTINELA,
       "supervisor_chat",
       r.motivo ?? (r.proposta ? `propôs ${r.proposta.ferramenta}` : null),
-      config.modelo,
+      modeloAtivo,
       uso,
     );
     return { ...r, tokensEntrada: uso.tokensEntrada, tokensSaida: uso.tokensSaida };
@@ -452,9 +491,9 @@ export async function gerarRespostaSupervisor(
 
   try {
     for (let iter = 0; iter <= MAX_ITER_FERRAMENTA; iter++) {
-      const resp = await provider.chamar(
+      const resp = await providerAtivo.chamar(
         {
-          modelo: config.modelo,
+          modelo: modeloAtivo,
           maxTokens: MAX_TOKENS,
           system,
           mensagens,
@@ -465,7 +504,9 @@ export async function gerarRespostaSupervisor(
       );
 
       if (!resp.ok) {
-        console.error(`[supervisor] provider=${config.provider}: ${resp.erro}`);
+        // Box local offline → tenta o Haiku de resiliência e reentra no loop.
+        if (await tentarFallbackResiliencia(resp)) continue;
+        console.error(`[supervisor] provider=${nomeProviderAtivo}: ${resp.erro}`);
         return finalizar(base({ motivo: `falha do provider: ${resp.erro}` }));
       }
 
@@ -506,8 +547,8 @@ export async function gerarRespostaSupervisor(
       // glitch de response_format+tools observado no Gemini na Luna).
       if (!tentouDeNovoPorTextoVazio) {
         tentouDeNovoPorTextoVazio = true;
-        const retry = await provider.chamar(
-          { modelo: config.modelo, maxTokens: MAX_TOKENS, system, mensagens, formatoResposta: ENVELOPE_SUPERVISOR },
+        const retry = await providerAtivo.chamar(
+          { modelo: modeloAtivo, maxTokens: MAX_TOKENS, system, mensagens, formatoResposta: ENVELOPE_SUPERVISOR },
           { timeoutMs: TIMEOUT_MS, signal: controller.signal },
         );
         if (retry.ok) {
@@ -537,7 +578,7 @@ export async function gerarRespostaSupervisor(
     return finalizar(base({ motivo: "limite de rodadas de ferramenta atingido" }));
   } catch (e) {
     const motivo = e instanceof Error ? e.message : String(e);
-    console.error(`[supervisor] erro ao chamar provider "${config.provider}": ${motivo}`);
+    console.error(`[supervisor] erro ao chamar provider "${nomeProviderAtivo}": ${motivo}`);
     return finalizar(base({ motivo: `exceção: ${motivo}` }));
   } finally {
     clearTimeout(timer);
