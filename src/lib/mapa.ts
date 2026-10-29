@@ -16,6 +16,10 @@ export type NegocioMapa = {
   temperatura: "QUENTE" | "MORNO" | "FRIO";
   finalidade: "VENDA" | "POS_VENDA";
   valor: unknown;
+  // Valor OFICIAL = COALESCE(valorAjustado, valor) (Fatia 3.10). valorAjustado,
+  // quando != null, MANDA sobre valor — mesma regra de dashboard/carteira/metas/
+  // supervisor. Decimal do Prisma -> unknown, converter com toNum.
+  valorAjustado: unknown;
   // Fatia 14.2: memoria do ganho — sobrevive a reabertura no pos-venda.
   jaFoiGanho: boolean;
   etapaId: string | null;
@@ -68,6 +72,7 @@ export const selectLeadMapa = {
       temperatura: true,
       finalidade: true,
       valor: true,
+      valorAjustado: true,
       jaFoiGanho: true,
       etapaId: true,
       criadoEm: true,
@@ -87,6 +92,14 @@ export function toNum(v: unknown): number {
   if (v == null) return 0;
   const n = Number(v as number);
   return Number.isFinite(n) ? n : 0;
+}
+
+// Valor OFICIAL do negocio = COALESCE(valorAjustado, valor) (Fatia 3.10). Um
+// valorAjustado != null sobrepoe o valor de tabela — a regra canonica que o
+// resto do sistema (dashboard, carteira, metas, supervisor) ja usa. Sem isto o
+// mapa mostrava o valor de tabela e divergia do faturamento oficial por estado.
+export function valorOficialNegocio(n: { valor: unknown; valorAjustado: unknown }): number {
+  return n.valorAjustado != null ? toNum(n.valorAjustado) : toNum(n.valor);
 }
 
 // UF do lead: 1o endereco com uf valida de 2 letras, senao DDD do telefone.
@@ -205,7 +218,7 @@ export function montarResumo(
       // Pipeline: pelo estado ATUAL, como sempre foi.
       if (n.status === "ABERTO") {
         negocios.abertos++;
-        valorAberto += toNum(n.valor);
+        valorAberto += valorOficialNegocio(n);
       } else if (n.status === "PERDIDO") {
         negocios.perdidos++;
       }
@@ -225,7 +238,7 @@ export function montarResumo(
         (n.status === "GANHO" || n.jaFoiGanho) && !ehDuplicadoNeutralizado(n);
       if (vendeu) {
         negocios.ganhos++;
-        faturamento += toNum(n.valor);
+        faturamento += valorOficialNegocio(n);
       }
     }
 
