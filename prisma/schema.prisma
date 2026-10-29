@@ -271,6 +271,11 @@ model Agente {
   oracleComandos        OracleComando[]
   presencas             PresencaPeriodo[]
   prospeccoes           ProspeccaoContato[]
+  // Carteira de Leads (prospeccao B2B por lista): contatos de que e dono e
+  // atividades que registrou. Back-relations virtuais (FK vive em CarteiraContato
+  // / CarteiraAtividade) — nenhuma coluna nova em Agente.
+  carteiraContatos      CarteiraContato[]   @relation("CarteiraDono")
+  carteiraAtividades    CarteiraAtividade[]
   criadoEm              DateTime           @default(now())
 }
 
@@ -375,6 +380,9 @@ model Lead {
   // Notas fiscais do cliente (Fatia D): multiplas, cada uma com numero + data,
   // vinculaveis a um orcamento. O campo legado notaFiscal (acima) permanece.
   notasFiscais   NotaFiscal[]
+  // Carteira de Leads: vinculo 1:1 com o contato de prospeccao, setado na
+  // ativacao (quando o vendedor abre a conversa). Virtual — FK em CarteiraContato.
+  carteiraContato CarteiraContato?
   criadoEm       DateTime       @default(now())
 
   @@index([donoId])
@@ -1985,4 +1993,95 @@ model SupervisorAcao {
 
   @@index([status])
   @@index([criadoEm])
+}
+
+// ============================================================================
+// CARTEIRA DE LEADS (prospeccao B2B por lista importada)
+// Pool de contatos FRIOS importados de planilhas, distribuidos entre vendedores.
+// SEPARADO do funil vivo: um contato so vira Lead/Negocio/Conversa na ATIVACAO
+// (quando o vendedor abre a conversa). Dedup duro por telefone normalizado.
+// Nomes distintos de ProspeccaoContato (cadencia de lead ja ativo) de proposito.
+// ============================================================================
+enum CarteiraCategoria {
+  REVENDA
+  VAREJO
+  LOCACAO
+  OUTRO
+}
+
+enum CarteiraStatusContato {
+  NOVO
+  EM_ABORDAGEM
+  RESPONDEU
+  CONVERTIDO
+  DESCARTADO
+}
+
+// Lote de importacao (uma planilha/lote enviado). Rastreia origem e total.
+model CarteiraLote {
+  id            String             @id @default(cuid())
+  nome          String
+  origem        String?
+  totalImportado Int               @default(0)
+  criadoEm      DateTime           @default(now())
+  contatos      CarteiraContato[]
+}
+
+// Um contato de prospeccao. telefone NORMALIZADO (= formato Lead.telefone, via
+// normalizarTelefoneBR) e @unique: o banco garante zero duplicata, mesmo em
+// reimportacao (upsert) ou corrida. leadId @unique: 1:1 com o Lead na ativacao.
+model CarteiraContato {
+  id            String             @id @default(cuid())
+  loteId        String?
+  lote          CarteiraLote?      @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  telefone      String             @unique
+  nome          String
+  uf            String?
+  cidade        String?
+  bairro        String?
+  endereco      String?
+  categoria     CarteiraCategoria  @default(OUTRO)
+  segmento      String?
+  notaGoogle    Float?
+  numAvaliacoes Int?
+  score         Int?
+  classe        String?
+  curvaCidade   String?
+  emailPublico  String?
+  linkFonte     String?
+  perfilObs     String?            @db.Text
+  // Vendedor dono (distribuicao). null = nao atribuido.
+  donoId        String?
+  dono          Agente?            @relation("CarteiraDono", fields: [donoId], references: [id], onDelete: SetNull)
+  status        CarteiraStatusContato @default(NOVO)
+  // Ponte p/ o funil vivo, setada na ativacao. leadId @unique: um Lead = um
+  // contato de carteira (nunca dois cards para o mesmo lead).
+  leadId        String?            @unique
+  lead          Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  conversaId    String?
+  ativadoEm     DateTime?
+  descartadoMotivo String?
+  criadoEm      DateTime           @default(now())
+  atualizadoEm  DateTime           @updatedAt
+  atividades    CarteiraAtividade[]
+
+  @@index([donoId, status])
+  @@index([uf, categoria])
+  @@index([status])
+}
+
+// Auditoria para as metricas do admin/supervisor (quem fez o que, quando).
+model CarteiraAtividade {
+  id         String           @id @default(cuid())
+  contatoId  String
+  contato    CarteiraContato  @relation(fields: [contatoId], references: [id], onDelete: Cascade)
+  agenteId   String?
+  agente     Agente?          @relation(fields: [agenteId], references: [id], onDelete: SetNull)
+  tipo       String // ABRIU_CHAT | ATIVOU | MUDOU_STATUS | DESCARTOU | REATRIBUIU | IMPORTADO
+  detalhe    String?
+  criadoEm   DateTime         @default(now())
+
+  @@index([agenteId, criadoEm])
+  @@index([contatoId])
+  @@index([tipo, criadoEm])
 }

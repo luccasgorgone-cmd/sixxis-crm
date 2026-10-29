@@ -29,6 +29,7 @@ import {
   Crosshair,
   PackageOpen,
   PauseCircle,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -101,6 +102,7 @@ export function Sidebar({
     { rotulo: "Agenda", href: "/agenda", icone: CalendarDays },
     { rotulo: "Minha carteira", href: "/carteira", icone: Briefcase },
     { rotulo: "Prospecção", href: "/prospeccao", icone: Crosshair },
+    { rotulo: "Carteira de Leads", href: "/carteira-leads", icone: UsersRound },
     { rotulo: "Pendências", href: "/pendencias", icone: PauseCircle },
     { rotulo: "Clima", href: "/inteligencia", icone: CloudSun },
     { rotulo: "Google Trends", href: "/google-trends", icone: TrendingUp },
@@ -120,6 +122,7 @@ export function Sidebar({
     ...(ehAdmin
       ? [
           { rotulo: "Supervisor", href: "/admin/supervisor", icone: Gauge },
+          { rotulo: "Carteira (admin)", href: "/admin/carteira-leads", icone: UsersRound },
           { rotulo: "Admin", href: "/admin", icone: Shield },
         ]
       : []),

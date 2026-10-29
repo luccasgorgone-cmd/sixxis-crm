@@ -32,5 +32,14 @@ exports/
 # manual ao Marketing, apagada apos uso) — nunca versionar
 scripts/extracao-atribuicao-meta.ts
 
+# Ferramenta operacional de perfil agregado (read-only, saida agregada sem PII;
+# handoff ao Marketing, apagada apos uso) — nunca versionar
+scripts/perfil-clientes.ts
+
+# Runner operacional do import inicial da Carteira de Leads (le JSON com dados de
+# prospeccao; a LOGICA reutilizavel fica em src/lib/carteira/importar.ts, essa
+# versionada) — nunca versionar o runner.
+scripts/importar-carteira-leads.ts
+
 # Estado local da ferramenta Impeccable (cache/hook por maquina)
 .impeccable/
