@@ -58,6 +58,11 @@ export function CardNegocio({
   // Pos-venda nao usa temperatura; usa garantia (marcador colorido). Venda mantem
   // a temperatura como sempre.
   const ehPosVenda = card.finalidade === "POS_VENDA";
+  // SLA estourado: negocio parado na etapa alem do tempo configurado. Pinta a
+  // borda INTEIRA do card de vermelho (halo/ring) + destaca o relogio. O alerta
+  // fecha sozinho ao mover de etapa/ganhar/perder (resolverAlertasNegocio), entao
+  // a cor volta ao normal automaticamente quando o card e corrigido.
+  const emAlerta = (card.alertasSla ?? 0) > 0;
 
   const style = {
     borderLeftColor: cor.hex,
@@ -71,7 +76,11 @@ export function CardNegocio({
       {...listeners}
       {...attributes}
       onClick={() => onAbrir?.(card.id)}
-      className={`group cursor-grab touch-none rounded-xl border border-l-[3px] border-black/5 bg-white p-3 shadow-sm transition-all active:cursor-grabbing ${
+      className={`group cursor-grab touch-none rounded-xl border border-l-[3px] p-3 shadow-sm transition-all active:cursor-grabbing ${
+        emAlerta
+          ? "border-red-300 bg-red-50/60 ring-2 ring-red-400/70"
+          : "border-black/5 bg-white"
+      } ${
         arrastando ? "rotate-1 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"
       } ${isDragging ? "opacity-40" : ""}`}
     >
@@ -218,17 +227,6 @@ export function CardNegocio({
         </div>
       )}
 
-      {(card.alertasSla ?? 0) > 0 && (
-        <div className="mb-2">
-          <span
-            title="Negocio parado alem do tempo (SLA)"
-            className="inline-flex animate-pulse items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700"
-          >
-            <BellRing className="h-3 w-3" /> Alerta de tempo
-            {(card.alertasSla ?? 0) > 1 ? ` (${card.alertasSla})` : ""}
-          </span>
-        </div>
-      )}
 
       {card.status === "PERDIDO" && card.motivoPerdaLabel && (
         <p
@@ -254,8 +252,17 @@ export function CardNegocio({
       )}
 
       <div className="flex items-center justify-between gap-2 text-[11px] text-medio/60">
-        <span className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
+        <span
+          className={`flex items-center gap-1 ${
+            emAlerta ? "font-semibold text-red-600" : ""
+          }`}
+          title={emAlerta ? "Parado alem do tempo da etapa (SLA)" : undefined}
+        >
+          {emAlerta ? (
+            <BellRing className="h-3 w-3" />
+          ) : (
+            <Clock className="h-3 w-3" />
+          )}
           {tempoDesde(card.entrouEtapaEm)}
         </span>
         <div className="flex items-center gap-1.5">
