@@ -17,6 +17,7 @@ import { garantirNegocioParaLead } from "./negocio";
 import { excluirLeadsCompleto } from "./exclusao";
 import { nomeBuscaDe } from "./cliente";
 import { TEMPLATE_BASE_CONHECIMENTO } from "./lunaCatalogo";
+import { normalizarHorarios } from "./horario";
 
 // Pre-configuracao "de fabrica" da Luna (campos EDITAVEIS). Aplicada no seed
 // SOMENTE quando o campo esta vazio — nunca sobrescreve o que o dono ja editou.
@@ -753,6 +754,111 @@ export async function seedEtapasIntermediarias(): Promise<void> {
   } catch (erro) {
     console.error(
       `[seed] falha nas etapas FollowUp: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Minutos de um dia util "cheio" a partir dos horarios configurados: o maior
+// somatorio de faixas entre os dias ABERTOS (ex.: HORARIOS_PADRAO seg-sex 9-18h
+// = 540). Usado para converter os prazos em DIAS UTEIS do Manual em minutos.
+// Sem horarios -> 540 (9h), o padrao do CRM.
+function minutosPorDiaUtil(horarios: unknown): number {
+  const norm = normalizarHorarios(horarios);
+  if (!norm) return 540;
+  let maior = 0;
+  for (const d of norm) {
+    if (!d.aberto) continue;
+    let soma = 0;
+    for (const f of d.faixas) {
+      const [hi, mi] = f.inicio.split(":").map(Number);
+      const [hf, mf] = f.fim.split(":").map(Number);
+      soma += (hf * 60 + (mf || 0)) - (hi * 60 + (mi || 0));
+    }
+    if (soma > maior) maior = soma;
+  }
+  return maior > 0 ? maior : 540;
+}
+
+// Defaults de ALERTA DE SLA por etapa, alinhados ao Manual de Atendimento
+// (secoes 1.3/1.4/2.4). dias = prazo em DIAS UTEIS do Manual (convertido p/
+// minutos); minutos = valor fixo (Novo/Aberto usam a regra "1a resposta <= 1h").
+// "Negociando" em dias=5 (B2C); o motor ja dobra p/ B2B (10) automaticamente.
+// "Aguardando cliente" do pos-venda NAO entra: a bola esta com o cliente, nao
+// deve pesar no SLA (Manual 2.4). Casado por (finalidade, nome) porque o mesmo
+// nome ("Em atendimento") existe nos dois funis.
+const SLA_MANUAL: {
+  finalidade: Finalidade;
+  nome: string;
+  dias?: number;
+  minutos?: number;
+}[] = [
+  { finalidade: Finalidade.VENDA, nome: "Novo", minutos: 60 },
+  { finalidade: Finalidade.VENDA, nome: "Em atendimento", dias: 1 },
+  { finalidade: Finalidade.VENDA, nome: "Negociando", dias: 5 },
+  { finalidade: Finalidade.VENDA, nome: "FollowUp - 1", dias: 2 },
+  { finalidade: Finalidade.VENDA, nome: "FollowUp - 2", dias: 3 },
+  { finalidade: Finalidade.VENDA, nome: "FollowUp - 3", dias: 1 },
+  { finalidade: Finalidade.VENDA, nome: "Aguardando pagamento", dias: 2 },
+  { finalidade: Finalidade.POS_VENDA, nome: "Aberto", minutos: 60 },
+  { finalidade: Finalidade.POS_VENDA, nome: "Análise", dias: 1 },
+  { finalidade: Finalidade.POS_VENDA, nome: "Em atendimento", dias: 1 },
+];
+
+// Semeia os ConfigAlertaSla alinhados ao Manual. IDEMPOTENTE: so cria onde ainda
+// NAO existe config para a (finalidade, etapa) — nunca sobrescreve o ajuste que o
+// admin fez em /admin/alertas. Na PRIMEIRA vez (nenhuma config existia), liga
+// slaEmDiasUteis para o relogio contar so horario comercial, como o Manual
+// pressupoe (sem isso, um limiar em minutos-uteis seria lido como tempo corrido
+// e dispararia de madrugada/fim de semana). Depois nunca mais toca no flag.
+export async function seedConfigAlertaSla(): Promise<void> {
+  try {
+    const cfg = await prisma.configuracaoCRM.findFirst({
+      select: { id: true, horarios: true, slaEmDiasUteis: true },
+    });
+    const porDia = minutosPorDiaUtil(cfg?.horarios);
+    const antes = await prisma.configAlertaSla.count();
+
+    const etapas = await prisma.etapa.findMany({
+      where: { ativo: true, tipo: TipoEtapa.ABERTA },
+      select: { id: true, nome: true, finalidade: true },
+    });
+    const porChave = new Map(
+      etapas.map((e) => [`${e.finalidade}:${e.nome.trim().toLowerCase()}`, e.id]),
+    );
+
+    let criadas = 0;
+    for (const s of SLA_MANUAL) {
+      const etapaId = porChave.get(`${s.finalidade}:${s.nome.trim().toLowerCase()}`);
+      if (!etapaId) continue; // etapa renomeada/ausente: pula sem buraco
+      const existe = await prisma.configAlertaSla.findUnique({
+        where: { finalidade_etapaId: { finalidade: s.finalidade, etapaId } },
+        select: { id: true },
+      });
+      if (existe) continue; // respeita o ajuste do admin
+      const minutos = s.minutos ?? Math.round((s.dias ?? 1) * porDia);
+      await prisma.configAlertaSla.create({
+        data: { finalidade: s.finalidade, etapaId, minutosParaAlerta: minutos, ativo: true },
+      });
+      criadas++;
+    }
+
+    if (antes === 0 && criadas > 0 && cfg && cfg.slaEmDiasUteis !== true) {
+      await prisma.configuracaoCRM.update({
+        where: { id: cfg.id },
+        data: { slaEmDiasUteis: true },
+      });
+      console.log(
+        "[seed] SLA: slaEmDiasUteis LIGADO (primeira configuracao, alinhado ao Manual)",
+      );
+    }
+    console.log(
+      criadas > 0
+        ? `[seed] SLA: ${criadas} config(s) de alerta semeada(s) (dia util = ${porDia} min)`
+        : "[seed] SLA: configs ja existentes (nada a semear)",
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha SLA: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }

@@ -20,6 +20,7 @@ import {
   seedAdmin,
   seedFunil,
   seedEtapasIntermediarias,
+  seedConfigAlertaSla,
   seedModelos,
   seedEmpresasFaturadas,
   seedProdutosInteresse,
@@ -69,6 +70,9 @@ async function main(): Promise<void> {
   // leva as duas listas para a ordem alvo (sequencia global venda -> pos-venda).
   await seedEtapasIntermediarias();
   await seedConfiguracoes();
+  // Defaults de alerta de SLA por etapa (Manual): depois das etapas E da config
+  // CRM existirem (le horarios p/ converter dias uteis em minutos). Idempotente.
+  await seedConfigAlertaSla();
   await seedAssistenteEscrita();
   await seedPecas();
   await seedVoltagemPecasEletricas();
