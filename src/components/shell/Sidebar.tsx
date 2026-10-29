@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BookOpen,
   Inbox as InboxIcon,
   MessagesSquare,
   Sparkles,
@@ -113,6 +114,7 @@ export function Sidebar({
           { rotulo: "Local", href: "/local", icone: PackageOpen },
         ]
       : []),
+    { rotulo: "Manual", href: "/manual", icone: BookOpen },
     { rotulo: "Campanhas", href: "/campanhas", icone: Megaphone },
     { rotulo: "Metas", href: ehAdmin ? "/admin/metas" : "/metas", icone: Target },
     ...(ehAdmin
