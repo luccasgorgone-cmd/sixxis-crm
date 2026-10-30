@@ -161,7 +161,7 @@ function LegendaSLA({ posVenda = false }: { posVenda?: boolean }) {
     {
       cls: "border-amber-400 bg-amber-50",
       nome: "Amarelo — prazo vencendo",
-      desc: "Faltam 12h uteis ou menos para o prazo da etapa vencer. E um aviso: priorize antes de virar atraso.",
+      desc: "O prazo da etapa esta na reta final (ate 12h uteis de vencer; em etapas de prazo curto, so a partir da metade do prazo). NUNCA aparece num card recem-entrado — sempre ha uma fase sem cor no inicio. Aviso: priorize antes de virar atraso.",
     },
     {
       cls: "border-red-400 bg-red-50",

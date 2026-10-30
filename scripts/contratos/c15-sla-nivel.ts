@@ -44,11 +44,22 @@ caso("alem do prazo -> VERMELHO", () => {
   assert.equal(nivelSla(LIM + 10_000, LIM, MARG), "VERMELHO");
 });
 
-caso("prazo curto (limiar <= margem): janela amarela vira [0, limiar)", () => {
-  // Novo = 60 min, margem 720: antes de vencer ja e AMARELO desde 0.
-  assert.equal(nivelSla(0, 60, MARG), "AMARELO");
+caso("prazo curto: card recem-entrado fica SEM COR (dentro do periodo)", () => {
+  // Novo = 60 min, margem 720 mas CAPADA em metade (30): amarelo so na 2a metade.
+  assert.equal(nivelSla(0, 60, MARG), null); // bug do Luccas: NAO nasce amarelo
+  assert.equal(nivelSla(29, 60, MARG), null); // ainda dentro do periodo
+  assert.equal(nivelSla(30, 60, MARG), "AMARELO"); // passou da metade -> vencendo
   assert.equal(nivelSla(59, 60, MARG), "AMARELO");
   assert.equal(nivelSla(60, 60, MARG), "VERMELHO");
+});
+
+caso("1 dia util (540min): verde ate a metade, amarelo depois, vermelho ao vencer", () => {
+  // Em atendimento = 540 min; margem = min(720, 270) = 270 -> amarelo a partir de 270.
+  assert.equal(nivelSla(0, 540, MARG), null); // recem-entrado: dentro do periodo
+  assert.equal(nivelSla(269, 540, MARG), null);
+  assert.equal(nivelSla(270, 540, MARG), "AMARELO");
+  assert.equal(nivelSla(539, 540, MARG), "AMARELO");
+  assert.equal(nivelSla(540, 540, MARG), "VERMELHO");
 });
 
 caso("limiar invalido (<=0) -> null (nunca marca)", () => {

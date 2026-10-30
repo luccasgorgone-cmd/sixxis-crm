@@ -69,7 +69,7 @@ O funil tem 9 etapas. As **abertas** (Novo até Aguardando pagamento) são negó
 
 **O semáforo do card** — a borda do card muda de cor conforme o prazo da etapa:
 
-- 🟡 **Amarelo — prazo vencendo:** faltam **12h úteis ou menos** para o prazo da etapa vencer. É um aviso: priorize antes de virar atraso.
+- 🟡 **Amarelo — prazo vencendo:** o prazo da etapa está na **reta final** (até **12h úteis** de vencer; em etapas de prazo curto, só a partir da **metade** do prazo). **Nunca** aparece num card recém-entrado — sempre há uma fase sem cor no início. Priorize antes de virar atraso.
 - 🔴 **Vermelho — em atraso:** o prazo da etapa **venceu**. É o seu vermelho prioritário.
 - 🔵 **Azul — A Prazo (recontato agendado):** cliente pediu para ser contatado em X dias. O card fica na coluna **A Prazo**, fora do SLA e das métricas, até o prazo — e volta sozinho para Em atendimento quando vence.
 - 🟣 **Roxo — cliente VIP:** marcar a etiqueta **VIP** move o card para a coluna **VIP** (agrupa todos os VIP); fica **fora** do SLA e das métricas (coringa). A borda roxa destaca que é VIP.
@@ -226,7 +226,7 @@ Mesma base da Venda — **horário comercial, dias úteis, sem feriado** — ada
 - O SLA cobra as etapas **Aberto**, **Análise** e **Em atendimento**. **Aguardando cliente** é onde a bola está **com o cliente** — essa etapa **não gera alerta** (o atraso não é nosso).
 - O SLA por etapa é configurável por finalidade (Pós-venda) na aba do Supervisor.
 
-**O semáforo do card** (igual à Venda): 🟡 **amarelo** = faltam ≤12h úteis para vencer (aviso); 🔴 **vermelho** = prazo vencido (atraso); 🟣 **roxo** = cliente **VIP** (fora da cobrança de SLA, só destaque); ⚪ **sem cor** = dentro do prazo. A cor volta ao normal quando você move o card.
+**O semáforo do card** (igual à Venda): 🟡 **amarelo** = reta final do prazo (até 12h úteis de vencer, nunca recém-entrado); 🔴 **vermelho** = prazo vencido (atraso); 🟣 **roxo** = cliente **VIP** (fora da cobrança de SLA, só destaque); ⚪ **sem cor** = dentro do prazo. A cor volta ao normal quando você move o card.
 
 **Sino e notificações:** você é **notificado (sino + som)** só quando um caso seu entra no **vermelho** (atraso); o amarelo é visual. O **sino de SLA** no topo lista o que está em atraso — clique para abrir e resolver.
 
@@ -270,7 +270,7 @@ Os **ganhos de pós-venda** são classificados por **tipo de ganho** (categorias
 
 - **Dono / Dono de pós-venda:** vendedor responsável pelo cliente (venda) ou pelo caso (pós-venda). Fonte da verdade do roteamento.
 - **Etapa aberta / ganho / perdido:** tipo da coluna no funil. Aberta = negócio/caso vivo; Ganho = Vendido/Resolvido; Perdido = Perdido/Encerrado sem solução.
-- **SLA:** prazo máximo que um card pode ficar numa etapa antes de gerar alerta. Contado em tempo útil. A borda do card sinaliza: **amarelo** = faltam ≤12h para vencer; **vermelho** = vencido/atraso; cor volta ao normal ao mover de etapa.
+- **SLA:** prazo máximo que um card pode ficar numa etapa antes de gerar alerta. Contado em tempo útil. A borda do card sinaliza: **amarelo** = reta final do prazo (até 12h de vencer, nunca recém-entrado); **vermelho** = vencido/atraso; cor volta ao normal ao mover de etapa.
 - **VIP:** cliente com a etiqueta **VIP** — vai para a **coluna VIP** (coringa), fica **fora** do SLA e das métricas e ganha **borda roxa** no card.
 - **A Prazo:** coluna/etiqueta **azul** de recontato agendado — cliente pediu X dias; card parado ali (fora do SLA e das métricas) com lembrete na agenda (aviso 24h antes), volta sozinho para Em atendimento no vencimento.
 - **Sino de SLA:** indicador no topo que conta os cards **em atraso** (vermelho) e abre a lista do que precisa ser resolvido; notifica o dono na virada para o vermelho.
