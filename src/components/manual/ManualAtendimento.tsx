@@ -4,10 +4,12 @@
 // ESTATICA (sem schema, sem dado): duas abas (Venda / Pos-venda) com o padrao de
 // atendimento, regras, metricas, tempo/SLA e o que nao fazer. Fiel ao que esta
 // implementado (funis em seed.ts, slaAlertas.ts, reguaFollowup.ts, metricas.ts,
-// motivosPerda.ts). Automacoes marcadas como "quando o gestor ativa" porque
-// nascem como flag (followupAtivo/slaEmDiasUteis = false por padrao); a REGRA
-// (o que o vendedor faz) vale sempre. Alvos marcados (ajustavel) sao os padroes
-// semeados, configuraveis na aba do Supervisor.
+// motivosPerda.ts). O SLA conta em tempo util (slaEmDiasUteis ligado na 1a
+// configuracao) e marca o card em 3 estados: amarelo (faltam 12h para vencer),
+// vermelho (atraso) e roxo (VIP, fora da cobranca). A regua de follow-up so age
+// quando o gestor ativa (followupAtivo); a REGRA (o que o vendedor faz) vale
+// sempre. Alvos marcados (ajustavel) sao os padroes semeados, configuraveis na
+// aba do Supervisor.
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
 
@@ -151,6 +153,49 @@ function Nota({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Legenda visual das cores do SLA no card (o semaforo do prazo). Os swatches
+// reproduzem a borda que o card ganha no Kanban: amarelo (vencendo), vermelho
+// (atraso), roxo (VIP, fora da cobranca) e normal (dentro do prazo).
+function LegendaSLA() {
+  const itens = [
+    {
+      cls: "border-amber-400 bg-amber-50",
+      nome: "Amarelo — prazo vencendo",
+      desc: "Faltam 12h uteis ou menos para o prazo da etapa vencer. E um aviso: priorize antes de virar atraso.",
+    },
+    {
+      cls: "border-red-400 bg-red-50",
+      nome: "Vermelho — em atraso",
+      desc: "O prazo da etapa venceu. E o seu vermelho prioritario; voce e notificado (sino + som).",
+    },
+    {
+      cls: "border-purple-400 bg-purple-50",
+      nome: "Roxo — cliente VIP",
+      desc: "Cliente com a etiqueta VIP fica FORA da cobranca de SLA (nunca amarelo nem vermelho). A borda roxa so destaca que e VIP.",
+    },
+    {
+      cls: "border-medio/25 bg-white",
+      nome: "Sem cor — dentro do prazo",
+      desc: "Tudo em dia. A cor some/volta ao normal assim que voce move o card de etapa (ou ganha/perde).",
+    },
+  ];
+  return (
+    <div className="space-y-2">
+      {itens.map((i) => (
+        <div key={i.nome} className="flex items-start gap-2.5">
+          <span
+            className={`mt-0.5 h-5 w-9 shrink-0 rounded-md border-2 ${i.cls}`}
+            aria-hidden
+          />
+          <p className="text-sm">
+            <strong className="text-escuro">{i.nome}.</strong> {i.desc}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ──────────────────────────────── VENDA ─────────────────────────────────────
 
 const FUNIL_VENDA: Etapa[] = [
@@ -200,7 +245,7 @@ function ConteudoVenda() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Entre <strong>online</strong> (toggle no topo). Lead novo so e entregue para quem esta online — offline nao recebe nada.</li>
           <li>Zere a <strong>fila da noite</strong>: toda mensagem fora do expediente deve ser respondida ate as <strong>9h</strong>.</li>
-          <li>Olhe seus <strong>leads vencidos/parados</strong> (abertos sem interacao ha mais de 7 dias <em>(ajustavel)</em>) e os <strong>alertas de SLA</strong>. Resolva os vermelhos primeiro.</li>
+          <li>Olhe seus <strong>leads vencidos/parados</strong> (abertos sem interacao ha mais de 7 dias <em>(ajustavel)</em>) e os <strong>alertas de SLA</strong>. Resolva os <strong>vermelhos</strong> (em atraso) primeiro e fique de olho nos <strong>amarelos</strong> (prazo vencendo).</li>
         </ul>
         <p className="font-semibold text-escuro">Durante o dia</p>
         <ul className="list-disc space-y-1 pl-5">
@@ -225,13 +270,24 @@ function ConteudoVenda() {
         </ul>
       </Secao>
 
-      <Secao num="4" titulo="Tempo e SLA — como o relogio funciona">
+      <Secao num="4" titulo="Tempo, SLA e as cores do card">
         <ul className="list-disc space-y-1 pl-5">
-          <li>O prazo de cada etapa pode ser contado em <strong>tempo util</strong> (horario comercial, dias uteis, sem feriado) quando o gestor ativa esse modo — ai sabado, domingo, madrugada e feriado nao correm contra voce.</li>
+          <li>O prazo de cada etapa e contado em <strong>tempo util</strong> (horario comercial, dias uteis, sem feriado): sabado, domingo, madrugada e feriado <strong>nao</strong> correm contra voce.</li>
           <li><strong>1a resposta</strong> e medida pelo <strong>tempo em que o dono esteve ONLINE</strong> entre o contato e a resposta — nao pelo relogio de parede.</li>
-          <li>Estourou o prazo da etapa? O CRM gera um <strong>alerta de SLA</strong> ao dono (e toca um aviso). Fecha sozinho quando voce move, ganha, perde ou resolve.</li>
+          <li>Os prazos de cada etapa ja vem configurados (os <strong>Prazo-alvo</strong> da tabela acima) e o gestor pode ajustar na aba do Supervisor.</li>
           <li><strong>B2B tem o dobro do prazo em Negociando</strong> (10 dias uteis vs 5 do B2C). Marque como <strong>B2B</strong> revenda, loja, assistencia, academia ou pedido grande (mais de 5 unidades).</li>
         </ul>
+        <p className="pt-1 font-semibold text-escuro">O semaforo do card (a borda muda de cor conforme o prazo)</p>
+        <LegendaSLA />
+        <p className="pt-1 font-semibold text-escuro">O sino de SLA e as notificacoes</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Voce e <strong>notificado (sino + som)</strong> quando um card seu entra no <strong>vermelho</strong> (atraso). O <strong>amarelo</strong> e so aviso visual na borda — sem notificacao, pra nao virar ruido.</li>
+          <li>O <strong>sino de SLA</strong> no topo mostra quantos cards estao <strong>em atraso</strong> e abre a <strong>lista</strong> (cliente, funil, etapa, ha quanto tempo parado). Clique num item para abrir a conversa e resolver.</li>
+          <li>Resolveu ou avancou? <strong>Mova o card</strong> de etapa: o alerta fecha e a cor volta ao normal na hora.</li>
+        </ul>
+        <Nota>
+          <strong>Cliente VIP:</strong> marque o cliente com a etiqueta <strong>VIP</strong> para tira-lo da cobranca de SLA — ele <strong>nunca</strong> fica amarelo nem vermelho e ganha uma <strong>borda roxa</strong> de destaque no card.
+        </Nota>
       </Secao>
 
       <Secao num="5" titulo="Follow-up — a regua">
@@ -355,7 +411,7 @@ function ConteudoPosVenda() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Entre <strong>online</strong>. Demandas sao entregues em rodizio a quem esta online; cliente que ja tem dono de pos-venda espera o dono voltar.</li>
           <li>Ataque a <strong>fila da noite</strong> (mensagens fora do expediente) ate as <strong>9h</strong>.</li>
-          <li>Olhe os <strong>casos parados</strong> (abertos sem interacao ha mais de 7 dias <em>(ajustavel)</em>) e os <strong>alertas de SLA</strong>.</li>
+          <li>Olhe os <strong>casos parados</strong> (abertos sem interacao ha mais de 7 dias <em>(ajustavel)</em>) e os <strong>alertas de SLA</strong>: resolva os <strong>vermelhos</strong> (em atraso) primeiro, de olho nos <strong>amarelos</strong> (vencendo).</li>
         </ul>
         <p className="font-semibold text-escuro">Durante o dia</p>
         <ul className="list-disc space-y-1 pl-5">
@@ -378,13 +434,23 @@ function ConteudoPosVenda() {
         </Nota>
       </Secao>
 
-      <Secao num="4" titulo="Tempo e SLA">
+      <Secao num="4" titulo="Tempo, SLA e as cores do card">
         <ul className="list-disc space-y-1 pl-5">
-          <li>Prazo pode ser contado em <strong>tempo util</strong> (quando o gestor ativa esse modo), igual a Venda.</li>
+          <li>Prazo contado em <strong>tempo util</strong> (horario comercial, dias uteis, sem feriado), igual a Venda.</li>
           <li>Mede-se o <strong>tempo ate a 1a resposta</strong> (tempo-online do dono) <strong>e</strong> o <strong>tempo de resolucao</strong> (do Aberto ao Resolvido).</li>
-          <li>Caso parado em Analise ou Em atendimento alem do prazo → <strong>alerta de SLA</strong> ao dono.</li>
-          <li><strong>Aguardando cliente</strong> e onde a bola esta <strong>com o cliente</strong> — e o estado certo para marcar que o atraso nao e nosso.</li>
+          <li>O SLA cobra as etapas <strong>Aberto</strong>, <strong>Analise</strong> e <strong>Em atendimento</strong>. <strong>Aguardando cliente</strong> e onde a bola esta <strong>com o cliente</strong> — essa etapa <strong>nao gera alerta</strong> (o atraso nao e nosso).</li>
         </ul>
+        <p className="pt-1 font-semibold text-escuro">O semaforo do card (a borda muda de cor conforme o prazo)</p>
+        <LegendaSLA />
+        <p className="pt-1 font-semibold text-escuro">O sino de SLA e as notificacoes</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Voce e <strong>notificado (sino + som)</strong> quando um caso seu entra no <strong>vermelho</strong> (atraso). O <strong>amarelo</strong> e so aviso visual na borda.</li>
+          <li>O <strong>sino de SLA</strong> no topo lista o que esta em atraso (cliente, funil, etapa, ha quanto tempo). Clique para abrir e resolver.</li>
+          <li>Resolveu ou avancou? <strong>Mova o card</strong>: o alerta fecha e a cor volta ao normal.</li>
+        </ul>
+        <Nota>
+          <strong>Cliente VIP:</strong> marcado com a etiqueta <strong>VIP</strong>, fica <strong>fora</strong> da cobranca de SLA (nunca amarelo nem vermelho) e ganha <strong>borda roxa</strong> de destaque.
+        </Nota>
       </Secao>
 
       <Secao num="5" titulo="Follow-up e cobranca">

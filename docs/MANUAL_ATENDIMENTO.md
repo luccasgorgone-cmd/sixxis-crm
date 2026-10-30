@@ -26,7 +26,7 @@ O CRM trabalha em **horário comercial, dias úteis e fora de feriados** — é 
 **Início do dia (revisão da manhã):**
 - Entre **online** no CRM (toggle no topo). Lead novo só é entregue para quem está online — se você está offline, não recebe nada.
 - Zere a **fila da noite**: toda mensagem que chegou fora do expediente deve ser respondida **até as 9h**. Cliente que escreveu às 23h tem que ter resposta na primeira hora da manhã.
-- Olhe seus **leads vencidos / parados** (negócio aberto sem interação há mais de 7 dias _(ajustável)_) e seus **alertas de SLA** (cards que estouraram o prazo da etapa). Resolva os vermelhos primeiro.
+- Olhe seus **leads vencidos / parados** (negócio aberto sem interação há mais de 7 dias _(ajustável)_) e seus **alertas de SLA**. Resolva os **vermelhos** (em atraso) primeiro e fique de olho nos **amarelos** (prazo vencendo).
 
 **Durante o dia:**
 - Responda rápido (meta: 1ª resposta ≤ 5 min; limite ≤ 1h útil).
@@ -58,12 +58,25 @@ O funil tem 9 etapas. As **abertas** (Novo até Aguardando pagamento) são negó
 - Só o **dono** mexe no card dele (quando está ativo/online). Isso evita dois vendedores na mesma venda.
 - **Entrou interação qualificada** (cliente pediu preço, frete, link, forma de pagamento) num card que estava em follow-up? Ele volta para **Em atendimento / Negociando** — porque o cliente esquentou de novo. Limite: **1 retorno** desses automáticos; um 2º precisa de aprovação do gestor (evita "zumbi" rodando pra sempre no funil).
 
-## 1.4 Tempo e SLA — como o relógio funciona
+## 1.4 Tempo, SLA e as cores do card
 
 - O prazo de cada etapa é contado em **tempo útil** (horário comercial, dias úteis, sem feriado). Sábado, domingo, madrugada e feriado **não** correm contra você.
 - **1ª resposta** é medida pelo **tempo em que o dono esteve ONLINE** entre o contato e a resposta — não pelo relógio de parede. Cliente escreveu 23h, você respondeu 8h20: conta o seu tempo online (minutos), não as 9 horas da noite.
-- Estourou o prazo da etapa? O CRM gera um **alerta de SLA** para o dono (e toca um aviso). O alerta fecha sozinho quando você move o card, ganha, perde ou resolve.
+- Os prazos de cada etapa já vêm configurados (os **Prazo-alvo** da tabela 1.3) e o gestor ajusta na aba do Supervisor.
 - **B2B tem o dobro do prazo em Negociando** (10 dias úteis vs 5 do B2C), porque compra de revenda/empresa demora mais. Marque o lead como **B2B** quando for revenda, loja, assistência, academia ou pedido grande (>5 unidades).
+
+**O semáforo do card** — a borda do card muda de cor conforme o prazo da etapa:
+
+- 🟡 **Amarelo — prazo vencendo:** faltam **12h úteis ou menos** para o prazo da etapa vencer. É um aviso: priorize antes de virar atraso.
+- 🔴 **Vermelho — em atraso:** o prazo da etapa **venceu**. É o seu vermelho prioritário.
+- 🟣 **Roxo — cliente VIP:** cliente com a etiqueta **VIP** fica **fora** da cobrança de SLA (nunca amarelo nem vermelho); a borda roxa só destaca que é VIP.
+- ⚪ **Sem cor — dentro do prazo.** A cor **some/volta ao normal** assim que você move o card de etapa (ou ganha/perde).
+
+**O sino de SLA e as notificações:**
+
+- Você é **notificado (sino + som)** quando um card seu entra no **vermelho** (atraso). O **amarelo é só aviso visual** na borda — sem notificação, para não virar ruído.
+- O **sino de SLA** no topo mostra quantos cards estão **em atraso** e abre a **lista** (cliente, funil, etapa, há quanto tempo parado); clique num item para abrir a conversa e resolver.
+- Resolveu ou avançou? **Mova o card** de etapa: o alerta fecha e a cor volta ao normal na hora.
 
 ## 1.5 Follow-up — a régua automática
 
@@ -159,7 +172,7 @@ Mesma base da Venda — **horário comercial, dias úteis, sem feriado** — ada
 **Início do dia:**
 - Entre **online**. Demandas de pós-venda são entregues em rodízio para quem está online; cliente que já tem dono de pós-venda espera o dono voltar.
 - Ataque a **fila da noite** (mensagens fora do expediente) **até as 9h**.
-- Olhe os **casos parados** (abertos sem interação há >7 dias _(ajustável)_) e os **alertas de SLA** — um cliente esperando resolução que estourou o prazo é o seu vermelho prioritário.
+- Olhe os **casos parados** (abertos sem interação há >7 dias _(ajustável)_) e os **alertas de SLA**: resolva os **vermelhos** (em atraso) primeiro, de olho nos **amarelos** (vencendo).
 
 **Durante o dia:**
 - Primeiro retorno rápido, mesmo que seja "recebi, estou verificando".
@@ -186,12 +199,16 @@ Mesma base da Venda — **horário comercial, dias úteis, sem feriado** — ada
 
 > **Regra importante (armadilha):** cliente que **já comprou** e volta só para uma dúvida ou acompanhamento **não deve ser movido para "Vendido" de novo** no funil de venda — isso cria uma **compra falsa** e infla o faturamento. O lugar dele é o Pós-venda; o desfecho é **Resolvido** ou **Encerrado sem solução**.
 
-## 2.4 Tempo e SLA
+## 2.4 Tempo, SLA e as cores do card
 
 - Prazo contado em **tempo útil** (horário comercial, dias úteis, sem feriado), igual à Venda.
 - Mede-se o **tempo até a 1ª resposta** (tempo-online do dono) **e** o **tempo de resolução** (quanto o caso levou do Aberto ao Resolvido).
-- Caso parado em "Em atendimento" ou "Análise" além do prazo configurado → **alerta de SLA** para o dono. "Aguardando cliente" é onde a bola está **com o cliente** — por isso essa etapa não deve pesar contra você (o relógio da resolução respeita quem está com a bola).
+- O SLA cobra as etapas **Aberto**, **Análise** e **Em atendimento**. **Aguardando cliente** é onde a bola está **com o cliente** — essa etapa **não gera alerta** (o atraso não é nosso).
 - O SLA por etapa é configurável por finalidade (Pós-venda) na aba do Supervisor.
+
+**O semáforo do card** (igual à Venda): 🟡 **amarelo** = faltam ≤12h úteis para vencer (aviso); 🔴 **vermelho** = prazo vencido (atraso); 🟣 **roxo** = cliente **VIP** (fora da cobrança de SLA, só destaque); ⚪ **sem cor** = dentro do prazo. A cor volta ao normal quando você move o card.
+
+**Sino e notificações:** você é **notificado (sino + som)** só quando um caso seu entra no **vermelho** (atraso); o amarelo é visual. O **sino de SLA** no topo lista o que está em atraso — clique para abrir e resolver.
 
 ## 2.5 Follow-up e cobrança
 
@@ -233,7 +250,9 @@ Os **ganhos de pós-venda** são classificados por **tipo de ganho** (categorias
 
 - **Dono / Dono de pós-venda:** vendedor responsável pelo cliente (venda) ou pelo caso (pós-venda). Fonte da verdade do roteamento.
 - **Etapa aberta / ganho / perdido:** tipo da coluna no funil. Aberta = negócio/caso vivo; Ganho = Vendido/Resolvido; Perdido = Perdido/Encerrado sem solução.
-- **SLA:** prazo máximo que um card pode ficar numa etapa antes de gerar alerta. Contado em tempo útil.
+- **SLA:** prazo máximo que um card pode ficar numa etapa antes de gerar alerta. Contado em tempo útil. A borda do card sinaliza: **amarelo** = faltam ≤12h para vencer; **vermelho** = vencido/atraso; cor volta ao normal ao mover de etapa.
+- **VIP:** cliente com a etiqueta **VIP** — fica **fora** da cobrança de SLA (nunca amarelo/vermelho) e ganha **borda roxa** de destaque no card.
+- **Sino de SLA:** indicador no topo que conta os cards **em atraso** (vermelho) e abre a lista do que precisa ser resolvido; notifica o dono na virada para o vermelho.
 - **Régua de follow-up:** sequência automática FU1→FU2→FU3 que move o card e cria tarefa (não fala com o cliente).
 - **Valor efetivo:** `valorAjustado` se preenchido, senão `valor`. O que conta no faturamento.
 - **Presença (online/offline):** estado ao vivo do vendedor; só quem está online recebe lead; tempo offline não pesa nas métricas.
