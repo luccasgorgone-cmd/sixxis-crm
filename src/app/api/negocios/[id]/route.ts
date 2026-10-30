@@ -25,6 +25,7 @@ import {
 import { lerTipoGanho, rotuloTipoGanho } from "@/lib/tipoGanho";
 import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
+import { limparMarcacaoAPrazo, NOME_ETAPA_A_PRAZO } from "@/lib/aprazo/ops";
 import { dispararPurchase } from "@/lib/metaCapi";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
@@ -247,6 +248,10 @@ export async function GET(
         criadoEm: r.criadoEm,
       })),
       fechadoEm: negocio.fechadoEm,
+      // "A Prazo": data de recontato (quando o card esta nessa coluna).
+      prazoContatoAte: negocio.prazoContatoAte
+        ? negocio.prazoContatoAte.toISOString()
+        : null,
       conversaId: conversa?.id ?? null,
       atendidoPor: conversa?.atendidoPor ?? null,
       notas: negocio.lead.notas.map((n) => ({
@@ -350,6 +355,8 @@ export async function PATCH(
       status: true,
       motivoPerda: true,
       finalidade: true,
+      etapaId: true,
+      etapa: { select: { nome: true } },
       pendente: true,
       // Rascunho do orcamento (Fatia 3.09) -> congela no snapshot da decisao.
       orcCupom: true,
@@ -446,6 +453,9 @@ export async function PATCH(
     ? (valorProdutos ?? 0) + (fretePagoEmpresa ? 0 : (freteInformado ?? 0))
     : null;
 
+  // Saiu da coluna "A Prazo" ao mover a mao -> limpa prazo+etiqueta+lembrete.
+  let saindoDoAPrazo = false;
+
   // ---- Mudanca de etapa ----
   if (body.etapaId) {
     const destino = await prisma.etapa.findUnique({
@@ -471,6 +481,9 @@ export async function PATCH(
 
     data.etapaId = destino.id;
     data.entrouEtapaEm = agora;
+    saindoDoAPrazo =
+      negocio.etapa?.nome?.trim().toUpperCase() ===
+        NOME_ETAPA_A_PRAZO.toUpperCase() && destino.id !== negocio.etapaId;
 
     if (destino.tipo === TipoEtapa.GANHO) {
       // "So duvida" (pos-venda): atendimento sem pedido e sem cobranca. Fecha
@@ -1134,6 +1147,11 @@ export async function PATCH(
   // de SLA abertos deste negocio. O job recria para a nova etapa, se exceder.
   if (data.etapaId !== undefined || data.status !== undefined) {
     await resolverAlertasNegocio(id);
+  }
+  // Mover o card para fora de "A Prazo" (a mao) encerra a marcacao: tira a
+  // etiqueta azul, limpa o prazo e cancela o Lembrete do recontato.
+  if (saindoDoAPrazo) {
+    await limparMarcacaoAPrazo(id, negocio.leadId);
   }
 
   // Meta Conversions API: ao marcar GANHO com valor, dispara "Purchase" com a

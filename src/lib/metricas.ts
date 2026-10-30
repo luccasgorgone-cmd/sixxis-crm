@@ -110,6 +110,10 @@ function negocioWhere(
   if (e.finalidade) w.finalidade = e.finalidade;
   if (status) w.status = { in: status };
   if (porFechamento) w.fechadoEm = { gte: p.inicio, lt: p.fim };
+  // "A Prazo" e "VIP" sao areas de parking: cards parados ali NAO entram nas
+  // metricas (pedido do Luccas). Exclui por nome de etapa; negocio sem etapa
+  // (etapaId null) e cards ja fechados (Vendido/Perdido) nao sao afetados.
+  w.NOT = { etapa: { nome: { in: ["A Prazo", "VIP"] } } };
   return w;
 }
 

@@ -156,7 +156,7 @@ function Nota({ children }: { children: React.ReactNode }) {
 // Legenda visual das cores do SLA no card (o semaforo do prazo). Os swatches
 // reproduzem a borda que o card ganha no Kanban: amarelo (vencendo), vermelho
 // (atraso), roxo (VIP, fora da cobranca) e normal (dentro do prazo).
-function LegendaSLA() {
+function LegendaSLA({ posVenda = false }: { posVenda?: boolean }) {
   const itens = [
     {
       cls: "border-amber-400 bg-amber-50",
@@ -168,10 +168,22 @@ function LegendaSLA() {
       nome: "Vermelho — em atraso",
       desc: "O prazo da etapa venceu. E o seu vermelho prioritario; voce e notificado (sino + som).",
     },
+    // A Prazo (azul) e uma coluna so do funil de VENDA.
+    ...(posVenda
+      ? []
+      : [
+          {
+            cls: "border-blue-400 bg-blue-50",
+            nome: "Azul — A Prazo (recontato agendado)",
+            desc: "Cliente pediu para ser contatado em X dias. O card fica na coluna A Prazo, fora do SLA e das metricas, ate o prazo — e volta sozinho para Em atendimento quando vence.",
+          },
+        ]),
     {
       cls: "border-purple-400 bg-purple-50",
       nome: "Roxo — cliente VIP",
-      desc: "Cliente com a etiqueta VIP fica FORA da cobranca de SLA (nunca amarelo nem vermelho). A borda roxa so destaca que e VIP.",
+      desc: posVenda
+        ? "Cliente VIP: fica FORA da cobranca de SLA (nunca amarelo/vermelho) e ganha borda roxa de destaque (coringa)."
+        : "Cliente VIP: marcar a etiqueta VIP move o card para a coluna VIP (agrupa todos os VIP). Fica FORA do SLA e das metricas (coringa). A borda roxa destaca que e VIP.",
     },
     {
       cls: "border-medio/25 bg-white",
@@ -206,8 +218,10 @@ const FUNIL_VENDA: Etapa[] = [
   { n: "5", nome: "FollowUp - 2", tipo: "aberta", sig: "2a cobranca", faz: "Nova abordagem / oferta", prazo: "3 dias uteis → FU3" },
   { n: "6", nome: "FollowUp - 3", tipo: "aberta", sig: "Ultima tentativa", faz: "Ultimo toque antes de desistir", prazo: "1 dia util → Perdido (Sem resposta)" },
   { n: "7", nome: "Aguardando pagamento", tipo: "aberta", sig: "Fechou, falta o pagamento cair", faz: "Acompanhar e confirmar o pagamento", prazo: "Conta como negocio ativo" },
-  { n: "8", nome: "Vendido", tipo: "ganho", sig: "GANHO — venda concretizada", faz: "Registrar o VALOR correto e encerrar", prazo: "—" },
-  { n: "9", nome: "Perdido", tipo: "perdido", sig: "PERDIDO — nao vendeu", faz: "Escolher o MOTIVO da lista", prazo: "—" },
+  { n: "8", nome: "A Prazo", tipo: "aberta", sig: "Cliente pediu para ser contatado em X dias", faz: "Agendar o recontato (seletor de dias no painel); o card volta sozinho no prazo", prazo: "Fora do SLA e das metricas" },
+  { n: "9", nome: "VIP", tipo: "aberta", sig: "Cliente VIP (coringa), agrupado numa coluna propria", faz: "Atender com prioridade; marcar/desmarcar a etiqueta VIP move o card para ca / de volta", prazo: "Fora do SLA e das metricas" },
+  { n: "10", nome: "Vendido", tipo: "ganho", sig: "GANHO — venda concretizada", faz: "Registrar o VALOR correto e encerrar", prazo: "—" },
+  { n: "11", nome: "Perdido", tipo: "perdido", sig: "PERDIDO — nao vendeu", faz: "Escolher o MOTIVO da lista", prazo: "—" },
 ];
 
 const METRICAS_VENDA: LinhaMetrica[] = [
@@ -300,7 +314,23 @@ function ConteudoVenda() {
         </ul>
       </Secao>
 
-      <Secao num="6" titulo="Regras de ouro (as que mais dao problema)">
+      <Secao num="6" titulo="Areas de parking: A Prazo e VIP">
+        <p>Entre <strong>Aguardando pagamento</strong> e <strong>Vendido</strong> ha duas colunas de parking — cards que ficam de lado, <strong>fora do SLA e das metricas</strong>, sem penalizar voce:</p>
+        <p className="pt-1 font-semibold text-blue-600">A Prazo (azul) — recontato agendado</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Cliente pediu para ser contatado depois ("me chama daqui 7 dias")? No painel do negocio, em <strong>A Prazo (recontato)</strong>, escolha os <strong>dias</strong> e clique <strong>Colocar A Prazo</strong>.</li>
+          <li>O card ganha <strong>borda azul</strong>, vai para a coluna A Prazo e <strong>entra na sua agenda</strong>: um lembrete no dia do prazo, com <strong>aviso 24h antes</strong> (e no proprio dia) para voce lembrar de mandar a mensagem.</li>
+          <li>Enquanto esta la, <strong>nao conta nas metricas nem gera alerta de SLA</strong> (o cliente pediu para esperar).</li>
+          <li><strong>Volta sozinho para Em atendimento</strong> quando o prazo vence (pediu 7 dias → no 8o dia volta), tirando a etiqueta azul — o ciclo recomeca. Se <strong>voce</strong> mover antes, ou o <strong>cliente responder</strong> antes, ele sai de A Prazo na hora.</li>
+        </ul>
+        <p className="pt-1 font-semibold text-purple-600">VIP (roxo) — cliente coringa</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Marque o cliente com a etiqueta <strong>VIP</strong>: o card vai para a <strong>coluna VIP</strong>, onde todos os VIP ficam agrupados, com <strong>borda roxa</strong>.</li>
+          <li>VIP e <strong>coringa</strong>: fica <strong>fora do SLA e das metricas</strong> (nunca amarelo/vermelho, nao penaliza). Tirar a etiqueta VIP devolve o card para Em atendimento.</li>
+        </ul>
+      </Secao>
+
+      <Secao num="7" titulo="Regras de ouro (as que mais dao problema)">
         <ul className="list-disc space-y-2 pl-5">
           <li><strong>Valor da venda — a armadilha no 1.</strong> O que conta e <Rotulo>valorAjustado</Rotulo> <strong>se estiver preenchido</strong>; senao, <Rotulo>valor</Rotulo>. Ou seja: um <strong>valorAjustado = 0 esquecido zera a venda em silencio</strong>. Confira o valor efetivo ao registrar o ganho. <Rotulo>valor</Rotulo> = pedido todo (produtos + frete); <Rotulo>valorProdutos</Rotulo> = so itens.</li>
           <li><strong>Mensagem que voce manda (saida) nao cria nem reabre negocio.</strong> So a mensagem do <strong>cliente</strong> (entrada) movimenta o funil.</li>
@@ -310,7 +340,7 @@ function ConteudoVenda() {
         </ul>
       </Secao>
 
-      <Secao num="7" titulo="Encerramento — ganhou ou perdeu, sempre com motivo">
+      <Secao num="8" titulo="Encerramento — ganhou ou perdeu, sempre com motivo">
         <p>Perder bem e tao importante quanto ganhar: o motivo certo alimenta a reaquisicao e as metricas. A lista e <strong>fechada</strong> (nao existe Outro — se falta um motivo, avise o gestor).</p>
         <p className="font-semibold text-erro">PERDIDO (nao vendeu, mas era cliente de verdade)</p>
         <ul className="list-disc space-y-1 pl-5">
@@ -330,7 +360,7 @@ function ConteudoVenda() {
         </Nota>
       </Secao>
 
-      <Secao num="8" titulo="Metricas e metas — o que te cobram e como ler">
+      <Secao num="9" titulo="Metricas e metas — o que te cobram e como ler">
         <p className="text-medio">Tudo recortado por periodo (Hoje / 7d / 15d / 30d / custom), por finalidade (Venda) e por vendedor.</p>
         <TabelaMetricas linhas={METRICAS_VENDA} />
         <p className="pt-1">
@@ -346,12 +376,12 @@ function ConteudoVenda() {
         </ul>
       </Secao>
 
-      <Secao num="9" titulo="Reaquisicao — a segunda chance do perdido">
+      <Secao num="10" titulo="Reaquisicao — a segunda chance do perdido">
         <p>Todo mes o CRM junta os <strong>perdidos elegiveis</strong> (motivos marcados entra-na-reaquisicao) e organiza uma campanha de reativacao em janela: <strong>6o dia util (R1) → 8o (R2) → 10o (fim)</strong>. Quem volta vira <strong>Reativado</strong>; quem nao responde ate o fim vira <strong>Perdido definitivo</strong>.</p>
         <Nota>O <strong>envio ao cliente e sempre armado por um gestor</strong> (admin) — a campanha nao dispara mensagem sozinha. Mesma trava do follow-up: falar com cliente e decisao humana.</Nota>
       </Secao>
 
-      <Secao num="10" titulo="O que NAO fazer (erros classicos)">
+      <Secao num="11" titulo="O que NAO fazer (erros classicos)">
         <ul className="list-disc space-y-1 pl-5">
           <li>Deixar cliente na etapa Novo por horas (SLA estoura, cliente esfria).</li>
           <li>Mover para Vendido um cliente que ja comprou e so voltou tirar duvida → use o fluxo de Pos-venda / Encerrar; nao crie venda falsa.</li>
@@ -441,7 +471,7 @@ function ConteudoPosVenda() {
           <li>O SLA cobra as etapas <strong>Aberto</strong>, <strong>Analise</strong> e <strong>Em atendimento</strong>. <strong>Aguardando cliente</strong> e onde a bola esta <strong>com o cliente</strong> — essa etapa <strong>nao gera alerta</strong> (o atraso nao e nosso).</li>
         </ul>
         <p className="pt-1 font-semibold text-escuro">O semaforo do card (a borda muda de cor conforme o prazo)</p>
-        <LegendaSLA />
+        <LegendaSLA posVenda />
         <p className="pt-1 font-semibold text-escuro">O sino de SLA e as notificacoes</p>
         <ul className="list-disc space-y-1 pl-5">
           <li>Voce e <strong>notificado (sino + som)</strong> quando um caso seu entra no <strong>vermelho</strong> (atraso). O <strong>amarelo</strong> e so aviso visual na borda.</li>

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import {
   Thermometer,
   GitBranch,
+  CalendarClock,
   Store,
   Tag,
   Plus,
@@ -134,6 +135,84 @@ export function SecaoEtapa({
           </option>
         ))}
       </select>
+    </section>
+  );
+}
+
+// "A Prazo": agenda o recontato do cliente em N dias CORRIDOS. Move o card para a
+// coluna A Prazo (fora do SLA e das metricas, borda azul), cria um Lembrete na
+// agenda do dono (aviso 24h antes + no dia) e volta sozinho para Em atendimento
+// quando o prazo vence. SO VENDA (o pai so monta na finalidade de venda).
+export function SecaoAPrazo({
+  negocioId,
+  prazoContatoAte,
+  onAtualizado,
+}: {
+  negocioId: string;
+  prazoContatoAte?: string | null;
+  onAtualizado?: () => void;
+}) {
+  const toast = useToast();
+  const [dias, setDias] = useState(7);
+  const [salvando, setSalvando] = useState(false);
+
+  async function marcar() {
+    if (dias < 1 || salvando) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/negocios/${negocioId}/a-prazo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dias }),
+      });
+      if (r.ok) {
+        toast.sucesso(`A Prazo: recontato agendado em ${dias} dia(s).`);
+        onAtualizado?.();
+      } else {
+        const d = (await r.json().catch(() => null)) as { erro?: string } | null;
+        toast.erro(d?.erro ?? "Nao foi possivel marcar A Prazo.");
+      }
+    } catch {
+      toast.erro("Falha de conexao ao marcar A Prazo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-black/5 bg-white p-4">
+      <TituloSecao icone={CalendarClock}>A Prazo (recontato)</TituloSecao>
+      {prazoContatoAte ? (
+        <p className="mb-2 text-sm font-medium text-blue-600">
+          Recontato agendado para{" "}
+          {new Date(prazoContatoAte).toLocaleDateString("pt-BR")}.
+        </p>
+      ) : (
+        <p className="mb-2 text-xs text-medio">
+          Cliente pediu para ser contatado depois? Agende: o card vai para a coluna
+          A Prazo (fora do SLA e das metricas), entra na sua agenda com aviso 24h
+          antes e volta sozinho para Em atendimento quando o prazo vence.
+        </p>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          max={365}
+          value={dias}
+          onChange={(e) => setDias(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+          className="w-20 rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-tiffany"
+        />
+        <span className="text-sm text-medio">dias</span>
+        <button
+          type="button"
+          onClick={() => void marcar()}
+          disabled={salvando}
+          className="ml-auto rounded-lg bg-blue-500 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+        >
+          {prazoContatoAte ? "Reagendar" : "Colocar A Prazo"}
+        </button>
+      </div>
     </section>
   );
 }

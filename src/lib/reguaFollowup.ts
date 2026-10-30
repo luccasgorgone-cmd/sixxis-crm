@@ -9,6 +9,7 @@ import { prisma } from "./prisma";
 import { StatusNeg, TipoEtapa, TipoHistorico, Finalidade } from "../generated/prisma/enums";
 import { diasUteisDecorridos, normalizarHorarios } from "./horario";
 import { resolverAlertasNegocio } from "./slaAlertas";
+import { processarAPrazo } from "./aprazo/ops";
 
 const MOTIVO_SEM_RESPOSTA = "NAO_RESPONDE";
 
@@ -259,5 +260,11 @@ async function moverParaPerdido(
 // Tick periódico (a cada 15 min). Chamado no boot. Em dry-run quando a flag off.
 export function iniciarReguaFollowup(): void {
   void processarReguaFollowup();
-  setInterval(() => void processarReguaFollowup(), 15 * 60 * 1000);
+  // Auto-retorno do "A Prazo" (card volta para Em atendimento quando o prazo do
+  // cliente vence). Mesmo tick; independente do followupAtivo.
+  void processarAPrazo();
+  setInterval(() => {
+    void processarReguaFollowup();
+    void processarAPrazo();
+  }, 15 * 60 * 1000);
 }

@@ -78,6 +78,8 @@ export function cardNegocio(n: NegocioCard) {
     motivoPerdaObs: n.motivoPerdaObs,
     etapaId: n.etapaId,
     entrouEtapaEm: n.entrouEtapaEm,
+    // "A Prazo": data de recontato (ISO) para o card mostrar "recontatar DD/MM".
+    prazoContatoAte: n.prazoContatoAte ? n.prazoContatoAte.toISOString() : null,
     // Fatia Y: null = nao fixada; data = fixada (sobe ao topo da coluna + pin no card).
     fixadaEm: conversaDaFinalidade?.fixadaEm ?? null,
     // Alvo do pin clicavel no card: POST /api/conversas/[id]/fixar (a mesma rota

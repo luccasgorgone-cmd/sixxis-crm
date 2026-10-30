@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
 import { TipoHistorico, AtividadeTipo, Finalidade } from "@/generated/prisma/enums";
+import { sairDaVipSeNaColuna, NOME_ETIQUETA_VIP } from "@/lib/aprazo/ops";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +67,12 @@ export async function DELETE(
         },
       }),
     ]);
+  }
+
+  // VIP: ao remover a etiqueta VIP, se o card esta na coluna VIP ele volta para
+  // Em atendimento (nao deixa card sem VIP numa coluna de VIP).
+  if (existente?.etiqueta.nome?.trim().toUpperCase() === NOME_ETIQUETA_VIP) {
+    await sairDaVipSeNaColuna(negocio.id);
   }
 
   return NextResponse.json({ ok: true });

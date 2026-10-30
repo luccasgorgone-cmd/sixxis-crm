@@ -68,6 +68,8 @@ export type CardNegocio = {
   // Nivel do alerta de SLA aberto: AMARELO (prazo vencendo) ou VERMELHO (atraso).
   // null/ausente = sem alerta. Define a cor da borda do card.
   slaNivel?: "AMARELO" | "VERMELHO" | null;
+  // "A Prazo": data de recontato (ISO) quando o card esta na coluna A Prazo.
+  prazoContatoAte?: string | null;
 };
 
 // Evento de tempo real emitido pelo servidor.

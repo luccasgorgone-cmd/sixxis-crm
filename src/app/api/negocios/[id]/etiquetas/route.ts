@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, podeAcessarNegocio } from "@/lib/autorizacao";
 import { TipoHistorico, AtividadeTipo, Finalidade } from "@/generated/prisma/enums";
+import { moverParaVipSeVenda, NOME_ETIQUETA_VIP } from "@/lib/aprazo/ops";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,12 @@ export async function POST(
         },
       }),
     ]);
+  }
+
+  // VIP: marcar a etiqueta VIP move o card para a coluna VIP (agrupa os VIP;
+  // eles ja ficam fora do SLA e das metricas). Idempotente (no-op se ja na VIP).
+  if (etiqueta.nome.trim().toUpperCase() === NOME_ETIQUETA_VIP) {
+    await moverParaVipSeVenda(negocio.id);
   }
 
   return NextResponse.json({ etiqueta });

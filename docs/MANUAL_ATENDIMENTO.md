@@ -50,8 +50,10 @@ O funil tem 9 etapas. As **abertas** (Novo até Aguardando pagamento) são negó
 | 5 | **FollowUp - 2** | 2ª cobrança | Nova abordagem / oferta | **3 dias úteis** → FU3 |
 | 6 | **FollowUp - 3** | Última tentativa | Último toque antes de desistir | **1 dia útil** → Perdido "Sem resposta" |
 | 7 | **Aguardando pagamento** | Fechou, falta o pagamento cair | Acompanhar o pagamento, confirmar | Conta como **negócio ativo** |
-| 8 | **Vendido** | GANHO — venda concretizada | Registrar o **valor correto** e encerrar | — |
-| 9 | **Perdido** | PERDIDO — não vendeu | Escolher o **motivo** da lista | — |
+| 8 | **A Prazo** | Cliente pediu para ser contatado em X dias | Agendar o recontato (seletor de dias no painel); volta sozinho no prazo | **Fora** do SLA e das métricas |
+| 9 | **VIP** | Cliente VIP (coringa), agrupado em coluna própria | Atender com prioridade; marcar/desmarcar a etiqueta VIP move pra cá / de volta | **Fora** do SLA e das métricas |
+| 10 | **Vendido** | GANHO — venda concretizada | Registrar o **valor correto** e encerrar | — |
+| 11 | **Perdido** | PERDIDO — não vendeu | Escolher o **motivo** da lista | — |
 
 **Regras de movimento:**
 - Card sobe conforme o cliente avança. Não pule etapa "pra adiantar": a etapa é a verdade do momento.
@@ -69,7 +71,8 @@ O funil tem 9 etapas. As **abertas** (Novo até Aguardando pagamento) são negó
 
 - 🟡 **Amarelo — prazo vencendo:** faltam **12h úteis ou menos** para o prazo da etapa vencer. É um aviso: priorize antes de virar atraso.
 - 🔴 **Vermelho — em atraso:** o prazo da etapa **venceu**. É o seu vermelho prioritário.
-- 🟣 **Roxo — cliente VIP:** cliente com a etiqueta **VIP** fica **fora** da cobrança de SLA (nunca amarelo nem vermelho); a borda roxa só destaca que é VIP.
+- 🔵 **Azul — A Prazo (recontato agendado):** cliente pediu para ser contatado em X dias. O card fica na coluna **A Prazo**, fora do SLA e das métricas, até o prazo — e volta sozinho para Em atendimento quando vence.
+- 🟣 **Roxo — cliente VIP:** marcar a etiqueta **VIP** move o card para a coluna **VIP** (agrupa todos os VIP); fica **fora** do SLA e das métricas (coringa). A borda roxa destaca que é VIP.
 - ⚪ **Sem cor — dentro do prazo.** A cor **some/volta ao normal** assim que você move o card de etapa (ou ganha/perde).
 
 **O sino de SLA e as notificações:**
@@ -86,6 +89,23 @@ O CRM tem uma **régua de follow-up** que não deixa lead esfriar por esquecimen
 - **O sistema NÃO manda mensagem para o cliente sozinho.** Ele só te organiza: move a etapa e cria a tarefa. **Quem fala com o cliente é você** — mensagem a cliente é decisão humana (regra de segurança da operação).
 - Chegou ao fim da régua sem resposta → o card vira **Perdido "Sem resposta"** automaticamente. Isso é saudável: tira o morto da sua carteira e alimenta a reaquisição.
 - Um follow-up bom retoma com **valor** (novidade, condição, dúvida pendente), não um "e aí, fechou?".
+
+## 1.5b Áreas de parking — A Prazo e VIP
+
+Entre **Aguardando pagamento** e **Vendido** há duas colunas de "parking": cards que ficam de lado, **fora do SLA e das métricas**, sem penalizar você.
+
+**A Prazo (azul) — recontato agendado:**
+
+- Cliente pediu para ser contatado depois ("me chama daqui 7 dias")? No painel do negócio, em **A Prazo (recontato)**, escolha os **dias** e clique **Colocar A Prazo**.
+- O card ganha **borda azul**, vai para a coluna A Prazo e **entra na sua agenda**: um lembrete no dia do prazo, com **aviso 24h antes** (e no próprio dia) para você lembrar de mandar a mensagem ao cliente.
+- Enquanto está lá, **não conta nas métricas nem gera alerta de SLA** (o cliente pediu para esperar).
+- **Volta sozinho para Em atendimento** quando o prazo vence (pediu 7 dias → no 8º dia volta), removendo a etiqueta azul — o ciclo recomeça. Se **você** mover antes, ou o **cliente responder** antes, ele sai de A Prazo na hora.
+- O sistema **não manda mensagem ao cliente** — só te organiza e avisa. Quem fala com o cliente é você.
+
+**VIP (roxo) — cliente coringa:**
+
+- Marque o cliente com a etiqueta **VIP**: o card vai para a **coluna VIP**, onde todos os VIP ficam agrupados, com **borda roxa**.
+- VIP é **coringa**: fica **fora do SLA e das métricas** (nunca amarelo/vermelho, não penaliza). Remover a etiqueta VIP devolve o card para Em atendimento.
 
 ## 1.6 Regras de ouro (as que mais dão problema quando ignoradas)
 
@@ -251,7 +271,8 @@ Os **ganhos de pós-venda** são classificados por **tipo de ganho** (categorias
 - **Dono / Dono de pós-venda:** vendedor responsável pelo cliente (venda) ou pelo caso (pós-venda). Fonte da verdade do roteamento.
 - **Etapa aberta / ganho / perdido:** tipo da coluna no funil. Aberta = negócio/caso vivo; Ganho = Vendido/Resolvido; Perdido = Perdido/Encerrado sem solução.
 - **SLA:** prazo máximo que um card pode ficar numa etapa antes de gerar alerta. Contado em tempo útil. A borda do card sinaliza: **amarelo** = faltam ≤12h para vencer; **vermelho** = vencido/atraso; cor volta ao normal ao mover de etapa.
-- **VIP:** cliente com a etiqueta **VIP** — fica **fora** da cobrança de SLA (nunca amarelo/vermelho) e ganha **borda roxa** de destaque no card.
+- **VIP:** cliente com a etiqueta **VIP** — vai para a **coluna VIP** (coringa), fica **fora** do SLA e das métricas e ganha **borda roxa** no card.
+- **A Prazo:** coluna/etiqueta **azul** de recontato agendado — cliente pediu X dias; card parado ali (fora do SLA e das métricas) com lembrete na agenda (aviso 24h antes), volta sozinho para Em atendimento no vencimento.
 - **Sino de SLA:** indicador no topo que conta os cards **em atraso** (vermelho) e abre a lista do que precisa ser resolvido; notifica o dono na virada para o vermelho.
 - **Régua de follow-up:** sequência automática FU1→FU2→FU3 que move o card e cria tarefa (não fala com o cliente).
 - **Valor efetivo:** `valorAjustado` se preenchido, senão `valor`. O que conta no faturamento.

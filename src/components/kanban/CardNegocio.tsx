@@ -65,18 +65,24 @@ export function CardNegocio({
   const ehVip = card.etiquetas.some(
     (e) => e.nome?.trim().toUpperCase() === "VIP",
   );
-  const nivel = ehVip ? null : (card.slaNivel ?? null);
+  const ehAPrazo = card.etiquetas.some(
+    (e) => e.nome?.trim().toUpperCase() === "A PRAZO",
+  );
+  // VIP e A Prazo ficam FORA do SLA (sem amarelo/vermelho).
+  const nivel = ehVip || ehAPrazo ? null : (card.slaNivel ?? null);
   const emVermelho = nivel === "VERMELHO";
   const emAmarelo = nivel === "AMARELO";
-  // Marcacao SOMENTE na borda (ring + borda colorida), sem fundo tingido (o
-  // background ficou ruim). Fundo sempre branco.
+  // Marcacao SOMENTE na borda (ring + borda colorida), sem fundo tingido. Fundo
+  // sempre branco. Prioridade: VIP (roxo) > A Prazo (azul) > vermelho > amarelo.
   const destaqueCard = ehVip
     ? "border-purple-400 bg-white ring-2 ring-purple-400/70"
-    : emVermelho
-      ? "border-red-400 bg-white ring-2 ring-red-400/70"
-      : emAmarelo
-        ? "border-amber-400 bg-white ring-2 ring-amber-400/70"
-        : "border-black/5 bg-white";
+    : ehAPrazo
+      ? "border-blue-400 bg-white ring-2 ring-blue-400/70"
+      : emVermelho
+        ? "border-red-400 bg-white ring-2 ring-red-400/70"
+        : emAmarelo
+          ? "border-amber-400 bg-white ring-2 ring-amber-400/70"
+          : "border-black/5 bg-white";
 
   const style = {
     borderLeftColor: cor.hex,
@@ -244,6 +250,13 @@ export function CardNegocio({
           className="mb-2 truncate rounded-md bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700"
         >
           Perdido: {card.motivoPerdaLabel}
+        </p>
+      )}
+
+      {ehAPrazo && card.prazoContatoAte && (
+        <p className="mb-2 flex items-center gap-1 text-[11px] font-semibold text-blue-600">
+          <Clock className="h-3 w-3" /> Recontatar em{" "}
+          {new Date(card.prazoContatoAte).toLocaleDateString("pt-BR")}
         </p>
       )}
 

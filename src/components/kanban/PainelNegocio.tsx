@@ -70,6 +70,7 @@ import {
 import {
   SecaoTemperatura,
   SecaoEtapa,
+  SecaoAPrazo,
   SecaoSegmento,
   SecaoDecisoes,
   SecaoEtiquetas,
@@ -516,6 +517,18 @@ export function PainelNegocio({
                   salvar={salvar}
                   abrirModal={(tipo, etapaId) => void abrirModalPedido(tipo, etapaId)}
                 />
+
+                {/* 5b. A Prazo (recontato agendado): so na VENDA. */}
+                {detalhe.finalidade !== "POS_VENDA" && (
+                  <SecaoAPrazo
+                    negocioId={negocioId}
+                    prazoContatoAte={detalhe.prazoContatoAte}
+                    onAtualizado={() => {
+                      void carregar();
+                      onAtualizado();
+                    }}
+                  />
+                )}
 
                 {/* 6. Segmento (Varejo/Atacado): so na VENDA. */}
                 {detalhe.finalidade !== "POS_VENDA" && (

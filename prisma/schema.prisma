@@ -773,6 +773,11 @@ model Negocio {
   // Notas fiscais emitidas no contexto deste negocio (Fatia D).
   notasFiscais  NotaFiscal[]
   entrouEtapaEm DateTime           @default(now())
+  // "A Prazo": data em que o dono deve recontatar o cliente (cliente pediu X dias).
+  // Setado ao marcar A Prazo; limpo ao sair (auto-retorno, mover a mao ou cliente
+  // responder). O job de auto-retorno compara agora >= prazoContatoAte. Dias
+  // CORRIDOS (prazo do mundo real do cliente), nao dias uteis.
+  prazoContatoAte DateTime?
   fechadoEm     DateTime?
   // Ultima INTERACAO (mensagem IN ou OUT) na conversa da finalidade deste
   // negocio. Espelha Conversa.ultimaMensagemEm no nivel do negocio porque o

@@ -158,6 +158,8 @@ const ORDEM_ALVO_VENDA = [
   "FollowUp - 2",
   "FollowUp - 3",
   "Aguardando pagamento",
+  "A Prazo",
+  "VIP",
   "Vendido",
   "Perdido",
 ];
@@ -192,6 +194,10 @@ const ETAPAS_INTERMEDIARIAS: {
   { nome: "FollowUp - 1", cor: "#3cbfb3", nomeAntigo: "1" },
   { nome: "FollowUp - 2", cor: "#2aa79b", nomeAntigo: "2" },
   { nome: "FollowUp - 3", cor: "#1d8f84", nomeAntigo: "3" },
+  // Areas de "parking" entre Aguardando pagamento e Vendido (nomeAntigo = o
+  // proprio nome: nao ha etapa antiga para renomear, entao sempre cria se faltar).
+  { nome: "A Prazo", cor: "#3b82f6", nomeAntigo: "A Prazo" }, // azul
+  { nome: "VIP", cor: "#7c3aed", nomeAntigo: "VIP" }, // roxo
 ];
 
 // Etiquetas padrao. So semeia se NENHUMA existir (idempotente).
@@ -580,6 +586,15 @@ export async function seedFunil(): Promise<void> {
         data: { nome: "B2B", cor: "#0ea5e9", finalidade: Finalidade.VENDA },
       });
       console.log("[seed] etiqueta B2B criada");
+    }
+
+    // "A Prazo" (azul): etiqueta da coluna A Prazo (recontato agendado). Aplicada
+    // pela acao de marcar A Prazo, nao escolhida a mao. Idempotente por nome.
+    if (!existentes.has("a prazo")) {
+      await prisma.etiqueta.create({
+        data: { nome: "A Prazo", cor: "#3b82f6", finalidade: Finalidade.VENDA },
+      });
+      console.log("[seed] etiqueta A Prazo criada");
     }
   } catch (erro) {
     console.error(

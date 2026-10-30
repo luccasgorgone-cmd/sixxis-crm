@@ -11,6 +11,7 @@ import { getIO } from "./socket";
 import { normalizarJid, telefoneParaLog } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
 import { aplicarRetornoFollowup } from "./reguaFollowup";
+import { retornarAPrazoPorInbound } from "./aprazo/ops";
 import { aplicarEtiquetaPorNome } from "./etiquetaAuto";
 import { rotearLeadNovo } from "./roteamento";
 import { criarNotificacao } from "./notificacao";
@@ -2425,6 +2426,9 @@ async function processarEvento(
       // follow-up e a mensagem e interacao QUALIFICADA, volta para Em
       // atendimento/Negociando (limite 1). No-op com followupAtivo=false.
       await aplicarRetornoFollowup(lead.id, finalidade, conteudo);
+      // "A Prazo": se o cliente responde antes do prazo, o card sai de A Prazo e
+      // volta para Em atendimento (independe do followupAtivo).
+      await retornarAPrazoPorInbound(lead.id, finalidade);
     }
 
     // Atendimento automatico em mensagens de ENTRADA. Primeiro a LUNA (gated por
