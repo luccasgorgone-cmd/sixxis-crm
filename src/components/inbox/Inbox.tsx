@@ -241,15 +241,34 @@ export function Inbox({
     [carregarConversas],
   );
 
-  // Deep-link opcional: /inbox?lead=<id> pre-abre a conversa daquele lead (ex.:
-  // vindo da lista de Clientes ou de uma notificacao). Roda uma vez, quando a
-  // lista carrega. Aditivo.
+  // Deep-link opcional: /inbox?finalidade=<VENDA|POS_VENDA> foca o funil certo
+  // ANTES de abrir a conversa (ex.: vindo do alerta de SLA) — assim a lista
+  // carrega a conversa DAQUELA finalidade, nao a do outro funil. Roda uma vez.
+  const finalidadeDeepRef = useRef(false);
+  useEffect(() => {
+    if (finalidadeDeepRef.current) return;
+    const f = new URLSearchParams(window.location.search).get("finalidade");
+    if (f === "VENDA" || f === "POS_VENDA") {
+      finalidadeDeepRef.current = true;
+      setFinalidade(f);
+    }
+  }, []);
+
+  // Deep-link opcional: /inbox?lead=<id>[&finalidade=<...>] pre-abre a conversa
+  // daquele lead (ex.: lista de Clientes, notificacao, alerta de SLA). Quando a
+  // finalidade vem junto, casa a conversa por lead E finalidade (o lead pode ter
+  // conversa de Venda E Pos-venda — abre a do negocio em atraso, nao a 1a da
+  // lista). Roda uma vez, quando a lista carrega. Aditivo.
   const leadAbertoRef = useRef(false);
   useEffect(() => {
     if (leadAbertoRef.current || conversas.length === 0) return;
-    const leadId = new URLSearchParams(window.location.search).get("lead");
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("lead");
+    const fin = params.get("finalidade");
     if (!leadId) return;
-    const conv = conversas.find((c) => c.leadId === leadId);
+    const conv = conversas.find(
+      (c) => c.leadId === leadId && (!fin || c.finalidade === fin),
+    );
     if (conv) {
       leadAbertoRef.current = true;
       void abrirConversa(conv.id);

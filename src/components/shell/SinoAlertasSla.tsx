@@ -115,7 +115,9 @@ export function SinoAlertasSla({
 
   function abrirItem(it: ItemAlerta) {
     setAberto(false);
-    router.push(`/inbox?lead=${it.leadId}`);
+    // Abre a conversa CORRETA: lead + finalidade do negocio em atraso (o cliente
+    // pode ter conversa de Venda e Pos-venda; foca a do alerta).
+    router.push(`/inbox?lead=${it.leadId}&finalidade=${it.finalidade}`);
   }
 
   if (total === 0) return null;
