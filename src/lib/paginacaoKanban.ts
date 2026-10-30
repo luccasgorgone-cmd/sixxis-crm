@@ -28,7 +28,17 @@ export const TETO_FIXADAS = 200;
 // null) cai para o fim exatamente na ordem de antes.
 export function ordemDaEtapa(
   tipo: TipoEtapa,
+  nome?: string | null,
 ): Prisma.NegocioOrderByWithRelationInput[] {
+  // Coluna "A Prazo": os prazos MAIS PROXIMOS de vencer aparecem primeiro
+  // (prazoContatoAte ascendente; quem nao tem prazo cai para o fim).
+  if (nome && nome.trim().toUpperCase() === "A PRAZO") {
+    return [
+      { prazoContatoAte: { sort: "asc", nulls: "last" } },
+      { entrouEtapaEm: "desc" },
+      { id: "desc" },
+    ];
+  }
   if (tipo === TipoEtapa.GANHO || tipo === TipoEtapa.PERDIDO) {
     return [
       { ultimaMensagemEm: { sort: "desc", nulls: "last" } },

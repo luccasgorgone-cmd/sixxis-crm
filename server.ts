@@ -22,6 +22,7 @@ import {
   seedEtapasIntermediarias,
   seedConfigAlertaSla,
   reiniciarMarcacaoSlaUmaVez,
+  backfillVipColunaUmaVez,
   seedModelos,
   seedEmpresasFaturadas,
   seedProdutosInteresse,
@@ -77,6 +78,9 @@ async function main(): Promise<void> {
   // Reinicio one-time da marcacao de SLA: limpa a enxurrada de notificacoes SLA
   // do deploy anterior (uma vez). Nao reseta o relogio das etapas.
   await reiniciarMarcacaoSlaUmaVez();
+  // Backfill one-time: VIP abertos ja existentes -> coluna VIP (depois das etapas
+  // existirem). Novos VIP vao pela acao de marcar a etiqueta.
+  await backfillVipColunaUmaVez();
   await seedAssistenteEscrita();
   await seedPecas();
   await seedVoltagemPecasEletricas();

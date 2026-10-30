@@ -1388,6 +1388,10 @@ model ConfiguracaoCRM {
   // subir a feature de 3 estados, marca as notificacoes de SLA antigas como lidas
   // (limpa a enxurrada) uma vez e passa a true. Nao reseta o relogio das etapas.
   slaMarcacaoReiniciada Boolean @default(false)
+  // Sentinela do BACKFILL one-time dos VIP para a coluna VIP: no 1o boot apos a
+  // feature, move os negocios VENDA ABERTO ja etiquetados VIP para a etapa VIP
+  // uma vez e passa a true (novos VIP vao pela acao de etiqueta).
+  vipColunaReiniciada Boolean @default(false)
   // Liga a REGUA DE FOLLOW-UP automatica (Manual secao 5): mover negocios ABERTO
   // por prazo (Etapa.diasUteisMax) e criar a proxima acao (lembrete) pro vendedor.
   // Comeca DESLIGADO: com false o job so registra em log o que FARIA (dry-run),

@@ -156,7 +156,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         ativo: true,
         finalidade: { in: finalidadeEtapas },
       },
-      select: { id: true, tipo: true },
+      select: { id: true, tipo: true, nome: true },
     });
     if (!etapa) {
       return NextResponse.json({ erro: "etapa nao encontrada" }, { status: 404 });
@@ -171,7 +171,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       prisma.negocio.findMany({
         where: { AND: [daEtapa, semFixadas] },
         include: includeCard,
-        orderBy: ordemDaEtapa(etapa.tipo),
+        orderBy: ordemDaEtapa(etapa.tipo, etapa.nome),
         skip: offset,
         take: limite + 1,
       }),
@@ -220,7 +220,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         prisma.negocio.findMany({
           where: { AND: [where, { etapaId: e.id }, semFixadas] },
           include: includeCard,
-          orderBy: ordemDaEtapa(e.tipo),
+          orderBy: ordemDaEtapa(e.tipo, e.nome),
           take: limite + 1,
         }),
       ),

@@ -11,6 +11,7 @@ import {
   TipoEtapa,
   Finalidade,
   FinalidadeEtapa,
+  StatusNeg,
   TipoCatalogo,
 } from "../generated/prisma/enums";
 import { garantirNegocioParaLead } from "./negocio";
@@ -18,6 +19,11 @@ import { excluirLeadsCompleto } from "./exclusao";
 import { nomeBuscaDe } from "./cliente";
 import { TEMPLATE_BASE_CONHECIMENTO } from "./lunaCatalogo";
 import { normalizarHorarios } from "./horario";
+import {
+  moverParaVipSeVenda,
+  NOME_ETIQUETA_VIP,
+  NOME_ETAPA_VIP,
+} from "./aprazo/ops";
 
 // Pre-configuracao "de fabrica" da Luna (campos EDITAVEIS). Aplicada no seed
 // SOMENTE quando o campo esta vazio — nunca sobrescreve o que o dono ja editou.
@@ -904,6 +910,52 @@ export async function reiniciarMarcacaoSlaUmaVez(): Promise<void> {
   } catch (erro) {
     console.error(
       `[seed] falha no reinicio SLA: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
+// Backfill ONE-TIME dos VIP para a coluna VIP (pedido do Luccas): no 1o boot apos
+// a feature, move os negocios VENDA ABERTO que JA tinham a etiqueta VIP (de antes
+// da coluna existir) para a etapa VIP, e passa o flag vipColunaReiniciada. Depois
+// nunca mais roda (novos VIP vao pela acao de marcar a etiqueta). So mexe em
+// ABERTO fora da etapa VIP -> um VIP ja vendido/perdido (fechado) nao e tocado.
+export async function backfillVipColunaUmaVez(): Promise<void> {
+  try {
+    const cfg = await prisma.configuracaoCRM.findFirst({
+      select: { id: true, vipColunaReiniciada: true },
+    });
+    if (!cfg || cfg.vipColunaReiniciada) return;
+    const [etiquetaVip, etapaVip] = await Promise.all([
+      prisma.etiqueta.findFirst({ where: { nome: NOME_ETIQUETA_VIP }, select: { id: true } }),
+      prisma.etapa.findFirst({
+        where: { nome: NOME_ETAPA_VIP, finalidade: FinalidadeEtapa.VENDA, ativo: true },
+        select: { id: true },
+      }),
+    ]);
+    let movidos = 0;
+    if (etiquetaVip && etapaVip) {
+      const alvo = await prisma.negocio.findMany({
+        where: {
+          finalidade: Finalidade.VENDA,
+          status: StatusNeg.ABERTO,
+          etapaId: { not: etapaVip.id },
+          lead: { etiquetas: { some: { etiquetaId: etiquetaVip.id } } },
+        },
+        select: { id: true },
+      });
+      for (const n of alvo) {
+        await moverParaVipSeVenda(n.id); // idempotente, com historico + resolve SLA
+        movidos++;
+      }
+    }
+    await prisma.configuracaoCRM.update({
+      where: { id: cfg.id },
+      data: { vipColunaReiniciada: true },
+    });
+    console.log(`[seed] VIP backfill: ${movidos} negocio(s) movido(s) para a coluna VIP`);
+  } catch (erro) {
+    console.error(
+      `[seed] falha no backfill VIP: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
   }
 }
