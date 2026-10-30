@@ -68,12 +68,14 @@ export function CardNegocio({
   const nivel = ehVip ? null : (card.slaNivel ?? null);
   const emVermelho = nivel === "VERMELHO";
   const emAmarelo = nivel === "AMARELO";
+  // Marcacao SOMENTE na borda (ring + borda colorida), sem fundo tingido (o
+  // background ficou ruim). Fundo sempre branco.
   const destaqueCard = ehVip
-    ? "border-purple-300 bg-purple-50/50 ring-2 ring-purple-400/70"
+    ? "border-purple-400 bg-white ring-2 ring-purple-400/70"
     : emVermelho
-      ? "border-red-300 bg-red-50/60 ring-2 ring-red-400/70"
+      ? "border-red-400 bg-white ring-2 ring-red-400/70"
       : emAmarelo
-        ? "border-amber-300 bg-amber-50/70 ring-2 ring-amber-400/70"
+        ? "border-amber-400 bg-white ring-2 ring-amber-400/70"
         : "border-black/5 bg-white";
 
   const style = {
