@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
+import { AlertaNivel } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export async function GET(): Promise<NextResponse> {
   const alertas = await prisma.alertaNegocio.findMany({
     where: {
       resolvidoEm: null,
+      // So o que esta EM ATRASO (VERMELHO); AMARELO e aviso visual no card.
+      nivel: AlertaNivel.VERMELHO,
       // Mesma regra do contador: dono ve os seus, admin ve todos.
       negocio: admin ? {} : { agenteId: agente.id },
     },

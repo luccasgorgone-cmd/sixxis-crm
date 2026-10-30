@@ -65,6 +65,9 @@ export type CardNegocio = {
   etiquetas: EtiquetaChip[];
   // Quantidade de alertas de SLA abertos (selo no card).
   alertasSla?: number;
+  // Nivel do alerta de SLA aberto: AMARELO (prazo vencendo) ou VERMELHO (atraso).
+  // null/ausente = sem alerta. Define a cor da borda do card.
+  slaNivel?: "AMARELO" | "VERMELHO" | null;
 };
 
 // Evento de tempo real emitido pelo servidor.

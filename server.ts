@@ -21,6 +21,7 @@ import {
   seedFunil,
   seedEtapasIntermediarias,
   seedConfigAlertaSla,
+  reiniciarMarcacaoSlaUmaVez,
   seedModelos,
   seedEmpresasFaturadas,
   seedProdutosInteresse,
@@ -73,6 +74,9 @@ async function main(): Promise<void> {
   // Defaults de alerta de SLA por etapa (Manual): depois das etapas E da config
   // CRM existirem (le horarios p/ converter dias uteis em minutos). Idempotente.
   await seedConfigAlertaSla();
+  // Reinicio one-time da marcacao de SLA: limpa a enxurrada de notificacoes SLA
+  // do deploy anterior (uma vez). Nao reseta o relogio das etapas.
+  await reiniciarMarcacaoSlaUmaVez();
   await seedAssistenteEscrita();
   await seedPecas();
   await seedVoltagemPecasEletricas();

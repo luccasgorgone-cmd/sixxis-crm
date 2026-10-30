@@ -6,8 +6,9 @@
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
 import { criarNotificacao } from "./notificacao";
-import { StatusNeg } from "../generated/prisma/enums";
+import { StatusNeg, AlertaNivel } from "../generated/prisma/enums";
 import { minutosUteisEntre, normalizarHorarios } from "./horario";
+import { nivelSla, MARGEM_AMARELO_MIN } from "./sla/nivel";
 
 // Avalia todos os negocios abertos e cria/fecha alertas de SLA conforme a config.
 export async function processarSlaAlertas(): Promise<void> {
@@ -45,14 +46,17 @@ export async function processarSlaAlertas(): Promise<void> {
       configs.map((c) => [`${c.finalidade}:${c.etapaId}`, c]),
     );
 
-    // B2B (Manual secao 3/4): lead com etiqueta "B2B" tem o DOBRO do prazo em
-    // Negociando (10 dias uteis vs 5). Resolve o id da etiqueta uma vez; se nao
-    // existir, o fator B2B simplesmente nao se aplica.
-    const etiquetaB2B = await prisma.etiqueta.findFirst({
-      where: { nome: "B2B" },
-      select: { id: true },
-    });
+    // Etiquetas que afetam o SLA: B2B DOBRA o prazo em Negociando (Manual 3/4,
+    // 10 dias vs 5); VIP fica FORA da marcacao (sem amarelo/vermelho, pedido do
+    // Luccas). Resolve os ids uma vez; ausente = o fator simplesmente nao se
+    // aplica.
+    const [etiquetaB2B, etiquetaVip] = await Promise.all([
+      prisma.etiqueta.findFirst({ where: { nome: "B2B" }, select: { id: true } }),
+      prisma.etiqueta.findFirst({ where: { nome: "VIP" }, select: { id: true } }),
+    ]);
     const b2bId = etiquetaB2B?.id ?? "";
+    const vipId = etiquetaVip?.id ?? "";
+    const idsEtiq = [b2bId, vipId].filter(Boolean);
 
     const negocios = await prisma.negocio.findMany({
       where: { status: StatusNeg.ABERTO, etapaId: { not: null } },
@@ -65,24 +69,40 @@ export async function processarSlaAlertas(): Promise<void> {
         lead: {
           select: {
             nome: true, pushName: true, nomeManual: true, telefone: true,
-            etiquetas: { where: { etiquetaId: b2bId }, select: { etiquetaId: true } },
+            etiquetas:
+              idsEtiq.length > 0
+                ? { where: { etiquetaId: { in: idsEtiq } }, select: { etiquetaId: true } }
+                : { where: { etiquetaId: "__nenhuma__" }, select: { etiquetaId: true } },
           },
         },
         etapa: { select: { nome: true } },
         alertasSla: {
           where: { resolvidoEm: null },
-          select: { id: true, configId: true },
+          select: { id: true, configId: true, nivel: true },
         },
       },
     });
 
     for (const n of negocios) {
+      const aberto = n.alertasSla[0] ?? null;
+      const ehVip = vipId !== "" && n.lead.etiquetas.some((e) => e.etiquetaId === vipId);
+
+      // VIP fica FORA da marcacao: nunca cria alerta; se tiver um aberto (ex.:
+      // etiquetado VIP depois de ja estar marcado), resolve para sair da cor.
+      if (ehVip) {
+        if (aberto) {
+          await prisma.alertaNegocio.update({
+            where: { id: aberto.id },
+            data: { resolvidoEm: agora },
+          });
+        }
+        continue;
+      }
+
       const chave = `${n.finalidade}:${n.etapaId}`;
       const config = mapaConfig.get(chave);
-      const aberto = n.alertasSla[0] ?? null;
 
-      // Sem config para a etapa atual: fecha qualquer alerta aberto (etapa mudou
-      // para uma sem SLA, ou a config foi desativada/removida).
+      // Sem config para a etapa atual: fecha qualquer alerta aberto.
       if (!config) {
         if (aberto) {
           await prisma.alertaNegocio.update({
@@ -93,47 +113,80 @@ export async function processarSlaAlertas(): Promise<void> {
         continue;
       }
 
-      // Alerta aberto de OUTRA etapa (config diferente): resolve e segue.
+      // Alerta aberto de OUTRA etapa (config diferente): resolve e trata como se
+      // nao houvesse alerta desta etapa.
+      let abertoDesta: { id: string; configId: string; nivel: AlertaNivel } | null =
+        aberto;
       if (aberto && aberto.configId !== config.id) {
         await prisma.alertaNegocio.update({
           where: { id: aberto.id },
           data: { resolvidoEm: agora },
         });
+        abertoDesta = null;
       }
 
       const decorridoMin = emDiasUteis
         ? minutosUteisEntre(n.entrouEtapaEm, agora, horariosNorm, feriados, fuso)
         : (agora.getTime() - n.entrouEtapaEm.getTime()) / 60_000;
-      const jaTemAlertaDestaEtapa = aberto && aberto.configId === config.id;
 
       // B2B dobra o prazo na etapa de Negociando (Manual: B2B 10d vs B2C 5d).
-      const ehB2B = n.lead.etiquetas.length > 0;
+      const ehB2B = b2bId !== "" && n.lead.etiquetas.some((e) => e.etiquetaId === b2bId);
       const emNegociacao = /negoci/i.test(n.etapa?.nome ?? "");
       const limiarMin =
         ehB2B && emNegociacao ? config.minutosParaAlerta * 2 : config.minutosParaAlerta;
 
-      if (decorridoMin >= limiarMin && !jaTemAlertaDestaEtapa) {
-        await prisma.alertaNegocio.create({
-          data: { negocioId: n.id, configId: config.id },
-        });
-        const nomeCliente =
-          n.lead.nomeManual || n.lead.pushName || n.lead.nome || n.lead.telefone;
+      // 3 estados: null (longe) / AMARELO (vencendo, 12h antes) / VERMELHO (atraso).
+      const alvo = nivelSla(decorridoMin, limiarMin, MARGEM_AMARELO_MIN);
+      const nomeCliente =
+        n.lead.nomeManual || n.lead.pushName || n.lead.nome || n.lead.telefone;
+
+      const notificarVermelho = (): void => {
         if (n.agenteId) {
-          await criarNotificacao({
+          void criarNotificacao({
             agenteId: n.agenteId,
             tipo: "SLA",
-            titulo: `Negocio parado: ${n.etapa?.nome ?? "etapa"}`,
-            descricao: `${nomeCliente} esta ha tempo demais nesta etapa`,
+            titulo: `Negocio em atraso: ${n.etapa?.nome ?? "etapa"}`,
+            descricao: `${nomeCliente} passou do prazo nesta etapa`,
             link: "/kanban",
             leadId: null,
           });
         }
-        // Avisa o cliente conectado para tocar o som e atualizar selos/badge.
         getIO()?.emit("alerta:novo", {
           agenteId: n.agenteId,
           negocioId: n.id,
-          som: config.som ?? null,
+          som: config!.som ?? null,
         });
+      };
+
+      if (!alvo) {
+        // Ainda longe do prazo: nao deve haver alerta desta etapa (defensivo).
+        if (abertoDesta) {
+          await prisma.alertaNegocio.update({
+            where: { id: abertoDesta.id },
+            data: { resolvidoEm: agora },
+          });
+        }
+        continue;
+      }
+
+      if (!abertoDesta) {
+        // Cria no nivel alvo. Notifica o dono SO se ja entrar direto em VERMELHO
+        // (amarelo e aviso visual, sem notificacao, pra nao gerar ruido).
+        await prisma.alertaNegocio.create({
+          data: { negocioId: n.id, configId: config.id, nivel: alvo as AlertaNivel },
+        });
+        if (alvo === "VERMELHO") notificarVermelho();
+        continue;
+      }
+
+      // Ja existe alerta desta etapa: sobe AMARELO -> VERMELHO (nunca regride) e
+      // notifica uma vez na virada.
+      if (abertoDesta.nivel !== "VERMELHO" && alvo === "VERMELHO") {
+        await prisma.alertaNegocio.update({
+          where: { id: abertoDesta.id },
+          data: { nivel: AlertaNivel.VERMELHO },
+        });
+        notificarVermelho();
       }
     }
 

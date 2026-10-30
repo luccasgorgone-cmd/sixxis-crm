@@ -39,7 +39,7 @@ export const includeCard = {
   agente: { select: { id: true, nome: true, avatarUrl: true } },
   etapa: { select: { id: true, tipo: true } },
   // Alertas de SLA abertos (selo/contador no card do kanban).
-  alertasSla: { where: { resolvidoEm: null }, select: { id: true } },
+  alertasSla: { where: { resolvidoEm: null }, select: { id: true, nivel: true } },
 } satisfies Prisma.NegocioInclude;
 
 type NegocioCard = Prisma.NegocioGetPayload<{ include: typeof includeCard }>;
@@ -91,6 +91,9 @@ export function cardNegocio(n: NegocioCard) {
     naoLidas: conversaDaFinalidade?.naoLidas ?? 0,
     marcadaNaoLida: conversaDaFinalidade?.marcadaNaoLida ?? false,
     alertasSla: n.alertasSla.length,
+    // Nivel do alerta aberto (ha no maximo 1 por negocio): AMARELO (vencendo) ou
+    // VERMELHO (atraso). null = sem alerta. O card pinta a borda por aqui.
+    slaNivel: n.alertasSla[0]?.nivel ?? null,
     agente: n.agente
       ? { id: n.agente.id, nome: n.agente.nome, avatarUrl: n.agente.avatarUrl }
       : null,

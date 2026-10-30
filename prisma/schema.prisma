@@ -626,14 +626,24 @@ model ConfigAlertaSla {
   @@unique([finalidade, etapaId])
 }
 
+// Nivel de um alerta de SLA. AMARELO = prazo vencendo (aviso antecipado, ~12h
+// antes); VERMELHO = prazo vencido (em atraso). Default VERMELHO = compativel com
+// os alertas ja existentes, que nasceram como atraso.
+enum AlertaNivel {
+  AMARELO
+  VERMELHO
+}
+
 // Alerta de SLA ATIVO de um negocio (resolvidoEm null = aberto). Fechado ao
-// mover de etapa / ganho / perdido / resolver.
+// mover de etapa / ganho / perdido / resolver. O motor cria o alerta ja na
+// janela AMARELA e sobe para VERMELHO ao cruzar o limiar.
 model AlertaNegocio {
   id          String          @id @default(cuid())
   negocioId   String
   negocio     Negocio         @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   configId    String
   config      ConfigAlertaSla @relation(fields: [configId], references: [id], onDelete: Cascade)
+  nivel       AlertaNivel     @default(VERMELHO)
   criadoEm    DateTime        @default(now())
   resolvidoEm DateTime?
 
@@ -1369,6 +1379,10 @@ model ConfiguracaoCRM {
   // DESLIGADO: deploy NAO muda o relogio atual (tempo corrido) ate o admin ligar.
   // Antigos (sem o campo) = false.
   slaEmDiasUteis     Boolean @default(false)
+  // Sentinela do REINICIO one-time da marcacao de SLA (pedido do Luccas): ao
+  // subir a feature de 3 estados, marca as notificacoes de SLA antigas como lidas
+  // (limpa a enxurrada) uma vez e passa a true. Nao reseta o relogio das etapas.
+  slaMarcacaoReiniciada Boolean @default(false)
   // Liga a REGUA DE FOLLOW-UP automatica (Manual secao 5): mover negocios ABERTO
   // por prazo (Etapa.diasUteisMax) e criar a proxima acao (lembrete) pro vendedor.
   // Comeca DESLIGADO: com false o job so registra em log o que FARIA (dry-run),

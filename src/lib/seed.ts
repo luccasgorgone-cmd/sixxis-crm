@@ -863,6 +863,36 @@ export async function seedConfigAlertaSla(): Promise<void> {
   }
 }
 
+// Reinicio ONE-TIME da marcacao de SLA (pedido do Luccas ao subir os 3 estados):
+// marca as notificacoes de SLA antigas NAO lidas como lidas (limpa a enxurrada do
+// deploy anterior) UMA vez e passa o flag slaMarcacaoReiniciada. NAO reseta o
+// relogio das etapas: quem ja esta vencido continua vencido (vira VERMELHO no
+// proximo passo do motor), conforme pedido. Guardado pelo flag -> um restart
+// futuro NAO apaga notificacoes legitimas.
+export async function reiniciarMarcacaoSlaUmaVez(): Promise<void> {
+  try {
+    const cfg = await prisma.configuracaoCRM.findFirst({
+      select: { id: true, slaMarcacaoReiniciada: true },
+    });
+    if (!cfg || cfg.slaMarcacaoReiniciada) return;
+    const r = await prisma.notificacao.updateMany({
+      where: { tipo: "SLA", lida: false },
+      data: { lida: true },
+    });
+    await prisma.configuracaoCRM.update({
+      where: { id: cfg.id },
+      data: { slaMarcacaoReiniciada: true },
+    });
+    console.log(
+      `[seed] SLA: reinicio de marcacao (${r.count} notificacao(oes) SLA marcada(s) como lida)`,
+    );
+  } catch (erro) {
+    console.error(
+      `[seed] falha no reinicio SLA: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+}
+
 // Vendedor de teste opcional (para validar papeis). So cria se as envs
 // existirem e ainda nao houver Agente com esse email.
 export async function seedVendedorTeste(): Promise<void> {

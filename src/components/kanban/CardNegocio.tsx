@@ -58,11 +58,23 @@ export function CardNegocio({
   // Pos-venda nao usa temperatura; usa garantia (marcador colorido). Venda mantem
   // a temperatura como sempre.
   const ehPosVenda = card.finalidade === "POS_VENDA";
-  // SLA estourado: negocio parado na etapa alem do tempo configurado. Pinta a
-  // borda INTEIRA do card de vermelho (halo/ring) + destaca o relogio. O alerta
-  // fecha sozinho ao mover de etapa/ganhar/perder (resolverAlertasNegocio), entao
-  // a cor volta ao normal automaticamente quando o card e corrigido.
-  const emAlerta = (card.alertasSla ?? 0) > 0;
+  // Marcacao de SLA na borda do card. VIP fica FORA da marcacao (pedido do
+  // Luccas) e ganha borda ROXA. Senao: VERMELHO = prazo vencido (atraso),
+  // AMARELO = prazo vencendo (~12h antes). O alerta fecha sozinho ao mover de
+  // etapa/ganhar/perder (resolverAlertasNegocio) -> a cor volta ao normal.
+  const ehVip = card.etiquetas.some(
+    (e) => e.nome?.trim().toUpperCase() === "VIP",
+  );
+  const nivel = ehVip ? null : (card.slaNivel ?? null);
+  const emVermelho = nivel === "VERMELHO";
+  const emAmarelo = nivel === "AMARELO";
+  const destaqueCard = ehVip
+    ? "border-purple-300 bg-purple-50/50 ring-2 ring-purple-400/70"
+    : emVermelho
+      ? "border-red-300 bg-red-50/60 ring-2 ring-red-400/70"
+      : emAmarelo
+        ? "border-amber-300 bg-amber-50/70 ring-2 ring-amber-400/70"
+        : "border-black/5 bg-white";
 
   const style = {
     borderLeftColor: cor.hex,
@@ -76,11 +88,7 @@ export function CardNegocio({
       {...listeners}
       {...attributes}
       onClick={() => onAbrir?.(card.id)}
-      className={`group cursor-grab touch-none rounded-xl border border-l-[3px] p-3 shadow-sm transition-all active:cursor-grabbing ${
-        emAlerta
-          ? "border-red-300 bg-red-50/60 ring-2 ring-red-400/70"
-          : "border-black/5 bg-white"
-      } ${
+      className={`group cursor-grab touch-none rounded-xl border border-l-[3px] p-3 shadow-sm transition-all active:cursor-grabbing ${destaqueCard} ${
         arrastando ? "rotate-1 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"
       } ${isDragging ? "opacity-40" : ""}`}
     >
@@ -254,11 +262,21 @@ export function CardNegocio({
       <div className="flex items-center justify-between gap-2 text-[11px] text-medio/60">
         <span
           className={`flex items-center gap-1 ${
-            emAlerta ? "font-semibold text-red-600" : ""
+            emVermelho
+              ? "font-semibold text-red-600"
+              : emAmarelo
+                ? "font-semibold text-amber-600"
+                : ""
           }`}
-          title={emAlerta ? "Parado alem do tempo da etapa (SLA)" : undefined}
+          title={
+            emVermelho
+              ? "Parado alem do prazo da etapa (SLA)"
+              : emAmarelo
+                ? "Prazo da etapa vencendo (SLA)"
+                : undefined
+          }
         >
-          {emAlerta ? (
+          {emVermelho ? (
             <BellRing className="h-3 w-3" />
           ) : (
             <Clock className="h-3 w-3" />
