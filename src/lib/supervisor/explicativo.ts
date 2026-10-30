@@ -21,9 +21,9 @@ export type EntradaVarredura = {
 export const REGISTRO_SISTEMA: EntradaVarredura[] = [
   {
     chave: "slaAlertas",
-    nome: "SLA por etapa",
+    nome: "SLA por etapa (3 cores)",
     oQueFaz:
-      "Negócio aberto parado além do limiar da etapa vira alerta e notifica o vendedor dono.",
+      "Card em 3 cores na borda: AMARELO (faltam ≤12h úteis p/ vencer o prazo da etapa), VERMELHO (vencido/atraso — notifica o dono e entra no sino de SLA), sem cor (no prazo). A Prazo (azul) e VIP (roxo) ficam FORA do SLA.",
     cadencia: "a cada 60s",
     le: "negócios abertos + limiares da tabela ConfigAlertaSla",
     editavel: "limiares por etapa em ConfigAlertaSla",

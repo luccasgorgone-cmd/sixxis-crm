@@ -196,15 +196,26 @@ export async function montarPainel(
     slasAtivos.map((s) => [chaveSla(s.finalidade, s.etapaId), s.minutosParaAlerta]),
   );
 
+  // Areas de parking (A Prazo / VIP): aparecem no FUNIL (sao colunas), mas ficam
+  // FORA de cobertura e parados (nao pesam nas metricas). Deriva os ids das
+  // etapas ja carregadas e filtra o snapshot so para esses dois calculos.
+  const PARKING_NOMES = new Set(["A Prazo", "VIP"]);
+  const parkingIds = new Set(
+    etapas.filter((et) => PARKING_NOMES.has(et.nome.trim())).map((et) => et.id),
+  );
+  const abertosForaParking = abertos.filter(
+    (n) => !n.etapaId || !parkingIds.has(n.etapaId),
+  );
+
   const funil = coreFunil(etapas, abertos, agora);
-  const parados = coreParados(etapas, abertos, limiares.paradoDiasPadrao, agora, slaMin);
+  const parados = coreParados(etapas, abertosForaParking, limiares.paradoDiasPadrao, agora, slaMin);
 
   const metaRestante =
     limiares.metaPeriodoReais !== null
       ? Math.max(0, limiares.metaPeriodoReais - metricas.valorVendido)
       : null;
   const cobertura = coreCobertura(
-    abertos.map((n) => ({
+    abertosForaParking.map((n) => ({
       valor: valorEfetivo(n.valor, n.valorAjustado),
       temperatura: n.temperatura,
     })),

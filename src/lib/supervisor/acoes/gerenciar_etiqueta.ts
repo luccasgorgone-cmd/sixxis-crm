@@ -12,6 +12,11 @@ import {
   logNegocio,
 } from "./comum";
 import {
+  moverParaVipSeVenda,
+  sairDaVipSeNaColuna,
+  NOME_ETIQUETA_VIP,
+} from "../../aprazo/ops";
+import {
   lerId,
   lerTexto,
   type Args,
@@ -101,6 +106,10 @@ async function executar(
       });
     });
     emitirNegocioAtualizado(negocioId, negocio.etapaId);
+    // VIP: adicionar a etiqueta VIP move o card para a coluna VIP (igual a API).
+    if (etiqueta.nome.trim().toUpperCase() === NOME_ETIQUETA_VIP) {
+      await moverParaVipSeVenda(negocioId);
+    }
     return {
       ok: true,
       antes: { linkExistiaAntes: false },
@@ -134,6 +143,10 @@ async function executar(
     });
   });
   emitirNegocioAtualizado(negocioId, negocio.etapaId);
+  // VIP: remover a etiqueta VIP devolve o card da coluna VIP para Em atendimento.
+  if (etiqueta.nome.trim().toUpperCase() === NOME_ETIQUETA_VIP) {
+    await sairDaVipSeNaColuna(negocioId);
+  }
   return {
     ok: true,
     antes: { linkExistiaAntes: true },

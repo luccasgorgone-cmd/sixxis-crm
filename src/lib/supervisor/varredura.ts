@@ -52,6 +52,8 @@ async function detSemProximoPasso(agora: Date): Promise<Candidato[]> {
   const negs = await prisma.negocio.findMany({
     where: {
       status: StatusNeg.ABERTO,
+      // Fora das areas de parking (A Prazo / VIP): nao sao "sem proximo passo".
+      etapa: { isNot: { nome: { in: ["A Prazo", "VIP"] } } },
       NOT: { lembretes: { some: { status: "PENDENTE", dataHora: { gte: agora } } } },
     },
     select: { id: true },
@@ -74,7 +76,12 @@ async function detParado(agora: Date, cfg: ConfigEditavel): Promise<Candidato[]>
   const slaMin = new Map(slas.map((s) => [chaveSla(s.finalidade, s.etapaId), s.minutosParaAlerta]));
 
   const negs = await prisma.negocio.findMany({
-    where: { status: StatusNeg.ABERTO, etapaId: { not: null } },
+    where: {
+      status: StatusNeg.ABERTO,
+      etapaId: { not: null },
+      // A Prazo / VIP sao parking: nunca contam como "parado".
+      etapa: { isNot: { nome: { in: ["A Prazo", "VIP"] } } },
+    },
     select: { id: true, finalidade: true, etapaId: true, entrouEtapaEm: true, etapa: { select: { nome: true } } },
     orderBy: { entrouEtapaEm: "asc" },
     take: 200, // avalia um lote; corta para TAKE_POR_SINAL após o filtro
@@ -100,7 +107,12 @@ async function negociosAbertosPorConversa(
   if (chaves.length === 0) return new Map();
   const leadIds = [...new Set(chaves.map((c) => c.leadId))];
   const negs = await prisma.negocio.findMany({
-    where: { status: StatusNeg.ABERTO, leadId: { in: leadIds } },
+    where: {
+      status: StatusNeg.ABERTO,
+      leadId: { in: leadIds },
+      // Nao anexa sinal (ex.: sem resposta) a card em parking (A Prazo / VIP).
+      etapa: { isNot: { nome: { in: ["A Prazo", "VIP"] } } },
+    },
     select: { id: true, leadId: true, finalidade: true },
   });
   const mapa = new Map<string, string>();

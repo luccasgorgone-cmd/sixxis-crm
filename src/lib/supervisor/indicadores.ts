@@ -256,7 +256,12 @@ export async function semProximoPasso(
   e: EscopoSupervisor = {},
   agora: Date = new Date(),
 ): Promise<SemProximoPassoResultado> {
-  const base = { AND: [escopoNegocioWhere(e), { status: StatusNeg.ABERTO }] };
+  // A Prazo / VIP sao parking: fora desta metrica (nao contam como abertos nem
+  // como "sem proximo passo").
+  const foraParking = { etapa: { isNot: { nome: { in: ["A Prazo", "VIP"] } } } };
+  const base = {
+    AND: [escopoNegocioWhere(e), { status: StatusNeg.ABERTO }, foraParking],
+  };
   const [totalAbertos, comProximo] = await Promise.all([
     prisma.negocio.count({ where: base }),
     prisma.negocio.count({
@@ -264,6 +269,7 @@ export async function semProximoPasso(
         AND: [
           escopoNegocioWhere(e),
           { status: StatusNeg.ABERTO },
+          foraParking,
           {
             lembretes: {
               some: { status: "PENDENTE", dataHora: { gte: agora } },
