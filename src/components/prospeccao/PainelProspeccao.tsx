@@ -24,7 +24,15 @@ type Contato = {
   nutricaoAte: string | null;
   lead: Lead;
 };
-type Meta = { cadastradosHoje: number; primeirosContatosHoje: number; alvo: number };
+type Meta = {
+  cadastradosHoje: number;
+  primeirosContatosHoje: number;
+  carteiraAtivadosHoje: number;
+  alvo: number;
+};
+// Prospeccoes ativas = clientes que o vendedor COMECOU (enviou a 1a mensagem):
+// carteira de leads ativada + numeros adicionados diretamente.
+type ProspAtivas = { carteira: number; diretos: number; total: number };
 
 const ORDEM_FASE = ["ABORDAGEM", "QUALIFICACAO", "PROPOSTA", "FECHAMENTO", "NUTRICAO", "QUALIFICADO", "ENCERRADO"];
 const ROTULO_FASE: Record<string, string> = {
@@ -40,6 +48,7 @@ export function PainelProspeccao() {
   const toast = useToast();
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [prospAtivas, setProspAtivas] = useState<ProspAtivas | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {
@@ -49,6 +58,7 @@ export function PainelProspeccao() {
         const d = await r.json();
         setContatos(d.contatos ?? []);
         setMeta(d.meta ?? null);
+        setProspAtivas(d.prospeccoesAtivas ?? null);
       }
     } finally {
       setCarregando(false);
@@ -94,10 +104,23 @@ export function PainelProspeccao() {
     <div className="mx-auto max-w-4xl p-4">
       <h1 className="mb-3 text-lg font-semibold text-escuro">Prospecção ativa</h1>
 
+      {prospAtivas && (
+        <div className="mb-4 rounded-xl border border-tiffany/20 bg-tiffany/5 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-tiffany-escuro">
+            Prospecções ativas (clientes que você começou)
+          </p>
+          <p className="mt-1 text-3xl font-bold text-escuro">{prospAtivas.total}</p>
+          <p className="mt-1 text-xs text-medio/70">
+            {prospAtivas.carteira} da carteira de leads · {prospAtivas.diretos} adicionados diretamente
+          </p>
+        </div>
+      )}
+
       {meta && (
-        <div className="mb-4 grid grid-cols-2 gap-3">
+        <div className="mb-4 grid grid-cols-3 gap-3">
           <MetaCard rotulo="Cadastros hoje" valor={meta.cadastradosHoje} alvo={meta.alvo} />
           <MetaCard rotulo="1º contatos hoje" valor={meta.primeirosContatosHoje} alvo={meta.alvo} />
+          <MetaCard rotulo="Carteira abordados hoje" valor={meta.carteiraAtivadosHoje} alvo={meta.alvo} />
         </div>
       )}
 

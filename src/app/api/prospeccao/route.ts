@@ -33,13 +33,47 @@ export async function GET(): Promise<NextResponse> {
   // Meta diaria (Manual Fase 2): 10 cadastros + 10 1os contatos por dia util.
   const inicioDia = new Date();
   inicioDia.setHours(0, 0, 0, 0);
-  const [cadastradosHoje, primeirosContatosHoje] = await Promise.all([
+  // Escopo da CARTEIRA de leads e por `donoId` (o ProspeccaoContato e por
+  // `agenteId`); admin ve tudo.
+  const escopoCarteira = ehAdmin(agente.papel) ? {} : { donoId: agente.id };
+  const [
+    cadastradosHoje,
+    primeirosContatosHoje,
+    carteiraAtivadosHoje,
+    carteiraAtivadosTotal,
+    diretosIniciadosTotal,
+  ] = await Promise.all([
     prisma.prospeccaoContato.count({ where: { ...escopo, criadoEm: { gte: inicioDia } } }),
     prisma.prospeccaoContato.count({ where: { ...escopo, primeiroContatoEm: { gte: inicioDia } } }),
+    // Carteira de leads que o vendedor ATIVOU hoje (começou — ativadoEm setado).
+    prisma.carteiraContato.count({
+      where: { ...escopoCarteira, ativadoEm: { gte: inicioDia } },
+    }),
+    // Total de carteira que o vendedor ja ativou (comecou por enviar a mensagem).
+    prisma.carteiraContato.count({
+      where: { ...escopoCarteira, ativadoEm: { not: null } },
+    }),
+    // Numeros adicionados DIRETAMENTE (prospeccao direta) com 1o contato feito.
+    prisma.prospeccaoContato.count({
+      where: { ...escopo, primeiroContatoEm: { not: null } },
+    }),
   ]);
+  // PROSPECCOES ATIVAS = clientes que o vendedor COMECOU (enviou a 1a mensagem):
+  // os ativados da carteira de leads + os numeros adicionados diretamente.
+  const prospeccoesAtivas = {
+    carteira: carteiraAtivadosTotal,
+    diretos: diretosIniciadosTotal,
+    total: carteiraAtivadosTotal + diretosIniciadosTotal,
+  };
   return NextResponse.json({
     contatos,
-    meta: { cadastradosHoje, primeirosContatosHoje, alvo: 10 },
+    meta: {
+      cadastradosHoje,
+      primeirosContatosHoje,
+      carteiraAtivadosHoje,
+      alvo: 10,
+    },
+    prospeccoesAtivas,
   });
 }
 
