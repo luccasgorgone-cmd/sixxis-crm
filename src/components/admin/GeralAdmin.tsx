@@ -483,6 +483,11 @@ export function GeralAdmin() {
           </label>
         </div>
 
+        {/* Manutencao pontual do quadro: rodar AGORA a limpeza dos perdidos e a
+            correcao de duplicados. Sao os mesmos endpoints admin ja existentes
+            (zero delete, idempotentes); aqui so ganham botao. */}
+        <ManutencaoQuadro />
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => void salvar()}
@@ -493,6 +498,210 @@ export function GeralAdmin() {
             Salvar
           </button>
           {aviso && <span className="text-sm text-medio/60">{aviso}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Manutencao pontual do quadro (admin): dois botoes de acao imediata.
+//  - Limpar perdidos: arquiva TODOS os PERDIDO de uma vez (Kanban + Inbox),
+//    sem esperar o prazo. Util para comecar o quadro limpo.
+//  - Corrigir duplicados: neutraliza negocios duplicados no mesmo cliente,
+//    mantendo o melhor (venda real nunca some).
+// Ambos: previa (GET) antes de executar, confirm obrigatorio, e ZERO delete.
+function ManutencaoQuadro() {
+  const toast = useToast();
+  const [previaPerd, setPreviaPerd] = useState<{
+    venda: number;
+    posVenda: number;
+    total: number;
+  } | null>(null);
+  const [rodandoPerd, setRodandoPerd] = useState(false);
+  const [previaDup, setPreviaDup] = useState<{
+    totalGrupos: number;
+    valorEmDobro: number;
+  } | null>(null);
+  const [rodandoDup, setRodandoDup] = useState(false);
+
+  async function previewPerdidos() {
+    setRodandoPerd(true);
+    try {
+      const r = await fetch("/api/admin/limpeza-perdidos");
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.erro(d?.erro ?? "Falha ao pre-visualizar.");
+        return;
+      }
+      setPreviaPerd(d.previa);
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRodandoPerd(false);
+    }
+  }
+
+  async function execPerdidos() {
+    if (
+      !window.confirm(
+        "Arquivar TODOS os perdidos agora? Eles saem do Kanban e do Inbox " +
+          "(nada e apagado; voltam se o cliente falar). Confirmar?",
+      )
+    ) {
+      return;
+    }
+    setRodandoPerd(true);
+    try {
+      const r = await fetch("/api/admin/limpeza-perdidos", { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.erro(d?.erro ?? "Falha na limpeza.");
+        return;
+      }
+      toast.sucesso(
+        `${d.arquivados.total} perdidos arquivados (venda ${d.arquivados.venda}, ` +
+          `pos-venda ${d.arquivados.posVenda}).`,
+      );
+      setPreviaPerd({ venda: 0, posVenda: 0, total: 0 });
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRodandoPerd(false);
+    }
+  }
+
+  async function previewDuplicados() {
+    setRodandoDup(true);
+    try {
+      const r = await fetch("/api/admin/corrigir-duplicados");
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.erro(d?.erro ?? "Falha ao pre-visualizar.");
+        return;
+      }
+      setPreviaDup({
+        totalGrupos: d.previa.totalGrupos,
+        valorEmDobro: d.previa.valorEmDobro,
+      });
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRodandoDup(false);
+    }
+  }
+
+  async function execDuplicados() {
+    if (
+      !window.confirm(
+        "Corrigir os duplicados agora? O melhor negocio de cada cliente e " +
+          "mantido e os duplicados sao neutralizados (nada e apagado). Confirmar?",
+      )
+    ) {
+      return;
+    }
+    setRodandoDup(true);
+    try {
+      const r = await fetch("/api/admin/corrigir-duplicados", {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.erro(d?.erro ?? "Falha ao corrigir.");
+        return;
+      }
+      toast.sucesso(
+        `${d.totalGrupos} clientes corrigidos, ${d.neutralizados} duplicados ` +
+          `neutralizados.`,
+      );
+      setPreviaDup({ totalGrupos: 0, valorEmDobro: 0 });
+    } catch {
+      toast.erro("Falha de conexao.");
+    } finally {
+      setRodandoDup(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-black/5 bg-white p-4">
+      <span className="block text-sm font-medium text-escuro">
+        Manutencao do quadro (agora)
+      </span>
+      <span className="mt-0.5 block text-xs text-medio/60">
+        Acoes imediatas, sem esperar prazo. Nada e apagado: tudo continua nas
+        telas de clientes e volta se o cliente falar.
+      </span>
+
+      {/* Limpar perdidos */}
+      <div className="mt-3 border-t border-black/5 pt-3">
+        <span className="block text-sm font-medium text-escuro">
+          Limpar perdidos
+        </span>
+        <span className="mt-0.5 block text-xs text-medio/60">
+          Tira do Kanban e do Inbox todos os cards de Perdido de uma vez.
+        </span>
+        {previaPerd && (
+          <p className="mt-2 text-xs text-medio">
+            {previaPerd.total > 0
+              ? `${previaPerd.total} perdidos no quadro (venda ${previaPerd.venda}, pos-venda ${previaPerd.posVenda}).`
+              : "Nenhum perdido no quadro."}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            onClick={() => void previewPerdidos()}
+            disabled={rodandoPerd}
+            className="flex items-center gap-1.5 rounded-lg border border-black/10 px-3 py-1.5 text-sm font-medium text-escuro hover:bg-black/5 disabled:opacity-60"
+          >
+            {rodandoPerd && <Loader2 className="h-4 w-4 animate-spin" />}
+            Pre-visualizar
+          </button>
+          <button
+            onClick={() => void execPerdidos()}
+            disabled={rodandoPerd || !previaPerd || previaPerd.total === 0}
+            className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar agora
+          </button>
+        </div>
+      </div>
+
+      {/* Corrigir duplicados */}
+      <div className="mt-3 border-t border-black/5 pt-3">
+        <span className="block text-sm font-medium text-escuro">
+          Corrigir duplicados
+        </span>
+        <span className="mt-0.5 block text-xs text-medio/60">
+          Quando o mesmo cliente tem mais de um negocio na mesma finalidade,
+          mantem o melhor e neutraliza o resto (a venda real nunca some).
+        </span>
+        {previaDup && (
+          <p className="mt-2 text-xs text-medio">
+            {previaDup.totalGrupos > 0
+              ? `${previaDup.totalGrupos} clientes com duplicata` +
+                (previaDup.valorEmDobro > 0
+                  ? ` (R$ ${previaDup.valorEmDobro.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} contando em dobro).`
+                  : ".")
+              : "Nenhum duplicado encontrado."}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            onClick={() => void previewDuplicados()}
+            disabled={rodandoDup}
+            className="flex items-center gap-1.5 rounded-lg border border-black/10 px-3 py-1.5 text-sm font-medium text-escuro hover:bg-black/5 disabled:opacity-60"
+          >
+            {rodandoDup && <Loader2 className="h-4 w-4 animate-spin" />}
+            Pre-visualizar
+          </button>
+          <button
+            onClick={() => void execDuplicados()}
+            disabled={rodandoDup || !previaDup || previaDup.totalGrupos === 0}
+            className="flex items-center gap-1.5 rounded-lg bg-tiffany px-3 py-1.5 text-sm font-semibold text-white hover:bg-tiffany-escuro disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            Corrigir agora
+          </button>
         </div>
       </div>
     </div>

@@ -8,7 +8,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { registrarAtividade } from "@/lib/atividade";
-import { normalizarTelefoneBR } from "@/lib/phone";
+import { normalizarTelefoneBR, variantesTelefoneBR } from "@/lib/phone";
+import { decidirCadastroDuplicado } from "@/lib/dedupCadastro";
 import { campoDono, temAcesso } from "@/lib/dono";
 import { espelharDonoNasConversas } from "@/lib/dono";
 import { garantirNegocioParaLead } from "@/lib/negocio";
@@ -125,9 +126,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const campo = campoDono(finalidade);
 
-  // Telefone ja cadastrado: sem assumir -> 409; com assumir -> vincula o dono.
-  const existente = await prisma.lead.findUnique({
-    where: { telefone },
+  // Telefone ja cadastrado? Busca TOLERANTE a variante (com/sem o 9o digito,
+  // com/sem o DDI 55) — nao so o match exato. Sem isto o MESMO cliente digitado
+  // noutra forma ("18999..." vs "5518999...") escaparia e viraria duplicata com
+  // outro dono. phone.ts ja gera as variantes plausiveis do numero.
+  const existentes = await prisma.lead.findMany({
+    where: { telefone: { in: variantesTelefoneBR(telefone) } },
     select: {
       id: true,
       nome: true,
@@ -138,7 +142,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       donoPosVendaId: true,
     },
   });
+  // Lead canonico: prefere um que JA tenha dono na finalidade (o dono manda na
+  // regra do bloqueio); senao o primeiro. Deterministico quando ha mais de um
+  // casando por variante (caso raro de base legada).
+  const existente =
+    existentes.find((l) => l[campo] != null) ?? existentes[0] ?? null;
+
   if (existente) {
+    const donoFinalidade = existente[campo];
+    const decisao = decidirCadastroDuplicado({
+      existe: true,
+      donoFinalidade,
+      requesterId: agente.id,
+      ehAdmin: admin,
+    });
+    // Nome do dono atual (quando houver), para o aviso dizer DE QUEM e o cliente.
+    const donoAtual = donoFinalidade
+      ? await prisma.agente.findUnique({
+          where: { id: donoFinalidade },
+          select: { id: true, nome: true },
+        })
+      : null;
+    const donoNome = donoAtual?.nome ?? null;
+
+    // Pertence a OUTRO vendedor e quem cadastra NAO e admin -> BLOQUEIA (403).
+    // Nao oferece "assumir": so um admin reatribui (transferencia de carteira).
+    if (decisao.acao === "ASSUMIR" && decisao.bloqueado) {
+      return NextResponse.json(
+        {
+          erro: donoNome
+            ? `Este cliente ja esta no sistema e pertence a ${donoNome}. Peca a um admin para reatribuir.`
+            : "Este cliente ja esta no sistema e pertence a outro vendedor. Peca a um admin para reatribuir.",
+          bloqueado: true,
+          leadId: existente.id,
+          nome: nomeEfetivo(existente),
+          donoId: donoFinalidade,
+          donoNome,
+        },
+        { status: 403 },
+      );
+    }
+
     if (!body.assumir) {
       return NextResponse.json(
         {
@@ -146,6 +190,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           duplicado: true,
           leadId: existente.id,
           nome: nomeEfetivo(existente),
+          donoId: donoFinalidade,
+          donoNome,
         },
         { status: 409 },
       );

@@ -69,10 +69,14 @@ export function ModalCadastrarCliente({
       setBuscandoCep(false);
     }
   }
-  // Duplicado: guarda o lead existente para oferecer assumir.
+  // Duplicado: guarda o lead existente para oferecer assumir — ou, quando o
+  // cliente pertence a OUTRO vendedor e quem cadastra nao e admin, apenas avisa
+  // e BLOQUEIA (bloqueado=true, sem botao de assumir).
   const [duplicado, setDuplicado] = useState<{
     leadId: string;
     nome: string;
+    donoNome: string | null;
+    bloqueado: boolean;
   } | null>(null);
 
   async function enviar(assumir: boolean) {
@@ -113,8 +117,24 @@ export function ModalCadastrarCliente({
         onCriado(d.leadId);
         return;
       }
+      // Pertence a outro vendedor e nao sou admin -> bloqueado (403), sem assumir.
+      if (r.status === 403 && d?.bloqueado) {
+        setDuplicado({
+          leadId: d.leadId,
+          nome: d.nome,
+          donoNome: d.donoNome ?? null,
+          bloqueado: true,
+        });
+        setSalvando(false);
+        return;
+      }
       if (r.status === 409 && d?.duplicado) {
-        setDuplicado({ leadId: d.leadId, nome: d.nome });
+        setDuplicado({
+          leadId: d.leadId,
+          nome: d.nome,
+          donoNome: d.donoNome ?? null,
+          bloqueado: false,
+        });
         setSalvando(false);
         return;
       }
@@ -142,12 +162,44 @@ export function ModalCadastrarCliente({
           </button>
         </div>
 
-        {duplicado ? (
+        {duplicado?.bloqueado ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-erro/30 bg-erro/5 p-3 text-sm text-erro">
+              Este cliente ja esta no sistema
+              {duplicado.donoNome ? (
+                <>
+                  {" "}
+                  e pertence a <strong>{duplicado.donoNome}</strong>
+                </>
+              ) : (
+                " e pertence a outro vendedor"
+              )}
+              : <strong>{duplicado.nome}</strong>. Nao e possivel cadastra-lo
+              de novo. Para passar esse cliente para voce, peca a um admin a
+              transferencia de carteira.
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setDuplicado(null)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-medio hover:bg-black/5"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        ) : duplicado ? (
           <div className="space-y-3">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               Ja existe um cliente com este telefone:{" "}
-              <strong>{duplicado.nome}</strong>. Em vez de duplicar, voce pode
-              assumi-lo como seu (na finalidade selecionada).
+              <strong>{duplicado.nome}</strong>
+              {duplicado.donoNome ? (
+                <>
+                  {" "}
+                  (hoje com <strong>{duplicado.donoNome}</strong>)
+                </>
+              ) : null}
+              . Em vez de duplicar, voce pode assumi-lo como seu (na finalidade
+              selecionada).
             </div>
             {erro && <p className="text-xs text-erro">{erro}</p>}
             <div className="flex justify-end gap-2">
