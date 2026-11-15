@@ -145,6 +145,12 @@ export async function processarReguaFollowup(): Promise<void> {
       },
     });
 
+    // Em dry-run (followupAtivo off) NAO logamos uma linha por negocio: com
+    // milhares de cards vencidos isso estoura o rate limit de logs do Railway
+    // (500/s) e derruba mensagens reais. Agregamos o que a regua FARIA por
+    // transicao e emitimos UMA linha-resumo por tick.
+    const resumoDryRun = new Map<string, number>();
+
     for (const n of negocios) {
       if (!n.etapaId) continue;
       const etapa = etapas.find((e) => e.id === n.etapaId);
@@ -155,9 +161,9 @@ export async function processarReguaFollowup(): Promise<void> {
       const prox = proximaReguaPorEtapa.get(n.etapaId) ?? null;
 
       if (!ativo) {
-        console.log(
-          `[regua][dry-run] negocio ${n.id} em "${etapa.nome}" ha ${decorrido} dia(s) util(eis) (>= ${etapa.diasUteisMax}) -> ${prox ? `"${prox.nome}"` : "PERDIDO (Sem resposta)"}`,
-        );
+        const destino = prox ? prox.nome : "PERDIDO (Sem resposta)";
+        const chave = `${etapa.nome} -> ${destino}`;
+        resumoDryRun.set(chave, (resumoDryRun.get(chave) ?? 0) + 1);
         continue;
       }
 
@@ -166,6 +172,18 @@ export async function processarReguaFollowup(): Promise<void> {
       } else {
         await moverParaPerdido(n, etapa.nome, n.finalidade);
       }
+    }
+
+    if (!ativo && resumoDryRun.size > 0) {
+      let total = 0;
+      const partes: string[] = [];
+      for (const [chave, qtd] of resumoDryRun) {
+        total += qtd;
+        partes.push(`${chave}: ${qtd}`);
+      }
+      console.log(
+        `[regua][dry-run] followupAtivo=off — ${total} negocio(s) venceriam a regua { ${partes.join(", ")} }`,
+      );
     }
   } catch (erro) {
     console.error(`[regua] falha: ${erro instanceof Error ? erro.message : String(erro)}`);
