@@ -797,7 +797,20 @@ model Negocio {
   // lib/arquivamento). null = arquivado antes desta fatia (origem desconhecida)
   // ou nao arquivado. Uso interno/relatorio: nao aparece para o vendedor.
   arquivadoMotivo String?
+  // ATRIBUICAO DE ANUNCIO (Click-to-WhatsApp) CONGELADA no fechamento (GANHO).
+  // Copiada do first-touch do Lead (marcadores da 1a msg IN; telefone @unique =
+  // um lead por contato, entao esse marcador JA E o first-touch do telefone),
+  // so quando o primeiro toque e <= 60d antes do ganho. ADITIVO/nullable: nao
+  // altera a venda, so registra qual anuncio trouxe o contato (relatorio do
+  // marketing + alimenta o CAPI). FORWARD-ONLY: historico passado nao e reescrito.
+  anuncioIdAtribuido     String?
+  anuncioTituloAtribuido String?
+  anuncioUrlAtribuido    String?
+  ctwaClidAtribuido      String?
+  atribuicaoAnuncioEm    DateTime?
   historicos    HistoricoNegocio[]
+  // Log de auditoria dos eventos Purchase enviados (ou pulados) ao Meta CAPI.
+  eventosCapi   EventoCapi[]
   atividades    Atividade[]
   lembretes     Lembrete[]
   cotacoes      CotacaoProduto[]
@@ -890,6 +903,37 @@ model HistoricoNegocio {
   criadoEm  DateTime      @default(now())
 
   @@index([negocioId, criadoEm])
+}
+
+// Log de auditoria dos eventos Purchase do Meta CAPI disparados (ou pulados)
+// no fechamento de um negocio. ADITIVO: nao altera nenhum fluxo existente, so
+// registra o que aconteceu com cada tentativa de envio, pra o marketing medir
+// atribuicao e pra depurar deduplicacao/dupla-contagem. onDelete:SetNull porque
+// o log sobrevive mesmo se o negocio for removido.
+model EventoCapi {
+  id           String   @id @default(cuid())
+  negocioId    String?
+  negocio      Negocio? @relation(fields: [negocioId], references: [id], onDelete: SetNull)
+  eventName    String   @default("Purchase")
+  eventId      String
+  actionSource String   @default("business_messaging")
+  valor        Decimal? @db.Decimal(12, 2)
+  moeda        String?
+  ctwaClid     String?
+  anuncioId    String?
+  // Quando true, o CAPI NAO foi enviado de proposito (ex.: origem = pedido do
+  // site, que ja dispara Purchase pelo proprio fluxo da loja) — evita dupla
+  // contagem no Meta. motivoPulo diz por que.
+  pulado       Boolean  @default(false)
+  motivoPulo   String?
+  ok           Boolean  @default(false)
+  status       Int?
+  motivo       String?  @db.Text
+  criadoEm     DateTime @default(now())
+
+  @@index([negocioId])
+  @@index([eventId])
+  @@index([criadoEm])
 }
 
 model Nota {

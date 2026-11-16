@@ -161,3 +161,61 @@ export async function testarConexaoMeta(override?: {
     };
   }
 }
+
+// Origens que representam um PEDIDO FEITO NO SITE/LOJA (Mercado Pago etc.).
+// Esse fluxo ja dispara seu proprio Purchase, entao o CRM NAO deve mandar um
+// segundo evento ao virar GANHO — evita dupla contagem no Meta. Comparacao
+// case-insensitive; valor desconhecido/whatsapp/manual => false (dispara normal).
+const ORIGENS_SITE = new Set([
+  "site",
+  "loja",
+  "pedido_site",
+  "pedido-site",
+  "ecommerce",
+  "e-commerce",
+]);
+
+export function ehPedidoDoSite(origem?: string | null): boolean {
+  if (!origem) return false;
+  return ORIGENS_SITE.has(origem.trim().toLowerCase());
+}
+
+// Log de auditoria de cada tentativa de Purchase (enviada OU pulada). Best-effort:
+// nunca derruba o fluxo de venda — se o insert falhar, so avisa no console.
+export async function registrarEventoCapi(opts: {
+  negocioId?: string | null;
+  eventName?: string;
+  eventId: string;
+  actionSource?: string;
+  valor?: number | null;
+  moeda?: string | null;
+  ctwaClid?: string | null;
+  anuncioId?: string | null;
+  pulado?: boolean;
+  motivoPulo?: string | null;
+  ok?: boolean;
+  status?: number | null;
+  motivo?: string | null;
+}): Promise<void> {
+  try {
+    await prisma.eventoCapi.create({
+      data: {
+        negocioId: opts.negocioId ?? null,
+        eventName: opts.eventName ?? "Purchase",
+        eventId: opts.eventId,
+        actionSource: opts.actionSource ?? "business_messaging",
+        valor: opts.valor ?? null,
+        moeda: opts.moeda ?? null,
+        ctwaClid: opts.ctwaClid ?? null,
+        anuncioId: opts.anuncioId ?? null,
+        pulado: opts.pulado ?? false,
+        motivoPulo: opts.motivoPulo ?? null,
+        ok: opts.ok ?? false,
+        status: opts.status ?? null,
+        motivo: opts.motivo ?? null,
+      },
+    });
+  } catch (erro) {
+    console.warn("[metaCapi] falha ao registrar EventoCapi:", erro);
+  }
+}
