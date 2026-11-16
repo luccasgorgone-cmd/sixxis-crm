@@ -5,6 +5,8 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
 import { setIO } from "./src/lib/socket";
+import { exigirSessaoNoSocket } from "./src/lib/socketAuth";
+import { prisma } from "./src/lib/prisma";
 import { registrarSinalizacaoChamada } from "./src/lib/sinalizacaoChamada";
 import { createMessagesWorker, createCampaignWorker } from "./src/lib/queue";
 import { iniciarManutencao } from "./src/lib/manutencao";
@@ -100,6 +102,20 @@ async function main(): Promise<void> {
 
   // Socket.io anexado ao MESMO httpServer. Sem CORS explicito = same-origin.
   const io = new Server(httpServer);
+  // O /socket.io/ NAO passa pelo middleware do Next: exige a sessao do painel
+  // no handshake (cookie JWT do NextAuth + agente ativo no banco). Sem isso,
+  // qualquer cliente anonimo receberia os broadcasts em tempo real.
+  exigirSessaoNoSocket(io, {
+    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+    sandbox: sandboxOnly,
+    verificarAtivo: async (id) => {
+      const a = await prisma.agente.findUnique({
+        where: { id },
+        select: { ativo: true },
+      });
+      return !!a?.ativo;
+    },
+  });
   setIO(io);
 
   // F7-Calling: relay de sinalizacao de chamada (aditivo, nao mexe nos emits

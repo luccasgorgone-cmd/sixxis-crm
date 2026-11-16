@@ -1,13 +1,13 @@
 // F7-Calling — relay de sinalizacao de chamada no servidor.
 //
 // ADITIVO: registra handlers em io.on("connection") SEM tocar nos emits globais
-// existentes (mensagem:nova, conversa:atualizada, etc.). Nenhuma conexao e
-// rejeitada — a identificacao do agente e opcional e so serve para criar salas
-// por agente (agente:<id>), permitindo entregar a chamada ao browser certo em
-// vez do broadcast global. Isto e o piso do F7.0; a auth estrita do handshake
-// (rejeitar conexao sem sessao) fica para um passo seguinte, com cuidado de
-// contrato para nao derrubar os clientes ja conectados.
+// existentes (mensagem:nova, conversa:atualizada, etc.). A conexao ja chega
+// autenticada pelo handshake (src/lib/socketAuth.ts, registrado no server.ts):
+// o socket so entra na sala do PROPRIO agente da sessao (agente:<id>) — o
+// agenteId enviado pelo cliente e ignorado quando ha sessao, para ninguem
+// "se identificar" como outro agente e receber as chamadas dele.
 import type { Server, Socket } from "socket.io";
+import { agenteDoSocket } from "./socketAuth";
 import {
   EVT,
   salaAgente,
@@ -21,7 +21,10 @@ export function registrarSinalizacaoChamada(io: Server): void {
   io.on("connection", (socket: Socket) => {
     // O cliente se identifica apos conectar; entra na sala do proprio agente.
     socket.on(EVT.identificar, (p: { agenteId?: string }) => {
-      const id = p?.agenteId?.trim();
+      // Com sessao (producao): SEMPRE o agente autenticado. Sem sessao so existe
+      // no modo sandbox local (SANDBOX_ONLY=1), onde vale o id informado.
+      const daSessao = agenteDoSocket(socket);
+      const id = daSessao ? daSessao.id : p?.agenteId?.trim();
       if (!id) return;
       void socket.join(salaAgente(id));
     });
