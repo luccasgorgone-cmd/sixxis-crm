@@ -3,7 +3,7 @@
 // e automatico da ingestao). Abrir a conversa zera ambos (ver a rota de
 // mensagens). Emite "conversa:atualizada" para as telas refletirem o indicador.
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { obterAgente, acessoConversa } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 
@@ -14,11 +14,17 @@ export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
+  const agente = await obterAgente();
+  if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
   const { id } = await ctx.params;
+
+  // Escopo: so admin, o atendente da conversa ou o dono do cliente
+  // (src/lib/acessoConversa.ts). Inexistente segue para o 404 abaixo.
+  if ((await acessoConversa(agente, id)) === "negado") {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
 
   const conversa = await prisma.conversa.findUnique({
     where: { id },
