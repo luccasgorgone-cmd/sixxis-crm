@@ -389,6 +389,8 @@ model Lead {
   @@index([donoPosVendaId])
   @@index([empresaFaturadaId])
   @@index([nomeBusca])
+  // API Leitura v1: Lead nao tem @updatedAt; sync por criadoEm + cursor id.
+  @@index([criadoEm, id], map: "Lead_criadoEm_id_idx")
 }
 
 // Endereco de um cliente. Varios por cliente; um pode ser marcado principal.
@@ -491,6 +493,8 @@ model Conversa {
   @@index([finalidade])
   @@index([agenteId, ultimaMensagemEm])
   @@index([fixadaEm])
+  // API Leitura v1: Conversa nao tem @updatedAt; sort/sync por criadoEm + id.
+  @@index([criadoEm, id], map: "Conversa_criadoEm_id_idx")
 }
 
 model Mensagem {
@@ -550,6 +554,8 @@ model Mensagem {
   @@index([respostaAId])
   @@index([conversaId, hora])
   @@index([conversaId, direcao])
+  // API Leitura v1: feed global por janela de data (hora) + cursor id.
+  @@index([hora, id], map: "Mensagem_hora_id_idx")
 }
 
 // ---------------------------------------------------------------------------
@@ -849,6 +855,8 @@ model Negocio {
   // Fatia W: resolucao do setor com atendimento ABERTO por lead na ingestao
   // (roteamento por setor aberto). Query barata/indexada em toda mensagem IN.
   @@index([leadId, status])
+  // API Leitura v1: watermark de sync incremental (atualizadoDesde) + cursor id.
+  @@index([atualizadoEm, id], map: "Negocio_atualizadoEm_id_idx")
 }
 
 // Codigo(s) de rastreio de um negocio. MULTIPLOS por negocio (varias remessas).
@@ -2156,4 +2164,53 @@ model CarteiraAtividade {
   @@index([agenteId, criadoEm])
   @@index([contatoId])
   @@index([tipo, criadoEm])
+}
+
+// ============================================================================
+// API de Leitura v1 (read-only externa). Tabelas ADITIVAS, desacopladas do
+// negocio (sem FK para models de dominio). Autenticacao Bearer independente do
+// NextAuth do app. Nunca guardamos a chave em claro — so o hash SHA-256.
+// ============================================================================
+
+// Chave de API read-only. `hash` = SHA-256 hex da chave completa (comparacao em
+// tempo constante). `prefixo` = primeiros chars (ex.: "sxc_live_ab12cd34") so
+// para exibir/identificar em logs/CLI — NUNCA revela a chave. `escopos` controla
+// o que a chave le (read:all, read:pedidos, ..., read:pii, read:mensagens).
+model ApiChaveLeitura {
+  id          String    @id @default(cuid())
+  nome        String
+  prefixo     String
+  hash        String    @unique
+  escopos     String[]  @default([])
+  criadoEm    DateTime  @default(now())
+  atualizadoEm DateTime @updatedAt
+  expiraEm    DateTime?
+  revogadoEm  DateTime?
+  ultimoUsoEm DateTime?
+  ultimoIp    String?
+
+  @@index([prefixo])
+  @@index([revogadoEm])
+}
+
+// Log de auditoria por requisicao da API v1. NUNCA guarda a chave nem valores de
+// PII — so o id/prefixo da chave, rota, query com valores redigidos, status,
+// duracao e IP. Retido para rastreabilidade; nao e dado de dominio.
+model ApiLogAcesso {
+  id         String   @id @default(cuid())
+  chaveId    String?
+  prefixo    String?
+  metodo     String
+  rota       String
+  query      String?  @db.Text
+  status     Int
+  duracaoMs  Int
+  ip         String?
+  userAgent  String?  @db.Text
+  requestId  String
+  criadoEm   DateTime @default(now())
+
+  @@index([chaveId, criadoEm])
+  @@index([rota, criadoEm])
+  @@index([criadoEm])
 }
