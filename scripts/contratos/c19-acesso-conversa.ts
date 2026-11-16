@@ -75,5 +75,10 @@ caso("fiacao: encaminhar checa tambem a conversa de ORIGEM", () => {
   assert.match(src, /acessoConversa\(agente, origem\.conversaId\)/);
 });
 
+caso("fiacao: middleware cobre /api/* mesmo com extensao no path", () => {
+  const src = readFileSync(join(process.cwd(), "src/middleware.ts"), "utf8");
+  assert.match(src, /matcher:\s*\[\s*"\/api\/:path\*"/);
+});
+
 console.log(`\nC19 acesso-conversa: ${ok} ok, ${falhou} falha(s)`);
 if (falhou > 0) process.exit(1);

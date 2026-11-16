@@ -73,6 +73,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Roda em tudo, menos assets estaticos do Next e arquivos com extensao.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)"],
+  // Roda em tudo, menos assets estaticos do Next e arquivos com extensao. A API
+  // entra SEMPRE (primeiro item): sem isso, um id com ".json"/".png" no fim
+  // (ex.: /api/leads/<id>.json) pulava o middleware e dependia so da checagem
+  // da propria rota.
+  matcher: ["/api/:path*", "/((?!_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)"],
 };
