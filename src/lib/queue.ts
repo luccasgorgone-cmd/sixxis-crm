@@ -2149,7 +2149,7 @@ async function processarEvento(
   // Reuso tolerante a VARIANTE do numero (com/sem o 9 de celular, com/sem o DDI
   // 55): o MESMO cliente que chega noutro formato NAO deve criar um 2o lead —
   // essa era a causa-raiz dos pares duplicados (upsert por telefone exato nao
-  // casava "5562996559395" com "556296559395"). So cria quando NENHUMA variante
+  // casava "5562999990000" com "556299990000"). So cria quando NENHUMA variante
   // existe. Entre variantes, usa a mais ANTIGA (o lead original) para as novas
   // mensagens caírem sempre no mesmo card. variantesTelefoneBR e conservador:
   // nunca inventa numero (so entra/sai o 9 quando bate o padrao de celular BR).

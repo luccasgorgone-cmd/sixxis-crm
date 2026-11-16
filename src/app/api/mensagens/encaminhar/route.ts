@@ -4,7 +4,7 @@
 // efeito para o cliente. Fatia 2.85.
 import { NextResponse, type NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import { auth } from "@/auth";
+import { obterAgente, acessoConversa } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
@@ -25,11 +25,11 @@ function ehUrlRenderavel(url?: string | null): boolean {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
+  const agente = await obterAgente();
+  if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  const agenteId = session.user.id;
+  const agenteId = agente.id;
 
   let body: { mensagemId?: string; conversaDestinoId?: string };
   try {
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const origem = await prisma.mensagem.findUnique({
     where: { id: mensagemId },
     select: {
+      conversaId: true,
       tipo: true,
       conteudo: true,
       mediaUrl: true,
@@ -58,6 +59,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
   if (!origem) {
     return NextResponse.json({ erro: "mensagem nao encontrada" }, { status: 404 });
+  }
+  // A mensagem de ORIGEM tambem precisa ser de uma conversa acessivel (senao
+  // daria para copiar conteudo de conversa alheia para a propria).
+  if ((await acessoConversa(agente, origem.conversaId)) !== "ok") {
+    return NextResponse.json({ erro: "mensagem nao encontrada" }, { status: 404 });
+  }
+
+  // Escopo: so admin, o atendente da conversa ou o dono do cliente
+  // (src/lib/acessoConversa.ts). Inexistente segue para o 404 abaixo.
+  if ((await acessoConversa(agente, conversaDestinoId)) === "negado") {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
   const conversa = await prisma.conversa.findUnique({

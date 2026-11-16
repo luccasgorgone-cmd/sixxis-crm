@@ -1,7 +1,7 @@
 // Mensagens de uma conversa (ordem cronologica). Ao abrir, zera o contador de
 // nao lidas e marca as mensagens IN como lidas.
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { obterAgente, acessoConversa } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { SELECT_CITADA } from "@/lib/citada";
@@ -14,12 +14,18 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
+  const agente = await obterAgente();
+  if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
 
   const { id } = await ctx.params;
+
+  // Escopo: so admin, o atendente da conversa ou o dono do cliente
+  // (src/lib/acessoConversa.ts). Inexistente segue para o 404 abaixo.
+  if ((await acessoConversa(agente, id)) === "negado") {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
+  }
 
   const conversa = await prisma.conversa.findUnique({
     where: { id },
@@ -105,7 +111,7 @@ export async function GET(
   // Fatia Y: abrir tambem limpa a marcacao MANUAL de nao-lida (marcadaNaoLida) —
   // por isso o bloco roda tambem quando ha marcacao manual, mesmo com naoLidas=0.
   const precisaLimpar =
-    conversa.agenteId === session.user.id &&
+    conversa.agenteId === agente.id &&
     (conversa.naoLidas > 0 || conversa.marcadaNaoLida);
   if (precisaLimpar) {
     await prisma.$transaction([

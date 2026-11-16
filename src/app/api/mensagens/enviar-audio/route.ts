@@ -6,7 +6,7 @@
 // derruba a rota: grava ERRO e retorna 502.
 import { NextResponse, type NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import { auth } from "@/auth";
+import { obterAgente, acessoConversa } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 import { marcarInteracaoNoNegocio } from "@/lib/negocio";
@@ -28,11 +28,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
+  const agente = await obterAgente();
+  if (!agente) {
     return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
   }
-  const agenteId = session.user.id;
+  const agenteId = agente.id;
 
   let form: FormData;
   try {
@@ -51,6 +51,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { erro: "conversaId e audio sao obrigatorios" },
       { status: 400 },
     );
+  }
+
+  // Escopo: so admin, o atendente da conversa ou o dono do cliente
+  // (src/lib/acessoConversa.ts). Inexistente segue para o 404 abaixo.
+  if ((await acessoConversa(agente, conversaId)) === "negado") {
+    return NextResponse.json({ erro: "sem permissao" }, { status: 403 });
   }
 
   const conversa = await prisma.conversa.findUnique({

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Papel } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import { podeAcessarConversa } from "@/lib/acessoConversa";
 
 export type SessaoAgente = {
   id: string;
@@ -181,4 +182,22 @@ export function podeAcessarNegocio(
 ): boolean {
   if (ehAdmin(agente.papel)) return true;
   return negocioAgenteId === agente.id;
+}
+
+// Acesso do agente a UMA conversa (rotas de mensagens/inbox por id). Regra em
+// src/lib/acessoConversa.ts (pura, coberta pelo contrato C19). "inexistente"
+// deixa a rota responder 404 como antes; "negado" -> 403.
+export async function acessoConversa(
+  agente: SessaoAgente,
+  conversaId: string,
+): Promise<"ok" | "negado" | "inexistente"> {
+  const conversa = await prisma.conversa.findUnique({
+    where: { id: conversaId },
+    select: {
+      agenteId: true,
+      lead: { select: { donoId: true, donoPosVendaId: true } },
+    },
+  });
+  if (!conversa) return "inexistente";
+  return podeAcessarConversa(agente, conversa) ? "ok" : "negado";
 }
