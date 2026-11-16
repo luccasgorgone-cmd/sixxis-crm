@@ -9,7 +9,7 @@ security:
   -     bearerAuth: []
 x-build:
   commit: "desconhecido"
-  time: "2026-11-16T19:46:53.981Z"
+  time: "2026-11-16T20:04:34.820Z"
 tags:
   -     name: "meta"
   -     name: "clientes"
@@ -1236,13 +1236,12 @@ components:
       additionalProperties: false
     Pagamentos:
       type: "object"
-      description: "Pagamentos (Mercado Pago). Link de checkout (initPoint) nao exposto."
+      description: "Pagamentos (Mercado Pago). Link de checkout (initPoint) e preference id (mpPreferenceId, reconstroi o checkout) nao expostos."
       properties:
         id: {}
         negocioId: {}
         orcamentoId: {}
         referencia: {}
-        mpPreferenceId: {}
         mpPaymentId: {}
         externalReference: {}
         valor:
@@ -9729,7 +9728,7 @@ paths:
       tags:
         - "pagamentos"
       summary: "Lista pagamentos"
-      description: "Pagamentos (Mercado Pago). Link de checkout (initPoint) nao exposto."
+      description: "Pagamentos (Mercado Pago). Link de checkout (initPoint) e preference id (mpPreferenceId, reconstroi o checkout) nao expostos."
       security:
         - bearerAuth:
             - "read:pagamentos"

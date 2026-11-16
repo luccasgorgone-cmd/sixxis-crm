@@ -9,6 +9,8 @@ import { recursoPorNome } from "./registro";
 
 export const LIMITE_PADRAO = 100;
 export const LIMITE_MAX = 500;
+// Teto de itens no filtro 'ids' (evita WHERE id IN (...) gigante -> carga no Postgres).
+export const MAX_IDS = 500;
 
 export interface PlanoConsulta {
   // Argumentos para prisma.<model>.findMany (sem `select`, que vem do serializador).
@@ -116,7 +118,12 @@ export function montarPlano(recurso: Recurso, params: URLSearchParams): PlanoCon
 
   // --- filtro ids -----------------------------------------------------------
   const ids = lerLista(params, "ids");
-  if (ids) condicoes.push({ id: { in: ids } });
+  if (ids) {
+    if (ids.length > MAX_IDS) {
+      throw requisicaoInvalida(`Parametro 'ids' aceita no maximo ${MAX_IDS} valores (recebidos ${ids.length}).`);
+    }
+    condicoes.push({ id: { in: ids } });
+  }
 
   // --- janelas de data ------------------------------------------------------
   const colCriacao = recurso.campoCriacao ?? colunaOrdenacao;

@@ -4225,7 +4225,7 @@
                 }
               ]
             },
-            "description": "Pagamentos (Mercado Pago). Link de checkout (initPoint) nao exposto."
+            "description": "Pagamentos (Mercado Pago). Link de checkout (initPoint) e preference id (mpPreferenceId, reconstroi o checkout) nao expostos."
           }
         },
         {

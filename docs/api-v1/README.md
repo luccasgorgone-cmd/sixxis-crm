@@ -117,7 +117,7 @@ Para PII/mensagens, sempre precisa somar `read:pii` / `read:mensagens`.
 |---|---|---|---|
 | `limit` | int (1–500) | 100 | Tamanho da página. |
 | `cursor` | string | — | Cursor keyset opaco (use `meta.nextCursor` da página anterior). |
-| `ids` | string | — | Lista de ids separada por vírgula. |
+| `ids` | string | — | Lista de ids separada por vírgula (**máx. 500**; acima disso → `400`). |
 | `fields` | string | — | **Campos esparsos** separados por vírgula (`id` sempre incluído). Reduz payload. |
 | `expand` | string | — | Expansões de profundidade 1, separadas por vírgula. |
 | `atualizadoDesde` | date-time (ISO) | — | **Sync incremental:** só registros alterados desde a data. |
@@ -271,6 +271,25 @@ Sempre há `requestId` — inclua-o ao reportar um problema.
 - Cabeçalhos em toda resposta: `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
   `X-RateLimit-Reset` (segundos até reiniciar).
 - Ao estourar: **`429`** + `Retry-After` (segundos). Respeite-o antes de tentar de novo.
+- O limitador é **por chave** e roda após a autenticação. Rajada de token inválido
+  (401) ainda não é limitada por IP — pendência de endurecimento abaixo.
+
+---
+
+## 9.1 Limitações conhecidas / pendências de endurecimento
+
+Nenhuma afeta sigilo de dado (allowlist deny-by-default segue valendo); são itens de
+robustez/operação revistos na auditoria de segurança do release:
+
+- **Rate limit só por chave (não por IP).** O limitador roda depois de `autenticar`,
+  então flood de **token inválido** não é freado por IP (cada tentativa é uma consulta
+  ao banco). Mitigação futura: teto por IP antes da autenticação. Em degradação do
+  Redis o limitador é *fail-open* (não bloqueia) — por ora aceitável porque a API é
+  read-only e sem segredos.
+- **Colunas `Json` trafegam cruas** nos recursos que as expõem na allowlist
+  (`negocios.produtos`, `orcamentos.pagamentos`, `campanhas.filtroJson`,
+  `configuracao.horarios`/`feriados`). São dados de negócio (não segredos), mas a forma
+  interna pode mudar sem aviso de quebra — trate esses campos como *opacos*.
 
 ---
 
