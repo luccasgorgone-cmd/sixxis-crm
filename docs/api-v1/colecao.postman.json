@@ -1,0 +1,4937 @@
+{
+  "info": {
+    "name": "Sixxis CRM — API de Leitura v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API read-only do CRM Sixxis. Auth: Bearer {{token}}. Base: {{baseUrl}}. Gerada do OpenApi (registro = fonte única)."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://sixxis-crm-production.up.railway.app/api/v1"
+    },
+    {
+      "key": "token",
+      "value": "SUA_CHAVE_AQUI_sxc_live_..."
+    }
+  ],
+  "item": [
+    {
+      "name": "agentes",
+      "item": [
+        {
+          "name": "Lista agentes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agentes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agentes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Atendentes/usuarios do CRM (vendedores, pos-venda, admin). Senha nunca exposta."
+          }
+        },
+        {
+          "name": "Obtem um agentes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agentes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agentes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um agentes por id"
+          }
+        },
+        {
+          "name": "Lista presencas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/presencas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "presencas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Periodos de presenca/online dos agentes (para tempo de resposta/SLA)."
+          }
+        },
+        {
+          "name": "Obtem um presencas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/presencas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "presencas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um presencas por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "analytics",
+      "item": [
+        {
+          "name": "Lista eventos-capi",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/eventos-capi?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "eventos-capi"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Eventos enviados ao Meta Conversions API (atribuicao de conversao)."
+          }
+        },
+        {
+          "name": "Obtem um eventos-capi por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/eventos-capi/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "eventos-capi",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um eventos-capi por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "campanhas",
+      "item": [
+        {
+          "name": "Lista campanhas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanhas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanhas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Campanhas de disparo/mensagem."
+          }
+        },
+        {
+          "name": "Obtem um campanhas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanhas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanhas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um campanhas por id"
+          }
+        },
+        {
+          "name": "Lista campanha-destinos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanha-destinos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanha-destinos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Destinos individuais de uma campanha."
+          }
+        },
+        {
+          "name": "Obtem um campanha-destinos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanha-destinos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanha-destinos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um campanha-destinos por id"
+          }
+        },
+        {
+          "name": "Lista campanhas-recaptacao",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanhas-recaptacao?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanhas-recaptacao"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Campanhas de recaptacao (follow-up em massa)."
+          }
+        },
+        {
+          "name": "Obtem um campanhas-recaptacao por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campanhas-recaptacao/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campanhas-recaptacao",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um campanhas-recaptacao por id"
+          }
+        },
+        {
+          "name": "Lista recaptacao-envios",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recaptacao-envios?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recaptacao-envios"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Envios individuais de recaptacao."
+          }
+        },
+        {
+          "name": "Obtem um recaptacao-envios por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recaptacao-envios/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recaptacao-envios",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um recaptacao-envios por id"
+          }
+        },
+        {
+          "name": "Lista prospeccao",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prospeccao?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prospeccao"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Fila/estado de prospeccao ativa por lead."
+          }
+        },
+        {
+          "name": "Obtem um prospeccao por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prospeccao/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prospeccao",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um prospeccao por id"
+          }
+        },
+        {
+          "name": "Lista carteira-lotes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carteira-lotes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carteira-lotes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lotes importados para a carteira de leads frios."
+          }
+        },
+        {
+          "name": "Obtem um carteira-lotes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carteira-lotes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carteira-lotes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um carteira-lotes por id"
+          }
+        },
+        {
+          "name": "Lista carteira-contatos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carteira-contatos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carteira-contatos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Contatos da carteira fria. Telefone/nome mascarados sem read:pii."
+          }
+        },
+        {
+          "name": "Obtem um carteira-contatos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carteira-contatos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carteira-contatos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um carteira-contatos por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "catalogo",
+      "item": [
+        {
+          "name": "Lista produtos-catalogo",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/produtos-catalogo?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos-catalogo"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Catalogo de produtos."
+          }
+        },
+        {
+          "name": "Obtem um produtos-catalogo por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/produtos-catalogo/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos-catalogo",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um produtos-catalogo por id"
+          }
+        },
+        {
+          "name": "Lista movimentacoes-peca",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movimentacoes-peca?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movimentacoes-peca"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Movimentacoes de estoque de pecas."
+          }
+        },
+        {
+          "name": "Obtem um movimentacoes-peca por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movimentacoes-peca/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movimentacoes-peca",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um movimentacoes-peca por id"
+          }
+        },
+        {
+          "name": "Lista pecas-uso",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pecas-uso?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pecas-uso"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Uso de pecas em negocios/assistencia."
+          }
+        },
+        {
+          "name": "Obtem um pecas-uso por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pecas-uso/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pecas-uso",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um pecas-uso por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "clientes",
+      "item": [
+        {
+          "name": "Lista leads",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Clientes/contatos. Dados pessoais mascarados sem read:pii."
+          }
+        },
+        {
+          "name": "Obtem um leads por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um leads por id"
+          }
+        },
+        {
+          "name": "Lista enderecos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enderecos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enderecos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Enderecos de clientes. Logradouro/numero mascarados sem read:pii."
+          }
+        },
+        {
+          "name": "Obtem um enderecos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enderecos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enderecos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um enderecos por id"
+          }
+        },
+        {
+          "name": "Lista empresas-faturadas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/empresas-faturadas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "empresas-faturadas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Empresas emissoras de nota (razao de faturamento)."
+          }
+        },
+        {
+          "name": "Obtem um empresas-faturadas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/empresas-faturadas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "empresas-faturadas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um empresas-faturadas por id"
+          }
+        },
+        {
+          "name": "Lista produtos-interesse",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/produtos-interesse?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos-interesse"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Catalogo de produtos de interesse marcaveis em leads."
+          }
+        },
+        {
+          "name": "Obtem um produtos-interesse por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/produtos-interesse/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos-interesse",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um produtos-interesse por id"
+          }
+        },
+        {
+          "name": "Lista notas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Notas internas livres em leads (texto interno)."
+          }
+        },
+        {
+          "name": "Obtem um notas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um notas por id"
+          }
+        },
+        {
+          "name": "Lista atividades",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/atividades?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "atividades"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Linha do tempo de atividades em leads/negocios."
+          }
+        },
+        {
+          "name": "Obtem um atividades por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/atividades/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "atividades",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um atividades por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "config",
+      "item": [
+        {
+          "name": "Lista config-alerta-sla",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-alerta-sla?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-alerta-sla"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Configuracao de alertas de SLA por etapa/finalidade."
+          }
+        },
+        {
+          "name": "Obtem um config-alerta-sla por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-alerta-sla/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-alerta-sla",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um config-alerta-sla por id"
+          }
+        },
+        {
+          "name": "Lista configuracao",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/configuracao?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "configuracao"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Configuracao geral do CRM. Token CAPI e blobs de logo/favicon nao expostos."
+          }
+        },
+        {
+          "name": "Obtem um configuracao por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/configuracao/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "configuracao",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um configuracao por id"
+          }
+        },
+        {
+          "name": "Lista config-roteamento",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-roteamento?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-roteamento"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Configuracao de roteamento de atendimento."
+          }
+        },
+        {
+          "name": "Obtem um config-roteamento por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-roteamento/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-roteamento",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um config-roteamento por id"
+          }
+        },
+        {
+          "name": "Lista config-agente-ia",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-agente-ia?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-agente-ia"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Configuracao do agente de IA de atendimento (sem chaves de API)."
+          }
+        },
+        {
+          "name": "Obtem um config-agente-ia por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/config-agente-ia/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "config-agente-ia",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um config-agente-ia por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "conversas",
+      "item": [
+        {
+          "name": "Lista conversas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Conversas de WhatsApp por lead/instancia."
+          }
+        },
+        {
+          "name": "Obtem um conversas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um conversas por id"
+          }
+        },
+        {
+          "name": "Lista mensagens",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensagens?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensagens"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Mensagens de conversa. Conteudo exige read:mensagens; payload bruto nunca exposto."
+          }
+        },
+        {
+          "name": "Obtem um mensagens por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensagens/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensagens",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um mensagens por id"
+          }
+        },
+        {
+          "name": "Lista grupos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grupos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grupos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Grupos internos de WhatsApp monitorados."
+          }
+        },
+        {
+          "name": "Obtem um grupos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grupos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grupos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um grupos por id"
+          }
+        },
+        {
+          "name": "Lista mensagens-grupo",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensagens-grupo?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensagens-grupo"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Mensagens de grupos internos. Conteudo exige read:mensagens."
+          }
+        },
+        {
+          "name": "Obtem um mensagens-grupo por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensagens-grupo/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensagens-grupo",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um mensagens-grupo por id"
+          }
+        },
+        {
+          "name": "Lista respostas-rapidas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/respostas-rapidas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "respostas-rapidas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Respostas rapidas/atalhos de atendimento."
+          }
+        },
+        {
+          "name": "Obtem um respostas-rapidas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/respostas-rapidas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "respostas-rapidas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um respostas-rapidas por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "integracoes",
+      "item": [
+        {
+          "name": "Lista instancias-whatsapp",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/instancias-whatsapp?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "instancias-whatsapp"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Instancias de WhatsApp (metadados). Token/credencial nunca exposto."
+          }
+        },
+        {
+          "name": "Obtem um instancias-whatsapp por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/instancias-whatsapp/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "instancias-whatsapp",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um instancias-whatsapp por id"
+          }
+        },
+        {
+          "name": "Lista integracao-mercadolivre",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/integracao-mercadolivre?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "integracao-mercadolivre"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Status da integracao Mercado Livre. accessToken/refreshToken nunca expostos."
+          }
+        },
+        {
+          "name": "Obtem um integracao-mercadolivre por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/integracao-mercadolivre/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "integracao-mercadolivre",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um integracao-mercadolivre por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta",
+      "item": [
+        {
+          "name": "Health check (sem auth)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Health check (sem auth)"
+          }
+        },
+        {
+          "name": "Informacoes da chave atual",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Informacoes da chave atual"
+          }
+        },
+        {
+          "name": "Catalogo de recursos e escopos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/meta/recursos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "meta",
+                "recursos"
+              ]
+            },
+            "description": "Catalogo de recursos e escopos"
+          }
+        },
+        {
+          "name": "Este documento OpenAPI 3.1",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "openapi.json"
+              ]
+            },
+            "description": "Este documento OpenAPI 3.1"
+          }
+        },
+        {
+          "name": "Documentacao interativa (Scalar)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "docs"
+              ]
+            },
+            "description": "Documentacao interativa (Scalar)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "metas",
+      "item": [
+        {
+          "name": "Lista metas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/metas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Metas (individuais/equipe) por metrica e periodo."
+          }
+        },
+        {
+          "name": "Obtem um metas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/metas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um metas por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "negocios",
+      "item": [
+        {
+          "name": "Lista negocios",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/negocios?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "negocios"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Negocios/oportunidades no funil. Valor efetivo = valorAjustado (quando != null) senao valor."
+          }
+        },
+        {
+          "name": "Obtem um negocios por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/negocios/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "negocios",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um negocios por id"
+          }
+        },
+        {
+          "name": "Lista negocios-historico",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/negocios-historico?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "negocios-historico"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Historico de eventos de um negocio (incl. valorGanho por ganho — base de faturamento)."
+          }
+        },
+        {
+          "name": "Obtem um negocios-historico por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/negocios-historico/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "negocios-historico",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um negocios-historico por id"
+          }
+        },
+        {
+          "name": "Lista etapas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/etapas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "etapas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Etapas do funil (kanban)."
+          }
+        },
+        {
+          "name": "Obtem um etapas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/etapas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "etapas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um etapas por id"
+          }
+        },
+        {
+          "name": "Lista etiquetas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "etiquetas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Etiquetas/tags."
+          }
+        },
+        {
+          "name": "Obtem um etiquetas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "etiquetas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um etiquetas por id"
+          }
+        },
+        {
+          "name": "Lista rastreios",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rastreios?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rastreios"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Codigos de rastreio de entrega por negocio."
+          }
+        },
+        {
+          "name": "Obtem um rastreios por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rastreios/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rastreios",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um rastreios por id"
+          }
+        },
+        {
+          "name": "Lista notas-fiscais",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notas-fiscais?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notas-fiscais"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Notas fiscais vinculadas a leads/negocios/orcamentos."
+          }
+        },
+        {
+          "name": "Obtem um notas-fiscais por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notas-fiscais/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notas-fiscais",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um notas-fiscais por id"
+          }
+        },
+        {
+          "name": "Lista alertas-negocio",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alertas-negocio?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-negocio"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Alertas de SLA disparados por negocio."
+          }
+        },
+        {
+          "name": "Obtem um alertas-negocio por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alertas-negocio/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-negocio",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um alertas-negocio por id"
+          }
+        },
+        {
+          "name": "Lista orcamentos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orcamentos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orcamentos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Orcamentos gerados por negocio."
+          }
+        },
+        {
+          "name": "Obtem um orcamentos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orcamentos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orcamentos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um orcamentos por id"
+          }
+        },
+        {
+          "name": "Lista orcamento-itens",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orcamento-itens?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orcamento-itens"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Itens de um orcamento."
+          }
+        },
+        {
+          "name": "Obtem um orcamento-itens por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orcamento-itens/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orcamento-itens",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um orcamento-itens por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "oracle",
+      "item": [
+        {
+          "name": "Lista oracle-conversas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/oracle-conversas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "oracle-conversas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Conversas do assistente interno Oracle."
+          }
+        },
+        {
+          "name": "Obtem um oracle-conversas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/oracle-conversas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "oracle-conversas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um oracle-conversas por id"
+          }
+        },
+        {
+          "name": "Lista oracle-mensagens",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/oracle-mensagens?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "oracle-mensagens"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Mensagens do Oracle. Texto exige read:mensagens."
+          }
+        },
+        {
+          "name": "Obtem um oracle-mensagens por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/oracle-mensagens/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "oracle-mensagens",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um oracle-mensagens por id"
+          }
+        },
+        {
+          "name": "Lista sol-eventos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sol-eventos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sol-eventos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Eventos do agente Sol/Luna (acoes + custo de tokens)."
+          }
+        },
+        {
+          "name": "Obtem um sol-eventos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sol-eventos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sol-eventos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um sol-eventos por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pagamentos",
+      "item": [
+        {
+          "name": "Lista pagamentos",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pagamentos?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pagamentos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Pagamentos (Mercado Pago). Link de checkout (initPoint) nao exposto."
+          }
+        },
+        {
+          "name": "Obtem um pagamentos por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pagamentos/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pagamentos",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um pagamentos por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pedidos",
+      "item": [
+        {
+          "name": "Lista itens-pedido",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/itens-pedido?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "itens-pedido"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Itens de pedido vinculados a negocios."
+          }
+        },
+        {
+          "name": "Obtem um itens-pedido por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/itens-pedido/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "itens-pedido",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um itens-pedido por id"
+          }
+        },
+        {
+          "name": "Lista itens-local",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/itens-local?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "itens-local"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Equipamentos em assistencia tecnica (bancada). Dados do cliente mascarados sem read:pii."
+          }
+        },
+        {
+          "name": "Obtem um itens-local por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/itens-local/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "itens-local",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um itens-local por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "produtos",
+      "item": [
+        {
+          "name": "Lista cotacoes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cotacoes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cotacoes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Cotacoes de produtos em leads/negocios."
+          }
+        },
+        {
+          "name": "Obtem um cotacoes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cotacoes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cotacoes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um cotacoes por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "supervisor",
+      "item": [
+        {
+          "name": "Lista supervisor-acoes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor-acoes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supervisor-acoes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Acoes propostas/executadas pelo supervisor (auditoria de mudancas)."
+          }
+        },
+        {
+          "name": "Obtem um supervisor-acoes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor-acoes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supervisor-acoes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um supervisor-acoes por id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tarefas",
+      "item": [
+        {
+          "name": "Lista tarefas",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarefas?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarefas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Tarefas/agenda dos agentes."
+          }
+        },
+        {
+          "name": "Obtem um tarefas por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarefas/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarefas",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um tarefas por id"
+          }
+        },
+        {
+          "name": "Lista lembretes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lembretes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lembretes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lembretes vinculados a lead/negocio."
+          }
+        },
+        {
+          "name": "Obtem um lembretes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lembretes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lembretes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um lembretes por id"
+          }
+        },
+        {
+          "name": "Lista notificacoes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "atualizadoDesde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Notificacoes internas dos agentes."
+          }
+        },
+        {
+          "name": "Obtem um notificacoes por id",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes/{id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "COLOQUE_O_ID"
+                }
+              ]
+            },
+            "description": "Obtem um notificacoes por id"
+          }
+        }
+      ]
+    }
+  ]
+}
