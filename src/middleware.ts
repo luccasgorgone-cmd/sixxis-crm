@@ -22,6 +22,11 @@ const ROTAS_PUBLICAS = [
   // sessao. So o prefixo "/api/interno/crm". A checagem abaixo (pathname === p
   // || startsWith(`${p}/`)) ja cobre buscar-cliente, previa e aplicar.
   "/api/interno/crm",
+  // API de Leitura v1 (programa externo). NAO usa cookie de sessao: cada rota
+  // valida o header Authorization: Bearer <chave> internamente (hash SHA-256 +
+  // comparacao constante, escopos, rate limit). Liberar aqui so TIRA o gate de
+  // sessao do NextAuth; a autorizacao real continua dentro de cada handler.
+  "/api/v1",
 ];
 
 export default auth((req) => {
