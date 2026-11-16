@@ -37,7 +37,7 @@ do local do cliente).
 - A partir de R$ 1.900. 110V/220V.
 
 ### SX100 Trend
-- Cobre ate 100 m2. Tanque 100 L. Potencia 400 W. Vazao 12.000 m3/h.
+- Cobre ate 120 m2. Tanque 100 L. Potencia 400 W. Vazao 12.000 m3/h.
 - A partir de R$ 2.900. 110V/220V.
 
 ### SX120 Prime
@@ -75,7 +75,7 @@ do local do cliente).
 ## Bikes de Spinning
 
 ### Sixxis Life
-- Bicicleta de spinning semi-profissional. Resistencia magnetica ajustavel em 10
+- Bicicleta de spinning semi-profissional. Resistencia magnetica ajustavel em 32
   niveis. Queima ate 600 cal/h. Baixo impacto nas articulacoes.
 - A partir de R$ 2.849. Bivolt.
 
