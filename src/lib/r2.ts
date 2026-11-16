@@ -79,6 +79,14 @@ export async function enviarParaR2(
     `AWS4-HMAC-SHA256 Credential=${accessKey}/${scope}, ` +
     `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
+  // Timeout duro no upload: sem isto um PUT pendurado no R2 segura um slot do
+  // worker de ingestao indefinidamente (persistirMidia roda no worker). Default
+  // 30s (upload de midia pode ser maior que uma chamada de API comum).
+  const ctrl = new AbortController();
+  const timer = setTimeout(
+    () => ctrl.abort(),
+    Math.max(1000, Number(process.env.R2_UPLOAD_TIMEOUT_MS ?? 30000)),
+  );
   try {
     const resp = await fetch(`https://${host}${canonicalUri}`, {
       method,
@@ -90,6 +98,7 @@ export async function enviarParaR2(
         Authorization: authorization,
       },
       body: new Uint8Array(corpo),
+      signal: ctrl.signal,
     });
     if (!resp.ok) {
       console.warn(`[r2] upload falhou (${resp.status}) para ${chave}`);
@@ -102,6 +111,8 @@ export async function enviarParaR2(
       `[r2] erro no upload de ${chave}: ${erro instanceof Error ? erro.message : String(erro)}`,
     );
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

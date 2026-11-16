@@ -61,6 +61,24 @@ export function statusCanais(): StatusCanal[] {
   ];
 }
 
+// Timeout duro para provedores externos (Twilio/Resend). Evita que um POST
+// pendurado segure o worker de campanhas/alertas. Default 15s.
+async function fetchProvedor(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(
+    () => ctrl.abort(),
+    Math.max(1000, Number(process.env.PROVIDER_FETCH_TIMEOUT_MS ?? 15000)),
+  );
+  try {
+    return await globalThis.fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // SMS via Twilio (REST, basic auth). Nunca lanca: retorna {ok,erro}.
 export async function enviarSMS(
   numero: string,
@@ -74,7 +92,7 @@ export async function enviarSMS(
   }
   try {
     const corpo = new URLSearchParams({ To: numero, From: from, Body: texto });
-    const resp = await fetch(
+    const resp = await fetchProvedor(
       `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
       {
         method: "POST",
@@ -107,7 +125,7 @@ export async function enviarEmail(
     return { ok: false, erro: "canal nao configurado" };
   }
   try {
-    const resp = await fetch("https://api.resend.com/emails", {
+    const resp = await fetchProvedor("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,

@@ -14,6 +14,28 @@ export function baseEKey(): { base: string; apikey: string } | null {
   return { base: base.replace(/\/$/, ""), apikey };
 }
 
+// Timeout DURO para TODA chamada a Evolution. O servidor nao-oficial e instavel
+// e um fetch pode ficar pendurado indefinidamente (socket aberto, sem resposta).
+// Como o worker da fila "messages-in" processa com concorrencia limitada, UMA
+// chamada pendurada (ex.: metadataGrupo/fetchFotoPerfil awaited inline) bloqueia
+// o processamento das mensagens SEGUINTES por horas — era a causa da reclamacao
+// "cliente manda de manha, so cai no CRM a tarde". Com o timeout, no pior caso a
+// chamada aborta em EVOLUTION_FETCH_TIMEOUT_MS (default 20s) e lanca AbortError;
+// o try/catch de cada funcao ja devolve { ok:false } / null, sem travar a fila.
+const EVOLUTION_FETCH_TIMEOUT_MS = Math.max(
+  1000,
+  Number(process.env.EVOLUTION_FETCH_TIMEOUT_MS ?? 20000),
+);
+async function fetchEvo(url: string, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), EVOLUTION_FETCH_TIMEOUT_MS);
+  try {
+    return await globalThis.fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Envia uma mensagem de texto por uma instancia especifica (ou a padrao do env).
 // Endpoint: POST {BASE}/message/sendText/{INSTANCE}  header apikey.
 export async function enviarTexto(
@@ -31,7 +53,7 @@ export async function enviarTexto(
 
   const url = `${cfg.base}/message/sendText/${instance}`;
   try {
-    const resp = await fetch(url, {
+    const resp = await fetchEvo(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -82,7 +104,7 @@ export async function enviarAudio(
 
   const url = `${cfg.base}/message/sendWhatsAppAudio/${instance}`;
   try {
-    const resp = await fetch(url, {
+    const resp = await fetchEvo(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -123,7 +145,7 @@ export async function enviarMidia(
   }
   const url = `${cfg.base}/message/sendMedia/${instance}`;
   try {
-    const resp = await fetch(url, {
+    const resp = await fetchEvo(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -165,7 +187,7 @@ export async function enviarContato(
   }
   const digitos = contato.telefone.replace(/\D/g, "");
   try {
-    const resp = await fetch(`${cfg.base}/message/sendContact/${instance}`, {
+    const resp = await fetchEvo(`${cfg.base}/message/sendContact/${instance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -208,7 +230,7 @@ export async function enviarReacao(
     return { ok: false, raw: { erro: "config Evolution ausente" } };
   }
   try {
-    const resp = await fetch(`${cfg.base}/message/sendReaction/${instance}`, {
+    const resp = await fetchEvo(`${cfg.base}/message/sendReaction/${instance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -242,7 +264,7 @@ export async function baixarMidiaBase64(
     return null;
   }
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/chat/getBase64FromMediaMessage/${instancia}`,
       {
         method: "POST",
@@ -296,7 +318,7 @@ export async function revogarMensagem(
     return { ok: false, raw: { erro: "config Evolution ausente" } };
   }
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/chat/deleteMessageForEveryone/${instance}`,
       {
         method: "DELETE",
@@ -334,7 +356,7 @@ export async function editarMensagem(
     return { ok: false, raw: { erro: "config Evolution ausente" } };
   }
   try {
-    const resp = await fetch(`${cfg.base}/chat/updateMessage/${instance}`, {
+    const resp = await fetchEvo(`${cfg.base}/chat/updateMessage/${instance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({
@@ -364,7 +386,7 @@ export async function fetchFotoPerfil(
   const cfg = baseEKey();
   if (!cfg || !instancia || !numero) return null;
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/chat/fetchProfilePictureUrl/${instancia}`,
       {
         method: "POST",
@@ -393,7 +415,7 @@ export async function metadataGrupo(
   const cfg = baseEKey();
   if (!cfg || !instancia || !jid) return null;
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/group/findGroupInfos/${instancia}?groupJid=${encodeURIComponent(jid)}`,
       { headers: { apikey: cfg.apikey } },
     );
@@ -425,7 +447,7 @@ export async function sairGrupo(
     return { ok: false, raw: { erro: "config Evolution ausente" } };
   }
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/group/leaveGroup/${instance}?groupJid=${encodeURIComponent(jid)}`,
       { method: "DELETE", headers: { apikey: cfg.apikey } },
     );
@@ -445,7 +467,7 @@ export async function estadoConexao(instancia: string): Promise<string> {
   const cfg = baseEKey();
   if (!cfg) return "sem_config";
   try {
-    const resp = await fetch(
+    const resp = await fetchEvo(
       `${cfg.base}/instance/connectionState/${instancia}`,
       { headers: { apikey: cfg.apikey } },
     );
@@ -470,7 +492,7 @@ export async function configurarWebhook(
   const cfg = baseEKey();
   if (!cfg) return { ok: false, raw: { erro: "config Evolution ausente" } };
   try {
-    const resp = await fetch(`${cfg.base}/webhook/set/${instancia}`, {
+    const resp = await fetchEvo(`${cfg.base}/webhook/set/${instancia}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: cfg.apikey },
       body: JSON.stringify({

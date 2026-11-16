@@ -541,6 +541,11 @@ model Mensagem {
   // util (conteudo/transcricao/tipo/midia/status) e preservado fora do raw.
   raw         Json?
   hora        DateTime     @default(now())
+  // Instante em que o CRM PERSISTIU a mensagem (insert), distinto de `hora`
+  // (timestamp do WhatsApp). recebidoEm - hora = latencia de ingestao. Nullable
+  // e preenchido pelo app (sem default no banco) => migracao so-metadado, sem
+  // reescrita de tabela. Linhas antigas ficam NULL (latencia desconhecida).
+  recebidoEm  DateTime?
 
   @@index([respostaAId])
   @@index([conversaId, hora])

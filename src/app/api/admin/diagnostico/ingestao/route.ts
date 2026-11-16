@@ -80,6 +80,36 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     prisma.mensagem.count({ where: { direcao: DirecaoMsg.IN, hora: { gte: desde } } }),
   ]);
 
+  // 5) LATENCIA DE INGESTAO (recebidoEm - hora): quanto tempo a mensagem do
+  // cliente levou do WhatsApp ate cair no CRM. Mede a reclamacao "demora pra
+  // mensagem aparecer". So IN com recebidoEm preenchido (linhas antigas = NULL).
+  // Clampado em 0 (relogios dessincronizados podem dar negativo marginal).
+  const [lat] = await prisma.$queryRaw<
+    {
+      amostra: number;
+      p50: number | null;
+      p90: number | null;
+      p99: number | null;
+      max: number | null;
+      acima_5min: number;
+      acima_30min: number;
+    }[]
+  >`
+    SELECT
+      COUNT(*)::int AS amostra,
+      percentile_cont(0.50) WITHIN GROUP (ORDER BY lag_s)::int AS p50,
+      percentile_cont(0.90) WITHIN GROUP (ORDER BY lag_s)::int AS p90,
+      percentile_cont(0.99) WITHIN GROUP (ORDER BY lag_s)::int AS p99,
+      MAX(lag_s)::int AS max,
+      COUNT(*) FILTER (WHERE lag_s > 300)::int AS acima_5min,
+      COUNT(*) FILTER (WHERE lag_s > 1800)::int AS acima_30min
+    FROM (
+      SELECT GREATEST(0, EXTRACT(EPOCH FROM ("recebidoEm" - "hora")))::float AS lag_s
+      FROM "Mensagem"
+      WHERE direcao = 'IN' AND "recebidoEm" IS NOT NULL AND hora >= ${desde}
+    ) t
+  `;
+
   return NextResponse.json({
     periodoDias: dias,
     desde,
@@ -88,6 +118,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // Foco: 'lid' (e demais nao-'s.whatsapp.net') indicam entrada mascarada.
       porSufixoJid: porSufixo,
       tipoOutro: msgOutro,
+    },
+    // Latencia de ingestao em SEGUNDOS (p50/p90/p99/max) + contagem de atrasadas.
+    // amostra pequena no inicio: so conta mensagens novas (com recebidoEm).
+    latenciaIngestaoSegundos: {
+      amostra: lat?.amostra ?? 0,
+      p50: lat?.p50 ?? null,
+      p90: lat?.p90 ?? null,
+      p99: lat?.p99 ?? null,
+      max: lat?.max ?? null,
+      acima5min: lat?.acima_5min ?? 0,
+      acima30min: lat?.acima_30min ?? 0,
     },
     leads: {
       total: leads?.total ?? 0,

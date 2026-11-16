@@ -8,7 +8,7 @@ import IORedis from "ioredis";
 import type { Server } from "socket.io";
 import { prisma } from "./prisma";
 import { getIO } from "./socket";
-import { normalizarJid, telefoneParaLog } from "./phone";
+import { normalizarJid, telefoneParaLog, variantesTelefoneBR } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
 import { aplicarRetornoFollowup } from "./reguaFollowup";
 import { retornarAPrazoPorInbound } from "./aprazo/ops";
@@ -2146,25 +2146,40 @@ async function processarEvento(
   }
 
   // Lead: upsert por telefone normalizado.
-  let lead = await prisma.lead.upsert({
-    where: { telefone },
-    update: {},
-    create: {
-      telefone,
-      // So nomeia a partir do pushName em mensagens de entrada (ver acima).
-      // Em saida, cria sem nome e cai no telefone via nomeEfetivo.
-      nome: pushNameCliente,
-      pushName: pushNameCliente,
-      // nomeBusca normalizado (Fatia P): inline, sem query extra no caminho quente.
-      nomeBusca: nomeBuscaDe({
+  // Reuso tolerante a VARIANTE do numero (com/sem o 9 de celular, com/sem o DDI
+  // 55): o MESMO cliente que chega noutro formato NAO deve criar um 2o lead —
+  // essa era a causa-raiz dos pares duplicados (upsert por telefone exato nao
+  // casava "5562996559395" com "556296559395"). So cria quando NENHUMA variante
+  // existe. Entre variantes, usa a mais ANTIGA (o lead original) para as novas
+  // mensagens caírem sempre no mesmo card. variantesTelefoneBR e conservador:
+  // nunca inventa numero (so entra/sai o 9 quando bate o padrao de celular BR).
+  const variantesTel = variantesTelefoneBR(telefone);
+  let lead =
+    (variantesTel.length > 0
+      ? await prisma.lead.findFirst({
+          where: { telefone: { in: variantesTel } },
+          orderBy: { criadoEm: "asc" },
+        })
+      : null) ??
+    (await prisma.lead.upsert({
+      where: { telefone },
+      update: {},
+      create: {
+        telefone,
+        // So nomeia a partir do pushName em mensagens de entrada (ver acima).
+        // Em saida, cria sem nome e cai no telefone via nomeEfetivo.
         nome: pushNameCliente,
         pushName: pushNameCliente,
-        nomeManual: null,
-        telefone,
-      }),
-      origem: "whatsapp",
-    },
-  });
+        // nomeBusca normalizado (Fatia P): inline, sem query extra no quente.
+        nomeBusca: nomeBuscaDe({
+          nome: pushNameCliente,
+          pushName: pushNameCliente,
+          nomeManual: null,
+          telefone,
+        }),
+        origem: "whatsapp",
+      },
+    }));
   // Mantem o pushName do WhatsApp atualizado — apenas em mensagens de ENTRADA.
   if (pushNameCliente && lead.pushName !== pushNameCliente) {
     lead = await prisma.lead.update({
@@ -2311,6 +2326,10 @@ async function processarEvento(
         ...(respostaAId ? { respostaAId } : {}),
         raw: payload as unknown as Prisma.InputJsonValue,
         ...(hora ? { hora } : {}),
+        // Instante em que a mensagem foi PERSISTIDA no CRM (hora do insert, nao
+        // do WhatsApp). recebidoEm - hora = latencia de ingestao; alimenta o
+        // diagnostico de latencia (admin) para detectar fila atrasada.
+        recebidoEm: new Date(),
       },
     });
 
@@ -2478,6 +2497,17 @@ async function processarEvento(
   }
 }
 
+// Concorrencia do worker de ingestao. BullMQ default = 1 (serial): uma unica
+// chamada lenta (ex.: Evolution pendurada) segurava TODAS as mensagens atras
+// dela por horas. Com concorrencia > 1, um job lento nao bloqueia os demais e a
+// fila drena rapido depois de qualquer soluco. Ordenacao de exibicao nao depende
+// da ordem de processamento (a UI ordena por `hora`, o timestamp do WhatsApp).
+// Configuravel por env; default 4 (conservador p/ nao estourar conexoes do PG).
+const MESSAGES_WORKER_CONCURRENCY = Math.max(
+  1,
+  Number(process.env.MESSAGES_WORKER_CONCURRENCY ?? 4),
+);
+
 // Cria e inicia o worker que consome a fila "messages-in".
 export function createMessagesWorker(io?: Server): Worker {
   const worker = new Worker(
@@ -2487,7 +2517,7 @@ export function createMessagesWorker(io?: Server): Worker {
       // reprocessar (retry). Um job ruim nunca derruba o worker.
       await processarEvento(job.data as EventoEvolution, io ?? null);
     },
-    { connection: getConnection() },
+    { connection: getConnection(), concurrency: MESSAGES_WORKER_CONCURRENCY },
   );
 
   worker.on("failed", (job, err) => {
@@ -2500,6 +2530,8 @@ export function createMessagesWorker(io?: Server): Worker {
     console.error(`[worker] erro de conexao: ${err?.message}`);
   });
 
-  console.log(`[worker] consumindo a fila "${NOME_FILA}"`);
+  console.log(
+    `[worker] consumindo a fila "${NOME_FILA}" (concorrencia=${MESSAGES_WORKER_CONCURRENCY})`,
+  );
   return worker;
 }
