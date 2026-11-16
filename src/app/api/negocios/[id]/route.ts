@@ -31,6 +31,7 @@ import {
   ehPedidoDoSite,
   registrarEventoCapi,
 } from "@/lib/metaCapi";
+import { ehFinalidadeDeConversao } from "@/lib/tracking/conversaoElegivel";
 import { atribuirAnuncioAoNegocio } from "@/lib/atribuicao";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
@@ -1202,7 +1203,21 @@ export async function PATCH(
       const pedidoDoSite = ehPedidoDoSite(leadCapi?.origem);
 
       if (leadCapi && valorVenda && valorVenda > 0) {
-        if (pedidoDoSite) {
+        if (!ehFinalidadeDeConversao(negocio.finalidade)) {
+          // Trava: SO VENDA NOVA (aquisicao) vira conversao Purchase no Meta.
+          // Pos-venda, assistencia, troca e afins NAO sao aquisicao -> registra
+          // como pulado (auditavel) e NAO dispara o CAPI. Aditivo.
+          await registrarEventoCapi({
+            negocioId: id,
+            eventId,
+            valor: valorVenda,
+            moeda: "BRL",
+            ctwaClid: leadCapi.ctwaClid,
+            anuncioId: leadCapi.anuncioId,
+            pulado: true,
+            motivoPulo: "finalidade_nao_venda",
+          });
+        } else if (pedidoDoSite) {
           await registrarEventoCapi({
             negocioId: id,
             eventId,

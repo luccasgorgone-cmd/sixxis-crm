@@ -14,7 +14,8 @@
 // no DictReader do uploader — por isso nunca prefixar ﻿.
 
 import { prisma } from "@/lib/prisma";
-import { StatusNeg, TipoHistorico } from "@/generated/prisma/enums";
+import { TipoHistorico } from "@/generated/prisma/enums";
+import { whereGanhosGoogleOffline } from "@/lib/tracking/conversaoElegivel";
 
 export const CABECALHO_GOOGLE_OFFLINE = "gclid,data,valor,moeda,transaction_id";
 
@@ -55,16 +56,12 @@ export function montarCsvGoogleOffline(linhas: LinhaGoogleOffline[]): string {
 }
 
 // Coleta os GANHOs de WhatsApp com gclid, prontos pro CSV. Filtro:
-// status=GANHO · lead.googleClickId != null · valor>0. A data e o criadoEm do
+// finalidade=VENDA · status=GANHO · lead.googleClickId != null · valor>0. A data e o criadoEm do
 // HistoricoNegocio GANHO mais recente ("houve ganho"). Negocio GANHO sem esse
 // historico e pulado (sem data confiavel — nunca fabrica data).
 export async function coletarLinhasGoogleOffline(): Promise<LinhaGoogleOffline[]> {
   const negocios = await prisma.negocio.findMany({
-    where: {
-      status: StatusNeg.GANHO,
-      valor: { gt: 0 },
-      lead: { googleClickId: { not: null } },
-    },
+    where: whereGanhosGoogleOffline(),
     select: {
       id: true,
       valor: true,
