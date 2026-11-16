@@ -126,25 +126,46 @@ export function montarPlano(recurso: Recurso, params: URLSearchParams): PlanoCon
   }
 
   // --- janelas de data ------------------------------------------------------
+  // So aplicamos janelas de data quando a coluna mapeada e realmente temporal.
+  // Recursos ordenados por "id" (sem coluna de data) nao suportam esses filtros;
+  // aplica-los geraria comparacao String x DateTime no Prisma (erro 500).
   const colCriacao = recurso.campoCriacao ?? colunaOrdenacao;
   const colAtualizacao = recurso.campoAtualizacao ?? colunaOrdenacao;
+  const suportaCriacao = colCriacao !== "id";
+  const suportaAtualizacao = colAtualizacao !== "id";
   const criadoDesde = lerData(params, "criadoDesde");
   const criadoAte = lerData(params, "criadoAte");
   const atualizadoDesde = lerData(params, "atualizadoDesde");
   const atualizadoAte = lerData(params, "atualizadoAte");
   if (criadoDesde || criadoAte) {
+    if (!suportaCriacao) {
+      throw requisicaoInvalida(
+        `Recurso '${recurso.nome}' nao suporta filtro por data de criacao (criadoDesde/criadoAte); use 'cursor' ou 'ids'.`,
+      );
+    }
     condicoes.push({ [colCriacao]: { ...(criadoDesde ? { gte: criadoDesde } : {}), ...(criadoAte ? { lte: criadoAte } : {}) } });
   }
   if (atualizadoDesde || atualizadoAte) {
+    if (!suportaAtualizacao) {
+      throw requisicaoInvalida(
+        `Recurso '${recurso.nome}' nao suporta filtro por data de atualizacao (atualizadoDesde/atualizadoAte); use 'cursor' ou 'ids'.`,
+      );
+    }
     condicoes.push({ [colAtualizacao]: { ...(atualizadoDesde ? { gte: atualizadoDesde } : {}), ...(atualizadoAte ? { lte: atualizadoAte } : {}) } });
   }
 
   // --- guarda de tabela grande ---------------------------------------------
   // Tabelas grandes exigem uma janela (cursor, data-desde ou ids) para evitar
-  // varredura completa.
-  if (recurso.grande && !cursor && !ids && !criadoDesde && !atualizadoDesde) {
+  // varredura completa. Recursos sem coluna de data so aceitam cursor/ids.
+  const temJanelaData =
+    (!!criadoDesde && suportaCriacao) || (!!atualizadoDesde && suportaAtualizacao);
+  if (recurso.grande && !cursor && !ids && !temJanelaData) {
+    const opcoes =
+      suportaCriacao || suportaAtualizacao
+        ? "'cursor', 'ids', 'criadoDesde' ou 'atualizadoDesde'"
+        : "'cursor' ou 'ids'";
     throw requisicaoInvalida(
-      `Recurso '${recurso.nome}' e grande: informe 'cursor', 'ids', 'criadoDesde' ou 'atualizadoDesde' para delimitar a consulta.`,
+      `Recurso '${recurso.nome}' e grande: informe ${opcoes} para delimitar a consulta.`,
     );
   }
 
