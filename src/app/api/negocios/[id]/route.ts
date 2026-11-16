@@ -26,7 +26,12 @@ import { lerTipoGanho, rotuloTipoGanho } from "@/lib/tipoGanho";
 import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { limparMarcacaoAPrazo, NOME_ETAPA_A_PRAZO } from "@/lib/aprazo/ops";
-import { dispararPurchase } from "@/lib/metaCapi";
+import {
+  dispararPurchase,
+  ehPedidoDoSite,
+  registrarEventoCapi,
+} from "@/lib/metaCapi";
+import { atribuirAnuncioAoNegocio } from "@/lib/atribuicao";
 import { movimentarPeca, estornarSaidasNegocio } from "@/lib/pecas";
 import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento";
 import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
@@ -1167,8 +1172,23 @@ export async function PATCH(
           nome: true,
           pushName: true,
           nomeManual: true,
+          origem: true,
+          anuncioId: true,
         },
       });
+
+      // Atribuicao de anuncio CONGELADA no fechamento: copia o first-touch do
+      // lead (anuncio Click-to-WhatsApp) pro Negocio, so dentro da janela de
+      // 60d. ADITIVO e isolado em try/catch proprio — se falhar, nao afeta nem
+      // o CAPI nem o fluxo de venda. Forward-only (so novos ganhos).
+      try {
+        await atribuirAnuncioAoNegocio(id, negocio.leadId, agora);
+      } catch (e) {
+        console.warn(
+          `[atribuicao] falha ao atribuir anuncio ao negocio ${id}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+
       // Integridade (Fatia 2.71/2.72/2.76): `atualizado.valor` E o TOTAL COBRADO
       // DO CLIENTE — produtos + frete quando o cliente paga o frete, ou SO
       // produtos quando o frete e pago pela empresa (despesa, fora do total). A
@@ -1176,16 +1196,45 @@ export async function PATCH(
       // `purchase-${id}` mantem o dedup por negocio. NAO alterar.
       const valorVenda =
         atualizado.valor != null ? Number(atualizado.valor) : null;
+      const eventId = `purchase-${id}`;
+      // Guarda anti-dupla-contagem: se a origem for pedido do site (Mercado
+      // Pago etc.), esse fluxo ja dispara seu proprio Purchase — o CRM pula.
+      const pedidoDoSite = ehPedidoDoSite(leadCapi?.origem);
+
       if (leadCapi && valorVenda && valorVenda > 0) {
-        await dispararPurchase({
-          ctwaClid: leadCapi.ctwaClid,
-          valor: valorVenda,
-          moeda: "BRL",
-          eventId: `purchase-${id}`,
-          telefone: leadCapi.telefone,
-          email: leadCapi.email,
-          nome: leadCapi.nomeManual || leadCapi.pushName || leadCapi.nome,
-        });
+        if (pedidoDoSite) {
+          await registrarEventoCapi({
+            negocioId: id,
+            eventId,
+            valor: valorVenda,
+            moeda: "BRL",
+            ctwaClid: leadCapi.ctwaClid,
+            anuncioId: leadCapi.anuncioId,
+            pulado: true,
+            motivoPulo: "pedido_site",
+          });
+        } else {
+          const res = await dispararPurchase({
+            ctwaClid: leadCapi.ctwaClid,
+            valor: valorVenda,
+            moeda: "BRL",
+            eventId,
+            telefone: leadCapi.telefone,
+            email: leadCapi.email,
+            nome: leadCapi.nomeManual || leadCapi.pushName || leadCapi.nome,
+          });
+          await registrarEventoCapi({
+            negocioId: id,
+            eventId,
+            valor: valorVenda,
+            moeda: "BRL",
+            ctwaClid: leadCapi.ctwaClid,
+            anuncioId: leadCapi.anuncioId,
+            ok: res.ok,
+            status: res.status ?? null,
+            motivo: res.motivo ?? null,
+          });
+        }
       }
     } catch (e) {
       console.warn(
