@@ -43,6 +43,10 @@ enum TipoGanho {
   DUVIDA
   PAGAMENTO
   GARANTIA
+  // Frente 4: cliente que JA comprou volta so para um atendimento. Fecham ganho
+  // SEM valor (nao conta faturamento, nao dispara Purchase).
+  RASTREIO
+  OUTRO
 }
 
 // Quem esta conduzindo o atendimento da conversa.
@@ -495,6 +499,11 @@ model Conversa {
   @@index([fixadaEm])
   // API Leitura v1: Conversa nao tem @updatedAt; sort/sync por criadoEm + id.
   @@index([criadoEm, id], map: "Conversa_criadoEm_id_idx")
+  // Indice PARCIAL "Conversa_naolidas_parcial_idx" ON ("agenteId") WHERE
+  // "arquivada"=false AND "naoLidas">0: acelera o COUNT de nao-lidas (frente 1).
+  // Prisma nao expressa indice parcial -> aplicado no deploy pela migracao
+  // 20261117160000_conversa_naolidas_idx. Nao declarar aqui (evita que o Prisma
+  // tente criar um indice NAO-parcial com o mesmo nome).
 }
 
 model Mensagem {
@@ -843,12 +852,13 @@ model Negocio {
   @@index([etapaId, ultimaMensagemEm(sort: Desc), id(sort: Desc)], map: "Negocio_etapa_ultima_msg_idx")
   // Bloco 3: varredura do job de arquivamento (status + arquivado + relogio).
   @@index([status, arquivado, ultimaMensagemEm], map: "Negocio_arquivamento_idx")
-  // TRAVA ANTI-DUPLICACAO (fatia 4/4): no maximo UM negocio ATIVO por
+  // TRAVA ANTI-DUPLICACAO (fatia 4/4 + frente 7): no maximo UM negocio ATIVO por
   // (leadId, finalidade), igual a Conversa. Vive so no banco, como indice unico
-  // PARCIAL (WHERE arquivado = false) — o SQL esta em
-  // prisma/manual/20260812020000_negocio_unico_ativo.sql e e aplicado A MAO,
-  // depois de /api/admin/corrigir-duplicados confirmar 0 duplicados (criar
-  // unique com duplicados na tabela FALHA e derrubaria o deploy).
+  // PARCIAL (WHERE arquivado = false). APLICADO NO DEPLOY pela migracao
+  // prisma/migrations/20261117140000_negocio_unico_ativo (que NEUTRALIZA os
+  // duplicados ativos com a regra de /api/admin/corrigir-duplicados ANTES de
+  // criar o indice — criar unique com duplicados na tabela FALHA e derrubaria o
+  // deploy). A rota admin continua para correcoes pontuais pos-trava.
   // NAO declarar @@unique([leadId, finalidade]) aqui: o Prisma nao expressa
   // indice parcial e geraria um unique TOTAL, que quebraria por causa dos
   // negocios ARQUIVADOS duplicados — que sao legitimos e continuam no banco.

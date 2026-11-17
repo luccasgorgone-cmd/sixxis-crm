@@ -52,9 +52,22 @@
 // certos, medindo coisas diferentes; o que os dois compartilham e a nocao de
 // ganho VALIDO (sem os duplicados de movimentacao).
 import type { Prisma } from "../generated/prisma/client";
-import { StatusNeg, TipoHistorico } from "../generated/prisma/enums";
-import { SUFIXO_GANHO_DUPLICADO } from "./compras";
+import { StatusNeg, TipoHistorico, Finalidade } from "../generated/prisma/enums";
+import { SUFIXO_GANHO_DUPLICADO, SUFIXO_GANHO_SEM_VALOR } from "./compras";
+import { TIPOS_GANHO_SEM_VALOR } from "./tipoGanho";
 import { WHERE_NAO_DUPLICADO_NEUTRALIZADO } from "./motivosPerda";
+
+// FRENTE 4: um ganho de RETORNO sem valor (cliente que ja comprou volta so para
+// duvida/rastreio/outro) fecha como GANHO numa VENDA, mas NAO e venda. O par
+// (finalidade VENDA + tipoGanho de atendimento) NUNCA existiu antes da frente 4
+// — venda sempre exigiu valor > 0 e nunca gravava tipoGanho —, entao exclui-lo
+// nao derruba nada que o criterio antigo contava (o superconjunto fica intacto).
+const WHERE_NAO_GANHO_SEM_VALOR: Prisma.NegocioWhereInput = {
+  NOT: {
+    finalidade: Finalidade.VENDA,
+    tipoGanho: { in: TIPOS_GANHO_SEM_VALOR },
+  },
+};
 
 export type JanelaVenda = { inicio: Date; fim: Date };
 
@@ -76,12 +89,18 @@ export function whereVendaNoPeriodo(j: JanelaVenda): Prisma.NegocioWhereInput {
       {
         status: StatusNeg.GANHO,
         fechadoEm: { gte: j.inicio, lte: j.fim },
+        // FRENTE 4: unico filtro na regra antiga — e seguro porque so barra um
+        // caso que ela nunca contou (venda sem valor nao existia). Ver topo.
+        ...WHERE_NAO_GANHO_SEM_VALOR,
       },
-      // 2) Memoria do ganho — sobrevive a reabertura no pos-venda.
+      // 2) Memoria do ganho — sobrevive a reabertura no pos-venda. (Um ganho sem
+      //    valor nao avanca ultimoGanhoEm, entao ja nao entra por aqui; o filtro
+      //    fica como defesa dupla contra dados legados.)
       {
         AND: [
           { ultimoGanhoEm: { gte: j.inicio, lte: j.fim } },
           WHERE_NAO_DUPLICADO_NEUTRALIZADO,
+          WHERE_NAO_GANHO_SEM_VALOR,
         ],
       },
       // 3) Prova documental, para o que e anterior a memoria existir.
@@ -94,9 +113,15 @@ export function whereVendaNoPeriodo(j: JanelaVenda): Prisma.NegocioWhereInput {
                 criadoEm: { gte: j.inicio, lte: j.fim },
                 // Ganho repetido por movimentacao do card nao e venda: ele e a
                 // MESMA venda contada duas vezes, e descartar e correcao, nao
-                // julgamento. Hoje este e o unico motivo pelo qual um ganho para
-                // de valer (o mesmo que WHERE_GANHO_VALIDO em lib/compras usa).
-                NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+                // julgamento. FRENTE 4: o ganho de retorno sem valor tambem nao
+                // e venda e carrega o seu proprio sufixo. Mesma exclusao que
+                // WHERE_GANHO_VALIDO em lib/compras aplica.
+                NOT: {
+                  OR: [
+                    { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+                    { descricao: { endsWith: SUFIXO_GANHO_SEM_VALOR } },
+                  ],
+                },
               },
             },
           },

@@ -8,7 +8,11 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Loader2, Plus, Trash2, ShieldCheck, Info, DownloadCloud } from "lucide-react";
 import { MOTIVOS_PERDA } from "@/lib/motivosPerda";
-import { TIPOS_GANHO, type CodigoTipoGanho } from "@/lib/tipoGanho";
+import {
+  TIPOS_GANHO,
+  TIPOS_GANHO_SEM_VALOR,
+  type CodigoTipoGanho,
+} from "@/lib/tipoGanho";
 import { formatarBRL } from "@/lib/format";
 import {
   SecaoPagamento,
@@ -95,6 +99,7 @@ export function ModalFechamento({
   tipo,
   valorInicial,
   finalidade = "VENDA",
+  ehRetornoGanho = false,
   freteInicial,
   fretePagoPelaEmpresaInicial = false,
   valorFinalInicial,
@@ -108,6 +113,9 @@ export function ModalFechamento({
   tipo: "ganho" | "perdido";
   valorInicial?: number | null;
   finalidade?: "VENDA" | "POS_VENDA";
+  // Frente 4: negocio de cliente que JA foi ganho alguma vez (jaFoiGanho). So
+  // nesse caso uma VENDA pode fechar ganho SEM valor (duvida/rastreio/outro).
+  ehRetornoGanho?: boolean;
   // Quando presente (ganho), carrega o rascunho de pagamentos do negocio.
   negocioId?: string;
   // Pre-carga direta das formas de pagamento (sobrepoe o fetch por negocioId).
@@ -129,6 +137,16 @@ export function ModalFechamento({
 }) {
   const ehGanho = tipo === "ganho";
   const ehPeca = finalidade === "POS_VENDA";
+  // Mostra o seletor de tipo do ganho no pos-venda (sempre) OU numa VENDA de
+  // RETORNO (frente 4). Numa venda nova nao aparece: segue so o valor.
+  const mostraTipoGanho = ehPeca || ehRetornoGanho;
+  // Opcoes do seletor: no pos-venda, todas; numa VENDA de retorno, so os motivos
+  // SEM valor (duvida/rastreio/outro) — uma venda de verdade usa o valor normal.
+  const opcoesTipoGanho = ehPeca
+    ? TIPOS_GANHO
+    : TIPOS_GANHO.filter((t) =>
+        (TIPOS_GANHO_SEM_VALOR as string[]).includes(t.code),
+      );
   const [valor, setValor] = useState(valorInicial != null ? String(valorInicial) : "");
   // Tipo do ganho (so pos-venda). Nasce sem selecao e e obrigatorio para
   // confirmar — assim o relatorio de resolvidos nunca ganha buraco novo.
@@ -393,11 +411,16 @@ export function ModalFechamento({
     return extras;
   }
 
-  // Payload do tipo de ganho: SO no pos-venda. Na venda sai vazio e o campo do
-  // negocio permanece null.
+  // Payload do tipo de ganho: no pos-venda ou numa VENDA de retorno (frente 4).
+  // Na venda NOVA sai vazio e o campo do negocio permanece null.
   function tipoGanhoPayload(): Pick<DadosFechamento, "tipoGanho"> {
-    return ehPeca && tipoGanho ? { tipoGanho } : {};
+    return mostraTipoGanho && tipoGanho ? { tipoGanho } : {};
   }
+
+  // Frente 4: motivo SEM valor selecionado (duvida/rastreio/outro) -> o ganho
+  // fecha em ZERO, sem exigir itens nem valor. Vale pos-venda e VENDA de retorno.
+  const ganhoSemValor =
+    mostraTipoGanho && (TIPOS_GANHO_SEM_VALOR as string[]).includes(tipoGanho);
 
   async function confirmar() {
     setErro(null);
@@ -405,6 +428,25 @@ export function ModalFechamento({
       // Pos-venda: o tipo do ganho e obrigatorio (nao deixa fechar sem).
       if (ehPeca && !tipoGanho) {
         setErro("Escolha o tipo do ganho.");
+        return;
+      }
+      // Frente 4: ganho SEM valor (duvida/rastreio/outro) -> fecha em ZERO
+      // direto, sem exigir itens nem valor. Cobre tambem a "so duvida" do
+      // pos-venda (antes tratada no modo simples). Nao conta faturamento nem
+      // dispara Purchase (o backend ja gateia por valor > 0).
+      if (ganhoSemValor) {
+        setSalvando(true);
+        try {
+          await onConfirmar({
+            valor: 0,
+            ...tipoGanhoPayload(),
+            orcPagamentos: paraPersistir(pagamentos),
+            ...checkoutExtras(),
+          });
+        } catch {
+          setErro("Nao foi possivel concluir.");
+          setSalvando(false);
+        }
         return;
       }
       if (itens.length > 0) {
@@ -450,19 +492,17 @@ export function ModalFechamento({
         }
         return;
       }
-      // Modo simples: so valor total. "So duvida" (pos-venda) e a excecao —
-      // atendimento sem pedido e sem cobranca fecha com zero, sem exigir itens
-      // nem valor. Os demais tipos e a VENDA seguem exigindo valor > 0.
-      const soDuvida = ehPeca && tipoGanho === "DUVIDA";
+      // Modo simples: so valor total. Os ganhos SEM valor ja sairam acima
+      // (short-circuit). Aqui a VENDA e o pos-venda com cobranca exigem valor > 0.
       const v = Number(valor.replace(",", "."));
-      if (!soDuvida && (!v || v <= 0)) {
+      if (!v || v <= 0) {
         setErro("Informe um valor ou adicione produtos.");
         return;
       }
       setSalvando(true);
       try {
         await onConfirmar({
-          valor: soDuvida ? (v > 0 ? v : 0) : v,
+          valor: v,
           ...tipoGanhoPayload(),
           orcPagamentos: paraPersistir(pagamentos),
           ...checkoutExtras(),
@@ -507,20 +547,30 @@ export function ModalFechamento({
         <div className="scroll-fino flex-1 overflow-y-auto p-5">
           {ehGanho ? (
             <div className="space-y-3">
-              {/* Tipo do ganho (POS-VENDA). Vem primeiro porque condiciona o
-                  resto: "So duvida" fecha sem itens e sem cobranca. */}
-              {ehPeca && (
+              {/* Tipo do ganho. No pos-venda e obrigatorio e condiciona o resto
+                  ("So duvida" fecha sem itens/cobranca). Numa VENDA de RETORNO
+                  (frente 4) e OPCIONAL: so para o cliente que ja comprou e voltou
+                  so para atendimento (duvida/rastreio/outro) — fecha ganho SEM
+                  valor. Sem escolha, segue o fluxo normal com valor. */}
+              {mostraTipoGanho && (
                 <div className="rounded-lg border border-black/5 bg-fundo p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-medio/50">
-                    Tipo do ganho
+                    {ehPeca
+                      ? "Tipo do ganho"
+                      : "Cliente ja comprou e so voltou para atendimento? (opcional, sem valor)"}
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {TIPOS_GANHO.map((t) => {
+                    {opcoesTipoGanho.map((t) => {
                       const ativo = tipoGanho === t.code;
                       return (
                         <button
                           key={t.code}
-                          onClick={() => setTipoGanho(t.code)}
+                          onClick={() =>
+                            // Pos-venda: obrigatorio, so seleciona. VENDA de
+                            // retorno (frente 4): opcional, clicar de novo
+                            // DESMARCA para voltar ao ganho normal com valor.
+                            setTipoGanho(ativo && !ehPeca ? "" : t.code)
+                          }
                           aria-pressed={ativo}
                           className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
                             ativo
@@ -534,8 +584,10 @@ export function ModalFechamento({
                     })}
                   </div>
                   <p className="mt-1.5 text-[11px] text-medio/60">
-                    {TIPOS_GANHO.find((t) => t.code === tipoGanho)?.ajuda ??
-                      "Escolha como este atendimento foi resolvido."}
+                    {opcoesTipoGanho.find((t) => t.code === tipoGanho)?.ajuda ??
+                      (ehPeca
+                        ? "Escolha como este atendimento foi resolvido."
+                        : "Marque so se o cliente voltou sem nova compra — fecha ganho sem contabilizar valor.")}
                   </p>
                 </div>
               )}

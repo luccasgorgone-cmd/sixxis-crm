@@ -3,7 +3,7 @@
 // Barra lateral do app. Realca a rota atual (maior prefixo correspondente, para
 // nao acender dois itens ao mesmo tempo). Admin so aparece para ADMIN. O Inbox
 // mostra um badge com o total de conversas nao lidas, atualizado ao vivo.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -68,10 +68,23 @@ export function Sidebar({
     }
   }, []);
 
+  // FRENTE 1 (lentidao): antes CADA evento de socket (mensagem:nova e irmaos,
+  // que sao BROADCAST global) disparava um refetch de /api/conversas/nao-lidas
+  // por agente online. Um burst de mensagens = N agentes x M eventos de counts,
+  // no mesmo processo Node da ingestao. Agora coalesce a rajada: o primeiro
+  // evento agenda UM refetch em ~1.2s e os eventos seguintes da janela caem
+  // nele, em vez de cada um abrir sua propria chamada.
+  const naoLidasTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     void carregarNaoLidas();
     const socket = getSocket();
-    const atualizar = () => void carregarNaoLidas();
+    const atualizar = () => {
+      if (naoLidasTimerRef.current) return;
+      naoLidasTimerRef.current = setTimeout(() => {
+        naoLidasTimerRef.current = null;
+        void carregarNaoLidas();
+      }, 1200);
+    };
     socket.on("mensagem:nova", atualizar);
     socket.on("conversa:lida", atualizar);
     socket.on("conversa:atualizada", atualizar);
@@ -79,6 +92,10 @@ export function Sidebar({
       socket.off("mensagem:nova", atualizar);
       socket.off("conversa:lida", atualizar);
       socket.off("conversa:atualizada", atualizar);
+      if (naoLidasTimerRef.current) {
+        clearTimeout(naoLidasTimerRef.current);
+        naoLidasTimerRef.current = null;
+      }
     };
   }, [carregarNaoLidas]);
 

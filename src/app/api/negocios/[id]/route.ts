@@ -22,7 +22,7 @@ import {
   ehCodigoMotivo,
   motivoEhDesqualificacao,
 } from "@/lib/motivosPerda";
-import { lerTipoGanho, rotuloTipoGanho } from "@/lib/tipoGanho";
+import { lerTipoGanho, rotuloTipoGanho, ehGanhoSemValor } from "@/lib/tipoGanho";
 import { ehCodigoPendencia, rotuloPendencia } from "@/lib/motivosPendencia";
 import { resolverAlertasNegocio } from "@/lib/slaAlertas";
 import { limparMarcacaoAPrazo, NOME_ETAPA_A_PRAZO } from "@/lib/aprazo/ops";
@@ -38,7 +38,8 @@ import { proximoNumeroOrcamento, comRetryNumeroOrcamento } from "@/lib/orcamento
 import { normalizarPagamentos, lerPagamentos } from "@/lib/pagamento";
 import { dataSomenteDia } from "@/lib/data";
 import { desarquivarConversaDoLead } from "@/lib/arquivamento";
-import { resumoComprasDoLead } from "@/lib/compras";
+import { resumoComprasDoLead, SUFIXO_GANHO_SEM_VALOR } from "@/lib/compras";
+import { avancarStatusCarteiraPorLead } from "@/lib/carteira/sync";
 import { resumoPerdasDoLead } from "@/lib/perdasCliente";
 
 export const runtime = "nodejs";
@@ -359,6 +360,9 @@ export async function PATCH(
       agenteId: true,
       valor: true,
       status: true,
+      // Frente 4: cliente que JA foi ganho (comprou) pode fechar um RETORNO como
+      // ganho SEM valor. Fresh venda (jaFoiGanho=false) continua exigindo valor.
+      jaFoiGanho: true,
       motivoPerda: true,
       finalidade: true,
       etapaId: true,
@@ -418,12 +422,18 @@ export async function PATCH(
   // Pecas / pos-venda: garantia e baixa de estoque so valem para POS_VENDA. Em
   // VENDA nada disso executa (fluxo e conversao Meta preservados).
   const ehPosVenda = negocio.finalidade === Finalidade.POS_VENDA;
+  // Frente 4: "retorno" = negocio de cliente que JA foi ganho alguma vez. So
+  // nesse caso uma VENDA pode fechar ganho SEM valor (duvida/rastreio/outro).
+  const ehRetornoGanho = negocio.jaFoiGanho === true;
 
   // Tipo do ganho: so existe no POS-VENDA e so e gravado no fechamento de GANHO
   // (abaixo). Valor fora da lista vira null e o filtro `ehPosVenda` descarta o
   // que venha numa venda. NUNCA e escrito como null num PATCH comum — o valor ja
   // gravado fica preservado.
-  const tipoGanhoInformado = ehPosVenda ? lerTipoGanho(body.tipoGanho) : null;
+  // Le o tipo do ganho no pos-venda (sempre) OU numa VENDA de RETORNO (frente
+  // 4). Numa venda nova nunca le: tipoGanho fica null e exige valor > 0.
+  const tipoGanhoInformado =
+    ehPosVenda || ehRetornoGanho ? lerTipoGanho(body.tipoGanho) : null;
 
   // ---- Fechamento de PEDIDO (opcional): itens + frete ----
   // Normaliza os itens e calcula os totais. Quando ha itens, o VALOR do negocio
@@ -492,29 +502,33 @@ export async function PATCH(
         NOME_ETAPA_A_PRAZO.toUpperCase() && destino.id !== negocio.etapaId;
 
     if (destino.tipo === TipoEtapa.GANHO) {
-      // "So duvida" (pos-venda): atendimento sem pedido e sem cobranca. Fecha
-      // com ZERO sem exigir itens nem valor — sem esse caso o ganho de duvida
-      // cairia no 422 abaixo.
-      const soDuvida = tipoGanhoInformado === "DUVIDA";
+      // Ganho SEM valor: atendimento sem cobranca. Vale na POS_VENDA ("so
+      // duvida") E numa VENDA de RETORNO (frente 4: cliente que ja comprou
+      // voltou so para duvida/rastreio/outro). Fecha com ZERO sem exigir itens
+      // nem valor — sem esse caso cairia no 422 abaixo. tipoGanhoInformado so e
+      // != null quando ehPosVenda || ehRetornoGanho, entao uma venda NOVA nunca
+      // entra aqui.
+      const ganhoSemValor = ehGanhoSemValor(tipoGanhoInformado);
       // Total: do PEDIDO (produtos + frete) quando ha itens; senao o valor
-      // informado (fluxo antigo) ou o valor atual do negocio. Em "so duvida" o
-      // padrao e zero (nao herda o valor do rascunho: nada foi cobrado).
+      // informado (fluxo antigo) ou o valor atual do negocio. Em ganho sem valor
+      // o padrao e zero (nao herda o valor do rascunho: nada foi cobrado).
       const valorEfetivo =
         totalPedido != null
           ? totalPedido
           : body.valor != null
             ? body.valor
-            : soDuvida
+            : ganhoSemValor
               ? 0
               : negocio.valor != null
                 ? Number(negocio.valor)
                 : null;
-      // Total ZERO e legitimo SO na pos-venda: com pedido (todas as pecas em
-      // garantia -> cliente nao paga nada) ou em "so duvida". VENDA continua
-      // exigindo valor > 0; valorEfetivo == null nunca fecha ganho (pos-venda
-      // sem itens, sem valor e sem tipo tambem cai aqui). O front
-      // (ModalFechamento) ja permite os mesmos casos.
-      const zeroSemCobranca = ehPosVenda && (temPedido || soDuvida) && valorEfetivo === 0;
+      // Total ZERO e legitimo em dois casos: (a) POS_VENDA com pedido (todas as
+      // pecas em garantia -> cliente nao paga nada); (b) ganho SEM valor
+      // (duvida/rastreio/outro) — seja pos-venda ou VENDA de retorno. Uma VENDA
+      // NOVA continua exigindo valor > 0 (ganhoSemValor=false porque tipoGanho
+      // nem e lido). valorEfetivo == null nunca fecha ganho.
+      const zeroSemCobranca =
+        valorEfetivo === 0 && ((ehPosVenda && temPedido) || ganhoSemValor);
       if (valorEfetivo == null || (valorEfetivo <= 0 && !zeroSemCobranca)) {
         return NextResponse.json(
           { erro: "valor e obrigatorio para marcar como ganho" },
@@ -522,19 +536,35 @@ export async function PATCH(
         );
       }
       data.valor = valorEfetivo;
-      // Tipo do ganho: gravado SO aqui (fechamento de ganho, pos-venda). Ausente
-      // ou invalido nao escreve nada — nunca sobrescreve com null.
-      if (tipoGanhoInformado) data.tipoGanho = tipoGanhoInformado;
+      // Tipo do ganho: gravado SO aqui (fechamento de ganho, pos-venda).
+      // FRENTE 4: numa TRANSICAO real para GANHO sem tipo informado (venda com
+      // valor), LIMPA qualquer tipoGanho remanescente de um ganho-sem-valor
+      // anterior (duvida/rastreio/outro). Sem isso, uma venda de RETORNO real
+      // herdaria o tipoGanho velho e o filtro de faturamento (vendasPeriodo) a
+      // excluiria como se fosse atendimento sem cobranca. So no momento da
+      // transicao: um PATCH que edita um negocio JA GANHO nunca apaga o tipo.
+      if (tipoGanhoInformado) {
+        data.tipoGanho = tipoGanhoInformado;
+      } else if (negocio.status !== StatusNeg.GANHO) {
+        data.tipoGanho = null;
+      }
       data.status = StatusNeg.GANHO;
       data.fechadoEm = agora;
       // Simetrico da perda (Bloco 1/5): a data do ganho fica preservada, porque
       // o retorno do cliente reabre o negocio e o status sai de GANHO.
       data.jaFoiGanho = true;
-      data.ultimoGanhoEm = agora;
+      // FRENTE 4: ganho SEM valor (duvida/rastreio/outro) NAO e uma nova venda —
+      // nao avanca a memoria de venda (ultimoGanhoEm) nem o contador (vezesGanho).
+      // Assim o faturamento por periodo (arm 2 de vendasPeriodo) e o selo de
+      // recompra continuam contando so as compras REAIS; o card ainda vai para
+      // Vendido (status/fechadoEm acima) e segue o relogio de 7 dias.
+      if (!ganhoSemValor) data.ultimoGanhoEm = agora;
       // CONTADOR: +1 so na TRANSICAO de verdade. Um negocio que ja esta GANHO e
       // recebe outro PATCH (editar valor, mover entre etapas de ganho) nao conta
       // de novo. Ganhar -> cliente volta (reabre) -> ganhar outra vez conta 2.
-      if (negocio.status !== StatusNeg.GANHO) {
+      // FRENTE 4: ganho SEM valor (duvida/rastreio/outro) nao e venda, entao nao
+      // incrementa o contador de vendas do cliente.
+      if (negocio.status !== StatusNeg.GANHO && !ganhoSemValor) {
         data.vezesGanho = { increment: 1 };
       }
       // Fechamento de pedido: grava os itens (substitui os anteriores deste
@@ -595,8 +625,11 @@ export async function PATCH(
         tipo: TipoHistorico.GANHO,
         descricao: `Negocio ganho (${brl(valorEfetivo)})${
           tipoGanhoInformado ? ` — ${rotuloTipoGanho(tipoGanhoInformado)}` : ""
-        }${detalhePedido}`,
+        }${detalhePedido}${ganhoSemValor ? SUFIXO_GANHO_SEM_VALOR : ""}`,
         // MESMO numero que vai no texto acima (e o que grava Negocio.valor).
+        // FRENTE 4: num ganho SEM valor o sufixo acima marca o evento como
+        // "nao e venda", entao compras/faturamento o ignoram (mesmo padrao do
+        // SUFIXO_GANHO_DUPLICADO). O evento continua inteiro na linha do tempo.
         valorGanho: valorEfetivo,
       });
     } else if (destino.tipo === TipoEtapa.PERDIDO) {
@@ -1158,6 +1191,17 @@ export async function PATCH(
   // etiqueta azul, limpa o prazo e cancela o Lembrete do recontato.
   if (saindoDoAPrazo) {
     await limparMarcacaoAPrazo(id, negocio.leadId);
+  }
+
+  // FRENTE 6: espelha o fechamento do negocio no status do CarteiraContato,
+  // quando o lead veio da Carteira de Leads. GANHO -> CONVERTIDO; PERDIDO ("sem
+  // interesse") -> DESCARTADO. Antes nada escrevia esses status automaticamente
+  // e os filtros "Convertido"/"Descartado" da carteira ficavam vazios. No-op
+  // fora da carteira; o helper nunca regride (CONVERTIDO e apex, ver sync.ts).
+  if (data.status === StatusNeg.GANHO) {
+    await avancarStatusCarteiraPorLead(negocio.leadId, "CONVERTIDO");
+  } else if (data.status === StatusNeg.PERDIDO) {
+    await avancarStatusCarteiraPorLead(negocio.leadId, "DESCARTADO");
   }
 
   // Meta Conversions API: ao marcar GANHO com valor, dispara "Purchase" com a

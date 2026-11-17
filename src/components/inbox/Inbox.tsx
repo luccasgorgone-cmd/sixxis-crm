@@ -132,9 +132,20 @@ export function Inbox({
 
   // Dono mudou (roteamento/assumir/transferir) -> recarrega a lista.
   // Conversa excluida (admin) -> remove da lista e fecha se estava aberta.
+  // FRENTE 1 (lentidao): conversa:atualizada e BROADCAST global e chegava a cada
+  // mensagem; cada um recarregava a lista INTEIRA (ate 200 conversas, admin sem
+  // filtro, include pesado de negocios). Debounce coalesce a rajada num recarregar
+  // so a cada ~1s. Exclusao continua imediata (mexe no estado local na hora).
+  const recarregarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const socket = getSocket();
-    const recarregar = () => void carregarConversas();
+    const recarregar = () => {
+      if (recarregarTimerRef.current) return;
+      recarregarTimerRef.current = setTimeout(() => {
+        recarregarTimerRef.current = null;
+        void carregarConversas();
+      }, 1000);
+    };
     const onExcluida = (p: { conversaId?: string }) => {
       if (p?.conversaId) {
         setConversas((prev) => prev.filter((c) => c.id !== p.conversaId));
@@ -154,6 +165,10 @@ export function Inbox({
     return () => {
       socket.off("conversa:atualizada", recarregar);
       socket.off("conversa:excluida", onExcluida);
+      if (recarregarTimerRef.current) {
+        clearTimeout(recarregarTimerRef.current);
+        recarregarTimerRef.current = null;
+      }
     };
   }, [carregarConversas]);
 

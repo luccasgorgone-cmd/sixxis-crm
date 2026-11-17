@@ -96,8 +96,19 @@ type EventoGanho = {
 export const SUFIXO_GANHO_DUPLICADO =
   " [duplicado de movimentacao — desconsiderado]";
 
+// FRENTE 4: ganho de RETORNO sem valor (cliente que ja comprou volta so para
+// tirar duvida / pedir codigo de rastreio / outro). Fecha como GANHO para o card
+// ir a Vendido, mas NAO e uma nova venda: nao conta em compras nem no
+// faturamento por periodo. Mesma mecanica do sufixo de duplicado — marca o
+// evento sem apaga-lo da linha do tempo.
+export const SUFIXO_GANHO_SEM_VALOR =
+  " [atendimento sem cobranca — nao e venda]";
+
 export function ehGanhoDesconsiderado(descricao: string): boolean {
-  return descricao.endsWith(SUFIXO_GANHO_DUPLICADO);
+  return (
+    descricao.endsWith(SUFIXO_GANHO_DUPLICADO) ||
+    descricao.endsWith(SUFIXO_GANHO_SEM_VALOR)
+  );
 }
 
 // A MESMA regra em WHERE, para quem filtra no banco (dedup e limpeza de compras
@@ -105,7 +116,12 @@ export function ehGanhoDesconsiderado(descricao: string): boolean {
 // nesta base (ver Fatia 14.1), e separadas voltam a divergir. Sem cuidado com
 // NULL aqui: descricao e NOT NULL.
 export const WHERE_GANHO_VALIDO = {
-  NOT: { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+  NOT: {
+    OR: [
+      { descricao: { endsWith: SUFIXO_GANHO_DUPLICADO } },
+      { descricao: { endsWith: SUFIXO_GANHO_SEM_VALOR } },
+    ],
+  },
 };
 
 // null = compra antiga sem valor estruturado (backfill nao casou). NUNCA vira 0:

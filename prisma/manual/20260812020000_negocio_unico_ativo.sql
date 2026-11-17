@@ -1,5 +1,11 @@
 -- =============================================================================
--- APLICAR MANUALMENTE — NAO MOVER PARA prisma/migrations AINDA.
+-- SUPERSEDIDO (frente 7, 2026-11-17): NAO aplicar mais a mao.
+-- A trava passou a ser aplicada AUTOMATICAMENTE no deploy pela migracao
+-- prisma/migrations/20261117140000_negocio_unico_ativo/migration.sql, que
+-- NEUTRALIZA os duplicados ativos (mesma regra de /api/admin/corrigir-duplicados)
+-- ANTES de criar o indice. Este arquivo fica so como referencia historica.
+-- =============================================================================
+-- (historico) APLICAR MANUALMENTE — NAO MOVER PARA prisma/migrations AINDA.
 -- =============================================================================
 -- Este arquivo esta FORA de prisma/migrations DE PROPOSITO. O deploy roda
 -- `prisma migrate deploy` no boot (package.json: "start"), entao qualquer coisa

@@ -80,17 +80,25 @@ export async function marcarInteracaoNoNegocio(
 // funil. INVARIANTE (Bloco 1): um lead + finalidade tem no MAXIMO um negocio —
 // se ja existe qualquer negocio (aberto, ganho ou perdido), ele e REUSADO; esta
 // funcao so cria um negocio para quem ainda nao tem nenhum.
-// `respeitarPrazoPerdido`: quando true, um negocio PERDIDO ainda VISIVEL no
-// Kanban (arquivado=false — dentro do prazo dos 4 dias contado da entrada na
-// coluna) NAO reabre so por causa desta chamada; o id do PERDIDO e devolvido
-// sem tocar status/etapa/entrouEtapaEm (ver bloco abaixo). Default FALSE
+// `respeitarPrazoPerdido`: quando true, um negocio FECHADO (PERDIDO **ou
+// GANHO**) ainda VISIVEL no Kanban (arquivado=false — dentro do prazo de
+// arquivamento: perdido conta da entrada na coluna, ganho conta da ultima
+// mensagem) NAO reabre so por causa desta chamada; o id do negocio fechado e
+// devolvido sem tocar status/etapa/entrouEtapaEm (ver bloco abaixo). O nome do
+// parametro ficou por historico (nasceu so para o perdido, 17/08); hoje cobre
+// os DOIS lados terminais. Default FALSE
 // preserva o comportamento antigo (sempre reabre) para todos os fluxos
 // DELIBERADOS/manuais (vincular lead, mover finalidade, restaurar ganho,
 // iniciar conversa pelo admin etc.) — so a INGESTAO AUTOMATICA de mensagem
 // (queue.ts, mensagem de ENTRADA do WhatsApp) passa true. Ver correcao 17/08
 // (pedido direto do Luccas): reabertura automatica so pode acontecer depois
 // que o negocio ja tiver SAIDO do quadro (arquivado=true), nunca enquanto
-// ainda esta visivel em Perdidos.
+// ainda esta visivel em Perdidos OU em Vendidos (ganho). Correcao 17/11
+// (frente 3, pedido do Luccas): a simetria passou a valer para GANHO — cliente
+// vendido que volta a falar NAO vira "Novo"; o card FICA em Vendido, sobe ao
+// topo pela ultima mensagem, e so sai quando o job de prazo (diasArquivarGanho)
+// arquiva; so entao uma nova mensagem o traz como "Novo" com o selo "ja
+// comprou" (jaFoiGanho).
 export async function garantirNegocioParaLead(
   leadId: string,
   finalidade: Finalidade = Finalidade.VENDA,
@@ -164,10 +172,17 @@ export async function garantirNegocioParaLead(
     // (mover-finalidade, vincular lead existente, restaurar-ganho, iniciar
     // conversa pelo admin) NAO passam respeitarPrazoPerdido=true e continuam
     // reabrindo como sempre — e uma acao deliberada de humano, nao o bug de
-    // mensagem automatica reabrindo sozinha. GANHO segue com o comportamento
-    // antigo em qualquer chamador (fora do escopo desta correcao — ver
-    // negocio.ts:jaFoiGanho).
-    if (eraPerdido && respeitarPrazoPerdido && !anterior.arquivado) {
+    // mensagem automatica reabrindo sozinha. GANHO agora segue a MESMA regra
+    // (frente 3, 17/11): cliente vendido que volta a falar pela ingestao
+    // automatica mantem o card em Vendido ate o prazo de arquivamento
+    // (diasArquivarGanho, relogio pela ultima mensagem) — NAO reabre como
+    // "Novo". So depois de arquivado (arquivado=true) uma nova mensagem o traz
+    // de volta como "Novo" com jaFoiGanho=true (selo "ja comprou"). Simetria
+    // pedida pelo Luccas; antes so o PERDIDO ficava no quadro e o vendido
+    // regredia para "Novo" (o bug relatado).
+    if (respeitarPrazoPerdido && !anterior.arquivado) {
+      // anterior.status e sempre PERDIDO ou GANHO (filtro do findFirst acima);
+      // os dois lados terminais ficam no quadro ate o job de prazo arquivar.
       return anterior.id;
     }
     const reaberto = await prisma.negocio.update({

@@ -66,6 +66,9 @@ export function cardNegocio(n: NegocioCard) {
     temperatura: n.temperatura,
     status: n.status,
     finalidade: n.finalidade,
+    // Frente 4: cliente que JA foi ganho alguma vez. O modal de fechamento usa
+    // para oferecer o ganho de RETORNO sem valor (duvida/rastreio/outro).
+    jaFoiGanho: n.jaFoiGanho,
     garantia: n.lead.garantia,
     pendente: n.pendente,
     motivoPendencia: n.motivoPendencia,

@@ -15,10 +15,11 @@
 // um segundo. O vinculo CarteiraContato.leadId (@unique) fecha o 1:1.
 import { prisma } from "@/lib/prisma";
 import { Finalidade } from "@/generated/prisma/enums";
-import { normalizarTelefoneBR } from "@/lib/phone";
+import { normalizarTelefoneBR, variantesTelefoneBR } from "@/lib/phone";
 import { garantirConversaUnificada } from "@/lib/conversa";
 import { garantirNegocioParaLead } from "@/lib/negocio";
 import { nomeBuscaDe } from "@/lib/cliente";
+import { decidirCadastroDuplicado } from "@/lib/dedupCadastro";
 
 export type ResultadoAtivacao = {
   ok: true;
@@ -28,10 +29,33 @@ export type ResultadoAtivacao = {
   reusouLead: boolean;
 };
 
+// Lancado quando o numero do contato ja pertence a OUTRO vendedor no sistema.
+// A carteira era o UNICO caminho de criacao de Lead que ainda escapava da trava
+// de duplicata (o cadastro manual /api/leads ja bloqueava desde 03/11) e, pior,
+// usava match EXATO de telefone — por isso DUPLICAVA o card para um segundo
+// vendedor (frente 7, pedido do Luccas). A rota de ativacao mapeia este erro
+// para HTTP 403 com o nome do dono atual.
+export class ConflitoCarteiraOutroVendedor extends Error {
+  readonly leadId: string;
+  readonly donoId: string | null;
+  readonly donoNome: string | null;
+  constructor(donoNome: string | null, leadId: string, donoId: string | null) {
+    super(
+      donoNome
+        ? `Este cliente ja esta no sistema e pertence a ${donoNome}. Peca a um admin para reatribuir.`
+        : "Este cliente ja esta no sistema e pertence a outro vendedor. Peca a um admin para reatribuir.",
+    );
+    this.name = "ConflitoCarteiraOutroVendedor";
+    this.leadId = leadId;
+    this.donoId = donoId;
+    this.donoNome = donoNome;
+  }
+}
+
 export async function ativarContato(
   contatoId: string,
   agenteId: string,
-  opts: { instanciaId?: string | null },
+  opts: { instanciaId?: string | null; ehAdmin?: boolean },
 ): Promise<ResultadoAtivacao> {
   const contato = await prisma.carteiraContato.findUnique({
     where: { id: contatoId },
@@ -51,15 +75,49 @@ export async function ativarContato(
 
   const telefone = normalizarTelefoneBR(contato.telefone);
 
-  // 1) Lead por telefone: reusa o existente (nunca duplica) ou cria.
-  const existente = await prisma.lead.findUnique({
-    where: { telefone },
+  // 1) Lead por telefone: busca TOLERANTE a variante (com/sem o 9o digito,
+  // com/sem o DDI 55) — igual ao cadastro manual (/api/leads). Antes era
+  // findUnique EXATO: o MESMO cliente ja ingerido noutra forma ("5518999..." vs
+  // "18999...") escapava, caia no create e nascia um SEGUNDO Lead com dono = o
+  // vendedor que ativava — a DUPLICATA cross-vendedor relatada (frente 7). A
+  // carteira e sempre VENDA, entao o dono da finalidade e Lead.donoId.
+  const existentes = await prisma.lead.findMany({
+    where: { telefone: { in: variantesTelefoneBR(telefone) } },
     select: { id: true, donoId: true },
   });
+  // Lead canonico: prefere um que JA tenha dono (o dono manda na trava); senao o
+  // primeiro. Deterministico quando ha mais de um casando por variante (legado).
+  const existente =
+    existentes.find((l) => l.donoId != null) ?? existentes[0] ?? null;
 
   let leadId: string;
   let reusouLead: boolean;
   if (existente) {
+    // TRAVA cross-vendedor (frente 7): numero que ja pertence a OUTRO vendedor
+    // nao pode ser ativado por vendedor comum — BLOQUEIA com aviso de quem e o
+    // dono; so admin reatribui (transferencia de carteira). Mesma regra PURA do
+    // cadastro manual (decidirCadastroDuplicado, contrato c17) — um ponto de
+    // decisao so para os dois caminhos nao divergirem de novo.
+    const decisao = decidirCadastroDuplicado({
+      existe: true,
+      donoFinalidade: existente.donoId,
+      requesterId: agenteId,
+      ehAdmin: opts.ehAdmin === true,
+    });
+    if (decisao.acao === "ASSUMIR" && decisao.bloqueado) {
+      const dono = existente.donoId
+        ? await prisma.agente.findUnique({
+            where: { id: existente.donoId },
+            select: { nome: true },
+          })
+        : null;
+      throw new ConflitoCarteiraOutroVendedor(
+        dono?.nome ?? null,
+        existente.id,
+        existente.donoId,
+      );
+    }
+
     reusouLead = true;
     leadId = existente.id;
     // So assume a posse se o lead estava sem dono (nunca rouba um lead ja de

@@ -338,7 +338,7 @@ export function Compositor({
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       // Ao PARAR: envia DIRETO (estilo WhatsApp), sem preview. Se a acao foi
-      // CANCELAR, apenas descarta. Toque acidental (muito curto/vazio) e ignorado.
+      // CANCELAR, apenas descarta.
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         pararTimer();
@@ -348,12 +348,28 @@ export function Compositor({
         if (acao === "cancelar") return;
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
         const durMs = Date.now() - gravacaoInicioRef.current;
-        if (blob.size === 0 || durMs < 1000) return;
-        void enviarAudioBlob(blob);
+        // FRENTE 2 (bug B): AVISA em vez de descartar em silencio. Antes um blob
+        // vazio ou um toque < 1s sumia sem o atendente entender por que "o audio
+        // nao foi". Agora da feedback claro.
+        if (blob.size === 0) {
+          setErro("Nao consegui capturar o audio. Tente gravar de novo.");
+          return;
+        }
+        if (durMs < 700) {
+          setErro("Audio muito curto — segure o microfone para gravar.");
+          return;
+        }
+        // FRENTE 2 (bug A): ENFILEIRA em vez de enviar direto. Fixa conversaId e
+        // instancia DESTA gravacao para nunca mandar pra conversa errada e nunca
+        // descartar um audio so porque o anterior ainda esta no ar.
+        enfileirarAudio(blob, conversaId, instanciaSel);
       };
       recorderRef.current = rec;
       gravacaoInicioRef.current = Date.now();
-      rec.start();
+      // timeslice de 250ms: o ondataavailable passa a liberar os chunks durante
+      // a gravacao (nao so no stop). Reduz o risco de blob vazio em gravacoes
+      // curtas/rapidas (parte do bug B) e flui melhor em alguns navegadores.
+      rec.start(250);
       setGravando(true);
       setSegundos(0);
       timerRef.current = setInterval(() => setSegundos((s) => s + 1), 1000);
@@ -362,21 +378,51 @@ export function Compositor({
     }
   }
 
-  // PARAR-E-ENVIAR: para o recorder; o onstop dispara o envio direto do blob.
+  // PARAR-E-ENVIAR: para o recorder; o onstop enfileira o blob para envio.
   function pararEEnviar() {
     acaoRef.current = "enviar";
     recorderRef.current?.stop();
     setGravando(false);
   }
 
-  async function enviarAudioBlob(blob: Blob) {
-    if (enviandoAudio) return;
+  // FRENTE 2 (bug A): fila FIFO de audios. Cada item carrega o conversaId e a
+  // instancia de QUANDO foi gravado. Drena um de cada vez, em ordem, sem nunca
+  // descartar um audio so porque o anterior ainda esta sendo enviado (era o
+  // `if (enviandoAudio) return` que fazia o 1o/2o "sumir").
+  const filaAudioRef = useRef<{ blob: Blob; conversaId: string; instanciaId: string | null }[]>([]);
+  const drenandoAudioRef = useRef(false);
+
+  function enfileirarAudio(blob: Blob, conversaDoAudio: string, instanciaDoAudio: string | null) {
+    filaAudioRef.current.push({ blob, conversaId: conversaDoAudio, instanciaId: instanciaDoAudio });
+    void drenarFilaAudio();
+  }
+
+  async function drenarFilaAudio() {
+    if (drenandoAudioRef.current) return;
+    drenandoAudioRef.current = true;
     setEnviandoAudio(true);
+    try {
+      while (filaAudioRef.current.length > 0) {
+        const item = filaAudioRef.current.shift();
+        if (!item) break;
+        await enviarUmAudio(item.blob, item.conversaId, item.instanciaId);
+      }
+    } finally {
+      drenandoAudioRef.current = false;
+      setEnviandoAudio(false);
+    }
+  }
+
+  async function enviarUmAudio(
+    blob: Blob,
+    conversaDoAudio: string,
+    instanciaDoAudio: string | null,
+  ) {
     setErro(null);
     try {
       const fd = new FormData();
-      fd.append("conversaId", conversaId);
-      if (instanciaSel) fd.append("instanciaId", instanciaSel);
+      fd.append("conversaId", conversaDoAudio);
+      if (instanciaDoAudio) fd.append("instanciaId", instanciaDoAudio);
       const ext = (blob.type.split("/")[1] || "webm").split(";")[0];
       fd.append("audio", blob, `audio.${ext}`);
       const r = await fetch("/api/mensagens/enviar-audio", {
@@ -384,14 +430,17 @@ export function Compositor({
         body: fd,
       });
       const d = await r.json().catch(() => null);
-      if (d?.mensagem) onEnviada(d.mensagem as MensagemItem);
+      // So reflete na tela se o audio for DA conversa aberta agora: a fila pode
+      // drenar depois que o atendente trocou de conversa (o audio ainda vai para
+      // a conversa certa, mas nao deve injetar bolha na conversa errada).
+      if (d?.mensagem && conversaDoAudio === conversaId) {
+        onEnviada(d.mensagem as MensagemItem);
+      }
       if (!r.ok) {
         setErro("Falha ao enviar o audio. Verifique a conexao com o WhatsApp.");
       }
     } catch {
       setErro("Nao foi possivel enviar o audio agora.");
-    } finally {
-      setEnviandoAudio(false);
     }
   }
 
@@ -736,6 +785,11 @@ export function Compositor({
   return (
     <div className="relative border-t border-black/5 bg-white p-3">
       {erro && <p className="mb-2 px-1 text-xs text-erro">{erro}</p>}
+      {enviandoAudio && (
+        <p className="mb-2 flex items-center gap-1.5 px-1 text-xs text-tiffany">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando audio...
+        </p>
+      )}
 
       {textoAnterior !== null && !reescrevendo && (
         <button

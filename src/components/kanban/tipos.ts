@@ -37,6 +37,9 @@ export type CardNegocio = {
   temperatura: Temperatura;
   status: StatusNeg;
   finalidade: Finalidade;
+  // Frente 4: cliente que JA foi ganho alguma vez (jaFoiGanho no banco).
+  // Habilita no modal de fechamento o ganho de RETORNO sem valor.
+  jaFoiGanho: boolean;
   // Garantia do cliente (pos-venda): null=nao definido, true=com, false=sem.
   garantia: boolean | null;
   pendente: boolean;

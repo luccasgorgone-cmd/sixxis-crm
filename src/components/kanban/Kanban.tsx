@@ -130,6 +130,7 @@ type Pendente = {
   etapaId: string;
   origemEtapaId: string | null;
   valorInicial: number | null;
+  ehRetornoGanho: boolean;
 };
 
 // Resumo agregado por etapa vindo da rota (Fatia P).
@@ -623,6 +624,7 @@ export function Kanban({
         etapaId: destinoEtapaId,
         origemEtapaId: achado.etapaId,
         valorInicial: achado.card.valor,
+        ehRetornoGanho: achado.card.jaFoiGanho === true,
       });
       return;
     }
@@ -633,6 +635,7 @@ export function Kanban({
         etapaId: destinoEtapaId,
         origemEtapaId: achado.etapaId,
         valorInicial: achado.card.valor,
+        ehRetornoGanho: false,
       });
       return;
     }
@@ -902,6 +905,7 @@ export function Kanban({
           tipo={pendente.tipo}
           valorInicial={pendente.valorInicial}
           finalidade={finalidade}
+          ehRetornoGanho={pendente.ehRetornoGanho}
           onConfirmar={confirmarFechamento}
           onCancelar={() => setPendente(null)}
         />

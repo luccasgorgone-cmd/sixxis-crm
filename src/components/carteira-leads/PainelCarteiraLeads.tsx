@@ -151,6 +151,11 @@ export function PainelCarteiraLeads({ ehAdmin }: { ehAdmin: boolean }) {
       if (r.ok && d?.leadId) {
         toast.sucesso("Conversa aberta — leve para o Inbox");
         router.push(`/inbox?lead=${encodeURIComponent(d.leadId)}`);
+      } else if (d?.bloqueado) {
+        // Numero ja pertence a OUTRO vendedor: alerta modal inconfundivel
+        // explicando por que nao deixou criar (frente 7) — toast transitorio
+        // passava batido e o vendedor achava que era bug.
+        window.alert(d?.erro ?? "Este cliente ja pertence a outro vendedor.");
       } else {
         toast.erro(d?.erro ?? "Falha ao abrir conversa");
       }

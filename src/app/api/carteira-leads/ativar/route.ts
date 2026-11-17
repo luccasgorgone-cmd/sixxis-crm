@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { obterAgente, ehAdmin } from "@/lib/autorizacao";
 import { prisma } from "@/lib/prisma";
-import { ativarContato } from "@/lib/carteira/ativar";
+import { ativarContato, ConflitoCarteiraOutroVendedor } from "@/lib/carteira/ativar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,9 +32,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const r = await ativarContato(contatoId, agente.id, { instanciaId: body?.instanciaId ?? null });
+    const r = await ativarContato(contatoId, agente.id, {
+      instanciaId: body?.instanciaId ?? null,
+      ehAdmin: ehAdmin(agente.papel),
+    });
     return NextResponse.json(r);
   } catch (e) {
+    // Numero ja e de outro vendedor: 403 com quem e o dono, para a UI mostrar o
+    // alerta explicando por que nao deixou criar (frente 7). Mesmo contrato de
+    // resposta do cadastro manual: { erro, bloqueado, leadId, donoId, donoNome }.
+    if (e instanceof ConflitoCarteiraOutroVendedor) {
+      return NextResponse.json(
+        {
+          erro: e.message,
+          bloqueado: true,
+          leadId: e.leadId,
+          donoId: e.donoId,
+          donoNome: e.donoNome,
+        },
+        { status: 403 },
+      );
+    }
     return NextResponse.json(
       { erro: e instanceof Error ? e.message : "falha ao ativar" },
       { status: 500 },

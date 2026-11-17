@@ -667,6 +667,7 @@ export function PainelNegocio({
           tipo={modal.tipo}
           valorInicial={detalhe.valor}
           finalidade={detalhe.finalidade}
+          ehRetornoGanho={detalhe.jaFoiGanho === true}
           negocioId={negocioId}
           itensIniciais={modal.itensIniciais}
           freteInicial={modal.orc?.frete}

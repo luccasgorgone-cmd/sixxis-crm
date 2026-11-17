@@ -32,6 +32,7 @@ import { nomeEfetivo, nomeBuscaDe } from "./cliente";
 import { gerarRespostaLuna, type LunaFinalidade } from "./luna";
 import { registrarSolEvento } from "./solEvento";
 import { marcarRespostaRecaptacao } from "./recaptacao";
+import { avancarStatusCarteiraPorLead } from "./carteira/sync";
 import { aplicarModelo } from "./modelos";
 import { enviarSMS, enviarEmail } from "./providers";
 import type { AcaoIngest, IdentidadeExterna, DirecaoCanal } from "./canal/tipos";
@@ -2417,6 +2418,11 @@ async function processarEvento(
     if (direcao === DirecaoMsg.IN) {
       const rec = await marcarRespostaRecaptacao(lead.id, mensagem.conteudo ?? "");
       optOutRecaptacao = rec.optOut;
+      // FRENTE 6: se este lead veio da Carteira de Leads, uma mensagem de
+      // ENTRADA e a resposta do prospect -> avanca NOVO/EM_ABORDAGEM para
+      // RESPONDEU. Antes nada escrevia isso e o filtro "Respondeu" ficava
+      // sempre vazio. No-op se nao for lead de carteira ou se nao avancar.
+      await avancarStatusCarteiraPorLead(lead.id, "RESPONDEU");
     }
 
     // Garante um negocio aberto para o lead NAQUELA finalidade (idempotente) e

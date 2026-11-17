@@ -337,6 +337,7 @@ function ConteudoVenda() {
           <li><strong>Cliente ja perdido nao reabre</strong> so por mandar mensagem — enquanto o prazo de perdido nao vence e o card nao e arquivado. O selo de ja-foi-perdido fica no historico.</li>
           <li><strong>O dono e a fonte da verdade do roteamento.</strong> Transferencia move leads, negocios <strong>abertos</strong> e conversas — mas <strong>preserva o vendedor historico nos negocios ja fechados</strong>.</li>
           <li><strong>Faturamento conta por houve-ganho-no-periodo, nao pelo status atual.</strong> Venda ganha hoje que reabrir amanha ainda conta como venda de hoje.</li>
+          <li><strong>Numero que ja e de outro vendedor nao da pra cadastrar.</strong> Ao tentar criar um contato ou abrir conversa com um numero que ja pertence a outro vendedor, o sistema <strong>bloqueia e avisa de quem e o cliente</strong> — nao duplica mais o card para dois vendedores. Para assumir esse cliente, peca a um <strong>admin</strong> a transferencia de carteira.</li>
         </ul>
       </Secao>
 
@@ -357,6 +358,14 @@ function ConteudoVenda() {
         <p>Numero errado / contato invalido · Spam · Fornecedor / nao e cliente · Busca emprego · Fora da area de atendimento · Produto que a SIXXIS nao vende.</p>
         <Nota>
           <strong>Regra pratica:</strong> se nao dava para vender porque <strong>nao era cliente</strong>, e <strong>Desqualificado</strong> (nao te penaliza). Se era cliente e nao rolou, e <strong>Perdido</strong> (com o motivo certo).
+        </Nota>
+        <p className="font-semibold text-tiffany">GANHO (vendeu) — e o caso especial do RETORNO</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li><strong>Venda de verdade:</strong> fecha Ganho com o <Rotulo>valor</Rotulo> efetivo (cuidado com a armadilha do valorAjustado, regra 7).</li>
+          <li><strong>Cliente que JA comprou e so voltou</strong> (tirar duvida, pedir codigo de rastreio ou outro motivo): feche como <strong>Ganho</strong> do mesmo jeito — o card vai/fica em <strong>Vendido</strong> — mas escolhendo o motivo de retorno <em>Só dúvida</em>, <em>Código de rastreio</em> ou <em>Outro motivo</em>. Esse ganho de retorno <strong>NAO soma faturamento, nao conta como nova compra e nao dispara Purchase no Meta</strong>: serve so para o card nao virar venda falsa nem ficar baguncado. O seletor de motivo <strong>aparece sozinho</strong> quando o cliente ja foi ganho antes.</li>
+        </ul>
+        <Nota>
+          <strong>Vendido segura 7 dias.</strong> Quando um cliente dado como Ganho/Vendido volta a mandar mensagem, o card <strong>sobe para o topo da coluna Vendido e PERMANECE la por 7 dias</strong> (contados pela ultima mensagem) — nao reaparece como "lead novo". So depois de 7 dias sem contato o card sai de Vendido; se o cliente voltar depois disso, entra como <strong>Novo</strong>, porem <strong>marcado "ja comprou"</strong> (igual ao selo do perdido). Voce nao precisa re-ganhar nem perder a cada mensagem.
         </Nota>
       </Secao>
 
@@ -384,7 +393,7 @@ function ConteudoVenda() {
       <Secao num="11" titulo="O que NAO fazer (erros classicos)">
         <ul className="list-disc space-y-1 pl-5">
           <li>Deixar cliente na etapa Novo por horas (SLA estoura, cliente esfria).</li>
-          <li>Mover para Vendido um cliente que ja comprou e so voltou tirar duvida → use o fluxo de Pos-venda / Encerrar; nao crie venda falsa.</li>
+          <li>Criar <strong>venda falsa</strong> para um cliente que ja comprou e so voltou tirar duvida. Feche como <strong>Ganho de retorno</strong> (motivo <em>Só dúvida / Código de rastreio / Outro</em>): vai pra Vendido <strong>sem somar faturamento</strong> — nunca invente um valor.</li>
           <li>Registrar ganho com <Rotulo>valorAjustado = 0</Rotulo> pendurado (zera a venda sem avisar).</li>
           <li>Deixar card aberto sem proximo passo.</li>
           <li>Fechar como Perdido algo que e Desqualificado (ou o contrario).</li>
