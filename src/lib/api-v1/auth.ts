@@ -9,7 +9,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { ChaveAutenticada } from "./tipos";
-import { naoAutenticado } from "./erros";
+import { naoAutenticado, limiteExcedido } from "./erros";
+import { registrarFalhaAuth } from "./rate-limit";
 
 export const PREFIXO_CHAVE = "sxc_live_";
 // Quantos chars do token viram o "prefixo" exibivel (sxc_live_ + 8 chars).
@@ -48,11 +49,26 @@ export function extrairBearer(header: string | null): string | null {
   return token.length > 0 ? token : null;
 }
 
+// Conta a falha de auth no contador por IP e lanca 401 — ou 429 (Retry-After) se
+// o IP ja estourou o limite de falhas na janela (anti brute-force de chaves).
+// Todas as falhas de autenticacao passam por aqui.
+async function falhaAutenticacao(ip: string | null): Promise<never> {
+  const r = await registrarFalhaAuth(ip);
+  if (r.excedido) {
+    throw limiteExcedido(
+      r.resetSeg,
+      "Muitas falhas de autenticacao deste IP. Tente novamente mais tarde.",
+    );
+  }
+  throw naoAutenticado();
+}
+
 // Autentica a requisicao. Lanca ProblemaApi(401) em qualquer falha (sem revelar
-// qual: ausente/invalida/revogada/expirada dao a mesma resposta generica).
+// qual: ausente/invalida/revogada/expirada dao a mesma resposta generica); apos
+// muitas falhas do mesmo IP na janela, responde 429.
 export async function autenticar(authorization: string | null, ip: string | null): Promise<ChaveAutenticada> {
   const token = extrairBearer(authorization);
-  if (!token || !token.startsWith(PREFIXO_CHAVE)) throw naoAutenticado();
+  if (!token || !token.startsWith(PREFIXO_CHAVE)) return falhaAutenticacao(ip);
 
   const hash = hashChave(token);
   const row = await prisma.apiChaveLeitura.findUnique({
@@ -68,11 +84,11 @@ export async function autenticar(authorization: string | null, ip: string | null
       ultimoUsoEm: true,
     },
   });
-  if (!row) throw naoAutenticado();
+  if (!row) return falhaAutenticacao(ip);
   // Defesa extra (constant-time) — o lookup ja foi por igualdade de hash.
-  if (!comparaConstante(hash, row.hash)) throw naoAutenticado();
-  if (row.revogadoEm) throw naoAutenticado();
-  if (row.expiraEm && row.expiraEm.getTime() <= Date.now()) throw naoAutenticado();
+  if (!comparaConstante(hash, row.hash)) return falhaAutenticacao(ip);
+  if (row.revogadoEm) return falhaAutenticacao(ip);
+  if (row.expiraEm && row.expiraEm.getTime() <= Date.now()) return falhaAutenticacao(ip);
 
   // Atualiza ultimo uso de forma throttled (no maximo 1x/min por chave).
   const agora = Date.now();

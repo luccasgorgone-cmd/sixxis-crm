@@ -103,12 +103,12 @@ export function metodoNaoPermitido(allow: string[]): ProblemaApi {
   });
 }
 
-export function limiteExcedido(retryAfterSeg: number): ProblemaApi {
+export function limiteExcedido(retryAfterSeg: number, detail?: string): ProblemaApi {
   return new ProblemaApi({
     status: 429,
     type: "limite-excedido",
     title: "Limite de requisicoes excedido",
-    detail: "Rate limit de 600 req/min por chave atingido.",
+    detail: detail ?? "Rate limit de 600 req/min por chave atingido.",
     headers: { "Retry-After": String(retryAfterSeg) },
   });
 }

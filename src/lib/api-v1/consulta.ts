@@ -104,9 +104,13 @@ export function montarPlano(recurso: Recurso, params: URLSearchParams): PlanoCon
 
   // --- limite ---------------------------------------------------------------
   const limiteBruto = lerInt(params, "limit");
-  let limite = limiteBruto ?? LIMITE_PADRAO;
-  if (limite < 1) throw requisicaoInvalida("'limit' deve ser >= 1.");
-  if (limite > LIMITE_MAX) limite = LIMITE_MAX;
+  const limite = limiteBruto ?? LIMITE_PADRAO;
+  // Contrato publico: 1..500 (bate com o 'maximum' do OpenAPI). Fora da faixa e
+  // 400 explicito — nunca clamp silencioso (o consumidor saberia errado quantas
+  // linhas pediu).
+  if (limite < 1 || limite > LIMITE_MAX) {
+    throw requisicaoInvalida(`'limit' deve ser entre 1 e ${LIMITE_MAX}.`);
+  }
 
   // --- cursor (keyset) ------------------------------------------------------
   let cursor: Cursor | null = null;
@@ -154,20 +158,13 @@ export function montarPlano(recurso: Recurso, params: URLSearchParams): PlanoCon
     condicoes.push({ [colAtualizacao]: { ...(atualizadoDesde ? { gte: atualizadoDesde } : {}), ...(atualizadoAte ? { lte: atualizadoAte } : {}) } });
   }
 
-  // --- guarda de tabela grande ---------------------------------------------
-  // Tabelas grandes exigem uma janela (cursor, data-desde ou ids) para evitar
-  // varredura completa. Recursos sem coluna de data so aceitam cursor/ids.
-  const temJanelaData =
-    (!!criadoDesde && suportaCriacao) || (!!atualizadoDesde && suportaAtualizacao);
-  if (recurso.grande && !cursor && !ids && !temJanelaData) {
-    const opcoes =
-      suportaCriacao || suportaAtualizacao
-        ? "'cursor', 'ids', 'criadoDesde' ou 'atualizadoDesde'"
-        : "'cursor' ou 'ids'";
-    throw requisicaoInvalida(
-      `Recurso '${recurso.nome}' e grande: informe ${opcoes} para delimitar a consulta.`,
-    );
-  }
+  // --- primeira pagina de tabela grande ------------------------------------
+  // Tabelas grandes NAO exigem mais um filtro para a 1a pagina. A consulta e
+  // sempre keyset (orderBy em coluna indexada + take = limite+1, limite <= 500):
+  // mesmo sem cursor/ids/data o Postgres le no maximo 501 linhas — nunca uma
+  // varredura completa. A carga inicial fica trivial (so `?limit=N`) e as
+  // paginas seguintes seguem por meta.nextCursor. Filtros de data continuam
+  // disponiveis para carga incremental em recursos com coluna temporal.
 
   // --- soft delete ----------------------------------------------------------
   const incluirExcluidos = lerBool(params, "incluirExcluidos") ?? false;
