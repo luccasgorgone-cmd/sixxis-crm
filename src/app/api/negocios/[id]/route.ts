@@ -1237,6 +1237,11 @@ export async function PATCH(
             telefone: leadCapi.telefone,
             email: leadCapi.email,
             nome: leadCapi.nomeManual || leadCapi.pushName || leadCapi.nome,
+            // external_id (dedup/match) = hash do id do Lead.
+            leadId: negocio.leadId,
+            // event_time = hora do GANHO (este PATCH), nao "agora" do POST:
+            // garante o dia certo no Meta mesmo em reenvio/retry.
+            eventTime: Math.floor(agora.getTime() / 1000),
           });
           await registrarEventoCapi({
             negocioId: id,
@@ -1248,6 +1253,8 @@ export async function PATCH(
             ok: res.ok,
             status: res.status ?? null,
             motivo: res.motivo ?? null,
+            // Medicao: persiste events_received + fbtrace_id + raw da Graph.
+            raw: res.raw,
           });
         }
       }

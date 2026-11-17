@@ -942,6 +942,12 @@ model EventoCapi {
   ok           Boolean  @default(false)
   status       Int?
   motivo       String?  @db.Text
+  // Medicao (Marketing): resposta da Graph no caminho de envio real. events_received
+  // + fbtrace_id p/ conferir no Events Manager; graphRaw guarda o JSON cru (inclui
+  // messages[] com avisos de validacao). Nulos quando pulado/erro sem corpo.
+  eventsReceived Int?
+  fbtraceId      String?
+  graphRaw       String?  @db.Text
   criadoEm     DateTime @default(now())
 
   @@index([negocioId])

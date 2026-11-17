@@ -58,6 +58,77 @@ export type ResultadoCapi = {
   raw?: unknown;
 };
 
+export type DadosUsuarioCapi = {
+  telefone?: string | null;
+  email?: string | null;
+  nome?: string | null;
+  ctwaClid?: string | null;
+  leadId?: string | null; // vira external_id (SHA-256), ajuda dedup/match
+};
+
+// Monta o user_data do evento: hasheia (SHA-256) so o que existe, inclui
+// ctwa_clid e external_id (hash do id do Lead) quando presentes e SEMPRE
+// page_id (obrigatorio em business_messaging). Puro/deterministico.
+export function montarUserData(dados: DadosUsuarioCapi): Record<string, unknown> {
+  const userData: Record<string, unknown> = {};
+  const ph = hashTelefone(dados.telefone);
+  const em = hashEmail(dados.email);
+  const fn = hashNome(dados.nome);
+  if (ph) userData.ph = ph;
+  if (em) userData.em = em;
+  if (fn) userData.fn = fn;
+  if (dados.ctwaClid) userData.ctwa_clid = dados.ctwaClid;
+  // external_id = hash do id interno do Lead (opaco, nao PII legivel). Melhora
+  // a deduplicacao e o match de vendas do mesmo cliente no Meta.
+  const lid = (dados.leadId ?? "").trim();
+  if (lid) userData.external_id = [sha256(lid)];
+  // Obrigatorio para action_source=business_messaging (vide META_PAGE_ID acima).
+  // Nao e hasheado (identificador da Pagina, nao PII). Enviado sempre.
+  userData.page_id = META_PAGE_ID;
+  return userData;
+}
+
+// Monta o evento Purchase. event_time DEVE ser a hora do GANHO (epoch seg) para
+// o evento cair no dia certo mesmo em reenvio/retry; so cai pra "agora" quando
+// nao informado. Puro/deterministico (nao faz rede nem le config).
+export function montarEventoPurchase(opts: {
+  valor: number;
+  moeda?: string;
+  eventId: string;
+  eventTime?: number;
+} & DadosUsuarioCapi): Record<string, unknown> {
+  return {
+    event_name: "Purchase",
+    event_time: opts.eventTime ?? Math.floor(Date.now() / 1000),
+    event_id: opts.eventId, // deduplicacao
+    // Conversao originada de mensageria (Click-to-WhatsApp).
+    action_source: "business_messaging",
+    messaging_channel: "whatsapp",
+    user_data: montarUserData(opts),
+    custom_data: { value: opts.valor, currency: opts.moeda ?? "BRL" },
+  };
+}
+
+// Extrai os campos de medicao da resposta da Graph (Conversions API). Tolera
+// raw nulo/sem campos. events_received + fbtrace_id sao o que o Marketing usa
+// pra conferir no Events Manager; messages[] traz avisos/erros de validacao.
+export function extrairRespostaGraph(raw: unknown): {
+  eventsReceived: number | null;
+  fbtraceId: string | null;
+  messages: unknown[] | null;
+} {
+  if (!raw || typeof raw !== "object") {
+    return { eventsReceived: null, fbtraceId: null, messages: null };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    eventsReceived:
+      typeof r.events_received === "number" ? r.events_received : null,
+    fbtraceId: typeof r.fbtrace_id === "string" ? r.fbtrace_id : null,
+    messages: Array.isArray(r.messages) ? r.messages : null,
+  };
+}
+
 // Dispara o evento Purchase para a Graph API (Conversions API).
 export async function dispararPurchase(opts: {
   ctwaClid?: string | null;
@@ -67,33 +138,13 @@ export async function dispararPurchase(opts: {
   telefone?: string | null;
   email?: string | null;
   nome?: string | null;
-  eventTime?: number; // epoch segundos (default: agora seria nao-deterministico)
+  leadId?: string | null; // vira external_id (SHA-256)
+  eventTime?: number; // epoch segundos (hora do GANHO; default agora)
 }): Promise<ResultadoCapi> {
   const cfg = await lerConfig();
   if (!cfg) return { ok: false, motivo: "Meta CAPI nao configurado" };
 
-  const userData: Record<string, unknown> = {};
-  const ph = hashTelefone(opts.telefone);
-  const em = hashEmail(opts.email);
-  const fn = hashNome(opts.nome);
-  if (ph) userData.ph = ph;
-  if (em) userData.em = em;
-  if (fn) userData.fn = fn;
-  if (opts.ctwaClid) userData.ctwa_clid = opts.ctwaClid;
-  // Obrigatorio para action_source=business_messaging (vide META_PAGE_ID acima).
-  // Nao e hasheado (identificador da Pagina, nao PII). Enviado sempre.
-  userData.page_id = META_PAGE_ID;
-
-  const evento: Record<string, unknown> = {
-    event_name: "Purchase",
-    event_time: opts.eventTime ?? Math.floor(Date.now() / 1000),
-    event_id: opts.eventId, // deduplicacao
-    // Conversao originada de mensageria (Click-to-WhatsApp).
-    action_source: "business_messaging",
-    messaging_channel: "whatsapp",
-    user_data: userData,
-    custom_data: { value: opts.valor, currency: opts.moeda ?? "BRL" },
-  };
+  const evento = montarEventoPurchase(opts);
 
   const body: Record<string, unknown> = { data: [evento] };
   if (cfg.testEventCode) body.test_event_code = cfg.testEventCode;
@@ -196,8 +247,11 @@ export async function registrarEventoCapi(opts: {
   ok?: boolean;
   status?: number | null;
   motivo?: string | null;
+  // Resposta da Graph (medicao): guardada so no caminho de envio real.
+  raw?: unknown;
 }): Promise<void> {
   try {
+    const graph = extrairRespostaGraph(opts.raw);
     await prisma.eventoCapi.create({
       data: {
         negocioId: opts.negocioId ?? null,
@@ -213,6 +267,9 @@ export async function registrarEventoCapi(opts: {
         ok: opts.ok ?? false,
         status: opts.status ?? null,
         motivo: opts.motivo ?? null,
+        eventsReceived: graph.eventsReceived,
+        fbtraceId: graph.fbtraceId,
+        graphRaw: opts.raw != null ? JSON.stringify(opts.raw) : null,
       },
     });
   } catch (erro) {
