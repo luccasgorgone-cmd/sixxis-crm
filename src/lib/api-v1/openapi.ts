@@ -156,7 +156,7 @@ function respostasPadrao(schema200: Json, com_404 = false): Json {
     "400": refProblema("Requisicao invalida (parametros)."),
     "401": refProblema("Nao autenticado (Bearer ausente/invalido/revogado)."),
     "403": refProblema("Escopo insuficiente."),
-    "429": refProblema("Rate limit excedido (600 req/min por chave)."),
+    "429": refProblema("Excesso de falhas de autenticacao do mesmo IP (anti brute-force)."),
     "500": refProblema("Erro interno."),
   };
   if (com_404) r["404"] = refProblema("Recurso nao encontrado.");
@@ -166,9 +166,6 @@ function respostasPadrao(schema200: Json, com_404 = false): Json {
 function cabecalhosPadrao(): Json {
   return {
     "X-Request-Id": { schema: { type: "string" }, description: "Id de correlacao da requisicao." },
-    "X-RateLimit-Limit": { schema: { type: "integer" } },
-    "X-RateLimit-Remaining": { schema: { type: "integer" } },
-    "X-RateLimit-Reset": { schema: { type: "integer" }, description: "Segundos ate reiniciar a janela." },
   };
 }
 

@@ -38,26 +38,21 @@ export function metaItem(requestId: string): MetaItem {
   return { requestId, generatedAt: new Date().toISOString(), apiVersion: API_VERSION };
 }
 
-export function respostaLista(
-  data: unknown[],
-  meta: MetaLista,
-  requestId: string,
-  extraHeaders?: Record<string, string>,
-): NextResponse {
+export function respostaLista(data: unknown[], meta: MetaLista, requestId: string): NextResponse {
   const res = NextResponse.json({ data, meta });
-  return aplicarBase(res, requestId, extraHeaders);
+  return aplicarBase(res, requestId);
 }
 
-export function respostaItem(data: unknown, requestId: string, extraHeaders?: Record<string, string>): NextResponse {
+export function respostaItem(data: unknown, requestId: string): NextResponse {
   const res = NextResponse.json({ data, meta: metaItem(requestId) });
-  return aplicarBase(res, requestId, extraHeaders);
+  return aplicarBase(res, requestId);
 }
 
 // Resposta JSON crua (health, openapi, me, catalogo, metricas): mesmo envelope
 // de cabecalhos, corpo livre.
-export function respostaJson(corpo: unknown, requestId: string, extraHeaders?: Record<string, string>): NextResponse {
+export function respostaJson(corpo: unknown, requestId: string): NextResponse {
   const res = NextResponse.json(corpo);
-  return aplicarBase(res, requestId, extraHeaders);
+  return aplicarBase(res, requestId);
 }
 
 export function respostaProblema(problema: ProblemaApi, requestId: string, instance?: string): NextResponse {

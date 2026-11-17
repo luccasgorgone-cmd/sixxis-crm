@@ -108,7 +108,7 @@ export function limiteExcedido(retryAfterSeg: number, detail?: string): Problema
     status: 429,
     type: "limite-excedido",
     title: "Limite de requisicoes excedido",
-    detail: detail ?? "Rate limit de 600 req/min por chave atingido.",
+    detail: detail ?? "Muitas requisicoes do mesmo IP. Tente novamente mais tarde.",
     headers: { "Retry-After": String(retryAfterSeg) },
   });
 }

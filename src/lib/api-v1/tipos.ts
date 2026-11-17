@@ -56,7 +56,8 @@ export interface Recurso {
   expand?: Record<string, { relacao: string; recurso: string }>;
   // Descricao do recurso (catalogo / OpenAPI).
   descricao?: string;
-  // true => tabela grande: exige janela de data ou cursor, cap de profundidade.
+  // true => tabela grande (so sinaliza porte no catalogo/OpenAPI). A 1a pagina
+  // e sempre keyset (orderBy indexado + take<=501), sem exigir janela/cursor.
   grande?: boolean;
 }
 

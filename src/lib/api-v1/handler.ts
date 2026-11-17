@@ -3,14 +3,13 @@
 //
 // Pipeline (nessa ordem, falha cedo):
 //   1. gerar requestId, ler ip/userAgent, iniciar cronometro
-//   2. autenticar (Bearer -> ProblemaApi 401)
+//   2. autenticar (Bearer -> ProblemaApi 401; flood de 401 por IP -> 429)
 //   3. escopo do recurso (podeLerRecurso -> 403)
-//   4. rate limit por chave (-> 429 + Retry-After)
-//   5. montar plano de consulta a partir da URL (-> 400 em entrada invalida)
-//   6. Prisma findMany/findUnique com `select` da allowlist (anti-vazamento)
-//   7. serializar aplicando mascara PII / gate de mensagens
-//   8. responder (envelope + X-Request-Id + no-store + headers de rate limit)
-//   9. auditar (best-effort, sem PII, nunca derruba a resposta)
+//   4. montar plano de consulta a partir da URL (-> 400 em entrada invalida)
+//   5. Prisma findMany/findUnique com `select` da allowlist (anti-vazamento)
+//   6. serializar aplicando mascara PII / gate de mensagens
+//   7. responder (envelope + X-Request-Id + no-store)
+//   8. auditar (best-effort, sem PII, nunca derruba a resposta)
 //
 // Qualquer erro vira problem+json via respostaErro (nunca vaza stack/detalhe).
 
@@ -19,7 +18,6 @@ import { prisma } from "@/lib/prisma";
 import type { ChaveAutenticada, Recurso } from "./tipos";
 import { recursoPorNome } from "./registro";
 import { autenticar } from "./auth";
-import { verificarRateLimit, cabecalhosRateLimit } from "./rate-limit";
 import { podeLerRecurso, podeVerPii, podeVerMensagens } from "./escopos";
 import { ipDaRequisicao, userAgentDe } from "./requisicao";
 import { montarPlano, montarSelecao, proximoCursor } from "./consulta";
@@ -38,7 +36,6 @@ import {
   proibido,
   naoEncontrado,
   naoAutenticado,
-  limiteExcedido,
   metodoNaoPermitido,
   requisicaoInvalida,
 } from "./erros";
@@ -82,34 +79,28 @@ function abrir(req: NextRequest): {
   };
 }
 
-// Autentica + aplica rate limit (sem checar escopo de recurso). Base comum do
-// prelude de recursos e das rotas transversais. Lanca ProblemaApi.
-async function autenticarComRate(
+// Autentica a requisicao (sem checar escopo de recurso). Base comum do prelude
+// de recursos e das rotas transversais. Lanca ProblemaApi (401; ou 429 por IP se
+// estourar o teto de falhas de auth). Nao ha rate limit por chave.
+async function autenticarRequisicao(
   authorization: string | null,
   ip: string | null,
-): Promise<{ chave: ChaveAutenticada; rateHeaders: Record<string, string> }> {
-  const chave = await autenticar(authorization, ip);
-  const rate = await verificarRateLimit(chave.id);
-  const rateHeaders = cabecalhosRateLimit(rate);
-  if (!rate.permitido) throw limiteExcedido(rate.resetSeg);
-  return { chave, rateHeaders };
+): Promise<ChaveAutenticada> {
+  return autenticar(authorization, ip);
 }
 
-// Prelude compartilhado dos recursos: autentica + rate limit + checa escopo do
-// recurso. Lanca ProblemaApi. Retorna a chave e os headers de rate limit.
+// Prelude compartilhado dos recursos: autentica + checa escopo do recurso.
+// Lanca ProblemaApi (401/403; ou 429 por IP em flood de auth). Retorna a chave.
 async function autorizar(
   authorization: string | null,
   ip: string | null,
   recurso: Recurso,
-): Promise<{ chave: ChaveAutenticada; rateHeaders: Record<string, string> }> {
+): Promise<ChaveAutenticada> {
   const chave = await autenticar(authorization, ip);
   if (!podeLerRecurso(chave.escopos, recurso.escopo)) {
     throw proibido(`A chave nao possui o escopo '${recurso.escopo}' (nem read:all) para ler '${recurso.nome}'.`);
   }
-  const rate = await verificarRateLimit(chave.id);
-  const rateHeaders = cabecalhosRateLimit(rate);
-  if (!rate.permitido) throw limiteExcedido(rate.resetSeg);
-  return { chave, rateHeaders };
+  return chave;
 }
 
 // Registra o acesso de forma best-effort (import tardio para nao acoplar o
@@ -143,11 +134,6 @@ async function auditar(entrada: {
   }
 }
 
-function anexarHeaders(res: NextResponse, headers: Record<string, string>): NextResponse {
-  for (const [k, v] of Object.entries(headers)) res.headers.set(k, v);
-  return res;
-}
-
 // --- LISTA ------------------------------------------------------------------
 // GET /api/v1/<recurso>
 export async function handlerLista(req: NextRequest, nomeRecurso: string): Promise<NextResponse> {
@@ -157,12 +143,9 @@ export async function handlerLista(req: NextRequest, nomeRecurso: string): Promi
   const ctx = abrir(req);
   let res: NextResponse;
   let chave: ChaveAutenticada | undefined;
-  let rateHeaders: Record<string, string> = {};
 
   try {
-    const auth = await autorizar(req.headers.get("authorization"), ctx.ip, recurso);
-    chave = auth.chave;
-    rateHeaders = auth.rateHeaders;
+    chave = await autorizar(req.headers.get("authorization"), ctx.ip, recurso);
 
     const plano = montarPlano(recurso, req.nextUrl.searchParams);
     const select = selecaoPrisma(recurso, { fields: plano.fields, expand: plano.expand });
@@ -188,9 +171,9 @@ export async function handlerLista(req: NextRequest, nomeRecurso: string): Promi
         : null;
 
     const meta = metaLista({ requestId: ctx.requestId, count: data.length, hasMore, nextCursor });
-    res = respostaLista(data, meta, ctx.requestId, rateHeaders);
+    res = respostaLista(data, meta, ctx.requestId);
   } catch (err) {
-    res = anexarHeaders(respostaErro(err, ctx.requestId, ctx.rota), rateHeaders);
+    res = respostaErro(err, ctx.requestId, ctx.rota);
   }
 
   await auditar({ chave, status: res.status, ...ctx });
@@ -206,12 +189,9 @@ export async function handlerItem(req: NextRequest, nomeRecurso: string, id: str
   const ctx = abrir(req);
   let res: NextResponse;
   let chave: ChaveAutenticada | undefined;
-  let rateHeaders: Record<string, string> = {};
 
   try {
-    const auth = await autorizar(req.headers.get("authorization"), ctx.ip, recurso);
-    chave = auth.chave;
-    rateHeaders = auth.rateHeaders;
+    chave = await autorizar(req.headers.get("authorization"), ctx.ip, recurso);
 
     const { fields, expand } = montarSelecao(recurso, req.nextUrl.searchParams);
     const select = selecaoPrisma(recurso, { fields, expand });
@@ -232,9 +212,9 @@ export async function handlerItem(req: NextRequest, nomeRecurso: string, id: str
       expand,
     };
     const data = serializarItem(recurso, linha, ctxSer);
-    res = respostaItem(data, ctx.requestId, rateHeaders);
+    res = respostaItem(data, ctx.requestId);
   } catch (err) {
-    res = anexarHeaders(respostaErro(err, ctx.requestId, ctx.rota), rateHeaders);
+    res = respostaErro(err, ctx.requestId, ctx.rota);
   }
 
   await auditar({ chave, status: res.status, ...ctx });
@@ -266,7 +246,7 @@ export function handlerOptions(): NextResponse {
 }
 
 // --- TRANSVERSAIS (auth, sem select de recurso) -----------------------------
-// Autentica + rate limit e delega a `fn(chave)` a montagem do corpo JSON.
+// Autentica e delega a `fn(chave)` a montagem do corpo JSON.
 // Usada por /me e /meta/recursos. `escopoExigido` opcional (ex.: metricas pedem
 // read:analytics). Audita best-effort.
 export async function handlerTransversal(
@@ -277,19 +257,16 @@ export async function handlerTransversal(
   const ctx = abrir(req);
   let res: NextResponse;
   let chave: ChaveAutenticada | undefined;
-  let rateHeaders: Record<string, string> = {};
 
   try {
-    const auth = await autenticarComRate(req.headers.get("authorization"), ctx.ip);
-    chave = auth.chave;
-    rateHeaders = auth.rateHeaders;
+    chave = await autenticarRequisicao(req.headers.get("authorization"), ctx.ip);
     if (escopoExigido && !chave.escopos.includes(ESCOPO_TUDO) && !chave.escopos.includes(escopoExigido)) {
       throw proibido(`A chave nao possui o escopo '${escopoExigido}' (nem read:all).`);
     }
     const corpo = await fn(chave);
-    res = respostaJson(corpo, ctx.requestId, rateHeaders);
+    res = respostaJson(corpo, ctx.requestId);
   } catch (err) {
-    res = anexarHeaders(respostaErro(err, ctx.requestId, ctx.rota), rateHeaders);
+    res = respostaErro(err, ctx.requestId, ctx.rota);
   }
 
   await auditar({ chave, status: res.status, ...ctx });

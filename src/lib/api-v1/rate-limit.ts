@@ -1,50 +1,22 @@
-// Rate limit por chave: 600 req/min, janela fixa por minuto no Redis.
-// Chave Redis: apiv1:rl:<chaveId>:<minutoEpoch>. INCR + EXPIRE 60s.
+// Throttle de FALHAS de autenticacao por IP (anti brute-force de chaves).
+// Chave Redis: apiv1:rl401:<ip>:<minutoEpoch>. INCR + EXPIRE 60s.
 //
-// Fail-open: se o Redis falhar, NAO bloqueia a leitura (um blip de Redis nao
-// deve derrubar a API inteira). O limite e protecao contra abuso, nao um gate
-// de seguranca de dados — esse papel e da autenticacao + escopos.
+// NAO existe rate limit por chave: uma chave valida e autenticada consulta sem
+// teto de requisicoes por minuto (a API de Leitura v1 e read-only, sem segredos,
+// e fica conectada direto a um programa externo). A unica protecao de volume que
+// resta e o teto por IP de FALHAS de autenticacao — ela nunca afeta a chave boa,
+// porque so conta requisicoes que falharam a autenticacao (401).
+//
+// Fail-open: se o Redis falhar, NAO bloqueia (um blip de Redis nao deve derrubar
+// a auth). E no-op sem IP.
 
 import { getRedis } from "@/lib/redis";
 
-export const LIMITE_POR_MINUTO = 600;
 const JANELA_SEG = 60;
 
-export interface ResultadoRateLimit {
-  permitido: boolean;
-  limite: number;
-  restante: number;
-  // Segundos ate a janela reiniciar.
-  resetSeg: number;
-}
-
-export async function verificarRateLimit(chaveId: string): Promise<ResultadoRateLimit> {
-  const agoraSeg = Math.floor(Date.now() / 1000);
-  const minuto = Math.floor(agoraSeg / JANELA_SEG);
-  const resetSeg = (minuto + 1) * JANELA_SEG - agoraSeg;
-  const redisKey = `apiv1:rl:${chaveId}:${minuto}`;
-  try {
-    const redis = getRedis();
-    const atual = await redis.incr(redisKey);
-    if (atual === 1) await redis.expire(redisKey, JANELA_SEG);
-    const restante = Math.max(0, LIMITE_POR_MINUTO - atual);
-    return {
-      permitido: atual <= LIMITE_POR_MINUTO,
-      limite: LIMITE_POR_MINUTO,
-      restante,
-      resetSeg,
-    };
-  } catch {
-    // Fail-open.
-    return { permitido: true, limite: LIMITE_POR_MINUTO, restante: LIMITE_POR_MINUTO, resetSeg };
-  }
-}
-
-// --- falhas de autenticacao por IP (anti brute-force de chaves) --------------
-// A autenticacao roda ANTES do rate limit por chave, entao requisicoes com
-// Bearer invalido (401) nunca eram contadas. Isto limita falhas de auth por IP
-// na mesma janela de 1 minuto no Redis. Chave Redis: apiv1:rl401:<ip>:<minuto>.
-// Fail-open (Redis down nao bloqueia nem derruba a auth) e no-op sem IP.
+// Teto de falhas de autenticacao por IP na janela de 1 minuto. A autenticacao
+// roda e, a cada Bearer invalido (401), conta a falha por IP. Acima disto o IP
+// recebe 429 + Retry-After ANTES de consultar o banco (anti brute-force).
 export const LIMITE_FALHAS_AUTH_POR_MINUTO = 60;
 
 export async function registrarFalhaAuth(
@@ -64,12 +36,4 @@ export async function registrarFalhaAuth(
     // Fail-open.
     return { excedido: false, resetSeg };
   }
-}
-
-export function cabecalhosRateLimit(r: ResultadoRateLimit): Record<string, string> {
-  return {
-    "X-RateLimit-Limit": String(r.limite),
-    "X-RateLimit-Remaining": String(r.restante),
-    "X-RateLimit-Reset": String(r.resetSeg),
-  };
 }

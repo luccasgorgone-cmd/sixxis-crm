@@ -17,7 +17,7 @@
   ],
   "x-build": {
     "commit": "desconhecido",
-    "time": "2026-11-16T20:04:34.820Z"
+    "time": "2026-11-17T14:48:20.168Z"
   },
   "tags": [
     {
@@ -2408,22 +2408,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -2465,7 +2449,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2507,22 +2491,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -2564,7 +2532,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2769,22 +2737,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -2841,7 +2793,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2918,22 +2870,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -2997,7 +2933,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3152,22 +3088,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -3224,7 +3144,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3300,22 +3220,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -3379,7 +3283,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3584,22 +3488,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -3656,7 +3544,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3733,22 +3621,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -3812,7 +3684,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3982,22 +3854,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4054,7 +3910,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4131,22 +3987,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4210,7 +4050,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4358,22 +4198,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4430,7 +4254,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4506,22 +4330,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4585,7 +4393,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4733,22 +4541,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4805,7 +4597,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4881,22 +4673,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -4960,7 +4736,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5122,22 +4898,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -5194,7 +4954,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5270,22 +5030,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -5349,7 +5093,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5525,22 +5269,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -5597,7 +5325,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5673,22 +5401,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -5752,7 +5464,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5956,22 +5668,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6028,7 +5724,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6104,22 +5800,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6183,7 +5863,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6352,22 +6032,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6424,7 +6088,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6500,22 +6164,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6579,7 +6227,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6748,22 +6396,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6820,7 +6452,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6896,22 +6528,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -6975,7 +6591,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7130,22 +6746,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -7202,7 +6802,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7278,22 +6878,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -7357,7 +6941,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7512,22 +7096,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -7584,7 +7152,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7660,22 +7228,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -7739,7 +7291,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7915,22 +7467,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -7987,7 +7523,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8063,22 +7599,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -8142,7 +7662,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8304,22 +7824,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -8376,7 +7880,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8452,22 +7956,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -8531,7 +8019,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8679,22 +8167,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -8751,7 +8223,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8827,22 +8299,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -8906,7 +8362,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9103,22 +8559,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -9175,7 +8615,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9251,22 +8691,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -9330,7 +8754,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9515,22 +8939,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -9587,7 +8995,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9665,22 +9073,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -9744,7 +9136,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9906,22 +9298,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -9978,7 +9354,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10054,22 +9430,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -10133,7 +9493,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10304,22 +9664,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -10376,7 +9720,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10454,22 +9798,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -10533,7 +9861,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10702,22 +10030,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -10774,7 +10086,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10850,22 +10162,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -10929,7 +10225,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11098,22 +10394,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -11170,7 +10450,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11246,22 +10526,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -11325,7 +10589,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11508,22 +10772,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -11580,7 +10828,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11656,22 +10904,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -11735,7 +10967,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11911,22 +11143,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -11983,7 +11199,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12059,22 +11275,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -12138,7 +11338,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12300,22 +11500,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -12372,7 +11556,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12448,22 +11632,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -12527,7 +11695,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12696,22 +11864,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -12768,7 +11920,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12844,22 +11996,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -12923,7 +12059,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13085,22 +12221,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -13157,7 +12277,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13233,22 +12353,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -13312,7 +12416,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13474,22 +12578,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -13546,7 +12634,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13622,22 +12710,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -13701,7 +12773,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13870,22 +12942,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -13942,7 +12998,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14018,22 +13074,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -14097,7 +13137,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14266,22 +13306,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -14338,7 +13362,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14414,22 +13438,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -14493,7 +13501,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14662,22 +13670,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -14734,7 +13726,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14810,22 +13802,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -14889,7 +13865,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15059,22 +14035,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -15131,7 +14091,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15208,22 +14168,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -15287,7 +14231,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15456,22 +14400,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -15528,7 +14456,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15604,22 +14532,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -15683,7 +14595,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15859,22 +14771,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -15931,7 +14827,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16007,22 +14903,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -16086,7 +14966,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16256,22 +15136,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -16328,7 +15192,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16405,22 +15269,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -16484,7 +15332,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16632,22 +15480,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -16704,7 +15536,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16780,22 +15612,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -16859,7 +15675,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17028,22 +15844,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -17100,7 +15900,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17176,22 +15976,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -17255,7 +16039,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17424,22 +16208,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -17496,7 +16264,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17572,22 +16340,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -17651,7 +16403,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17834,22 +16586,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -17906,7 +16642,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17982,22 +16718,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -18061,7 +16781,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18237,22 +16957,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -18309,7 +17013,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18385,22 +17089,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -18464,7 +17152,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18634,22 +17322,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -18706,7 +17378,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18783,22 +17455,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -18862,7 +17518,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19010,22 +17666,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19082,7 +17722,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19158,22 +17798,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19237,7 +17861,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19385,22 +18009,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19457,7 +18065,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19533,22 +18141,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19612,7 +18204,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19760,22 +18352,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19832,7 +18408,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19908,22 +18484,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -19987,7 +18547,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20135,22 +18695,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -20207,7 +18751,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20283,22 +18827,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -20362,7 +18890,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20545,22 +19073,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -20617,7 +19129,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20693,22 +19205,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -20772,7 +19268,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20934,22 +19430,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21006,7 +19486,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21082,22 +19562,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21161,7 +19625,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21324,22 +19788,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21396,7 +19844,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21473,22 +19921,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21552,7 +19984,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21721,22 +20153,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21793,7 +20209,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21869,22 +20285,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -21948,7 +20348,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22096,22 +20496,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -22168,7 +20552,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22244,22 +20628,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -22323,7 +20691,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22507,22 +20875,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -22579,7 +20931,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22656,22 +21008,6 @@
                   "type": "string"
                 },
                 "description": "Id de correlacao da requisicao."
-              },
-              "X-RateLimit-Limit": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Remaining": {
-                "schema": {
-                  "type": "integer"
-                }
-              },
-              "X-RateLimit-Reset": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Segundos ate reiniciar a janela."
               }
             },
             "content": {
@@ -22735,7 +21071,7 @@
             }
           },
           "429": {
-            "description": "Rate limit excedido (600 req/min por chave).",
+            "description": "Excesso de falhas de autenticacao do mesmo IP (anti brute-force).",
             "content": {
               "application/problem+json": {
                 "schema": {

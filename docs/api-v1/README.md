@@ -259,7 +259,7 @@ nas métricas com série temporal, `agrupar` (`dia`/`semana`/`mes`). Fuso: `Amer
 | 403 | `escopo-insuficiente` | Chave válida sem o escopo do recurso/PII/mensagens. |
 | 404 | `nao-encontrado` | Recurso ou id inexistente. |
 | 405 | `metodo-nao-permitido` | Qualquer verbo de escrita. |
-| 429 | `rate-limit` | Estourou o limite (ver seção 9). |
+| 429 | `rate-limit` | Excesso de **falhas de autenticação** do mesmo IP (anti brute-force — ver seção 9). |
 
 Sempre há `requestId` — inclua-o ao reportar um problema.
 
@@ -267,12 +267,17 @@ Sempre há `requestId` — inclua-o ao reportar um problema.
 
 ## 9. Rate limit
 
-- **600 requisições por minuto por chave** (janela fixa por minuto).
-- Cabeçalhos em toda resposta: `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
-  `X-RateLimit-Reset` (segundos até reiniciar).
-- Ao estourar: **`429`** + `Retry-After` (segundos). Respeite-o antes de tentar de novo.
-- O limitador é **por chave** e roda após a autenticação. Rajada de token inválido
-  (401) ainda não é limitada por IP — pendência de endurecimento abaixo.
+- **Não há limite de requisições por minuto para uma chave válida e autenticada.**
+  A API é read-only, sem segredos, e fica conectada direto a um programa externo —
+  então uma chave boa consulta sem teto de volume (continue paginando por `cursor`).
+- A única proteção de volume é **anti brute-force por IP**: no máximo **60 falhas de
+  autenticação por minuto por IP** (apenas requisições que falham o `401`). Isso
+  **nunca afeta a chave boa** — só conta tentativas com Bearer ausente/ inválido/
+  revogado/ expirado.
+- Ao estourar esse teto de falhas: **`429`** + `Retry-After` (segundos) para aquele IP.
+- Sem cabeçalhos `X-RateLimit-*` (não há cota por chave para reportar).
+- O throttle por IP é *fail-open*: se o Redis degradar, ele não bloqueia (um blip de
+  Redis não deve derrubar a autenticação).
 
 ---
 
@@ -281,11 +286,11 @@ Sempre há `requestId` — inclua-o ao reportar um problema.
 Nenhuma afeta sigilo de dado (allowlist deny-by-default segue valendo); são itens de
 robustez/operação revistos na auditoria de segurança do release:
 
-- **Rate limit só por chave (não por IP).** O limitador roda depois de `autenticar`,
-  então flood de **token inválido** não é freado por IP (cada tentativa é uma consulta
-  ao banco). Mitigação futura: teto por IP antes da autenticação. Em degradação do
-  Redis o limitador é *fail-open* (não bloqueia) — por ora aceitável porque a API é
-  read-only e sem segredos.
+- **Throttle de volume é só anti brute-force por IP (não há cota por chave).** Uma
+  chave válida consulta sem teto por minuto; o único freio conta **falhas de
+  autenticação** por IP (60/min) e é *fail-open* em degradação do Redis. Como a API é
+  read-only e sem segredos, não há cota por chave a endurecer — o volume legítimo é
+  limitado só pela paginação por cursor.
 - **Colunas `Json` trafegam cruas** nos recursos que as expõem na allowlist
   (`negocios.produtos`, `orcamentos.pagamentos`, `campanhas.filtroJson`,
   `configuracao.horarios`/`feriados`). São dados de negócio (não segredos), mas a forma
@@ -364,4 +369,4 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/leads/ckxyz...?fields=id,nome,t
 
 - **v1.0.0** — Release inicial: 51 recursos, 6 métricas, auth Bearer com escopos,
   mascaramento de PII/mensagens por escopo, paginação por cursor, sync incremental,
-  rate limit 600/min, erros RFC 9457, OpenAPI 3.1 e docs interativas.
+  sem cota por chave (só anti brute-force por IP), erros RFC 9457, OpenAPI 3.1 e docs interativas.
