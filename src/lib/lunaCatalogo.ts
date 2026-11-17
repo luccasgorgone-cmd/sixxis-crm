@@ -49,7 +49,7 @@ do local do cliente).
 - A partir de R$ 4.750. 220V.
 
 ### SX200 Trend
-- Cobre ate 175 m2. Tanque 175 L. Potencia 750 W. Vazao 20.000 m3/h.
+- Cobre ate 200 m2. Tanque 175 L. Potencia 750 W. Vazao 20.000 m3/h.
 - A partir de R$ 5.750. 220V.
 
 ### SX200 Prime
