@@ -6,7 +6,6 @@ import { LogoutButton } from "./LogoutButton";
 import { SinoLembretes } from "@/components/lembretes/SinoLembretes";
 import { SinoNotificacoes } from "./SinoNotificacoes";
 import { SinoAlertasSla } from "./SinoAlertasSla";
-import { DisponibilidadeUsuario } from "./DisponibilidadeUsuario";
 import { TemaToggle } from "./TemaToggle";
 import { TogglePresenca } from "@/components/presenca/TogglePresenca";
 
@@ -56,9 +55,11 @@ export function Topbar({
             qualquer um marque sua presenca e possa testar. Auto-offline por
             inatividade. (O roteamento por presenca, quando existir, filtra por
             papel de qualquer forma — admin online nao recebe lead.) */}
+        {/* Presenca (online/offline) governa o rodizio de leads: online = recebe,
+            offline/inatividade = nao recebe. O antigo toggle manual "Disponivel/
+            Ausente" foi removido (confundia e nao batia com a presenca). */}
         <TogglePresenca />
         {/* Disponibilidade: so para quem recebe leads (nao-admin). Reusa Agente.ativo. */}
-        {papel !== "ADMIN" && <DisponibilidadeUsuario />}
         <TemaToggle />
         <SinoAlertasSla agenteId={agenteId} papel={papel} />
         <SinoNotificacoes />

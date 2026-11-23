@@ -3,7 +3,7 @@
 // inatividade (cliente) chama POST {online:false}. So mexe no proprio agente.
 import { NextResponse, type NextRequest } from "next/server";
 import { obterAgente } from "@/lib/autorizacao";
-import { estadoPresenca, ficarOnline, ficarOffline } from "@/lib/presenca/presenca";
+import { estadoPresenca, ficarOnline, ficarOffline, registrarHeartbeat } from "@/lib/presenca/presenca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,4 +37,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ? await ficarOnline(agente.id)
     : await ficarOffline(agente.id);
   return NextResponse.json(r);
+}
+
+// Heartbeat do cliente (a cada ~60s enquanto a aba vive): renova a presenca viva
+// e mantem o vendedor no rodizio. So mexe no proprio agente. Idempotente.
+export async function PUT(): Promise<NextResponse> {
+  const agente = await obterAgente();
+  if (!agente) {
+    return NextResponse.json({ erro: "nao autorizado" }, { status: 401 });
+  }
+  return NextResponse.json(await registrarHeartbeat(agente.id));
 }

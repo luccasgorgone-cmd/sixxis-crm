@@ -18,6 +18,7 @@ import { iniciarReguaFollowup } from "./src/lib/reguaFollowup";
 import { iniciarProspeccao } from "./src/lib/prospeccao/prospeccao";
 import { iniciarVarreduraSupervisor } from "./src/lib/supervisor/varredura";
 import { iniciarAprendizadoSupervisor } from "./src/lib/supervisor/aprendizado";
+import { iniciarVarreduraPresenca } from "./src/lib/presenca/presenca";
 import {
   seedAdmin,
   seedFunil,
@@ -162,6 +163,10 @@ async function main(): Promise<void> {
     // deriva de SupervisorAcao + negocios fechados. Roda mesmo com a varredura
     // desligada; nunca auto-edita config (so sugere via insight).
     iniciarAprendizadoSupervisor();
+    // Presenca: derruba (offline + fora do rodizio) quem parou de mandar
+    // heartbeat ha >5min (fechou a aba / caiu a rede). Ticker 60s. Garante que o
+    // rodizio so entrega a quem esta realmente presente.
+    iniciarVarreduraPresenca();
   }
 
   httpServer.listen(port, () => {

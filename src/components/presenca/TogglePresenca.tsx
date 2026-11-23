@@ -10,6 +10,7 @@ import { ModalInatividade } from "./ModalInatividade";
 
 const INATIVIDADE_MS = 15 * 60 * 1000; // 15 minutos
 const COUNTDOWN_S = 60; // 1 minuto
+const HEARTBEAT_MS = 60 * 1000; // 60s — renova a presenca viva no servidor
 
 export function TogglePresenca() {
   const [online, setOnline] = useState<boolean | null>(null);
@@ -17,6 +18,7 @@ export function TogglePresenca() {
   const [segundos, setSegundos] = useState(COUNTDOWN_S);
   const timerInat = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerCount = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerBatida = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const definir = useCallback(async (v: boolean) => {
     try {
@@ -31,17 +33,33 @@ export function TogglePresenca() {
     }
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch("/api/me/presenca");
-        if (r.ok) setOnline(!!(await r.json()).online);
-        else setOnline(false);
-      } catch {
-        setOnline(false);
-      }
-    })();
+  // Heartbeat: renova a presenca viva (PUT) e mantem no rodizio. O servidor
+  // derruba quem para de bater (fechou a aba) via varredura.
+  const baterPresenca = useCallback(async () => {
+    try {
+      const r = await fetch("/api/me/presenca", { method: "PUT" });
+      if (r.ok) setOnline(!!(await r.json()).online);
+    } catch {
+      /* rede: ignora esta batida */
+    }
   }, []);
+
+  // Ao abrir o app = ficar online (bate uma vez). Depois o efeito de heartbeat
+  // mantem vivo. Assim quem esta com o CRM aberto esta no rodizio sem precisar
+  // achar um toggle — e a inatividade/fechar-aba e que tira.
+  useEffect(() => {
+    void baterPresenca();
+  }, [baterPresenca]);
+
+  // Enquanto online, bate a cada HEARTBEAT_MS (roda tambem em aba de fundo,
+  // throttled; o limite do servidor tem folga pra isso).
+  useEffect(() => {
+    if (!online) return;
+    timerBatida.current = setInterval(() => void baterPresenca(), HEARTBEAT_MS);
+    return () => {
+      if (timerBatida.current) clearInterval(timerBatida.current);
+    };
+  }, [online, baterPresenca]);
 
   const continuarOnline = useCallback(() => {
     if (timerCount.current) clearInterval(timerCount.current);
@@ -99,8 +117,8 @@ export function TogglePresenca() {
         onClick={() => void definir(!online)}
         title={
           online
-            ? "Presença: Online. Clique para ficar offline. (Disponibilidade de leads é o controle 'Disponível/Ausente'.)"
-            : "Presença: Offline. Clique para ficar online. (Disponibilidade de leads é o controle 'Disponível/Ausente'.)"
+            ? "Online — recebendo novos leads. Clique para ficar offline (sai do rodízio e pausa a contagem de presença)."
+            : "Offline — não recebe novos leads. Clique para ficar online e voltar ao rodízio."
         }
         aria-pressed={online}
         className="flex items-center gap-1.5 rounded-lg border border-black/5 px-2 py-1 text-xs font-medium transition-colors hover:bg-black/[0.03]"
