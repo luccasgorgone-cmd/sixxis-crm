@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
+import { invalidarConfigCRM } from "@/lib/configCrm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,5 +56,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     data.metaCapiToken = body.token.trim();
   }
   await prisma.configuracaoCRM.update({ where: { id }, data });
+  invalidarConfigCRM();
   return NextResponse.json({ ok: true });
 }

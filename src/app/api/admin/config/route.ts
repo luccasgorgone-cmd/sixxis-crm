@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obterAdmin } from "@/lib/autorizacao";
+import { invalidarConfigCRM } from "@/lib/configCrm";
 import { Prisma } from "@/generated/prisma/client";
 import {
   estaAbertoAgora,
@@ -216,6 +217,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     } else {
       await pegarConfig();
     }
+    // Config mudou -> limpa o cache para refletir na hora (ver lib/configCrm).
+    invalidarConfigCRM();
 
     const config = await pegarConfig();
     const horarios = normalizarHorarios(config.horarios) ?? HORARIOS_PADRAO;

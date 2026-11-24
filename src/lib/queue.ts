@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import IORedis from "ioredis";
 import type { Server } from "socket.io";
 import { prisma } from "./prisma";
+import { lerConfigCRM } from "./configCrm";
 import { getIO } from "./socket";
 import { normalizarJid, telefoneParaLog, variantesTelefoneBR } from "./phone";
 import { garantirNegocioParaLead, marcarInteracaoNoNegocio } from "./negocio";
@@ -1120,15 +1121,7 @@ async function responderForaHorarioSePreciso(
   io: Server | null,
 ): Promise<void> {
   try {
-    const config = await prisma.configuracaoCRM.findFirst({
-      select: {
-        horarios: true,
-        fuso: true,
-        mensagemForaHorario: true,
-        avisoForaHorarioAtivo: true,
-        mensagensAutomaticasAtivas: true,
-      },
-    });
+    const config = await lerConfigCRM();
     if (!config) return;
     // Interruptor MESTRE (default DESLIGADO): com ele false, NENHUMA mensagem
     // automatica sai. Registros antigos (null/ausente) contam como false. 2.78.
@@ -1325,9 +1318,7 @@ async function responderComLunaSePreciso(
 
     // Gatilho de horario: opera24h responde sempre; senao SO fora do expediente.
     if (!cfg.opera24h) {
-      const crm = await prisma.configuracaoCRM.findFirst({
-        select: { horarios: true, fuso: true },
-      });
+      const crm = await lerConfigCRM();
       const aberto = estaAbertoAgora(
         normalizarHorarios(crm?.horarios),
         crm?.fuso ?? "America/Sao_Paulo",

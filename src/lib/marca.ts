@@ -1,6 +1,6 @@
 // Identidade visual do app (marca). Centraliza a leitura no servidor (sem flash)
 // e a validacao/sanitizacao da logo no envio.
-import { prisma } from "@/lib/prisma";
+import { lerConfigCRM } from "@/lib/configCrm";
 
 export type Marca = {
   temLogo: boolean;
@@ -21,15 +21,7 @@ const MIMES_RASTER = ["image/png", "image/jpeg", "image/webp"];
 // Lida no layout raiz/area autenticada para prover a marca por props.
 export async function obterMarca(): Promise<Marca> {
   try {
-    const config = await prisma.configuracaoCRM.findFirst({
-      select: {
-        nomeEmpresa: true,
-        logoData: true,
-        logoEm: true,
-        faviconData: true,
-        faviconEm: true,
-      },
-    });
+    const config = await lerConfigCRM();
     return {
       temLogo: Boolean(config?.logoData),
       logoEm: config?.logoEm?.getTime() ?? 0,

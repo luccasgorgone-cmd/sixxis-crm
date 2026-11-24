@@ -8,8 +8,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ModalInatividade } from "./ModalInatividade";
 
-const INATIVIDADE_MS = 15 * 60 * 1000; // 15 minutos
-const COUNTDOWN_S = 60; // 1 minuto
+const INATIVIDADE_MS = 14 * 60 * 1000; // 14 minutos sem atividade -> pergunta
+const COUNTDOWN_S = 60; // 1 minuto pra responder; sem resposta -> offline
 const HEARTBEAT_MS = 60 * 1000; // 60s — renova a presenca viva no servidor
 
 export function TogglePresenca() {

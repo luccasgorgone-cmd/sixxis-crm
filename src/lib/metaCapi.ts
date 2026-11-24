@@ -5,6 +5,7 @@
 // browser. Sem config => no-op (nao quebra o fluxo de venda).
 import crypto from "node:crypto";
 import { prisma } from "./prisma";
+import { lerConfigCRM } from "./configCrm";
 
 const GRAPH_VERSION = "v19.0";
 
@@ -21,9 +22,7 @@ type ConfigMeta = {
 };
 
 async function lerConfig(): Promise<ConfigMeta | null> {
-  const cfg = await prisma.configuracaoCRM.findFirst({
-    select: { metaPixelId: true, metaCapiToken: true, metaTestEventCode: true },
-  });
+  const cfg = await lerConfigCRM();
   if (!cfg?.metaPixelId || !cfg?.metaCapiToken) return null;
   return {
     pixelId: cfg.metaPixelId,
