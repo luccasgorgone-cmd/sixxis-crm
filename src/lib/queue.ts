@@ -25,6 +25,12 @@ import {
   destinoTelefone,
   externalIdEnviado,
 } from "./canal/envio";
+import {
+  enviarPeloCanalAutomatico,
+  executarMensagemAutomatica,
+  executarMensagemAutomaticaSe,
+  mestreMensagensAutomaticasAtivo,
+} from "./mensagemAutomatica";
 import { garantirConversaUnificada } from "./conversa";
 import { resolverFinalidadeEntrante } from "./finalidadeEntrante";
 import { persistirMidia, persistirMidiaGrupo } from "./midia";
@@ -210,7 +216,7 @@ async function processarCampanha(
       where: { id: campanhaId },
       select: { status: true },
     });
-    if (atual?.status === StatusCampanha.CANCELADA) break;
+    if (atual?.status !== StatusCampanha.ENVIANDO) break;
 
     const texto = aplicarModelo(campanha.mensagem, {
       lead: {
@@ -226,27 +232,51 @@ async function processarCampanha(
       variacoes,
     });
 
-    let ok = false;
-    let erro: string | null = null;
-    let externalIdWa: string | undefined;
-    if (campanha.canal === CanalEnvio.WHATSAPP) {
-      const r = await enviarPeloCanal(
-        contaEvolution(instancia),
-        destinoTelefone(d.destino),
-        { tipo: "TEXTO", texto },
+    const envioAutomatico = await executarMensagemAutomaticaSe(
+      async () => {
+        const estadoFinal = await prisma.campanha.findUnique({
+          where: { id: campanhaId },
+          select: { status: true },
+        });
+        return estadoFinal?.status === StatusCampanha.ENVIANDO;
+      },
+      async () => {
+        let ok = false;
+        let erro: string | null = null;
+        let externalIdWa: string | undefined;
+        if (campanha.canal === CanalEnvio.WHATSAPP) {
+          const r = await enviarPeloCanal(
+            contaEvolution(instancia),
+            destinoTelefone(d.destino),
+            { tipo: "TEXTO", texto },
+          );
+          ok = r.ok;
+          externalIdWa = externalIdEnviado(r);
+          erro = r.ok ? null : "falha no envio (WhatsApp)";
+        } else if (campanha.canal === CanalEnvio.SMS) {
+          const r = await enviarSMS(d.destino, texto);
+          ok = r.ok;
+          erro = r.erro ?? null;
+        } else {
+          const r = await enviarEmail(d.destino, campanha.assunto ?? "", texto);
+          ok = r.ok;
+          erro = r.erro ?? null;
+        }
+        return { ok, erro, externalIdWa };
+      },
+    );
+    if (!envioAutomatico.executada) {
+      if (envioAutomatico.motivo === "PRECONDICAO_NEGADA") break;
+      await prisma.campanha.updateMany({
+        where: { id: campanhaId, status: StatusCampanha.ENVIANDO },
+        data: { status: StatusCampanha.CANCELADA, concluidoEm: new Date() },
+      });
+      console.warn(
+        `[campanha] ${campanhaId} CANCELADA: automacao bloqueada (${envioAutomatico.motivo})`,
       );
-      ok = r.ok;
-      externalIdWa = externalIdEnviado(r);
-      erro = r.ok ? null : "falha no envio (WhatsApp)";
-    } else if (campanha.canal === CanalEnvio.SMS) {
-      const r = await enviarSMS(d.destino, texto);
-      ok = r.ok;
-      erro = r.erro ?? null;
-    } else {
-      const r = await enviarEmail(d.destino, campanha.assunto ?? "", texto);
-      ok = r.ok;
-      erro = r.erro ?? null;
+      break;
     }
+    const { ok, erro, externalIdWa } = envioAutomatico.resultado;
 
     await prisma.campanhaDestino.update({
       where: { id: d.id },
@@ -1144,11 +1174,13 @@ async function responderForaHorarioSePreciso(
     const texto = (config.mensagemForaHorario ?? "").trim();
     if (!texto) return;
     const agora = new Date();
-    const r = await enviarPeloCanal(
+    const envioAutomatico = await enviarPeloCanalAutomatico(
       contaEvolution(conversa.instancia),
       destinoTelefone(telefone),
       { tipo: "TEXTO", texto },
     );
+    if (!envioAutomatico.executada) return;
+    const r = envioAutomatico.resultado;
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
 
     let msg;
@@ -1278,6 +1310,8 @@ async function responderComLunaSePreciso(
   io: Server | null,
 ): Promise<boolean> {
   try {
+    // O interruptor geral prevalece sobre a configuracao propria da Sol.
+    if (!(await mestreMensagensAutomaticasAtivo())) return false;
     const cfg = await prisma.configAgenteIA.findFirst({
       select: {
         ativo: true,
@@ -1369,6 +1403,8 @@ async function executarRespostaLuna(
   finalidade: Finalidade,
   io: Server | null,
 ): Promise<void> {
+  // Re-checa apos o debounce para nao gastar IA se o mestre foi desligado.
+  if (!(await mestreMensagensAutomaticasAtivo())) return;
   // Re-checa a trava mestra no disparo (a config pode ter mudado no intervalo).
   const cfg = await prisma.configAgenteIA.findFirst();
   if (!cfg || !cfg.ativo) return;
@@ -1421,20 +1457,26 @@ async function executarRespostaLuna(
 
   const finLuna: LunaFinalidade =
     finalidade === Finalidade.POS_VENDA ? "POS_VENDA" : "VENDA";
-  const resultado = await gerarRespostaLuna({
-    finalidade: finLuna,
-    historico,
-    totalMensagensCliente,
-    config: {
-      modelo: cfg.modelo,
-      promptSistema: cfg.promptSistema,
-      maxMensagensAntesHandoff: cfg.maxMensagensAntesHandoff,
-      cupomPrimeiraCompra: cfg.cupomPrimeiraCompra,
-      cupomDescricao: cfg.cupomDescricao,
-      cupomAtivo: cfg.cupomAtivo,
-    },
-    catalogo: cfg.baseConhecimento ?? "",
-  });
+  // Gate fresco imediatamente antes do provedor de IA: se o mestre mudou para
+  // OFF durante as leituras acima, nem tokens nem efeitos da Sol sao gerados.
+  const geracaoAutomatica = await executarMensagemAutomatica(() =>
+    gerarRespostaLuna({
+      finalidade: finLuna,
+      historico,
+      totalMensagensCliente,
+      config: {
+        modelo: cfg.modelo,
+        promptSistema: cfg.promptSistema,
+        maxMensagensAntesHandoff: cfg.maxMensagensAntesHandoff,
+        cupomPrimeiraCompra: cfg.cupomPrimeiraCompra,
+        cupomDescricao: cfg.cupomDescricao,
+        cupomAtivo: cfg.cupomAtivo,
+      },
+      catalogo: cfg.baseConhecimento ?? "",
+    }),
+  );
+  if (!geracaoAutomatica.executada) return;
+  const resultado = geracaoAutomatica.resultado;
 
   // Telemetria (Fatia 2.98): registra a decisao do motor (responder/handoff/
   // silenciar) com o motivo interno e o modelo. Best-effort.
@@ -1463,17 +1505,27 @@ async function executarRespostaLuna(
   // responder | handoff: envia cada mensagem do array, na ordem, com intervalo.
   // No handoff as mensagens ja avisam que vao transferir.
   if (resultado.mensagens.length > 0) {
-    await enviarMensagensLuna(conversa, telefone, lead, resultado.mensagens, io);
+    const mensagensPermitidas = await enviarMensagensLuna(
+      conversa,
+      telefone,
+      lead,
+      resultado.mensagens,
+      io,
+    );
+    if (!mensagensPermitidas) return;
   }
 
   // Handoff (cliente pediu humano): cria lembrete pro atendente do setor e marca
   // a conversa para a Luna PARAR de responder este lead. So no handoff.
   if (resultado.acao === "handoff") {
-    await tratarHandoffLuna(conversa, lead, finalidade).catch((e) =>
+    try {
+      const handoffPermitido = await tratarHandoffLuna(conversa, lead, finalidade);
+      if (!handoffPermitido) return;
+    } catch (e) {
       console.warn(
         `[luna] falha no handoff ${telefone}: ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    );
+      );
+    }
   }
 }
 
@@ -1484,7 +1536,7 @@ async function tratarHandoffLuna(
   conversa: ConvLuna,
   lead: LeadLuna,
   finalidade: Finalidade,
-): Promise<void> {
+): Promise<boolean> {
   const leadDb = await prisma.lead.findUnique({
     where: { id: lead.id },
     select: { donoId: true, donoPosVendaId: true },
@@ -1502,59 +1554,64 @@ async function tratarHandoffLuna(
     agenteId = primeiro?.id ?? null;
   }
 
-  // Marca a conversa para a Luna parar (mesmo que nao haja atendente disponivel).
-  await prisma.conversa.update({
-    where: { id: conversa.id },
-    data: { handoffFeitoEm: new Date() },
-  });
-
-  if (!agenteId) {
-    console.warn(
-      `[luna] handoff sem atendente disponivel (lead ${lead.id}, ${finalidade})`,
-    );
-    return;
-  }
-
   // Ultima mensagem do cliente para dar CONTEXTO ao atendente (Fatia 2.98).
-  const ultimaCliente = await prisma.mensagem.findFirst({
-    where: { conversaId: conversa.id, direcao: DirecaoMsg.IN },
-    orderBy: { hora: "desc" },
-    select: { conteudo: true, transcricao: true },
-  });
+  const ultimaCliente = agenteId
+    ? await prisma.mensagem.findFirst({
+        where: { conversaId: conversa.id, direcao: DirecaoMsg.IN },
+        orderBy: { hora: "desc" },
+        select: { conteudo: true, transcricao: true },
+      })
+    : null;
   const trechoCliente = (ultimaCliente?.transcricao ?? ultimaCliente?.conteudo ?? "")
     .trim()
     .slice(0, 200);
 
-  await prisma.lembrete.create({
-    data: {
-      leadId: lead.id,
+  // Todas as consultas preparatorias terminaram. A leitura fresca do mestre vem
+  // agora, imediatamente antes da primeira mutacao do handoff.
+  const handoffAutomatico = await executarMensagemAutomatica(async () => {
+    // Marca a conversa para a Luna parar (mesmo sem atendente disponivel).
+    await prisma.conversa.update({
+      where: { id: conversa.id },
+      data: { handoffFeitoEm: new Date() },
+    });
+
+    if (!agenteId) {
+      console.warn(
+        `[luna] handoff sem atendente disponivel (lead ${lead.id}, ${finalidade})`,
+      );
+      return;
+    }
+
+    await prisma.lembrete.create({
+      data: {
+        leadId: lead.id,
+        agenteId,
+        finalidade,
+        dataHora: new Date(),
+        nota: `Sol transferiu ao humano.${
+          trechoCliente ? ` Ultima mensagem do cliente: '${trechoCliente}'` : ""
+        }`,
+        status: StatusLembrete.PENDENTE,
+      },
+    });
+
+    // Manual secao 5: marca o lead transferido para o vendedor ter contexto.
+    await aplicarEtiquetaPorNome(lead.id, "Transferido do agente", { finalidade });
+
+    await criarNotificacao({
       agenteId,
-      finalidade,
-      dataHora: new Date(),
-      nota: `Sol transferiu ao humano.${
-        trechoCliente ? ` Ultima mensagem do cliente: '${trechoCliente}'` : ""
+      tipo: "LEMBRETE",
+      titulo: "Cliente pediu atendimento humano",
+      descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Sol).${
+        trechoCliente ? ` Ultima mensagem: '${trechoCliente}'` : ""
       }`,
-      status: StatusLembrete.PENDENTE,
-    },
+      link: "/inbox",
+      leadId: lead.id,
+    });
+
+    getIO()?.emit("conversa:atualizada", { leadId: lead.id, finalidade });
   });
-
-  // Manual secao 5: lead transferido pelo agente recebe a etiqueta "Transferido
-  // do agente" para o vendedor saber o contexto (e para medir a conversao das
-  // transferencias). Idempotente; nao bloqueia o handoff em caso de falha.
-  await aplicarEtiquetaPorNome(lead.id, "Transferido do agente", { finalidade });
-
-  await criarNotificacao({
-    agenteId,
-    tipo: "LEMBRETE",
-    titulo: "Cliente pediu atendimento humano",
-    descricao: `${nomeEfetivo(lead)} solicitou falar com um atendente (via Sol).${
-      trechoCliente ? ` Ultima mensagem: '${trechoCliente}'` : ""
-    }`,
-    link: "/inbox",
-    leadId: lead.id,
-  });
-
-  getIO()?.emit("conversa:atualizada", { leadId: lead.id, finalidade });
+  return handoffAutomatico.executada;
 }
 
 // Envia as mensagens da Luna, na ordem, gravando cada uma como OUT viaIA=true.
@@ -1564,7 +1621,7 @@ async function enviarMensagensLuna(
   lead: LeadLuna,
   mensagens: string[],
   io: Server | null,
-): Promise<void> {
+): Promise<boolean> {
   // Ritmo humano (Fatia 2.92): ~3s entre cada bolha subsequente (era 1,5s).
   // Configuravel em ConfigAgenteIA.segundosEntreMensagens; default 3. Limitado a
   // [0, 30]s para nunca travar a fila.
@@ -1577,11 +1634,13 @@ async function enviarMensagensLuna(
     if (!texto?.trim()) continue;
     if (i > 0) await esperar(intervaloMs); // intervalo natural entre bolhas
 
-    const r = await enviarPeloCanal(
+    const envioAutomatico = await enviarPeloCanalAutomatico(
       contaEvolution(conversa.instancia),
       destinoTelefone(telefone),
       { tipo: "TEXTO", texto },
     );
+    if (!envioAutomatico.executada) return false;
+    const r = envioAutomatico.resultado;
     const status = r.ok ? StatusEnvio.ENVIADA : StatusEnvio.ERRO;
     const agora = new Date();
 
@@ -1642,6 +1701,7 @@ async function enviarMensagensLuna(
     // Falha de envio: nao insiste com as proximas mensagens.
     if (!r.ok) break;
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,11 @@ import {
   destinoTelefone,
   externalIdEnviado,
 } from "./canal/envio";
+import {
+  executarMensagemAutomaticaSe,
+  mestreMensagensAutomaticasAtivo,
+} from "./mensagemAutomatica";
+import { criarLiberadorReservaRecaptacao } from "./recaptacaoReserva";
 import { nomeEfetivo } from "./cliente";
 import { normalizarTexto } from "./format";
 import { estaAbertoAgora, normalizarHorarios, diasUteisDecorridos } from "./horario";
@@ -113,6 +118,22 @@ async function pausar(campanhaId: string, motivo: string): Promise<void> {
   getIO()?.emit("recaptacao:atualizada", { campanhaId });
 }
 
+const liberarReservaRecaptacao = criarLiberadorReservaRecaptacao((args) =>
+  prisma.campanhaRecaptacao.updateMany(args),
+);
+
+async function devolverReservaRecaptacao(
+  campanhaId: string,
+  dataContadorDia: Date,
+): Promise<void> {
+  const liberada = await liberarReservaRecaptacao(campanhaId, dataContadorDia);
+  if (liberada.count === 0) {
+    console.warn(
+      `[recaptacao] reserva de cota nao encontrada para devolver (${campanhaId})`,
+    );
+  }
+}
+
 export async function processarRecaptacao(io: Server | null = null): Promise<void> {
   // Um motor por vez: um lote com jitter pode durar mais que o tick.
   if (rodando) return;
@@ -124,6 +145,11 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       orderBy: { criadoEm: "asc" },
     });
     if (!campanha) return;
+
+    if (!(await mestreMensagensAutomaticasAtivo())) {
+      await pausar(campanha.id, "mestre de mensagens automaticas desligado");
+      return;
+    }
 
     const cfg = await prisma.configuracaoCRM.findFirst({
       select: { horarios: true, fuso: true },
@@ -270,11 +296,35 @@ export async function processarRecaptacao(io: Server | null = null): Promise<voi
       const texto = renderizarMensagem(campanha.mensagemTemplate, primeiroNome);
 
       // Sai pela instancia de ORIGEM: o numero que o cliente ja conhece.
-      const r = await enviarPeloCanal(
-        contaEvolution(envio.instancia),
-        destinoTelefone(lead.telefone),
-        { tipo: "TEXTO", texto },
+      const envioAutomatico = await executarMensagemAutomaticaSe(
+        async () => {
+          const atual = await prisma.campanhaRecaptacao.findUnique({
+            where: { id: campanha.id },
+            select: { status: true },
+          });
+          return atual?.status === StatusCampanhaRecap.ARMADA;
+        },
+        () =>
+          enviarPeloCanal(
+            contaEvolution(envio.instancia),
+            destinoTelefone(lead.telefone),
+            { tipo: "TEXTO", texto },
+          ),
       );
+      if (!envioAutomatico.executada) {
+        // A vaga foi reservada antes do jitter, mas nenhum I/O ocorreu. Devolve
+        // atomicamente a cota do mesmo dia antes de pausar a campanha.
+        await devolverReservaRecaptacao(campanha.id, hoje);
+        if (envioAutomatico.motivo === "PRECONDICAO_NEGADA") return;
+        await pausar(
+          campanha.id,
+          envioAutomatico.motivo === "ERRO_PRECONDICAO"
+            ? "erro ao revalidar estado antes do envio"
+            : "mestre de mensagens automaticas desligado",
+        );
+        return;
+      }
+      const r = envioAutomatico.resultado;
       const agora = new Date();
 
       // Registra a bolha na conversa para o atendimento aparecer no inbox.
