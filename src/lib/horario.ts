@@ -14,6 +14,33 @@ const NOME_DIA: Record<string, number> = {
   Sat: 6,
 };
 
+// O ticker de SLA chama partesLocais milhares de vezes por minuto. Construir um
+// Intl.DateTimeFormat em cada data dominava o event loop; o formatador e imutavel
+// e pode ser reutilizado. Cache de uma entrada mantem memoria O(1) mesmo se este
+// helper receber varios fusos ao longo da vida do processo.
+let ultimoFormatadorPartes: {
+  fuso: string;
+  formatador: Intl.DateTimeFormat;
+} | null = null;
+
+function obterFormatadorPartesLocais(fuso: string): Intl.DateTimeFormat {
+  if (ultimoFormatadorPartes?.fuso === fuso) {
+    return ultimoFormatadorPartes.formatador;
+  }
+  const formatador = new Intl.DateTimeFormat("en-GB", {
+    timeZone: fuso,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    weekday: "short",
+  });
+  ultimoFormatadorPartes = { fuso, formatador };
+  return formatador;
+}
+
 // Converte um Json desconhecido para o array de horarios (defensivo).
 export function normalizarHorarios(valor: unknown): DiaHorario[] | null {
   if (!Array.isArray(valor)) return null;
@@ -51,16 +78,7 @@ function partesLocais(
   fuso: string,
 ): { dateKey: string; diaSemana: number; minutoDia: number } {
   try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: fuso,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-      weekday: "short",
-    }).formatToParts(d);
+    const parts = obterFormatadorPartesLocais(fuso).formatToParts(d);
     const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
     const ano = get("year");
     const mes = get("month");
