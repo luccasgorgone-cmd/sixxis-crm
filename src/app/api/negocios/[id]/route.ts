@@ -1234,11 +1234,10 @@ export async function PATCH(
         );
       }
 
-      // Integridade (Fatia 2.71/2.72/2.76): `atualizado.valor` E o TOTAL COBRADO
-      // DO CLIENTE — produtos + frete quando o cliente paga o frete, ou SO
-      // produtos quando o frete e pago pela empresa (despesa, fora do total). A
-      // conversao usa esse valor (o que o cliente realmente pagou). O eventId
-      // `purchase-${id}` mantem o dedup por negocio. NAO alterar.
+      // Integridade (Fatia 2.71/2.72/2.76): por decisao de negocio, o Meta CAPI
+      // usa `atualizado.valor` bruto (produtos + frete quando cobrado). O
+      // `valorAjustado` e exclusivo do Google Offline e NAO deve contaminar este
+      // payload. O eventId `purchase-${id}` mantem o dedup por negocio. NAO alterar.
       const valorVenda =
         atualizado.valor != null ? Number(atualizado.valor) : null;
       const eventId = `purchase-${id}`;
