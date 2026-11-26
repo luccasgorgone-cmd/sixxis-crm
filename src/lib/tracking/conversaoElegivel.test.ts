@@ -36,6 +36,10 @@ test("where do Google offline trava em finalidade=VENDA (pos-venda bloqueada)", 
 test("where do Google offline preserva os filtros historicos (sem regressao)", () => {
   const where = whereGanhosGoogleOffline();
   assert.equal(where.status, "GANHO");
-  assert.deepEqual(where.valor, { gt: 0 });
+  assert.equal(where.valor, undefined);
+  assert.deepEqual(where.OR, [
+    { valorAjustado: { gt: 0 } },
+    { valorAjustado: null, valor: { gt: 0 } },
+  ]);
   assert.deepEqual(where.lead, { googleClickId: { not: null } });
 });

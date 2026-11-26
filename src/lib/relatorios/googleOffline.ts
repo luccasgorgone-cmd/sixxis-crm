@@ -7,7 +7,7 @@
 // Contrato 1:1 com o CSV do Site (lido pelo pipe datamanager_upload do Marketing):
 //   header: gclid,data,valor,moeda,transaction_id
 //   data   = ISO com offset fixo -03:00 (Sao Paulo; Brasil sem horario de verao)
-//   valor  = 2 casas decimais (Negocio.valor, NAO valorAjustado — igual ao Meta)
+//   valor  = 2 casas decimais (valorAjustado quando nao nulo; senao valor)
 //   moeda  = BRL
 //   transaction_id = negocioId (1 linha por negocio)
 // Dialeto: separador "," · UTF-8 SEM BOM · quebra LF. O BOM quebra a coluna gclid
@@ -25,6 +25,14 @@ export interface LinhaGoogleOffline {
   valor: string; // "990.00"
   moeda: string; // "BRL"
   transactionId: string;
+}
+
+export function resolverValorGoogleOffline(n: {
+  valor: unknown;
+  valorAjustado: unknown;
+}): number {
+  const valor = Number(n.valorAjustado != null ? n.valorAjustado : n.valor);
+  return Number.isFinite(valor) ? valor : 0;
 }
 
 // Formata um Date (UTC no banco) no horario de Sao Paulo com offset fixo -03:00,
@@ -56,15 +64,17 @@ export function montarCsvGoogleOffline(linhas: LinhaGoogleOffline[]): string {
 }
 
 // Coleta os GANHOs de WhatsApp com gclid, prontos pro CSV. Filtro:
-// finalidade=VENDA · status=GANHO · lead.googleClickId != null · valor>0. A data e o criadoEm do
-// HistoricoNegocio GANHO mais recente ("houve ganho"). Negocio GANHO sem esse
-// historico e pulado (sem data confiavel — nunca fabrica data).
+// finalidade=VENDA · status=GANHO · lead.googleClickId != null · valor oficial>0.
+// A data e o criadoEm do HistoricoNegocio GANHO mais recente ("houve ganho").
+// Negocio GANHO sem esse historico e pulado (sem data confiavel — nunca fabrica
+// data).
 export async function coletarLinhasGoogleOffline(): Promise<LinhaGoogleOffline[]> {
   const negocios = await prisma.negocio.findMany({
     where: whereGanhosGoogleOffline(),
     select: {
       id: true,
       valor: true,
+      valorAjustado: true,
       lead: { select: { googleClickId: true } },
       historicos: {
         where: { tipo: TipoHistorico.GANHO },
@@ -79,8 +89,8 @@ export async function coletarLinhasGoogleOffline(): Promise<LinhaGoogleOffline[]
   for (const n of negocios) {
     const gclid = n.lead.googleClickId;
     const hist = n.historicos[0];
-    if (!gclid || !hist || n.valor == null) continue;
-    const valorNum = Number(n.valor);
+    if (!gclid || !hist) continue;
+    const valorNum = resolverValorGoogleOffline(n);
     if (!(valorNum > 0)) continue;
     linhas.push({
       gclid,

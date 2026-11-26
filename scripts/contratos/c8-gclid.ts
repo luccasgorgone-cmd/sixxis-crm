@@ -13,6 +13,7 @@ import {
   CABECALHO_GOOGLE_OFFLINE,
   montarCsvGoogleOffline,
   formatarDataGoogleAds,
+  resolverValorGoogleOffline,
 } from "../../src/lib/relatorios/googleOffline";
 
 let ok = 0;
@@ -134,6 +135,12 @@ caso("meia-noite SP usa 00, nao 24", () => {
   // 03:00:00Z == 00:00:00 em Sao Paulo
   const d = new Date("2026-10-12T03:00:00.000Z");
   assert.equal(formatarDataGoogleAds(d), "2026-10-12T00:00:00-03:00");
+});
+
+caso("valor oficial usa ajustado, fallback bruto e preserva zero ajustado", () => {
+  assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: 750 }), 750);
+  assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: null }), 1000);
+  assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: 0 }), 0);
 });
 
 console.log(`\nC8 gclid + CSV google offline: ${ok} ok, ${falhou} falha(s)`);

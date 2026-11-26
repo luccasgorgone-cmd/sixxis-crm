@@ -22,13 +22,16 @@ export function ehFinalidadeDeConversao(finalidade: Finalidade): boolean {
 /**
  * `where` dos negocios GANHOS elegiveis ao CSV de conversao offline do Google.
  * Inclui a trava de finalidade (SO VENDA) alem dos filtros historicos
- * (status GANHO, valor>0, lead com googleClickId).
+ * (status GANHO, valor oficial>0, lead com googleClickId).
  */
 export function whereGanhosGoogleOffline(): Prisma.NegocioWhereInput {
   return {
     finalidade: Finalidade.VENDA,
     status: StatusNeg.GANHO,
-    valor: { gt: 0 },
+    OR: [
+      { valorAjustado: { gt: 0 } },
+      { valorAjustado: null, valor: { gt: 0 } },
+    ],
     lead: { googleClickId: { not: null } },
   };
 }
