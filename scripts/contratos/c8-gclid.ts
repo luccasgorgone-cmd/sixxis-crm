@@ -13,6 +13,7 @@ import {
   CABECALHO_GOOGLE_OFFLINE,
   montarCsvGoogleOffline,
   formatarDataGoogleAds,
+  formatarValorGoogleOffline,
   resolverValorGoogleOffline,
 } from "../../src/lib/relatorios/googleOffline";
 
@@ -141,6 +142,23 @@ caso("valor oficial usa ajustado, fallback bruto e preserva zero ajustado", () =
   assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: 750 }), 750);
   assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: null }), 1000);
   assert.equal(resolverValorGoogleOffline({ valor: 1000, valorAjustado: 0 }), 0);
+});
+
+caso("valor ajustado decimal chega ao CSV com 2 casas", () => {
+  const csv = montarCsvGoogleOffline([
+    {
+      gclid: "CjwK-ajustado",
+      data: "2026-11-26T09:30:00-03:00",
+      valor: formatarValorGoogleOffline({ valor: 1000, valorAjustado: 750.5 }),
+      moeda: "BRL",
+      transactionId: "negocio-ajustado",
+    },
+  ]);
+  assert.equal(
+    csv,
+    "gclid,data,valor,moeda,transaction_id\n" +
+      "CjwK-ajustado,2026-11-26T09:30:00-03:00,750.50,BRL,negocio-ajustado\n",
+  );
 });
 
 console.log(`\nC8 gclid + CSV google offline: ${ok} ok, ${falhou} falha(s)`);

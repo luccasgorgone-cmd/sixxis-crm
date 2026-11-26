@@ -55,8 +55,8 @@ export function cardNegocio(n: NegocioCard) {
     leadFoto: n.lead.fotoUrl,
     leadTelefone: n.lead.telefone,
     origem: n.lead.origem,
-    // Pos-venda com desconto: mostra o valor REALMENTE cobrado (valorAjustado).
-    // Em venda valorAjustado e sempre null -> cai no valor (conversao intocada).
+    // Valor oficial: valorAjustado nao nulo manda, inclusive 0; senao usa valor.
+    // O Meta CAPI continua usando o valor bruto intencionalmente.
     valor:
       n.valorAjustado != null
         ? Number(n.valorAjustado)

@@ -35,6 +35,13 @@ export function resolverValorGoogleOffline(n: {
   return Number.isFinite(valor) ? valor : 0;
 }
 
+export function formatarValorGoogleOffline(n: {
+  valor: unknown;
+  valorAjustado: unknown;
+}): string {
+  return resolverValorGoogleOffline(n).toFixed(2);
+}
+
 // Formata um Date (UTC no banco) no horario de Sao Paulo com offset fixo -03:00,
 // identico ao CSV do Site (ex.: 2026-10-11T15:19:08-03:00). hourCycle h23 evita
 // "24" na meia-noite; en-CA garante YYYY-MM-DD.
@@ -95,7 +102,7 @@ export async function coletarLinhasGoogleOffline(): Promise<LinhaGoogleOffline[]
     linhas.push({
       gclid,
       data: formatarDataGoogleAds(hist.criadoEm),
-      valor: valorNum.toFixed(2),
+      valor: formatarValorGoogleOffline(n),
       moeda: "BRL",
       transactionId: n.id,
     });

@@ -707,9 +707,8 @@ model Negocio {
   // conversao Meta CAPI ao marcar GANHO. valorProdutos = soma dos itens.
   valor         Decimal?           @db.Decimal(12, 2)
   valorProdutos Decimal?           @db.Decimal(12, 2)
-  // Valor final REALMENTE cobrado quando houve desconto/acrescimo no fechamento
-  // de pos-venda (pecas). null = vale o calculado (itens cobraveis + frete). O
-  // valor da venda (Meta CAPI) continua em `valor`; este e so o ajuste manual.
+  // Valor efetivo quando preenchido, inclusive 0; null = usa `valor`. Essa
+  // precedencia e canonica; o Meta CAPI usa `valor` bruto intencionalmente.
   valorAjustado Decimal?           @db.Decimal(12, 2)
   // Modelo do aparelho que o CLIENTE possui, marcado no atendimento de pos-venda
   // (Fatia 3.06). Filtra as pecas compativeis no bloco "Pecas necessarias".
